@@ -16,6 +16,8 @@ export const IPC_CHANNELS = {
   workspaceClose: 'workspace:close',
   workspaceGet: 'workspace:get',
   workspaceStructures: 'workspace:structures',
+  /** The Minecraft version of the active content pack (from its version.json). */
+  contentVersion: 'content:version',
   /** Activate a known/detected workspace (payload Workspace) — returns it or null if stale. */
   workspaceActivate: 'workspace:activate',
   /** Detect whether a `.nbt` path belongs to a mod project — returns a Workspace or null. */

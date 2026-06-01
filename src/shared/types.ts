@@ -172,6 +172,8 @@ export interface BlockwrightApi {
   openWorkspace: () => Promise<Workspace | null>;
   closeWorkspace: () => Promise<null>;
   getWorkspace: () => Promise<Workspace | null>;
+  /** Minecraft version of the active content pack (its version.json), or null. */
+  getContentVersion: () => Promise<string | null>;
   /** Activate a known/detected workspace; returns it, or null if it no longer exists. */
   activateWorkspace: (workspace: Workspace) => Promise<Workspace | null>;
   /** Detect whether a `.nbt` path belongs to a mod project (returns its Workspace or null). */

@@ -16,9 +16,10 @@ import { renderStatus, resetStatus, setStatus } from './ui/statusbar';
 import { JigsawController } from './jigsaw';
 import { isJigsawSupported } from '@/shared/mc-version';
 
-/** The bundled vanilla content pack is 1.21.1, so loose (non-workspace)
- *  structures are treated as that version for jigsaw support. */
-const BUNDLED_VERSION = '1.21.1';
+/** Fallback for the content pack's version until main reports the real one
+ *  (read from its version.json) — loose (non-workspace) structures are gated on
+ *  this for jigsaw support. The bundled pack is 1.21.1. */
+const FALLBACK_CONTENT_VERSION = '1.21.1';
 
 const api = window.blockwright;
 
@@ -26,6 +27,10 @@ export class App {
   private readonly state = store.getState();
   private readonly settings: SettingsModal = mountSettingsModal();
   private readonly jigsaw: JigsawController;
+  /** Version of the active content pack, resolved from main once at startup. */
+  private contentVersion: string | null = FALLBACK_CONTENT_VERSION;
+  /** Active workspace's structures, sorted by display name (filtered by search). */
+  private workspaceStructurePaths: string[] = [];
 
   constructor(
     private shell: Shell,
@@ -46,6 +51,9 @@ export class App {
     for (const btn of this.shell.openButtons) {
       btn.addEventListener('click', () => this.open());
     }
+    this.shell.workspaceStructuresSearch.addEventListener('input', () =>
+      this.renderWorkspaceStructureList(),
+    );
     this.shell.recentsClear.addEventListener('click', () => this.clearRecents());
     this.shell.recentWorkspacesClear.addEventListener('click', () => api.clearRecentWorkspaces());
     this.shell.openWorkspaceButton.addEventListener('click', () => api.openWorkspace());
@@ -118,17 +126,42 @@ export class App {
     this.state.setWorkspaceStructures(await api.listWorkspaceStructures());
   }
 
-  /** Render the active workspace's structures on the welcome screen. */
+  /** Receive the active workspace's structures, sort them by display name, and
+   *  render (the search box filters this cached list without re-fetching). */
   private renderWorkspaceStructures(paths: string[]) {
-    const { workspaceStructures, workspaceStructuresHead, workspaceStructuresList } = this.shell;
-    if (paths.length === 0) {
+    this.workspaceStructurePaths = [...paths].sort((a, b) =>
+      basename(a).localeCompare(basename(b)),
+    );
+    const { workspaceStructures, workspaceStructuresSearch, workspaceStructuresList } = this.shell;
+    if (this.workspaceStructurePaths.length === 0) {
       workspaceStructures.classList.add('hidden');
       workspaceStructuresList.innerHTML = '';
       return;
     }
     workspaceStructures.classList.remove('hidden');
-    workspaceStructuresHead.textContent = `Workspace structures · ${paths.length}`;
-    workspaceStructuresList.innerHTML = paths
+    workspaceStructuresSearch.value = ''; // fresh workspace → clear any stale query
+    this.renderWorkspaceStructureList();
+  }
+
+  /** Render the (alphabetical) workspace structures, filtered by the search box. */
+  private renderWorkspaceStructureList() {
+    const { workspaceStructuresHead, workspaceStructuresList, workspaceStructuresSearch } =
+      this.shell;
+    const total = this.workspaceStructurePaths.length;
+    const query = workspaceStructuresSearch.value.trim().toLowerCase();
+    const matches = query
+      ? this.workspaceStructurePaths.filter((p) => basename(p).toLowerCase().includes(query))
+      : this.workspaceStructurePaths;
+
+    workspaceStructuresHead.textContent = query
+      ? `Workspace structures · ${matches.length}/${total}`
+      : `Workspace structures · ${total}`;
+
+    if (matches.length === 0) {
+      workspaceStructuresList.innerHTML = `<li class="recents-empty">No structures match “${escapeHtml(query)}”.</li>`;
+      return;
+    }
+    workspaceStructuresList.innerHTML = matches
       .map(
         (p) => `<li class="recent-row" title="${escapeHtml(p)}">
           <span class="recent-name">${escapeHtml(basename(p))}</span>
@@ -136,7 +169,7 @@ export class App {
       )
       .join('');
     workspaceStructuresList.querySelectorAll<HTMLElement>('.recent-row').forEach((row, i) => {
-      row.addEventListener('click', () => this.load(paths[i]));
+      row.addEventListener('click', () => this.load(matches[i]));
     });
   }
 
@@ -177,7 +210,7 @@ export class App {
   private updateJigsaw() {
     const { structure, workspace } = store.getState();
     if (!structure) return;
-    const version = workspace ? workspace.minecraftVersion : BUNDLED_VERSION;
+    const version = workspace ? workspace.minecraftVersion : this.contentVersion;
     this.jigsaw.setStructure(structure, isJigsawSupported(version), version);
   }
 
@@ -324,6 +357,15 @@ export class App {
 
   /** Hint on the empty state whether a content pack is available. */
   private async probeContent() {
+    // Pick up the content pack's real version (from its version.json) so loose
+    // files gate on it rather than a hardcoded guess; keep the fallback if null.
+    const version = await api.getContentVersion();
+    if (version) {
+      this.contentVersion = version;
+      // Re-gate an already-open loose file now that we know the real version.
+      if (!store.getState().workspace) this.updateJigsaw();
+    }
+
     const hint = this.shell.contentHint;
     if (!hint) return;
     const present = await api.hasTexture('minecraft/block/stone');

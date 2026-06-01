@@ -22,6 +22,7 @@ const api: BlockwrightApi = {
   openWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceOpen),
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
   getWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
+  getContentVersion: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentVersion),
   activateWorkspace: (ws: Workspace): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),
   detectFileWorkspace: (path: string): Promise<Workspace | null> =>

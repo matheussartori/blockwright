@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import type { AssembleOptions, Workspace } from '@/shared/types';
 import { IPC_CHANNELS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
-import { getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
+import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
 import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
@@ -67,6 +67,7 @@ export function registerIpc(): void {
     return null;
   });
   ipcMain.handle(IPC_CHANNELS.workspaceGet, async () => getActiveWorkspace());
+  ipcMain.handle(IPC_CHANNELS.contentVersion, async () => contentPackVersion());
   ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
     listWorkspaceStructures(getActiveWorkspace()),
   );

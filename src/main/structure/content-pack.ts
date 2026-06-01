@@ -5,6 +5,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Workspace } from '@/shared/types';
+import { detectMcVersion } from '../mc-version-detect';
 
 let activeWorkspace: Workspace | null = null;
 
@@ -26,6 +27,13 @@ export function contentDir(): string {
         path.join(process.cwd(), 'content'),
       ];
   return candidates.find((c) => fs.existsSync(c)) ?? candidates[0];
+}
+
+/** The Minecraft version of the active content pack, read from its `version.json`
+ *  (or `pack.mcmeta` format). Loose vanilla files are gated on this rather than a
+ *  hardcoded version, so pointing BW_CONTENT at another extraction Just Works. */
+export function contentPackVersion(): string | null {
+  return detectMcVersion(contentDir());
 }
 
 /** The resources root that owns a namespace: the workspace for its own namespace,

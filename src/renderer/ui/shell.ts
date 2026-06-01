@@ -22,6 +22,7 @@ export interface Shell {
   /** Welcome-screen list of the active workspace's structures (hidden when none). */
   workspaceStructures: HTMLElement;
   workspaceStructuresHead: HTMLElement;
+  workspaceStructuresSearch: HTMLInputElement;
   workspaceStructuresList: HTMLElement;
   /** Top-left navigation cheatsheet shown while a structure is open. */
   controlsHelp: HTMLElement;
@@ -63,6 +64,8 @@ const TEMPLATE = `
           <div class="recents-head">
             <span id="workspace-structures-head">Workspace structures</span>
           </div>
+          <input id="workspace-structures-search" class="recents-search" type="search"
+                 placeholder="Search structures…" autocomplete="off" spellcheck="false" />
           <ul id="workspace-structures-list" class="recents-list"></ul>
         </div>
         <div class="recents-cols">
@@ -144,6 +147,7 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     openWorkspaceButton: byId('open-workspace'),
     workspaceStructures: byId('workspace-structures'),
     workspaceStructuresHead: byId('workspace-structures-head'),
+    workspaceStructuresSearch: byId('workspace-structures-search') as HTMLInputElement,
     workspaceStructuresList: byId('workspace-structures-list'),
     controlsHelp: byId('controls-help'),
     controlsMode: byId('controls-mode'),

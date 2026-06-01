@@ -68,6 +68,14 @@ function fromGradle(resourcesRoot: string): string | null {
   return parseMcVersion(line?.[1]);
 }
 
+/** An extracted/generated vanilla pack ships a `version.json` whose `id`/`name`
+ *  is the exact Minecraft version (e.g. {"id":"1.21.1",...}). This is the most
+ *  authoritative source when present, so it's tried first. */
+function fromVersionJson(resourcesRoot: string): string | null {
+  const json = parseJson(path.join(resourcesRoot, 'version.json'));
+  return parseMcVersion((json?.id ?? json?.name) as string | undefined);
+}
+
 function fromPackMeta(resourcesRoot: string): string | null {
   const json = parseJson(path.join(resourcesRoot, 'pack.mcmeta'));
   const pack = json?.pack as Record<string, unknown> | undefined;
@@ -75,10 +83,12 @@ function fromPackMeta(resourcesRoot: string): string | null {
   return format !== undefined ? (PACK_FORMAT_VERSION[format] ?? null) : null;
 }
 
-/** Detect the Minecraft version a workspace targets, or null if undeterminable.
- *  `resourcesRoot` is the workspace's `root` (the dir that owns `assets/`/`data/`). */
+/** Detect the Minecraft version a workspace or content pack targets, or null if
+ *  undeterminable. `resourcesRoot` is the dir that owns `assets/`/`data/` — for a
+ *  mod its project/resources root, for the vanilla pack the content-pack dir. */
 export function detectMcVersion(resourcesRoot: string): string | null {
   return (
+    fromVersionJson(resourcesRoot) ??
     fromFabric(resourcesRoot) ??
     fromForgeToml(resourcesRoot) ??
     fromGradle(resourcesRoot) ??
