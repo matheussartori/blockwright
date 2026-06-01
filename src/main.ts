@@ -6,6 +6,7 @@ import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-p
 import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
 import { buildAppMenu } from '@/main/app-menu';
+import { applyWorkspace, detectWorkspace } from '@/main/workspace';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -24,6 +25,11 @@ app.on('open-file', (event, filePath) => {
 app.on('ready', () => {
   registerTextureProtocol();
   registerIpc();
+  // Dev-only: activate a mod workspace on startup (used for automated checks).
+  if (process.env.BW_WORKSPACE) {
+    const ws = detectWorkspace(process.env.BW_WORKSPACE);
+    if (ws) applyWorkspace(ws);
+  }
   createWindow();
   buildAppMenu();
 });

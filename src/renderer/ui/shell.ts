@@ -13,6 +13,10 @@ export interface Shell {
   recents: HTMLElement;
   recentsList: HTMLElement;
   recentsClear: HTMLElement;
+  /** Welcome-screen button that opens a mod workspace. */
+  openWorkspaceButton: HTMLElement;
+  /** Bottom-left badge shown while a workspace is active. */
+  workspaceBadge: HTMLElement;
 }
 
 const TEMPLATE = `
@@ -34,7 +38,10 @@ const TEMPLATE = `
         <h1>View Minecraft structures in 3D</h1>
         <p>Open an <code>.nbt</code> file to render it from your content pack —
            or drop one anywhere on this window.</p>
-        <button id="open-empty" class="btn primary lg">Open NBT file</button>
+        <div class="empty-actions">
+          <button id="open-empty" class="btn primary lg">Open NBT file</button>
+          <button id="open-workspace" class="btn lg">Open mod workspace…</button>
+        </div>
         <p class="hint" id="content-hint"></p>
         <div id="recents" class="recents hidden">
           <div class="recents-head">
@@ -46,6 +53,7 @@ const TEMPLATE = `
       </div>
     </div>
     <div id="loading" class="loading hidden"><div class="spinner"></div></div>
+    <div id="workspace-badge" class="workspace-badge hidden"></div>
   </main>
   <footer class="statusbar" id="statusbar">
     <span class="muted">No file loaded</span>
@@ -69,5 +77,7 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     recents: byId('recents'),
     recentsList: byId('recents-list'),
     recentsClear: byId('recents-clear'),
+    openWorkspaceButton: byId('open-workspace'),
+    workspaceBadge: byId('workspace-badge'),
   };
 }

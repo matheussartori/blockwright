@@ -66,13 +66,27 @@ export interface StructureData {
   blockCount: number;
 }
 
+/** An opened mod project whose assets augment the base content pack. */
+export interface Workspace {
+  /** Display name (the chosen project folder's basename). */
+  name: string;
+  /** Resources root that contains `assets/` and `data/` (e.g. .../src/main/resources). */
+  root: string;
+  /** The mod's asset namespace, e.g. "theplacebeyond". */
+  namespace: string;
+}
+
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
   openDialog: () => Promise<string | null>;
   loadStructure: (path: string) => Promise<StructureData>;
-  /** Build a texture URL served by the custom protocol. */
+  /** Build a texture URL served by the custom protocol. Key is "namespace/path". */
   textureUrl: (key: string) => string;
   hasTexture: (key: string) => Promise<boolean>;
+  /** Open a mod workspace (directory picker); returns the active workspace or null. */
+  openWorkspace: () => Promise<Workspace | null>;
+  closeWorkspace: () => Promise<null>;
+  getWorkspace: () => Promise<Workspace | null>;
   /** Whether a path still exists on disk (used to validate recents before opening). */
   pathExists: (path: string) => Promise<boolean>;
   /** Recently opened files, most-recent first. All return the updated list. */
@@ -84,6 +98,8 @@ export interface BlockwrightApi {
   onFileDrop: (cb: (path: string) => void) => void;
   /** Notified when the recents list changes in main (e.g. via the native menu). */
   onRecentsChanged: (cb: (paths: string[]) => void) => void;
+  /** Notified when the active mod workspace changes (opened or closed). */
+  onWorkspaceChanged: (cb: (workspace: Workspace | null) => void) => void;
 }
 
 declare global {

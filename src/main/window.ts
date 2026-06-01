@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { IPC_EVENTS } from '@/shared/ipc';
 import { getRecents } from './recents';
+import { getActiveWorkspace } from './structure/content-pack';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
@@ -35,9 +36,26 @@ export async function openFileDialog(): Promise<string | null> {
   return result.canceled ? null : result.filePaths[0];
 }
 
+/** Show the native directory picker for choosing a mod workspace. */
+export async function openDirectoryDialog(): Promise<string | null> {
+  const options: OpenDialogOptions = {
+    title: 'Open mod workspace',
+    properties: ['openDirectory'],
+  };
+  const result = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  return result.canceled ? null : result.filePaths[0];
+}
+
 /** Push the current recents list to the renderer (keeps the welcome view in sync). */
 export function notifyRecents(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());
+}
+
+/** Push the active workspace to the renderer (drives the workspace badge). */
+export function notifyWorkspace(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.workspaceChanged, getActiveWorkspace());
 }
 
 export function createWindow(): BrowserWindow {

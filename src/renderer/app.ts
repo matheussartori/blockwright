@@ -1,6 +1,7 @@
 // Application orchestration for the renderer: wires UI controls and the file
 // open/load flow to the 3D viewer and the inspector/status panels.
 import type { Viewer } from './viewer/viewer';
+import type { Workspace } from '@/shared/types';
 import type { Shell } from './ui/shell';
 import { escapeHtml } from './ui/html';
 import { basename, dirname } from './ui/path';
@@ -19,6 +20,11 @@ export class App {
     this.wire();
     this.probeContent();
     void this.initRecents();
+    void this.initWorkspace();
+  }
+
+  private async initWorkspace() {
+    this.renderWorkspace(await api.getWorkspace());
   }
 
   private wire() {
@@ -26,6 +32,7 @@ export class App {
       btn.addEventListener('click', () => this.open());
     }
     this.shell.recentsClear.addEventListener('click', () => this.clearRecents());
+    this.shell.openWorkspaceButton.addEventListener('click', () => api.openWorkspace());
 
     api.onOpenPath((path) => this.load(path));
     api.onFileDrop((path) => this.load(path));
@@ -35,6 +42,24 @@ export class App {
       this.recents = paths;
       this.renderRecents();
     });
+    // Workspace is owned by main (File menu or welcome button); the badge tracks it.
+    api.onWorkspaceChanged((ws) => this.renderWorkspace(ws));
+  }
+
+  /** Show/hide the bottom-left workspace badge with the project name. */
+  private renderWorkspace(ws: Workspace | null) {
+    const badge = this.shell.workspaceBadge;
+    if (!ws) {
+      badge.classList.add('hidden');
+      badge.innerHTML = '';
+      return;
+    }
+    badge.classList.remove('hidden');
+    badge.innerHTML = `
+      <span class="ws-dot"></span>
+      <span class="ws-label">Workspace</span>
+      <span class="ws-name">${escapeHtml(ws.name)}</span>`;
+    badge.title = `${ws.namespace} · ${ws.root}`;
   }
 
   private async open() {
@@ -109,7 +134,7 @@ export class App {
   private async probeContent() {
     const hint = this.shell.contentHint;
     if (!hint) return;
-    const present = await api.hasTexture('block/stone');
+    const present = await api.hasTexture('minecraft/block/stone');
     hint.textContent = present
       ? '✓ Content pack detected — full textures available'
       : 'No content pack found — blocks will render as flat colors';

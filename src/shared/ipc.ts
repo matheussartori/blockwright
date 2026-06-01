@@ -12,6 +12,9 @@ export const IPC_CHANNELS = {
   recentsAdd: 'recents:add',
   recentsRemove: 'recents:remove',
   recentsClear: 'recents:clear',
+  workspaceOpen: 'workspace:open',
+  workspaceClose: 'workspace:close',
+  workspaceGet: 'workspace:get',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -19,4 +22,6 @@ export const IPC_EVENTS = {
   openPath: 'open-path',
   /** Recents list changed in main (e.g. via the native menu) — payload is the new list. */
   recentsChanged: 'recents-changed',
+  /** Active mod workspace changed — payload is the Workspace or null. */
+  workspaceChanged: 'workspace-changed',
 } as const;

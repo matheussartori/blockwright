@@ -11,9 +11,12 @@ import { assetsDir, loadJson } from './content-pack';
 
 export const FACES: FaceDir[] = ['down', 'up', 'north', 'south', 'east', 'west'];
 
-/** Strip the "minecraft:" namespace from a resource reference. */
-export function bare(ref: string): string {
-  return ref.replace(/^minecraft:/, '');
+/** Split a resource reference into its namespace and path (default "minecraft"). */
+export function parseRef(ref: string): { namespace: string; path: string } {
+  const colon = ref.indexOf(':');
+  return colon >= 0
+    ? { namespace: ref.slice(0, colon), path: ref.slice(colon + 1) }
+    : { namespace: 'minecraft', path: ref };
 }
 
 interface RawModel {
@@ -29,14 +32,21 @@ interface RawElement {
 
 const modelCache = new Map<string, RawModel | null>();
 
-/** Walk the parent chain, merging textures (child wins) and inheriting elements. */
+/** Drop cached models (call when the active workspace changes). */
+export function clearModelCache(): void {
+  modelCache.clear();
+}
+
+/** Walk the parent chain, merging textures (child wins) and inheriting elements.
+ *  Refs are namespace-qualified, so a mod model can extend a `minecraft:` parent. */
 function loadModel(ref: string, seen = new Set<string>()): RawModel | null {
-  const key = bare(ref);
+  const { namespace, path: rel } = parseRef(ref);
+  const key = `${namespace}:${rel}`;
   if (modelCache.has(key)) return modelCache.get(key) ?? null;
   if (seen.has(key)) return null;
   seen.add(key);
 
-  const file = path.join(assetsDir(), 'models', `${key}.json`);
+  const file = path.join(assetsDir(namespace), 'models', `${rel}.json`);
   const json = loadJson(file) as
     | { parent?: string; textures?: Record<string, string>; elements?: RawElement[] }
     | null;
@@ -54,12 +64,17 @@ function loadModel(ref: string, seen = new Set<string>()): RawModel | null {
   return resolved;
 }
 
-/** Follow "#ref" texture indirection to a concrete texture key. */
+/** Follow "#ref" indirection to a concrete, namespace-qualified texture key
+ *  ("namespace/path") that the texture protocol can serve. */
 function resolveTexture(ref: string | undefined, textures: Record<string, string>): string | null {
   let cur = ref;
   for (let i = 0; i < 10 && cur; i++) {
-    if (!cur.startsWith('#')) return bare(cur);
-    cur = textures[cur.slice(1)];
+    if (cur.startsWith('#')) {
+      cur = textures[cur.slice(1)];
+      continue;
+    }
+    const { namespace, path: rel } = parseRef(cur);
+    return `${namespace}/${rel}`;
   }
   return null;
 }

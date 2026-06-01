@@ -3,7 +3,7 @@
 import path from 'node:path';
 import type { ResolvedModel } from '@/shared/types';
 import { assetsDir, loadJson } from './content-pack';
-import { bare, buildResolvedModel } from './model-loader';
+import { buildResolvedModel, parseRef } from './model-loader';
 
 const AIR = new Set([
   'minecraft:air',
@@ -56,8 +56,8 @@ export function resolveBlock(
   name: string,
   properties: Record<string, string> = {},
 ): ResolvedModel[] {
-  const key = bare(name);
-  const file = path.join(assetsDir(), 'blockstates', `${key}.json`);
+  const { namespace, path: key } = parseRef(name);
+  const file = path.join(assetsDir(namespace), 'blockstates', `${key}.json`);
   const state = loadJson(file) as
     | { variants?: Record<string, VariantModel | VariantModel[]>; multipart?: { when?: MultipartWhen; apply: VariantModel | VariantModel[] }[] }
     | null;

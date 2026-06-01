@@ -1,12 +1,13 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
 import { IPC_CHANNELS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
-import { textureFile } from './structure/content-pack';
+import { getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
+import { applyWorkspace, promptOpenWorkspace } from './workspace';
 import { openFileDialog } from './window';
-import { refreshMenu } from './app-menu';
+import { buildAppMenu, refreshMenu } from './app-menu';
 
 export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
@@ -16,7 +17,8 @@ export function registerIpc(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.hasTexture, async (_e, key: string) => {
-    return fs.existsSync(textureFile(key));
+    const resolved = resolveTextureFile(key);
+    return !!resolved && fs.existsSync(resolved.file);
   });
 
   ipcMain.handle(IPC_CHANNELS.pathExists, async (_e, filePath: string) => {
@@ -41,4 +43,17 @@ export function registerIpc(): void {
     refreshMenu();
     return list;
   });
+
+  ipcMain.handle(IPC_CHANNELS.workspaceOpen, async () => {
+    const { workspace, error } = await promptOpenWorkspace();
+    if (error) dialog.showErrorBox('Open mod workspace', error);
+    buildAppMenu(); // reflect the active workspace in the File menu
+    return workspace;
+  });
+  ipcMain.handle(IPC_CHANNELS.workspaceClose, async () => {
+    applyWorkspace(null);
+    buildAppMenu();
+    return null;
+  });
+  ipcMain.handle(IPC_CHANNELS.workspaceGet, async () => getActiveWorkspace());
 }

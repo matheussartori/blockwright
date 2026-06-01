@@ -2,7 +2,7 @@
 // to the renderer under a strict CSP (bw-texture://block/stone.png).
 import { protocol } from 'electron';
 import fs from 'node:fs';
-import { textureFile, texturesDir } from './structure/content-pack';
+import { resolveTextureFile } from './structure/content-pack';
 
 export const TEXTURE_SCHEME = 'bw-texture';
 
@@ -27,16 +27,18 @@ export function registerTextureScheme(): void {
 
 /** Wire up the request handler. Call after `app.ready`. */
 export function registerTextureProtocol(): void {
-  const root = texturesDir();
   protocol.handle(TEXTURE_SCHEME, async (request) => {
-    // bw-texture://block/stone.png -> <textures>/block/stone.png
+    // bw-texture://asset/<namespace>/<path>.png -> <ns textures>/<path>.png.
+    // The namespace lives in the path (not the host) so underscores are allowed.
     const url = new URL(request.url);
-    const key = decodeURIComponent(url.host + url.pathname).replace(/\.png$/, '');
-    const file = textureFile(key);
-    if (!file.startsWith(root) || !fs.existsSync(file)) {
+    const key = decodeURIComponent(url.pathname).replace(/^\//, '').replace(/\.png$/, '');
+    const resolved = resolveTextureFile(key);
+    // Resolution is per-request so it tracks the active workspace, and the
+    // prefix check keeps "../" keys from escaping the namespace root.
+    if (!resolved || !resolved.file.startsWith(resolved.root) || !fs.existsSync(resolved.file)) {
       return new Response(null, { status: 404 });
     }
-    const data = await fs.promises.readFile(file);
+    const data = await fs.promises.readFile(resolved.file);
     return new Response(data, {
       headers: {
         'content-type': 'image/png',

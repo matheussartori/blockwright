@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as nbt from 'prismarine-nbt';
 import type { PaletteEntry, StructureData } from '@/shared/types';
-import { hasContent } from './content-pack';
+import { getActiveWorkspace, hasContent } from './content-pack';
 import { collectTextures } from './model-loader';
 import { isAir, resolveBlock } from './blockstate-resolver';
 import { fallbackColor } from './fallback-color';
@@ -28,12 +28,15 @@ export async function loadStructure(filePath: string): Promise<StructureData> {
   };
 
   const withContent = hasContent();
+  // Resolve models if the vanilla pack is present or a mod workspace is open
+  // (workspace structures reference both mod and vanilla blocks).
+  const canResolve = withContent || getActiveWorkspace() !== null;
   const size = (root.size ?? [0, 0, 0]) as [number, number, number];
 
   const palette: PaletteEntry[] = (root.palette ?? []).map((raw) => {
     const properties = normalizeProps(raw.Properties);
     const air = isAir(raw.Name);
-    const models = !air && withContent ? resolveBlock(raw.Name, properties) : [];
+    const models = !air && canResolve ? resolveBlock(raw.Name, properties) : [];
     return {
       name: raw.Name,
       properties,
