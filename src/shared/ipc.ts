@@ -34,6 +34,8 @@ export const IPC_CHANNELS = {
   setFileOpen: 'file:set-open',
   /** Renderer reports its floating-window state so the View menu checkmarks stay in sync. */
   windowsReport: 'windows:report',
+  /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
+  captureConfig: 'capture:config',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */

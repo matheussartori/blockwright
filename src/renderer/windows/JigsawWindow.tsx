@@ -63,6 +63,31 @@ export function JigsawWindow({ available }: { available: boolean }) {
     setCandidates(null);
   }, [structure?.path]);
 
+  // Dev-only (BW_ASSEMBLE): once the structure + viewer are ready, auto-run a
+  // full assembly so the headless capture screenshots a village, not just the
+  // root piece. Runs once per structure path.
+  const autoRan = useRef<string | null>(null);
+  useEffect(() => {
+    if (!viewer || !structure || !supported) return;
+    if (autoRan.current === structure.path) return;
+    autoRan.current = structure.path;
+    void (async () => {
+      const cfg = await api.captureAssemble();
+      if (!cfg) return;
+      const plan = await api.assembleJigsaw(structure.path, { seed: cfg.seed, maxDepth: cfg.depth });
+      const pieces = await Promise.all(
+        plan.pieces.map(async (p) => ({
+          data: await api.loadStructure(p.structurePath),
+          offset: p.offset,
+          quarterTurns: p.quarterTurns,
+        })),
+      );
+      await viewer.showAssembly(pieces);
+      setPieceCount(plan.pieces.length);
+      setWarnings(plan.warnings);
+    })();
+  }, [viewer, structure?.path, supported]);
+
   if (!structure) return null;
 
   const loadData = (path: string): Promise<StructureData> => {

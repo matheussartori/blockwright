@@ -104,4 +104,12 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.windowsReport, async (_e, state: WindowsReport) =>
     setWindowsState(state),
   );
+
+  // Dev-only: the headless capture sets BW_ASSEMBLE so the renderer auto-runs a
+  // full assembly. Read from main's env (a sandboxed preload can't see it).
+  ipcMain.handle(IPC_CHANNELS.captureConfig, async () =>
+    process.env.BW_ASSEMBLE
+      ? { depth: Number(process.env.BW_ASSEMBLE_DEPTH) || 6, seed: Number(process.env.BW_ASSEMBLE_SEED) || 1 }
+      : null,
+  );
 }

@@ -16,6 +16,7 @@ import type {
   PlacedPiece,
 } from '@/shared/types';
 import {
+  type Aabb,
   type Placement,
   aabbOverlap,
   makeRng,
@@ -26,7 +27,7 @@ import {
   solveAttachment,
 } from '@/shared/jigsaw';
 import { loadStructureMeta, type StructureMeta } from './load-structure';
-import { resolvePool, type ResolvedPoolElement } from './template-pool';
+import { resolvePool, type ResolvedPool, type ResolvedPoolElement } from './template-pool';
 
 const EMPTY_POOL = 'minecraft:empty';
 /** Hard cap so a self-recursive pool can't plan forever. */
@@ -41,6 +42,7 @@ interface PlacedNode {
   piece: PlacedPiece;
   meta: StructureMeta;
   placement: Placement;
+  box: Aabb;
 }
 
 /**
@@ -77,13 +79,14 @@ class Assembler {
     const rootMeta = await this.meta(rootPath);
     await this.validate(rootMeta, rootId);
 
+    const rootPl = rootPlacement();
     const root: PlacedNode = {
       piece: { id: 'root', structureId: rootId, structurePath: rootPath, offset: [0, 0, 0], quarterTurns: 0, depth: 0 },
       meta: rootMeta,
-      placement: rootPlacement(),
+      placement: rootPl,
+      box: pieceAabb(rootMeta.size, rootPl),
     };
     const placed: PlacedNode[] = [root];
-    const aabbs = [pieceAabb(rootMeta.size, root.placement)];
 
     // Breadth-first by depth; connectors with higher selection priority first.
     let frontier: PlacedNode[] = [root];
@@ -96,10 +99,9 @@ class Assembler {
           .sort((a, b) => b.selectionPriority - a.selectionPriority);
         for (const connector of connectors) {
           if (placed.length >= MAX_PIECES) break;
-          const child = await this.tryAttach(connector, node, rng, aabbs, placed.length, depth + 1);
+          const child = await this.tryAttach(connector, node, rng, placed, placed.length, depth + 1);
           if (child) {
             placed.push(child);
-            aabbs.push(pieceAabb(child.meta.size, child.placement));
             next.push(child);
           }
         }
@@ -114,20 +116,46 @@ class Assembler {
     return { pieces: placed.map((n) => n.piece), warnings: this.warnings };
   }
 
-  /** Attach a child to `connector`, trying pool elements in weighted-random order
-   *  until one fits without overlapping. Returns null when none can attach. */
+  /** Attach a child to `connector`. Tries the connector's pool first; if the dice
+   *  land on an `empty` element the slot is left bare (as in worldgen), and if no
+   *  piece fits, the pool's `fallback` (usually terminators) gets a turn. Returns
+   *  null when the slot ends up empty. */
   private async tryAttach(
     connector: JigsawConnector,
     parent: PlacedNode,
     rng: () => number,
-    aabbs: ReturnType<typeof pieceAabb>[],
+    placed: PlacedNode[],
     nextIndex: number,
     depth: number,
   ): Promise<PlacedNode | null> {
     const pool = resolvePool(connector.pool);
+    const result = await this.attachFromPool(pool, connector, parent, rng, placed, nextIndex, depth);
+    if (result === 'empty') return null; // terminated cleanly — no fallback
+    if (result !== 'none') return result; // a piece fit
+    // Nothing fit; cap the slot with the fallback pool (terminators).
+    if (pool.fallback && pool.fallback !== EMPTY_POOL) {
+      const fb = await this.attachFromPool(resolvePool(pool.fallback), connector, parent, rng, placed, nextIndex, depth);
+      if (fb !== 'empty' && fb !== 'none') return fb;
+    }
+    return null;
+  }
+
+  /** Try to place one piece from `pool` onto `connector`, in weighted-random
+   *  order. Returns the placed node, or 'empty' when the pick was a terminal
+   *  element (leave the slot bare), or 'none' when nothing fit. */
+  private async attachFromPool(
+    pool: ResolvedPool,
+    connector: JigsawConnector,
+    parent: PlacedNode,
+    rng: () => number,
+    placed: PlacedNode[],
+    nextIndex: number,
+    depth: number,
+  ): Promise<PlacedNode | 'empty' | 'none'> {
     for (const el of weightedOrder(pool.elements, rng)) {
+      if (el.empty) return 'empty';
       if (!el.structurePath) {
-        this.warn('missing-structure', `Template ${el.structureId} (pool ${connector.pool}) was not found.`);
+        this.warn('missing-structure', `Template ${el.structureId} (pool ${pool.id}) was not found.`);
         continue;
       }
       const childMeta = await this.meta(el.structurePath);
@@ -138,7 +166,10 @@ class Assembler {
         );
         if (!placement) continue;
         const box = pieceAabb(childMeta.size, placement);
-        if (aabbs.some((a) => aabbOverlap(a, box))) continue;
+        // Reject overlaps with other pieces, but not with the parent: a child
+        // intentionally interpenetrates the piece it attaches to (a house's
+        // entrance reaches into the street, on-surface decor sits in the plaza).
+        if (placed.some((n) => n !== parent && aabbOverlap(n.box, box))) continue;
         return {
           piece: {
             id: `p${nextIndex}`,
@@ -150,10 +181,11 @@ class Assembler {
           },
           meta: childMeta,
           placement,
+          box,
         };
       }
     }
-    return null;
+    return 'none';
   }
 
   // --- Manual mode: candidates for a single connector ------------------------
@@ -204,8 +236,11 @@ class Assembler {
         this.warn('empty-pool', `Pool ${c.pool} has no placeable elements.`);
         continue;
       }
-      let targetMatched = false;
+      // An `empty` element is a valid terminal outcome, so a pool with one can
+      // always "satisfy" the connector even if no piece carries the target name.
+      let targetMatched = pool.elements.some((el) => el.empty);
       for (const el of pool.elements) {
+        if (el.empty) continue;
         if (!el.structurePath) {
           this.warn('missing-structure', `Template ${el.structureId} (pool ${c.pool}) was not found.`);
           continue;

@@ -35,8 +35,11 @@ use **reference NBTs** and **reference images**.
 | Door/window misaligned by 1 | Off-by-one in the perimeter test | Recheck `x==0||x==W-1||…` bounds |
 | Two materials clash | Palette too busy | Reduce to 2–3 materials |
 
-Because the preview doesn't show item-frame/sign **contents**, validate *layout and geometry*
-visually and trust the contents to the data checks.
+Because the preview doesn't show item-frame/sign **contents** (nor banner patterns or
+`entities`), validate *layout and geometry* visually and trust the contents to the data checks.
+For the exact list of what does and doesn't render, see the **fidelity table** in
+[`08-complex-structures.md`](08-complex-structures.md) — and note that Blockwright *does* render
+chest, bed, wall-banner, and water/lava geometry specially.
 
 ## Using reference `.nbt` files
 

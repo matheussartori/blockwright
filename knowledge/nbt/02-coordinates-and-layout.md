@@ -42,9 +42,15 @@ furniture/doors/stairs consistent with it. Common convention for generated build
 Block `facing` values: `north`, `south`, `east`, `west` (and `up`/`down` for some blocks).
 Note the directional meaning differs by block family — see [`03`](03-blocks-and-blockstates.md):
 
-- **Stairs / doors / furnaces / chests**: `facing` = the direction the block's *front* points.
+- **Furnaces / chests / droppers / observers**: `facing` = the side that points *at the player*
+  who placed it (the front/opening).
+- **Stairs**: `facing` = the side the stair *ascends toward* (the tall riser side) — a different
+  meaning of "front"; see [`03`](03-blocks-and-blockstates.md).
+- **Doors**: `facing` = the direction faced when **closed** (the side you approach from).
 - **Logs / pillars**: use `axis` (`x`/`y`/`z`), not `facing`.
-- **Torches / wall-blocks**: `facing` = the wall they're attached to.
+- **Wall torches / ladders / wall signs / wall banners / wall buttons & levers**: `facing` = the
+  direction the block **points, away from** its supporting wall (a `wall_torch[facing=east]` is
+  mounted on a block to its west and sticks out east).
 
 ## Rotation (when reusing/mirroring patterns)
 
@@ -52,11 +58,16 @@ Minecraft structures are placed with one of four Y rotations (`NONE`, `CW_90`, `
 `CW_270`) and optional mirroring. If you rotate a layout in your head, you must also rotate
 every `facing`/`axis`:
 
-- Quarter turn clockwise (viewed from above, +Y down): `north→east→south→west→north`.
-- `(x, z)` for a CW_90 turn within a `W×L` footprint maps to `(z, W−1−x)`.
+- Quarter turn **clockwise** (looking down from above): `north→east→south→west→north`.
+- Coordinates for a CW_90 turn of a `W×L` footprint (`W` along x, `L` along z) map
+  `(x, z) → (L−1−z, x)`, and the new footprint is `L×W`. (This matches Minecraft's own
+  `CLOCKWISE_90`, raw transform `(x,z)→(−z,x)` then shifted to stay non-negative.) The inverse
+  CW_270 is `(x, z) → (z, W−1−x)`; CW_180 is `(x, z) → (W−1−x, L−1−z)`.
 
 Keep rotations simple: design the build in one orientation; let the app/world handle final
-placement rotation. Only rotate manually when mirroring a wing or repeating a module.
+placement rotation. Only rotate manually when mirroring a wing or repeating a module — and when
+you do, **re-derive the corners by hand and verify in the preview**, since a sign error here
+silently flips the whole module.
 
 ## Sizing guidance for generated builds
 
@@ -68,6 +79,10 @@ Pick a size that fits the request, then build inside it. Rules of thumb:
 - **Wall thickness**: 1 block. **Floor/ceiling**: 1 block.
 - Keep the bounding box **tight** — don't pad with huge empty volumes. The preview and file
   size both suffer, and the placement footprint should match the visible build.
+- **Size ceiling:** a vanilla **structure block** loads at most **48×48×48**. Larger structure
+  files exist (placed via `/place` or worldgen), and Blockwright will render them, but if the
+  build is meant to be reusable in-game keep each dimension ≤ 48. For bigger scenes, split into
+  multiple structures (see [`08`](08-complex-structures.md) §"Modular builds").
 
 ## Worked layout: footprint → layers
 

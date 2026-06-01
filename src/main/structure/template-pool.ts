@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dataDir, loadJson } from './content-pack';
 
+const EMPTY_ID = 'minecraft:empty';
+
 /** Split "namespace:path" into parts, defaulting the namespace to "minecraft". */
 function parseId(id: string): { namespace: string; path: string } {
   const colon = id.indexOf(':');
@@ -40,6 +42,10 @@ export interface ResolvedPoolElement {
   structurePath: string | null;
   weight: number;
   projection: string;
+  /** A terminal "place nothing" outcome: `empty_pool_element` (vanilla's slot
+   *  terminator) or a `feature_pool_element` we can't render. It keeps its weight
+   *  so a connector terminates as often as it does in worldgen. */
+  empty?: boolean;
 }
 
 export interface ResolvedPool {
@@ -96,12 +102,18 @@ export function resolvePool(poolId: string): ResolvedPool {
 
   const elements: ResolvedPoolElement[] = [];
   for (const entry of raw.elements ?? []) {
+    const weight = typeof entry.weight === 'number' ? entry.weight : 1;
     const location = elementLocation(entry.element);
-    if (!location) continue; // feature/empty elements have nothing to render
+    if (!location) {
+      // empty/feature/unknown: a terminal outcome that still consumes its weight,
+      // so a slot is left bare as often as worldgen leaves it bare.
+      elements.push({ structureId: entry.element?.element_type ?? EMPTY_ID, structurePath: null, weight, projection: 'rigid', empty: true });
+      continue;
+    }
     elements.push({
       structureId: location,
       structurePath: resolveStructurePath(location),
-      weight: typeof entry.weight === 'number' ? entry.weight : 1,
+      weight,
       projection: entry.element?.projection ?? 'rigid',
     });
   }

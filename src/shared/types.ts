@@ -180,6 +180,10 @@ export type WindowsReport = Record<WindowId, WindowMenuState>;
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
+  /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE), or
+   *  null. When set, the renderer auto-runs an assembly so the headless capture
+   *  screenshots a full assembly instead of just the root piece. */
+  captureAssemble: () => Promise<{ depth: number; seed: number } | null>;
   openDialog: () => Promise<string | null>;
   loadStructure: (path: string) => Promise<StructureData>;
   /** Build a texture URL served by the custom protocol. Key is "namespace/path". */

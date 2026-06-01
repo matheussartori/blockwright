@@ -14,10 +14,15 @@ block with properties; the `nbt` rides alongside.
 - Coordinates: a block entity needs no `x/y/z` inside `nbt` for structure files — position
   comes from the `blocks` entry's `pos`.
 
-> Rendering note: Blockwright renders chest *geometry* from the blockstate (a dedicated
-> entity renderer), and does **not** render the items inside or sign text visually. So
-> contents are for correctness/placement, not preview appearance. Decorate with the block
-> itself; use contents when the request asks for stocked storage.
+> **Rendering note (Blockwright-specific).** Vanilla draws some blocks with a dedicated
+> *entity* renderer, so their blockstate model is particle-only. Blockwright synthesizes
+> geometry for **chests, beds, and wall banners**, and renders **water/lava** as full cubes.
+> Everything else uses the normal block model. What Blockwright does **not** render: items
+> inside containers, sign/hanging-sign **text**, banner **patterns**, standing (floor)
+> banners as cloth, and anything in the top-level `entities` list (item frames, paintings,
+> mobs). So container `Items`, sign messages, and frame contents are for **correctness/
+> placement only** — they won't appear in the preview. Validate *geometry* visually; trust
+> data checks for contents. See the full fidelity table in [`08`](08-complex-structures.md).
 
 ## Item format (1.21.1 — data components)
 
@@ -27,10 +32,17 @@ each stack also has a `Slot` (Byte). **`count` is an Int; `Slot` is a Byte.**
 ```jsonc
 { "Slot": 0, "id": "minecraft:bread", "count": 16 }
 { "Slot": 1, "id": "minecraft:diamond_sword", "count": 1,
-  "components": { "minecraft:custom_name": "{\"text\":\"Excalibur\"}" } }
+  "components": { "minecraft:custom_name": "Excalibur" } }
 ```
 
-Old `{ id, Count, Damage, tag }` is **pre-1.20.5 and wrong for 1.21.1** — do not emit it.
+- `count` is an **Int** and the field is **lowercase**; `Slot` is a **Byte**.
+- `components` keys are namespaced component IDs. **Text-valued components** (`custom_name`,
+  `item_name`, `lore` lines) are **text components**: write a plain string for literal text
+  (`"Excalibur"`) or an object for formatting (`{ "text": "Excalibur", "italic": false }`).
+  Don't nest a JSON-string-inside-a-string (`"{\"text\":...}"`) — that's the old style and a
+  common double-encoding bug.
+- Old `{ id, Count, Damage, tag }` (capital `Count`, a `tag` compound) is **pre-1.20.5 and wrong
+  for 1.21.1** — do not emit it.
 
 ## Containers
 
@@ -61,21 +73,25 @@ Props: `facing`, `lit`. NBT can hold `Items` (slot 0 input, 1 fuel, 2 output) pl
 
 ## Signs & hanging signs — `minecraft:*_sign`, `*_wall_sign`, `*_hanging_sign`
 
-1.21.1 signs are two-sided. Top-level `is_waxed` (Byte). Each side is a compound with
-`messages` (a list of **4** text strings — JSON text components serialized as strings),
-`color` (dye name, default `black`), and `has_glowing_text` (Byte).
+1.21.1 signs are two-sided. Top-level `is_waxed` (Byte). Each side (`front_text`/`back_text`) is
+a compound with `messages` (a list of **exactly 4** lines, each a **text component**), `color`
+(dye name, default `black`), and `has_glowing_text` (Byte).
 
 ```jsonc
 { "state": 6, "pos": [3, 1, 0],
   "nbt": { "id": "minecraft:oak_sign", "is_waxed": 0,
-           "front_text": { "messages": ["\"Welcome\"", "\"\"", "\"\"", "\"\""],
+           "front_text": { "messages": ["Welcome", "", "", ""],
                            "color": "black", "has_glowing_text": 0 },
-           "back_text":  { "messages": ["\"\"", "\"\"", "\"\"", "\"\""],
+           "back_text":  { "messages": ["", "", "", ""],
                            "color": "black", "has_glowing_text": 0 } } }
 ```
 
-- Each of the 4 `messages` entries is a **JSON text component as a string**. A plain line is
-  `"\"Hello\""` (a quoted string inside the string). Empty lines are `"\"\""`.
+- Each line is a **text component**. In the authoring JSON, write it as a **plain string**
+  (`"Welcome"`) for a literal line, or an object for formatting (`{ "text": "Hi", "color": "red",
+  "bold": true }`); the compiler serializes each as an NBT text component. Always provide **all 4**
+  entries; empty lines are `""`. (Raw NBT in 1.21.1 stores these as text components, not the
+  legacy `Text1..Text4` strings — don't emit the old field names.)
+- Blockwright shows the sign's geometry but **not** the text — see [`08`](08-complex-structures.md).
 - Block variants: standing `*_sign` (prop `rotation` 0–15), `*_wall_sign` (prop `facing`),
   `*_hanging_sign` (prop `rotation`, `attached`), `*_wall_hanging_sign` (prop `facing`).
 
@@ -84,11 +100,17 @@ Props: `facing`, `has_book`, `powered`. If `has_book:true`, NBT holds a `Book` i
 component. Usually leave bookless for decoration.
 
 ## Decorated pot — `minecraft:decorated_pot`
-Props: `facing`, `waterlogged`. NBT `sherds` (list of 4 item IDs: back/left/right/front).
+Props: `facing`, `waterlogged`. NBT `sherds` = a list of **4 full item IDs**, ordered **front
+first, then clockwise** (front, left, back, right when looking at the front). Each is either
+`"minecraft:brick"` (blank face) or a `*_pottery_sherd` (e.g. `"minecraft:angler_pottery_sherd"`).
 
 ## Banners — `minecraft:*_banner` / `*_wall_banner`
 Base color is in the block ID (`red_banner`). Props: standing `rotation` 0–15; wall `facing`.
-Patterns live in NBT `patterns` (list of `{ color, pattern }`). Omit for a plain banner.
+Patterns live in NBT `patterns` — a list of `{ "pattern": <id>, "color": <dye> }`. **In 1.21.1
+`pattern` is a full resource location** (`"minecraft:creeper"`, `"minecraft:half_horizontal"`,
+`"minecraft:stripe_top"`), **not** the legacy short codes (`"cre"`, `"hh"`) that pre-1.20.5 used —
+emitting a short code is wrong. `color` is a dye name (`"red"`). Omit `patterns` for a plain
+banner. (Blockwright shows wall-banner cloth but **not** the patterns — see [`08`](08-complex-structures.md).)
 
 ## Beehive / bell / brewing stand / beacon
 - `bell`: props `facing`, `attachment` (`floor`/`ceiling`/`single_wall`/`double_wall`).

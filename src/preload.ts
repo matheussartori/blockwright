@@ -13,6 +13,7 @@ import type {
 
 const api: BlockwrightApi = {
   platform: process.platform,
+  captureAssemble: () => ipcRenderer.invoke(IPC_CHANNELS.captureConfig),
   openDialog: () => ipcRenderer.invoke(IPC_CHANNELS.openDialog),
   loadStructure: (path: string): Promise<StructureData> =>
     ipcRenderer.invoke(IPC_CHANNELS.loadStructure, path),

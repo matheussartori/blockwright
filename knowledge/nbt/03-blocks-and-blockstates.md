@@ -32,7 +32,7 @@ All `*_stairs` (e.g. `oak_stairs`, `stone_brick_stairs`, `cobblestone_stairs`).
 { "Name": "minecraft:oak_stairs",
   "Properties": { "facing": "north", "half": "bottom", "shape": "straight", "waterlogged": "false" } }
 ```
-- `facing`: direction the **full-height back** faces away from / the step rises toward. Practically: a stair you climb going north has `facing: "south"` is wrong — set `facing` to the direction you face when ascending. Verify in preview.
+- `facing`: the direction the stair **ascends toward** — the full-height (tall) side is on the `facing` side and the step descends to the opposite side. A staircase you walk *up* while heading east is `facing:"east"` (its tall riser is on the east). Note this differs from furnaces/chests, whose `facing` is the side that points *at the player* who placed them. Always confirm in the preview.
 - `half`: `bottom` (normal) or `top` (upside-down).
 - `shape`: `straight`, `inner_left`, `inner_right`, `outer_left`, `outer_right` (corners). Use `straight` unless making an L-corner.
 
@@ -103,7 +103,34 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 ### Block-entity blocks (carry `nbt`) — see [`04`](04-block-entities.md)
 `chest` (`facing`,`type`), `trapped_chest`, `barrel` (`facing`,`open`), `furnace`/`blast_furnace`/`smoker`
 (`facing`,`lit`), `*_sign` & `*_hanging_sign`/`*_wall_sign`, `*_shulker_box`, `brewing_stand`,
-`beacon`, `bell`, `lectern`, `decorated_pot`, `flower_pot`†, `jukebox`, `note_block`.
+`beacon`, `bell`, `lectern`, `decorated_pot`, `jukebox`, `note_block`, `crafter`
+(`orientation`,`triggered`,`crafting` — new in 1.21).
+
+> Note: `flower_pot` is **not** a block entity in 1.21.1 — an empty pot is just `flower_pot`, and
+> a planted pot is its own block state (`potted_poppy`, `potted_oak_sapling`, …). No `nbt`.
+
+### Invisible light source — `minecraft:light`
+`{ "Name": "minecraft:light", "Properties": { "level": "15", "waterlogged": "false" } }`. A
+fully transparent, collision-less block that emits light `level` 0–15. **The right tool to light a
+build without a visible fixture** (it renders as empty space in the preview, by design). Use it
+sparingly to brighten interiors that the decorative theme can't light naturally.
+
+### 1.21 / "Tricky Trials" blocks (valid in 1.21.1)
+- **Copper family:** `copper_bulb` (+`exposed_/weathered_/oxidized_/waxed_*`; props `lit`,`powered`),
+  `copper_door`, `copper_trapdoor`, `copper_grate`, `chiseled_copper`. Decorative, oxidation tiers.
+- **Tuff family:** `polished_tuff`, `tuff_bricks`, `chiseled_tuff(_bricks)` + their stairs/slabs/walls.
+- **Trial chambers blocks:** `trial_spawner` (block entity; `trial_spawner_state`), `vault`
+  (`vault_state`,`facing`,`ominous`), `heavy_core`. Use only for trial-chamber-themed builds.
+- **Crafter** (auto-crafter): a block entity, see above.
+
+### Useful structural / decorative blocks often forgotten
+- `scaffolding` (`bottom`,`distance`), `chain` (`axis`), `lightning_rod` (`facing`,`powered`).
+- `iron_bars` (connection props auto-resolve like panes).
+- `end_rod` (`facing`) — thin white pole/light, great for modern fixtures.
+- `amethyst_cluster`/`*_amethyst_bud` (`facing`), `pointed_dripstone` (`vertical_direction`,`thickness`).
+- `sea_pickle` (`pickles` 1–4, `waterlogged`), `turtle_egg`, `frogspawn` — pond/beach detail.
+- Concrete & terracotta: `*_concrete`, `*_concrete_powder`, `*_terracotta`, `*_glazed_terracotta`
+  (`facing` — directional pattern, useful for floors/accents).
 
 ## Common ID gotchas (1.21.1)
 

@@ -49,6 +49,9 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
 | [`05-building-houses.md`](05-building-houses.md) | Foundations, walls, roofs, windows, doors — construction recipes. |
 | [`06-decoration-and-interiors.md`](06-decoration-and-interiors.md) | Faux-furniture, lighting, kitchens, bedrooms, storage, gardens. |
 | [`07-workflow.md`](07-workflow.md) | Generate → preview → validate → iterate; using references & images. |
+| [`08-complex-structures.md`](08-complex-structures.md) | Render-fidelity table, large/modular builds, vertical zoning (basement/floors/attic), deep reference-NBT & image workflow, advanced gotchas. |
+| [`09-worked-example.md`](09-worked-example.md) | One complete annotated cabin in the authoring JSON — copy as a template. |
+| [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 
 ## Hard rules (read before generating)
 
@@ -64,3 +67,12 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
 - When unsure whether a block or property exists, prefer a simpler, known-good block over an
   invented one. A wrong block ID renders as a fallback color, which is a visible failure in
   the preview.
+- **The preview validates geometry, not data.** Items in containers, sign/banner text &
+  patterns, and `entities` (item frames, paintings, mobs) do **not** appear — see the fidelity
+  table in [`08`](08-complex-structures.md). Build interiors from block *geometry* (faux-furniture).
+- **Never renumber palette indices** once `blocks` reference them — append new states only, and
+  don't mutate a shared entry to change a subset of blocks ([`08`](08-complex-structures.md)).
+- **Validity isn't the bar — looking intentional is.** A correct hollow single-material cube is a
+  bad build. Apply the design principles in [`10`](10-design-principles.md): 3–5 cohesive
+  materials, surface depth, a pitched/edged roof with an overhang, a framed entrance, and a
+  grounded base. Don't ship a flat one-block box.

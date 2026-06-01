@@ -38,6 +38,10 @@ There is also an optional `palettes` (note the **s**) — a `List<List<Compound>
 structure ships multiple random variants. **Do not emit `palettes`**; always use the single
 `palette`. Blockwright reads `palette` only.
 
+An optional top-level `author : String` (the creator's name) may appear in older files; it's
+metadata only, Blockwright ignores it, and **you should not emit it**. No other top-level tags
+are part of the structure format — don't invent fields.
+
 ### `palette` entries
 
 Each entry is one *block state* (a block + a specific set of properties). Two oak stairs
