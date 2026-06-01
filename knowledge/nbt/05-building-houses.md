@@ -1,0 +1,127 @@
+# 05 — Building houses (construction recipes)
+
+This is the practical core: how to turn *"a small oak cottage"* into correct `blocks`. Work
+in **layers by `y`**, build the shell, then cut openings, then add roof, then decorate
+(see [`06`](06-decoration-and-interiors.md)).
+
+## The method
+
+1. **Choose footprint & size.** e.g. cottage interior 5×5 → exterior 7×7 (walls included),
+   wall height 4 → `size: [7, 6, 7]` (floor `y=0`, walls `y=1..4`, roof `y=5`). Entrance on
+   south (+Z) by default ([`02`](02-coordinates-and-layout.md)).
+2. **Floor** at `y=0`: fill the whole footprint solid.
+3. **Walls** at `y=1..(top-1)`: perimeter ring solid, interior air (omit interior cells).
+4. **Cut openings**: door (2 tall) and windows — just *don't place* those wall cells, or
+   place glass for windows.
+5. **Ceiling/roof** on top.
+6. **Decorate** interior + exterior.
+
+Generate cells programmatically in your head/notes: for each `(x,y,z)` decide the block, then
+emit one `blocks` entry per non-air cell, reusing palette indices.
+
+## Materials palette (pick a cohesive set)
+
+A build looks intentional when materials are limited and themed:
+
+- **Oak cottage**: `oak_planks` walls, `oak_log` corner posts, `oak_stairs`/`oak_slab` roof,
+  `glass_pane` windows, `oak_door`, `cobblestone` foundation, `stone_bricks` chimney.
+- **Stone cottage**: `cobblestone`/`stone_bricks` walls, `oak_log` frame (Tudor look),
+  `dark_oak_stairs` roof, `spruce_door`.
+- **Modern**: `smooth_stone`/`white_concrete`/`glass`, flat slab roof, large `glass` walls.
+
+Accent with **logs at corners** and **stairs/slabs at the roofline** — that single move reads
+as "built by a person" rather than a box.
+
+## Floor (`y=0`)
+
+Fill `x ∈ 0..W-1`, `z ∈ 0..L-1` with the floor block. Optionally make the perimeter a
+foundation course of `cobblestone` and the interior `oak_planks`.
+
+## Walls (`y = 1 .. H`)
+
+Perimeter ring only. For each wall layer, place a block where `x==0 || x==W-1 || z==0 ||
+z==L-1`; leave interior cells as air (omit them).
+
+**Tudor framing** (very effective): put `oak_log axis:y` at the four corners (and optionally
+mid-span posts) for the full height, and a `oak_log axis:x`/`axis:z` belt at the top wall
+course; fill the rest with `oak_planks` or `white_terracotta`.
+
+```
+Top-down wall ring (W=L=7), L=log post, #=planks, at y=2:
+L # # # # # L
+# . . . . . #
+# . . . . . #
+# . . . . . #
+# . . . . . #
+# . . . . . #
+L # # # W # L      (door opening handled separately)
+```
+
+## Door opening (south wall, centered)
+
+Leave the two cells `(x=mid, y=1, z=L-1)` and `(x=mid, y=2, z=L-1)` for the door. Place a
+two-block `oak_door` there:
+- lower half at `(mid, 1, L-1)`, upper at `(mid, 2, L-1)`, both `facing:south`, same `hinge`.
+
+(See door blockstate in [`03`](03-blocks-and-blockstates.md).)
+
+## Windows
+
+Replace selected wall cells (usually at `y=2`, the "eye level" course) with `glass_pane` or
+`glass`. A nice rhythm: windows two wide, separated by one wall block. Add `oak_trapdoor`
+shutters on the outside for charm, or a `oak_slab`/`stairs` sill below.
+
+## Ceiling & roofs
+
+### Flat ceiling
+Fill the top layer (`y=H+1`) solid with planks/slabs. Simple, good for modern or for a
+second story floor.
+
+### Gable roof (pitched, the classic)
+Build above the walls with **stairs** stepping inward each layer, capped with a slab/stairs
+ridge. For a roof over a `W`-wide building running along `z` (ridge along the z-axis):
+
+- Layer `r=0` (just above walls): a course of stairs around the eaves, `facing` outward,
+  e.g. west eave `oak_stairs facing:east half:bottom`, east eave `facing:west`.
+- Each higher layer, inset by 1 on the sloped sides, stepping the stairs up.
+- At the ridge, place a row of **upside-down stairs** facing each other, or top slabs.
+
+Mini cross-section (W=7, slope on x, `/`=stair facing east, `\`=stair facing west, `=`=slab):
+```
+y+3            =                 ridge
+y+2          / =   \
+y+1        /         \
+y+0      /             \         eaves (sit on wall top)
+x:     0  1  2   3   4  5  6
+```
+Translate each `/` to `oak_stairs facing:east`, each `\` to `facing:west`, ridge `=` to
+`oak_slab type:top` or paired top stairs. Fill any gap under the slope with planks if you want
+a solid (non-hollow) roof, or leave hollow for an attic.
+
+### Hip roof
+Slope inward on **all four** sides; use corner stairs (`shape: outer_*`) at the corners. More
+work — only when asked for it.
+
+## Foundations & terrain tie-in
+
+A course of `cobblestone`/`stone_bricks` at `y=0` (or a 1-block skirt around the base) grounds
+the build. For builds meant to sit on a slope, you can extend the foundation downward — but
+remember structure positions can't go below `y=0`, so build the foundation *up* from `y=0` and
+let the build's bottom be the foundation.
+
+## Chimneys, porches, extensions
+
+- **Chimney**: a 1×1 (or 2×2) column of `bricks`/`stone_bricks` rising past the roofline, top
+  capped with a `campfire` (smoke) or trapdoors.
+- **Porch**: extend the floor out past the entrance, add `oak_fence` posts holding a small
+  slab/stair roof.
+- **Bay window / wing**: bump the footprint out by 1–2 blocks on one side; keep walls/roof
+  consistent.
+
+## Quality checklist for the shell
+
+- Walls fully enclose (no accidental gaps except intended windows/door).
+- Door is 2 tall and reachable (air in front and behind at `y=1..2`).
+- Roof has no holes where slopes meet; ridge is continuous.
+- Corners use posts/contrast so it doesn't read as a plain cube.
+- Interior has ≥3 air height. Then move to [`06`](06-decoration-and-interiors.md).

@@ -1,0 +1,97 @@
+# 06 — Decoration & interiors
+
+Minecraft has almost no "furniture" blocks — interiors are made by **combining ordinary
+blocks into shapes that read as furniture**. This is the most "trained-builder" part of the
+job: a table is a fence + pressure plate; a chair is a stair + signs. Below are the
+canonical recipes. Mix and match, keep materials cohesive with the build.
+
+> Reminder: Blockwright renders block geometry but not item-frame contents or sign text. So
+> these faux-furniture shapes preview accurately, which makes them ideal to validate.
+
+## Faux-furniture recipes
+
+Each recipe lists blocks and their relative placement (`@` = the anchor cell).
+
+### Tables
+- **Small table**: `oak_fence` (or any fence) at `@`, with a **carpet** or **pressure plate**
+  on top (`@ y+1`). For a wider table, put fences under each corner and slabs on top, or use a
+  row of `*_slab type:top`.
+- **Desk**: a `*_stairs` upside-down (`half:top`) reads as a desk/counter with knee space.
+
+### Chairs / stools / benches
+- **Chair**: a `*_stairs facing:<toward table>`, with `*_sign`/`*_wall_sign` on the two sides
+  as armrests (optional). A `*_trapdoor` on the back wall behind it = backrest.
+- **Stool**: a single `*_slab` or upside-down stair.
+- **Bench**: a row of stairs all facing the same way.
+
+### Kitchen / counters
+- **Counter**: row of `*_stairs half:top` or full blocks topped with `*_slab`.
+- **Sink**: a `cauldron` (optionally `water_cauldron level:3`) set into the counter, with a
+  `*_trapdoor` or lever as a faucet on the wall behind.
+- **Stove/oven**: `furnace`/`smoker facing:out` in the counter line; `lit:true` if "cooking".
+- **Hood/cabinets**: `*_trapdoor`s on the wall above; `barrel`s = base cabinets.
+- **Pantry**: `barrel`s, `decorated_pot`s, `composter`, hanging `lantern`.
+
+### Storage
+- `chest`/`barrel` for storage (set `facing`). Stacks of `barrel`s with `trapdoor` doors read
+  as a cupboard. `bookshelf` walls + `lectern` = a study/library.
+
+### Beds & bedrooms
+- `*_bed` (2 blocks, see [`03`](03-blocks-and-blockstates.md)), foot toward the room.
+- **Nightstand**: a `barrel` or `oak_slab`-on-fence beside the bed head, with a `lantern`,
+  `candle`, or `flower_pot` on top.
+- **Headboard**: trapdoors or a banner on the wall behind the head.
+- **Wardrobe**: 1×2 column of `barrel`s or doors set into the wall.
+
+### Lighting (do this everywhere — dark builds look unfinished)
+- `lantern` (floor or `hanging:true` under a slab/fence), `wall_torch`, `candle`s on tables,
+  `sea_lantern`/`glowstone` hidden behind `*_trapdoor` for indirect light, `campfire` (cozy),
+  `froglight` (modern). Aim for a light source roughly every ~6 blocks.
+
+### Soft furnishings
+- **Rug/carpet**: `*_carpet` (16 colors) on the floor. Layer two colors for a patterned rug.
+- **Curtains**: columns of `*_wool`/`*_carpet`-on-wall (use banners for hanging cloth).
+- **Cushions/sofa**: stairs in a U with carpet/slab tops, wool accents.
+
+### Plants & nature
+- `flower_pot` → `potted_*` variants on sills/tables.
+- `oak_leaves` + `oak_log` for an indoor tree; `bamboo`, `hanging_roots`, `vine`.
+- Window boxes: `oak_trapdoor` shelf holding `flower_pot`s outside the window.
+
+### Bathroom (whimsical, players love it)
+- **Toilet**: `cauldron` with a `*_trapdoor` lid behind; or quartz stairs + slab + button flush.
+- **Bath**: a ring of `quartz_slab`/blocks holding `water`; `tripwire`/`lever` taps.
+- **Mirror**: an `item_frame` with a map, or a framed `glass`/`white_stained_glass` panel.
+
+### Decorative details that sell a room
+- `item_frame`s with maps/tools as wall art (entities — keep modest).
+- `painting`s.
+- `chain` + `lantern` hanging fixtures.
+- `decorated_pot`, `*_banner`, `bookshelf`/`chiseled_bookshelf`, `armor_stand` (entity),
+  `cake`, `brewing_stand` (lab), `bell`, `note_block`, `jukebox`.
+- `cobweb` in corners for "abandoned"; `candle` clusters for "ritual/cozy".
+
+## Composing a furnished room
+
+1. Decide the room's **function** (kitchen, bedroom, living room) from the prompt.
+2. Place the **big anchor** first (bed / counter run / dining table) against a sensible wall.
+3. Add **circulation** — leave 1–2 cells of walking space; don't fill the whole floor.
+4. Add **lighting** (every ~6 blocks, plus a feature light).
+5. Add **2–4 detail props** (plants, art, rug) — restraint reads as tasteful; clutter reads as messy.
+6. Echo the build's **material theme** (oak build → oak furniture, warm lights).
+
+## Style presets (quick starting points)
+
+- **Cozy cottage**: oak + wool, lanterns, rugs, flower pots, bookshelf nook, fireplace.
+- **Rustic farmhouse**: spruce + cobblestone, barrels, hay, composter, hanging lanterns.
+- **Modern**: quartz/concrete/glass, hidden lighting, froglight, minimal props, flat surfaces.
+- **Medieval**: stone bricks + dark oak, banners, chandeliers (chain+lantern), brewing/anvil.
+- **Abandoned/ruined**: cobwebs, cracked/mossy variants, missing blocks, vines, no light.
+
+## Common decoration mistakes to avoid
+
+- Leaving rooms dark. Always light them.
+- Furniture floating or blocking the door. Keep paths clear.
+- Over-cluttering. Negative space is part of the design.
+- Mixing too many wood/stone types — pick 2–3 and stick to them.
+- Forgetting `facing` on stairs/chairs so they point the wrong way (catch this in preview).
