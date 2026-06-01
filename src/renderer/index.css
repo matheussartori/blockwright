@@ -514,6 +514,7 @@ body {
   gap: 2px;
   max-height: 196px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .recent-row {
   display: flex;
@@ -522,6 +523,7 @@ body {
   padding: 7px 10px;
   border-radius: 7px;
   cursor: pointer;
+  min-width: 0;
 }
 .recent-row:hover {
   background: var(--panel-strong);
@@ -529,6 +531,9 @@ body {
 .recent-name {
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .recent-path {
   font-size: 11px;
