@@ -31,7 +31,10 @@ src/
       load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
       content-pack.ts      Namespace-aware asset roots (vanilla pack + workspace) + JSON cache
       blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
-      block-entity.ts      Chests (normal/trapped/ender + modded): synthesize entity-atlas geometry
+      block-entity/        Blocks vanilla draws with an entity renderer (particle-only model),
+                           synthesized from a 64×64 atlas: box-uv.ts (shared box/UV helper),
+                           chest.ts, bed.ts, banner.ts (wall), index.ts (dispatcher)
+      fluid.ts             Water/lava: full-cube from the animated "still" strip (water blue-tinted)
       fallback-color.ts    Deterministic per-block color when textures are missing
       jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
       template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
@@ -116,11 +119,21 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 
 ## Conventions / gotchas
 
-- **Block entities (chests):** vanilla chests are particle-only blockstates rendered by a
-  dedicated entity renderer, so `block-entity.ts` intercepts them in `resolveBlock` and
-  synthesizes `ResolvedModel` boxes (bottom/lid/lock) with explicit box-UV into the 64×64
-  `entity/chest/*` atlas. `facing` maps to a blockstate y-rotation; modded chests are detected
-  by name and matched to an `entity/chest/...` texture in their own namespace (vanilla fallback).
+- **Synthesized blocks (entities + fluids):** some blocks have a particle-only blockstate
+  model because vanilla draws them with a dedicated renderer. `resolveBlock` intercepts them
+  before the normal model path: `fluid.ts` (water/lava) and the `block-entity/` dispatcher
+  (chest/bed/banner). Each builds `ResolvedModel`s directly. **Add a new kind as its own file**
+  in `block-entity/` and wire it into `block-entity/index.ts` — don't lump them together.
+  - Entity geometry uses `box-uv.ts`: `boxFaces` is the standard Minecraft box-UV unwrap
+    (front lands on +z/south) into a 64×64 atlas; `FACING_Y` maps `facing` to a y-rotation
+    (base front = +z). Chests = bottom/lid/lock; beds = mattress slab + 2 legs per half
+    (`part=head|foot`, pillow/blanket/cap regions hardcoded from the atlas, see `bed.ts`);
+    wall banners = a tinted cloth panel from `entity/banner_base` (dye color per `<color>_wall_banner`).
+  - Fluids render a full cube from the animated "still" strip; the renderer auto-detects the
+    vertical strip and samples its first frame, so a plain 0..16 UV is correct.
+  - **Tinting:** grayscale textures (water's still, the white banner cloth) are colored via
+    `ModelFace.tint` (explicit sRGB `[r,g,b]`), which the renderer multiplies in; it takes
+    precedence over the grass-green `tintindex` path. Lava/chests/bed textures are already colored.
 - **Path alias:** `@/*` → `src/*` (see `tsconfig.json`). Use it for cross-dir imports.
 - **Texture protocol CORS:** the `bw-texture://` scheme must be registered as privileged
   with `corsEnabled: true` *and* the handler must return an `access-control-allow-origin`
@@ -150,6 +163,8 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 
 The app can screenshot itself headlessly. Set env vars when launching:
 - `BW_OPEN=/path/to/file.nbt` — open a file on startup.
-- `BW_CAPTURE=/path/out.png` — render, write a PNG, then quit (~2.5s delay).
+- `BW_CAPTURE=/path/out.png` — render, write a PNG, then quit (~2.5s delay). On a cold
+  dev start (Vite re-optimizing deps) 2.5s can capture a blank page; bump it with
+  `BW_CAPTURE_DELAY=8000` (ms).
 - `BW_CONTENT=/path/to/content` — override the content-pack location.
 - `BW_WORKSPACE=/path/to/mod-project` — activate a mod workspace on startup.

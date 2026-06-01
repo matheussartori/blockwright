@@ -126,6 +126,6 @@ function onDidFinishLoad() {
       const img = await mainWindow!.webContents.capturePage();
       fs.writeFileSync(process.env.BW_CAPTURE!, img.toPNG());
       app.quit();
-    }, 2500);
+    }, Number(process.env.BW_CAPTURE_DELAY) || 2500);
   }
 }

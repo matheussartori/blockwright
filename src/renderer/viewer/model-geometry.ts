@@ -151,7 +151,9 @@ export function addModel(
 
       const def = FACE_DEFS[dir];
       const uvs = faceUVs(face.uv, face.rotation, loaded?.frames ?? 1);
-      const tint = face.tintindex !== undefined && face.tintindex >= 0 ? TINT : WHITE;
+      let tint = WHITE;
+      if (face.tint) tint = new THREE.Color().setRGB(face.tint[0], face.tint[1], face.tint[2], THREE.SRGBColorSpace);
+      else if (face.tintindex !== undefined && face.tintindex >= 0) tint = TINT;
 
       // Transform the 4 corners and the normal.
       const box = [el.from[0], el.from[1], el.from[2], el.to[0], el.to[1], el.to[2]];

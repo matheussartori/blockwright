@@ -12,6 +12,10 @@ export interface ModelFace {
   rotation?: number;
   /** Biome tint index (>= 0 means the face is tinted, e.g. grass/foliage). */
   tintindex?: number;
+  /** Explicit multiply tint as sRGB [r,g,b] in 0..1 (e.g. water blue, banner
+   *  dye). Takes precedence over `tintindex`; used by synthesized blocks whose
+   *  texture is grayscale and colored at render time. */
+  tint?: [number, number, number];
 }
 
 export interface ElementRotation {
