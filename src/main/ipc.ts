@@ -1,10 +1,12 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
-import type { Workspace } from '@/shared/types';
+import type { AssembleOptions, Workspace } from '@/shared/types';
 import { IPC_CHANNELS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
+import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
+import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import {
@@ -13,6 +15,7 @@ import {
   detectWorkspaceForFile,
   listWorkspaceStructures,
   promptOpenWorkspace,
+  setWorkspaceVersion,
 } from './workspace';
 import { notifyRecentWorkspaces, openFileDialog } from './window';
 import { buildAppMenu, refreshMenu, setFileOpen } from './app-menu';
@@ -82,5 +85,18 @@ export function registerIpc(): void {
     buildAppMenu();
     return list;
   });
+  ipcMain.handle(IPC_CHANNELS.workspaceSetVersion, async (_e, version: string) => {
+    const ws = setWorkspaceVersion(version);
+    buildAppMenu();
+    return ws;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.jigsawAssemble, async (_e, filePath: string, options: AssembleOptions) =>
+    assembleJigsaw(filePath, structureIdFromPath(filePath), options),
+  );
+  ipcMain.handle(IPC_CHANNELS.jigsawCandidates, async (_e, filePath: string, index: number) =>
+    jigsawCandidates(filePath, index),
+  );
+
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
 }

@@ -52,6 +52,32 @@ export interface StructureBlock {
   pos: [number, number, number];
 }
 
+/** How a jigsaw constrains the rotation of the piece attached to it. */
+export type JigsawJoint = 'rollable' | 'aligned';
+
+/** A jigsaw block in a structure — the connection point used by worldgen to
+ *  attach another piece. Parsed from the block's `orientation` property plus its
+ *  block-entity NBT (`name`/`target`/`pool`/`final_state`/`joint`/priorities). */
+export interface JigsawConnector {
+  /** Block position within the structure's local coordinate space. */
+  pos: [number, number, number];
+  /** This connector's own name; a child jigsaw attaches here when its `target` matches. */
+  name: string;
+  /** The connector name this one wants to attach to (matched against another's `name`). */
+  target: string;
+  /** Template pool to pull the attached piece from (e.g. "minecraft:village/houses"). */
+  pool: string;
+  /** Block this jigsaw turns into after generation (usually "minecraft:air"). */
+  finalState: string;
+  joint: JigsawJoint;
+  /** Block `orientation` property, "<front>_<top>" (e.g. "south_up", "down_east"). */
+  orientation: string;
+  /** Generation selection order (1.20.3+); 0 when absent. */
+  selectionPriority: number;
+  /** Child-placement order (1.20.3+); 0 when absent. */
+  placementPriority: number;
+}
+
 export interface StructureData {
   name: string;
   path: string;
@@ -64,6 +90,8 @@ export interface StructureData {
   hasContent: boolean;
   /** Total non-air blocks. */
   blockCount: number;
+  /** Jigsaw connection points found in this structure (empty when none). */
+  jigsaws: JigsawConnector[];
 }
 
 /** An opened mod project whose assets augment the base content pack. */
@@ -74,6 +102,63 @@ export interface Workspace {
   root: string;
   /** The mod's asset namespace, e.g. "theplacebeyond". */
   namespace: string;
+  /** Detected (or user-selected) Minecraft version, e.g. "1.21.1"; null when unknown. */
+  minecraftVersion: string | null;
+}
+
+// --- Jigsaw assembly ---------------------------------------------------------
+
+/** A structure placed in the assembly: which file, where, and its Y rotation.
+ *  Rotation is in quarter-turns about +Y (0..3); offset is the world position of
+ *  the piece's local origin (after rotation), in block units. */
+export interface PlacedPiece {
+  /** Stable id for this placement (root is "root"). */
+  id: string;
+  /** The pieces's structure id (namespace:path), for display. */
+  structureId: string;
+  /** Absolute path to the structure `.nbt`, so the renderer can load its meshes. */
+  structurePath: string;
+  offset: [number, number, number];
+  quarterTurns: 0 | 1 | 2 | 3;
+  /** Placement depth from the root (root = 0). */
+  depth: number;
+}
+
+export type JigsawWarningKind =
+  | 'missing-structure'
+  | 'empty-pool'
+  | 'unmatched-target'
+  | 'overlap'
+  | 'depth-limit'
+  | 'unsupported-orientation';
+
+/** A problem found while assembling/validating, surfaced to the user. */
+export interface JigsawWarning {
+  kind: JigsawWarningKind;
+  message: string;
+  /** Optional placement id the warning relates to. */
+  pieceId?: string;
+}
+
+export interface JigsawPlan {
+  pieces: PlacedPiece[];
+  warnings: JigsawWarning[];
+}
+
+export interface AssembleOptions {
+  /** Deterministic seed; same seed + structure ⇒ same assembly. */
+  seed: number;
+  /** Maximum recursion depth from the root piece. */
+  maxDepth: number;
+}
+
+/** One candidate piece that could attach to a given connector (manual mode). */
+export interface JigsawCandidate {
+  structureId: string;
+  structurePath: string;
+  weight: number;
+  /** The placement that would attach this candidate to the source connector. */
+  placement: PlacedPiece;
 }
 
 export interface BlockwrightApi {
@@ -96,6 +181,12 @@ export interface BlockwrightApi {
   clearRecentWorkspaces: () => Promise<Workspace[]>;
   /** Absolute paths of the active workspace's `.nbt` structures (empty when none). */
   listWorkspaceStructures: () => Promise<string[]>;
+  /** Persist a user-chosen Minecraft version for the active workspace; returns it. */
+  setWorkspaceVersion: (version: string) => Promise<Workspace | null>;
+  /** Plan a full jigsaw assembly starting from a structure file. */
+  assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
+  /** Candidate pieces that can attach to one connector of a structure (manual mode). */
+  jigsawCandidates: (path: string, connectorIndex: number) => Promise<JigsawCandidate[]>;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */

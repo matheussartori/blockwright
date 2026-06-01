@@ -27,7 +27,9 @@ export function getRecentWorkspaces(): Workspace[] {
   if (cache) return cache;
   try {
     const data = JSON.parse(fs.readFileSync(storeFile(), 'utf8'));
-    cache = Array.isArray(data) ? data.filter(isWorkspace) : [];
+    cache = Array.isArray(data)
+      ? data.filter(isWorkspace).map((w) => ({ ...w, minecraftVersion: w.minecraftVersion ?? null }))
+      : [];
   } catch {
     cache = [];
   }

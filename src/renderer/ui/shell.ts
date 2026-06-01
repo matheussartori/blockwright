@@ -31,6 +31,8 @@ export interface Shell {
   workspaceBadge: HTMLElement;
   /** Bottom-left prompt offering to load a detected mod workspace (hidden by default). */
   workspaceSuggest: HTMLElement;
+  /** Bottom-right jigsaw panel, shown while a structure with jigsaws is open. */
+  jigsawPanel: HTMLElement;
 }
 
 const TEMPLATE = `
@@ -112,6 +114,7 @@ const TEMPLATE = `
     <div id="loading" class="loading hidden"><div class="spinner"></div></div>
     <div id="workspace-badge" class="workspace-badge hidden"></div>
     <div id="workspace-suggest" class="workspace-suggest hidden"></div>
+    <div id="jigsaw-panel" class="jigsaw-panel hidden"></div>
   </main>
   <footer class="statusbar" id="statusbar">
     <span class="muted">No file loaded</span>
@@ -146,5 +149,6 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     controlsMode: byId('controls-mode'),
     workspaceBadge: byId('workspace-badge'),
     workspaceSuggest: byId('workspace-suggest'),
+    jigsawPanel: byId('jigsaw-panel'),
   };
 }

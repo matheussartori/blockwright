@@ -22,6 +22,12 @@ export const IPC_CHANNELS = {
   workspaceDetectFile: 'workspace:detect-file',
   recentWorkspacesList: 'recent-workspaces:list',
   recentWorkspacesClear: 'recent-workspaces:clear',
+  /** Persist a user-chosen Minecraft version for the active workspace. */
+  workspaceSetVersion: 'workspace:set-version',
+  /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */
+  jigsawAssemble: 'jigsaw:assemble',
+  /** Candidate pieces for one connector of a structure (payload: path + index). */
+  jigsawCandidates: 'jigsaw:candidates',
   /** Renderer tells main whether a structure is currently open (drives Close File). */
   setFileOpen: 'file:set-open',
 } as const;

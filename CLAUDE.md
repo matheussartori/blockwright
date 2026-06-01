@@ -33,15 +33,22 @@ src/
       blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
       block-entity.ts      Chests (normal/trapped/ender + modded): synthesize entity-atlas geometry
       fallback-color.ts    Deterministic per-block color when textures are missing
+      jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
+      template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
+      jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
+    mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
   renderer/
     index.ts              Renderer entry: mountShell → Viewer → App
     app.ts                Orchestration: open/load flow, wiring
+    jigsaw.ts             Jigsaw panel controller: drives assembly/manual modes + warnings
     ui/shell.ts           Static chrome (titlebar/stage/statusbar) → typed element refs
-    ui/inspector.ts, statusbar.ts, html.ts
-    viewer/               Three.js viewer + mesh/geometry/texture building
+    ui/inspector.ts, statusbar.ts, html.ts, version-select.ts
+    viewer/               Three.js viewer + mesh/geometry/texture building (renders placed pieces)
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types.ts              Type-only contracts shared by both bundles (incl. BlockwrightApi)
+    jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
+    mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
 content/                  Extracted Minecraft content pack (assets/minecraft/...). Shipped as extraResource.
 ```
 
@@ -80,6 +87,27 @@ inside a mod (`<root>/data/<namespace>/structure/...nbt` with a matching `assets
 no workspace active triggers `detectWorkspaceForFile`, and the renderer shows a bottom-left prompt
 offering to load that workspace; accepting activates it and re-renders the file so mod textures
 resolve.
+
+Each workspace also carries a **target Minecraft version** (`mc-version-detect.ts` reads it from
+`fabric.mod.json` / `mods.toml` / `gradle.properties` / `pack.mcmeta`; if none is found the renderer
+asks via `version-select.ts` and `setWorkspaceVersion` persists it). Loose vanilla files assume the
+bundled pack's version.
+
+### Jigsaw assembly
+
+A jigsaw is a normal block (its `orientation` is a blockstate property) plus block-entity NBT
+(`name`/`target`/`pool`/`final_state`/`joint`/priorities). `load-structure.ts` keeps that NBT — the
+one place it isn't discarded — and `jigsaw.ts` turns it into `JigsawConnector[]` on `StructureData`.
+`template-pool.ts` resolves a connector's `pool` (`data/<ns>/worldgen/template_pool/...`, namespace-
+aware like assets; handles `single`/`legacy_single`/`list` elements) to candidate structure files.
+`jigsaw-assembler.ts` plans an assembly: seeded + bounded recursion that follows each connector,
+attaches a piece (front-to-front, matched by `target`↔`name`), rejects overlaps (AABB), and emits
+validation warnings (missing/empty pools, dead connectors, depth limit). **All geometry is pure and
+lives in `shared/jigsaw.ts`** so the planner (main) and the placement (renderer) share one rotation
+convention: `quarterTurns` maps to `group.rotation.y = q·π/2` and `offset` to `group.position`, so a
+plan's coordinates land exactly where the meshes go. Jigsaw features are gated to validated versions
+via `isJigsawSupported`; unsupported versions show a notice instead. Pieces only resolve when the
+relevant data is reachable (an active workspace, or the vanilla pack for `minecraft:` pools).
 
 ## Conventions / gotchas
 

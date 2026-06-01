@@ -11,6 +11,15 @@ import { TextureLoader } from './texture-loader';
 
 export type NavMode = 'orbit' | 'fly';
 
+/** One structure placed in the scene: its data plus a rigid transform. Rotation
+ *  is quarter-turns about +Y, offset is the position of its local origin — the
+ *  exact convention shared/jigsaw computes, so the meshes land where planned. */
+export interface AssemblyPiece {
+  data: StructureData;
+  offset: [number, number, number];
+  quarterTurns: number;
+}
+
 /** Keys that drive fly movement — captured (preventDefault) only while flying. */
 const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight',
@@ -203,13 +212,34 @@ export class Viewer {
     this.renderer.setSize(w, h);
   }
 
+  /** Render a single structure (the common case). */
   async show(data: StructureData): Promise<void> {
+    await this.showAssembly([{ data, offset: [0, 0, 0], quarterTurns: 0 }]);
+  }
+
+  /** Render one or more placed structures as a jigsaw assembly. Each piece is its
+   *  own transformed group, so framing and the grid follow the combined bounds. */
+  async showAssembly(pieces: AssemblyPiece[]): Promise<void> {
     this.clear();
-    const textures = await this.textures.load(data.textures);
-    this.current = buildStructure(data, textures);
-    this.scene.add(this.current);
-    this.addGrid(data.size);
-    this.frame(data.size);
+    if (pieces.length === 0) return;
+
+    const keys = new Set<string>();
+    for (const p of pieces) for (const t of p.data.textures) keys.add(t);
+    const textures = await this.textures.load([...keys]);
+
+    const parent = new THREE.Group();
+    for (const p of pieces) {
+      const group = buildStructure(p.data, textures);
+      group.rotation.y = (p.quarterTurns * Math.PI) / 2;
+      group.position.set(p.offset[0], p.offset[1], p.offset[2]);
+      parent.add(group);
+    }
+    this.current = parent;
+    this.scene.add(parent);
+
+    const box = new THREE.Box3().setFromObject(parent);
+    this.addGrid(box);
+    this.frame(box);
   }
 
   /** Remove the current structure and grid from the scene (back to empty). */
@@ -239,10 +269,12 @@ export class Viewer {
     });
   }
 
-  private addGrid(size: [number, number, number]) {
-    const span = Math.max(size[0], size[2], 1);
+  private addGrid(box: THREE.Box3) {
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const span = Math.ceil(Math.max(size.x, size.z, 1));
     const grid = new THREE.GridHelper(span, span, 0x4b5563, 0x33373e);
-    grid.position.set(size[0] / 2, 0, size[2] / 2);
+    grid.position.set(center.x, box.min.y, center.z);
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.35;
     grid.visible = this.showGrid;
@@ -250,9 +282,10 @@ export class Viewer {
     this.grid = grid;
   }
 
-  private frame(size: [number, number, number]) {
-    const center = new THREE.Vector3(size[0] / 2, size[1] / 2, size[2] / 2);
-    const radius = Math.max(size[0], size[1], size[2], 1);
+  private frame(box: THREE.Box3) {
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const radius = Math.max(size.x, size.y, size.z, 1);
     const dist = radius * 1.8 + 2;
     // Fly speed proportional to the structure so big builds aren't a slow crawl.
     this.flySpeed = Math.max(6, radius * 0.8);

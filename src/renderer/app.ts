@@ -8,21 +8,30 @@ import type { Shell } from './ui/shell';
 import { store, watch } from './state/store';
 import { watchSettings } from './state/settings';
 import { mountSettingsModal, type SettingsModal } from './ui/settings-modal';
+import { promptVersionSelect } from './ui/version-select';
 import { escapeHtml } from './ui/html';
 import { basename, dirname } from './ui/path';
 import { clearInspector, renderInspector } from './ui/inspector';
 import { renderStatus, resetStatus, setStatus } from './ui/statusbar';
+import { JigsawController } from './jigsaw';
+import { isJigsawSupported } from '@/shared/mc-version';
+
+/** The bundled vanilla content pack is 1.21.1, so loose (non-workspace)
+ *  structures are treated as that version for jigsaw support. */
+const BUNDLED_VERSION = '1.21.1';
 
 const api = window.blockwright;
 
 export class App {
   private readonly state = store.getState();
   private readonly settings: SettingsModal = mountSettingsModal();
+  private readonly jigsaw: JigsawController;
 
   constructor(
     private shell: Shell,
     private viewer: Viewer,
   ) {
+    this.jigsaw = new JigsawController(shell.jigsawPanel, viewer);
     this.wire();
     this.bindViews();
     this.applySettings();
@@ -65,7 +74,14 @@ export class App {
       this.hideSuggest(); // a workspace decision was made (opened or closed)
       // Closing a workspace returns to welcome — the open structure may depend
       // on its assets, and you've left that project's context.
-      if (ws === null) this.close();
+      if (ws === null) {
+        this.close();
+        return;
+      }
+      // A workspace whose version we couldn't detect needs one before jigsaw
+      // previews can resolve; ask, then refresh the panel for the open structure.
+      if (ws.minecraftVersion === null) void this.askWorkspaceVersion(ws.name);
+      this.updateJigsaw();
     });
   }
 
@@ -151,8 +167,24 @@ export class App {
     if (store.getState().structure === null) return;
     this.viewer.clear();
     this.state.setStructure(null);
+    this.jigsaw.setStructure(null, false, null);
     clearInspector(this.shell.inspector);
     resetStatus(this.shell.statusbar);
+  }
+
+  /** Refresh the jigsaw panel for the open structure, gating on the version of
+   *  the active context (the workspace, or the bundled pack for loose files). */
+  private updateJigsaw() {
+    const { structure, workspace } = store.getState();
+    if (!structure) return;
+    const version = workspace ? workspace.minecraftVersion : BUNDLED_VERSION;
+    this.jigsaw.setStructure(structure, isJigsawSupported(version), version);
+  }
+
+  /** Ask the user which Minecraft version a workspace targets and persist it. */
+  private async askWorkspaceVersion(name: string) {
+    const version = await promptVersionSelect(name);
+    if (version) await api.setWorkspaceVersion(version);
   }
 
   private async load(path: string) {
@@ -179,6 +211,7 @@ export class App {
         this.state.setStructure(data);
         renderInspector(inspector, data);
         renderStatus(statusbar, data);
+        this.updateJigsaw();
         void this.maybeSuggestWorkspace(path);
       }
     } catch (err) {

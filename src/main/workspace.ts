@@ -11,6 +11,7 @@ import {
 import { clearModelCache } from './structure/model-loader';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
+import { detectMcVersion } from './mc-version-detect';
 
 // A picked folder may be the project root (Gradle layout) or the resources dir.
 const RESOURCE_CANDIDATES = ['src/main/resources', ''];
@@ -25,7 +26,7 @@ export function detectWorkspace(dir: string): Workspace | null {
       .readdirSync(assets, { withFileTypes: true })
       .find((e) => e.isDirectory() && e.name !== 'minecraft')?.name;
     if (!namespace) continue;
-    return { name: path.basename(dir), root, namespace };
+    return { name: path.basename(dir), root, namespace, minecraftVersion: detectMcVersion(root) };
   }
   return null;
 }
@@ -55,6 +56,19 @@ export function activateWorkspace(ws: Workspace): Workspace | null {
   return ws;
 }
 
+/** Record a user-chosen Minecraft version for the active workspace (when
+ *  detection failed), persisting it to recents and broadcasting the change. */
+export function setWorkspaceVersion(version: string): Workspace | null {
+  const ws = getActiveWorkspace();
+  if (!ws) return null;
+  const updated: Workspace = { ...ws, minecraftVersion: version };
+  setActiveWorkspace(updated);
+  addRecentWorkspace(updated); // replaces the entry with the same root (now versioned)
+  notifyRecentWorkspaces();
+  notifyWorkspace();
+  return updated;
+}
+
 /** Detect whether a structure file lives inside a mod project, so opening a
  *  loose `.nbt` can offer to load its workspace. Mod structures sit at
  *  `<resources>/data/<namespace>/structure/...nbt`, with assets in the same root. */
@@ -78,7 +92,12 @@ export function detectWorkspaceForFile(filePath: string): Workspace | null {
   const projectRoot = root.endsWith(path.join('src', 'main', 'resources'))
     ? path.dirname(path.dirname(path.dirname(root)))
     : root;
-  return { name: path.basename(projectRoot), root, namespace };
+  return {
+    name: path.basename(projectRoot),
+    root,
+    namespace,
+    minecraftVersion: detectMcVersion(root),
+  };
 }
 
 /** List the `.nbt` structures a workspace ships under `data/<namespace>/structure`,

@@ -19,6 +19,7 @@ export function renderInspector(inspector: HTMLElement, data: StructureData): vo
         <div><dt>Size</dt><dd>${data.size.join(' × ')}</dd></div>
         <div><dt>Blocks</dt><dd>${data.blockCount.toLocaleString()}</dd></div>
         <div><dt>Palette</dt><dd>${uniqueBlocks.length}</dd></div>
+        ${data.jigsaws.length > 0 ? `<div><dt>Jigsaws</dt><dd>${data.jigsaws.length}</dd></div>` : ''}
       </dl>
     </div>
     <div class="palette-list">

@@ -41,6 +41,12 @@ export function assetsDir(namespace = 'minecraft'): string {
   return path.join(rootFor(namespace), 'assets', namespace);
 }
 
+/** The `data/<namespace>` dir owning a namespace (workspace for its own, else
+ *  the bundled pack) — where worldgen pools and structures live. */
+export function dataDir(namespace = 'minecraft'): string {
+  return path.join(rootFor(namespace), 'data', namespace);
+}
+
 export function texturesDir(namespace = 'minecraft'): string {
   return path.join(assetsDir(namespace), 'textures');
 }

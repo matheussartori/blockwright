@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
-import type { BlockwrightApi, StructureData, Workspace } from '@/shared/types';
+import type {
+  AssembleOptions,
+  BlockwrightApi,
+  JigsawCandidate,
+  JigsawPlan,
+  StructureData,
+  Workspace,
+} from '@/shared/types';
 
 const api: BlockwrightApi = {
   platform: process.platform,
@@ -25,6 +32,12 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesClear),
   listWorkspaceStructures: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceStructures),
+  setWorkspaceVersion: (version: string): Promise<Workspace | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceSetVersion, version),
+  assembleJigsaw: (path: string, options: AssembleOptions): Promise<JigsawPlan> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jigsawAssemble, path, options),
+  jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jigsawCandidates, path, connectorIndex),
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
