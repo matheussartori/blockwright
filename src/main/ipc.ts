@@ -1,13 +1,21 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
+import type { Workspace } from '@/shared/types';
 import { IPC_CHANNELS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
-import { applyWorkspace, promptOpenWorkspace } from './workspace';
-import { openFileDialog } from './window';
-import { buildAppMenu, refreshMenu } from './app-menu';
+import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
+import {
+  activateWorkspace,
+  applyWorkspace,
+  detectWorkspaceForFile,
+  listWorkspaceStructures,
+  promptOpenWorkspace,
+} from './workspace';
+import { notifyRecentWorkspaces, openFileDialog } from './window';
+import { buildAppMenu, refreshMenu, setFileOpen } from './app-menu';
 
 export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
@@ -56,4 +64,23 @@ export function registerIpc(): void {
     return null;
   });
   ipcMain.handle(IPC_CHANNELS.workspaceGet, async () => getActiveWorkspace());
+  ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
+    listWorkspaceStructures(getActiveWorkspace()),
+  );
+  ipcMain.handle(IPC_CHANNELS.workspaceActivate, async (_e, ws: Workspace) => {
+    const active = activateWorkspace(ws);
+    buildAppMenu();
+    return active;
+  });
+  ipcMain.handle(IPC_CHANNELS.workspaceDetectFile, async (_e, filePath: string) =>
+    detectWorkspaceForFile(filePath),
+  );
+  ipcMain.handle(IPC_CHANNELS.recentWorkspacesList, async () => getRecentWorkspaces());
+  ipcMain.handle(IPC_CHANNELS.recentWorkspacesClear, async () => {
+    const list = clearRecentWorkspaces();
+    notifyRecentWorkspaces();
+    buildAppMenu();
+    return list;
+  });
+  ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
 }

@@ -15,6 +15,19 @@ const api: BlockwrightApi = {
   openWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceOpen),
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
   getWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
+  activateWorkspace: (ws: Workspace): Promise<Workspace | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),
+  detectFileWorkspace: (path: string): Promise<Workspace | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceDetectFile, path),
+  listRecentWorkspaces: (): Promise<Workspace[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesList),
+  clearRecentWorkspaces: (): Promise<Workspace[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesClear),
+  listWorkspaceStructures: (): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceStructures),
+  setFileOpen: (open: boolean) => {
+    ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
+  },
   listRecents: () => ipcRenderer.invoke(IPC_CHANNELS.recentsList),
   addRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsAdd, path),
   removeRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsRemove, path),
@@ -27,6 +40,12 @@ const api: BlockwrightApi = {
   },
   onWorkspaceChanged: (cb: (workspace: Workspace | null) => void) => {
     ipcRenderer.on(IPC_EVENTS.workspaceChanged, (_e, ws: Workspace | null) => cb(ws));
+  },
+  onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => {
+    ipcRenderer.on(IPC_EVENTS.recentWorkspacesChanged, (_e, list: Workspace[]) => cb(list));
+  },
+  onCloseStructure: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.closeStructure, () => cb());
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());

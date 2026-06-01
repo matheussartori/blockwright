@@ -23,13 +23,15 @@ src/
     window.ts             BrowserWindow creation, open dialog, pending-open queue, BW_CAPTURE
     ipc.ts                ipcMain.handle registrations for IPC_CHANNELS
     app-menu.ts           Native application menu (OS menu bar): File ▸ Open / Open Recent / Workspace
-    recents.ts            Persisted "recently opened" list (last 10) in userData
-    workspace.ts          Mod-workspace detect/apply (extra namespaced asset source)
+    recents.ts            Persisted "recently opened" files (last 10) in userData
+    recent-workspaces.ts  Persisted "recently opened" mod workspaces (last 10) in userData
+    workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one)
     texture-protocol.ts   Custom bw-texture:// privileged scheme serving namespaced PNGs
     structure/
       load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
       content-pack.ts      Namespace-aware asset roots (vanilla pack + workspace) + JSON cache
       blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
+      block-entity.ts      Chests (normal/trapped/ender + modded): synthesize entity-atlas geometry
       fallback-color.ts    Deterministic per-block color when textures are missing
   renderer/
     index.ts              Renderer entry: mountShell → Viewer → App
@@ -69,10 +71,23 @@ parent from the vanilla pack and the texture from the workspace. Resolved textur
 locates its resources root (`src/main/resources` or the folder itself) and the non-`minecraft`
 namespace under `assets/`, then `applyWorkspace` registers it as an extra asset source and clears
 the JSON/model caches. A bottom-left badge shows the active workspace name. The mod's structures
-(`data/<namespace>/structure/*.nbt`) then render with their custom textures.
+(`data/<namespace>/structure/*.nbt`) then render with their custom textures, and are listed on the
+welcome screen.
+
+Opened workspaces are remembered in `recent-workspaces.ts` and surfaced both on the welcome screen
+(next to recent files) and under File ▸ Open Recent Workspace. Opening a **loose** `.nbt` that sits
+inside a mod (`<root>/data/<namespace>/structure/...nbt` with a matching `assets/<namespace>`) with
+no workspace active triggers `detectWorkspaceForFile`, and the renderer shows a bottom-left prompt
+offering to load that workspace; accepting activates it and re-renders the file so mod textures
+resolve.
 
 ## Conventions / gotchas
 
+- **Block entities (chests):** vanilla chests are particle-only blockstates rendered by a
+  dedicated entity renderer, so `block-entity.ts` intercepts them in `resolveBlock` and
+  synthesizes `ResolvedModel` boxes (bottom/lid/lock) with explicit box-UV into the 64×64
+  `entity/chest/*` atlas. `facing` maps to a blockstate y-rotation; modded chests are detected
+  by name and matched to an `entity/chest/...` texture in their own namespace (vanilla fallback).
 - **Path alias:** `@/*` → `src/*` (see `tsconfig.json`). Use it for cross-dir imports.
 - **Texture protocol CORS:** the `bw-texture://` scheme must be registered as privileged
   with `corsEnabled: true` *and* the handler must return an `access-control-allow-origin`

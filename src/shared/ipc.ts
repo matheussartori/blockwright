@@ -15,6 +15,15 @@ export const IPC_CHANNELS = {
   workspaceOpen: 'workspace:open',
   workspaceClose: 'workspace:close',
   workspaceGet: 'workspace:get',
+  workspaceStructures: 'workspace:structures',
+  /** Activate a known/detected workspace (payload Workspace) — returns it or null if stale. */
+  workspaceActivate: 'workspace:activate',
+  /** Detect whether a `.nbt` path belongs to a mod project — returns a Workspace or null. */
+  workspaceDetectFile: 'workspace:detect-file',
+  recentWorkspacesList: 'recent-workspaces:list',
+  recentWorkspacesClear: 'recent-workspaces:clear',
+  /** Renderer tells main whether a structure is currently open (drives Close File). */
+  setFileOpen: 'file:set-open',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -24,4 +33,8 @@ export const IPC_EVENTS = {
   recentsChanged: 'recents-changed',
   /** Active mod workspace changed — payload is the Workspace or null. */
   workspaceChanged: 'workspace-changed',
+  /** Recent-workspaces list changed — payload is the new Workspace[]. */
+  recentWorkspacesChanged: 'recent-workspaces-changed',
+  /** Request the renderer to close the current structure and return to welcome. */
+  closeStructure: 'close-structure',
 } as const;

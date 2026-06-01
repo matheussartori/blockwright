@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { ResolvedModel } from '@/shared/types';
 import { assetsDir, loadJson } from './content-pack';
 import { buildResolvedModel, parseRef } from './model-loader';
+import { resolveBlockEntity } from './block-entity';
 
 const AIR = new Set([
   'minecraft:air',
@@ -56,6 +57,11 @@ export function resolveBlock(
   name: string,
   properties: Record<string, string> = {},
 ): ResolvedModel[] {
+  // Block entities (chests) bypass the blockstate/model path — their vanilla
+  // model is particle-only, so we synthesize their geometry from the atlas.
+  const entity = resolveBlockEntity(name, properties);
+  if (entity) return entity;
+
   const { namespace, path: key } = parseRef(name);
   const file = path.join(assetsDir(namespace), 'blockstates', `${key}.json`);
   const state = loadJson(file) as

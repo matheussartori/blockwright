@@ -87,6 +87,17 @@ export interface BlockwrightApi {
   openWorkspace: () => Promise<Workspace | null>;
   closeWorkspace: () => Promise<null>;
   getWorkspace: () => Promise<Workspace | null>;
+  /** Activate a known/detected workspace; returns it, or null if it no longer exists. */
+  activateWorkspace: (workspace: Workspace) => Promise<Workspace | null>;
+  /** Detect whether a `.nbt` path belongs to a mod project (returns its Workspace or null). */
+  detectFileWorkspace: (path: string) => Promise<Workspace | null>;
+  /** Recently opened mod workspaces, most-recent first. Both return the updated list. */
+  listRecentWorkspaces: () => Promise<Workspace[]>;
+  clearRecentWorkspaces: () => Promise<Workspace[]>;
+  /** Absolute paths of the active workspace's `.nbt` structures (empty when none). */
+  listWorkspaceStructures: () => Promise<string[]>;
+  /** Report whether a structure is currently open, so main can enable/disable Close File. */
+  setFileOpen: (open: boolean) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */
   pathExists: (path: string) => Promise<boolean>;
   /** Recently opened files, most-recent first. All return the updated list. */
@@ -100,6 +111,10 @@ export interface BlockwrightApi {
   onRecentsChanged: (cb: (paths: string[]) => void) => void;
   /** Notified when the active mod workspace changes (opened or closed). */
   onWorkspaceChanged: (cb: (workspace: Workspace | null) => void) => void;
+  /** Notified when the recent-workspaces list changes. */
+  onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => void;
+  /** Notified when main requests closing the current structure (native File menu). */
+  onCloseStructure: (cb: () => void) => void;
 }
 
 declare global {

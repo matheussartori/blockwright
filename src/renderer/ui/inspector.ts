@@ -36,3 +36,9 @@ export function renderInspector(inspector: HTMLElement, data: StructureData): vo
   `;
   inspector.classList.remove('hidden');
 }
+
+/** Hide and empty the inspector (returning to the welcome view). */
+export function clearInspector(inspector: HTMLElement): void {
+  inspector.classList.add('hidden');
+  inspector.innerHTML = '';
+}

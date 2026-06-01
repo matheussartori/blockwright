@@ -8,6 +8,11 @@ export function setStatus(statusbar: HTMLElement, html: string): void {
   statusbar.innerHTML = html;
 }
 
+/** Reset the status bar to its idle "no file loaded" state. */
+export function resetStatus(statusbar: HTMLElement): void {
+  setStatus(statusbar, '<span class="muted">No file loaded</span>');
+}
+
 /** Show the summary line for a successfully loaded structure. */
 export function renderStatus(statusbar: HTMLElement, data: StructureData): void {
   const mode = data.hasContent

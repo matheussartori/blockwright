@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { IPC_EVENTS } from '@/shared/ipc';
 import { getRecents } from './recents';
+import { getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/content-pack';
 
 let mainWindow: BrowserWindow | null = null;
@@ -56,6 +57,16 @@ export function notifyRecents(): void {
 /** Push the active workspace to the renderer (drives the workspace badge). */
 export function notifyWorkspace(): void {
   mainWindow?.webContents.send(IPC_EVENTS.workspaceChanged, getActiveWorkspace());
+}
+
+/** Push the recent-workspaces list to the renderer (keeps the welcome view in sync). */
+export function notifyRecentWorkspaces(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.recentWorkspacesChanged, getRecentWorkspaces());
+}
+
+/** Ask the renderer to close the current structure (back to the welcome view). */
+export function notifyClose(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.closeStructure);
 }
 
 export function createWindow(): BrowserWindow {

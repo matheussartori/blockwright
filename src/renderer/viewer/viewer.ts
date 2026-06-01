@@ -69,7 +69,8 @@ export class Viewer {
     this.frame(data.size);
   }
 
-  private clear() {
+  /** Remove the current structure and grid from the scene (back to empty). */
+  clear() {
     if (this.current) {
       this.scene.remove(this.current);
       this.disposeGroup(this.current);

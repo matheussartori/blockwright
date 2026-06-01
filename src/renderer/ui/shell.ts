@@ -13,10 +13,20 @@ export interface Shell {
   recents: HTMLElement;
   recentsList: HTMLElement;
   recentsClear: HTMLElement;
+  /** Recent-workspaces block on the welcome screen (hidden when empty). */
+  recentWorkspaces: HTMLElement;
+  recentWorkspacesList: HTMLElement;
+  recentWorkspacesClear: HTMLElement;
   /** Welcome-screen button that opens a mod workspace. */
   openWorkspaceButton: HTMLElement;
+  /** Welcome-screen list of the active workspace's structures (hidden when none). */
+  workspaceStructures: HTMLElement;
+  workspaceStructuresHead: HTMLElement;
+  workspaceStructuresList: HTMLElement;
   /** Bottom-left badge shown while a workspace is active. */
   workspaceBadge: HTMLElement;
+  /** Bottom-left prompt offering to load a detected mod workspace (hidden by default). */
+  workspaceSuggest: HTMLElement;
 }
 
 const TEMPLATE = `
@@ -26,7 +36,7 @@ const TEMPLATE = `
       <span class="name">Blockwright</span>
     </div>
     <div class="actions">
-      <button id="open-btn" class="btn primary">Open NBT…</button>
+      <button id="open-btn" class="btn primary">Open File</button>
     </div>
   </header>
   <main class="stage">
@@ -43,17 +53,33 @@ const TEMPLATE = `
           <button id="open-workspace" class="btn lg">Open mod workspace…</button>
         </div>
         <p class="hint" id="content-hint"></p>
-        <div id="recents" class="recents hidden">
+        <div id="workspace-structures" class="recents hidden">
           <div class="recents-head">
-            <span>Recent</span>
-            <button id="recents-clear" class="link">Clear</button>
+            <span id="workspace-structures-head">Workspace structures</span>
           </div>
-          <ul id="recents-list" class="recents-list"></ul>
+          <ul id="workspace-structures-list" class="recents-list"></ul>
+        </div>
+        <div class="recents-cols">
+          <div id="recents" class="recents hidden">
+            <div class="recents-head">
+              <span>Recent files</span>
+              <button id="recents-clear" class="link">Clear</button>
+            </div>
+            <ul id="recents-list" class="recents-list"></ul>
+          </div>
+          <div id="recent-workspaces" class="recents hidden">
+            <div class="recents-head">
+              <span>Recent workspaces</span>
+              <button id="recent-workspaces-clear" class="link">Clear</button>
+            </div>
+            <ul id="recent-workspaces-list" class="recents-list"></ul>
+          </div>
         </div>
       </div>
     </div>
     <div id="loading" class="loading hidden"><div class="spinner"></div></div>
     <div id="workspace-badge" class="workspace-badge hidden"></div>
+    <div id="workspace-suggest" class="workspace-suggest hidden"></div>
   </main>
   <footer class="statusbar" id="statusbar">
     <span class="muted">No file loaded</span>
@@ -77,7 +103,14 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     recents: byId('recents'),
     recentsList: byId('recents-list'),
     recentsClear: byId('recents-clear'),
+    recentWorkspaces: byId('recent-workspaces'),
+    recentWorkspacesList: byId('recent-workspaces-list'),
+    recentWorkspacesClear: byId('recent-workspaces-clear'),
     openWorkspaceButton: byId('open-workspace'),
+    workspaceStructures: byId('workspace-structures'),
+    workspaceStructuresHead: byId('workspace-structures-head'),
+    workspaceStructuresList: byId('workspace-structures-list'),
     workspaceBadge: byId('workspace-badge'),
+    workspaceSuggest: byId('workspace-suggest'),
   };
 }
