@@ -1,7 +1,7 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
-import type { AssembleOptions, Workspace } from '@/shared/types';
+import type { AssembleOptions, Workspace, WindowsReport } from '@/shared/types';
 import { IPC_CHANNELS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
@@ -18,7 +18,7 @@ import {
   setWorkspaceVersion,
 } from './workspace';
 import { notifyRecentWorkspaces, openFileDialog } from './window';
-import { buildAppMenu, refreshMenu, setFileOpen } from './app-menu';
+import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
 
 export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
@@ -100,4 +100,8 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
+
+  ipcMain.handle(IPC_CHANNELS.windowsReport, async (_e, state: WindowsReport) =>
+    setWindowsState(state),
+  );
 }

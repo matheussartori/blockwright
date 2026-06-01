@@ -9,6 +9,7 @@
   <a href="https://threejs.org"><img src="https://img.shields.io/badge/three.js-0.184-000000?logo=three.js&logoColor=white" alt="Three.js" /></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-6-blue?logo=typescript&logoColor=white" alt="TypeScript" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License" /></a>
+  <a href="https://buymeacoffee.com/mattsartori"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee" /></a>
 </p>
 
 <p align="center">
@@ -17,7 +18,8 @@
   <a href="#usage">Usage</a> ·
   <a href="#mod-workspaces">Mod Workspaces</a> ·
   <a href="#development">Development</a> ·
-  <a href="#architecture">Architecture</a>
+  <a href="#architecture">Architecture</a> ·
+  <a href="#support">Support</a>
 </p>
 
 ## Overview
@@ -137,6 +139,18 @@ content/         Extracted Minecraft content pack, shipped as an extraResource
 - **Renderer state** — held in a vanilla [Zustand](https://github.com/pmndrs/zustand) store.
 
 Built with **Electron Forge + Vite + TypeScript + Three.js**.
+
+## Support
+
+Blockwright is a solo, open-source project. If it's useful to you and you'd like to help fund
+its development (and the long-term goal of AI-generated structures), consider buying me a coffee —
+every bit is genuinely appreciated. ☕
+
+<p align="center">
+  <a href="https://buymeacoffee.com/mattsartori">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="50" />
+  </a>
+</p>
 
 ## License
 

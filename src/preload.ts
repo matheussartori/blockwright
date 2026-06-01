@@ -7,6 +7,8 @@ import type {
   JigsawPlan,
   StructureData,
   Workspace,
+  WindowId,
+  WindowsReport,
 } from '@/shared/types';
 
 const api: BlockwrightApi = {
@@ -42,6 +44,9 @@ const api: BlockwrightApi = {
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
+  reportWindows: (state: WindowsReport) => {
+    ipcRenderer.invoke(IPC_CHANNELS.windowsReport, state);
+  },
   listRecents: () => ipcRenderer.invoke(IPC_CHANNELS.recentsList),
   addRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsAdd, path),
   removeRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsRemove, path),
@@ -63,6 +68,12 @@ const api: BlockwrightApi = {
   },
   onOpenSettings: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.openSettings, () => cb());
+  },
+  onToggleWindow: (cb: (id: WindowId) => void) => {
+    ipcRenderer.on(IPC_EVENTS.windowToggle, (_e, id: WindowId) => cb(id));
+  },
+  onResetWindows: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.windowsReset, () => cb());
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());

@@ -47,6 +47,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Subtle, consistent scrollbars everywhere (welcome lists, palette, jigsaw). */
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Non-mac platforms get an opaque backdrop (no system vibrancy). */
 .platform-win32,
 .platform-linux {
@@ -145,6 +168,14 @@ body {
   padding: 9px 18px;
   font-size: 14px;
 }
+.btn.sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 
 /* --- Stage / viewport ------------------------------------------------------ */
 
@@ -161,115 +192,172 @@ body {
   outline: none;
 }
 
-/* --- Empty state ----------------------------------------------------------- */
+/* --- Welcome / empty state ------------------------------------------------- */
 
-.empty {
+/* Fills the stage and scrolls when content is tall; `margin:auto` on the inner
+   content centers it when short, and (unlike justify-content:center) never
+   clips the top once the content overflows. */
+.welcome {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
+  overflow-y: auto;
 }
-.empty.hidden {
-  display: none;
+.welcome-inner {
+  display: flex;
+  min-height: 100%;
+  padding: 48px 24px;
+  box-sizing: border-box;
 }
-.empty-card {
-  pointer-events: auto;
+.welcome-content {
+  margin: auto;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  max-width: 520px;
-  padding: 32px;
 }
-.empty-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px;
-  border-radius: 18px;
+.welcome-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
   background:
     linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(59, 130, 246, 0.12)),
     var(--panel-strong);
   border: 1px solid var(--border);
   position: relative;
 }
-.empty-icon::after {
+.welcome-icon::after {
   content: '';
   position: absolute;
-  inset: 20px;
+  inset: 17px;
   border-radius: 6px;
   background: linear-gradient(135deg, #60a5fa, #3b82f6 55%, #1e40af);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   transform: rotate(8deg);
 }
-.empty-card h1 {
-  font-size: 21px;
+.welcome-hero h1 {
+  font-size: 20px;
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: 18px 0 8px;
 }
-.empty-card p {
-  color: var(--text-muted);
+.welcome-hero p {
+  max-width: 420px;
+  margin: 0 0 20px;
   font-size: 13.5px;
   line-height: 1.5;
-  margin: 0 0 20px;
+  color: var(--text-muted);
 }
-.empty-card code {
+.welcome-hero code {
   background: var(--panel-strong);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 12px;
 }
-.hint {
-  margin-top: 16px !important;
-  font-size: 12px !important;
-}
-.empty-actions {
+.welcome-actions {
   display: flex;
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
 }
+.welcome-hint {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
 
-/* --- Controls cheatsheet (top-left) ---------------------------------------- */
+/* --- Shared floating window chrome (Controls / Inspector / Jigsaw) ---------- */
 
-.controls-help {
+/* One chrome for all three windows, so titles, spacing and typography read
+   identically. Positioned by the windows store (stage-local left/top). */
+.bw-window {
   position: absolute;
-  top: 12px;
-  left: 12px;
   z-index: 50;
-  width: 196px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 24px);
   font-size: 12px;
-  border-radius: var(--radius);
   color: var(--text);
   background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
-.controls-help.hidden {
-  display: none;
-}
-.ch-head {
+.bw-window-head {
   -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  font: inherit;
+  padding: 9px 8px 9px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: grab;
+  user-select: none;
+}
+.bw-window-head:active {
+  cursor: grabbing;
+}
+.bw-window.minimized .bw-window-head {
+  border-bottom: 0;
+}
+.bw-window-title {
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
+}
+.bw-window-extra {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.bw-window-min {
+  -webkit-app-region: no-drag;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-muted);
   background: transparent;
   border: 0;
+  border-radius: 5px;
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
-.ch-head:hover {
+.bw-window-min:hover {
   background: var(--panel);
+  color: var(--text);
 }
-.ch-title {
-  font-weight: 600;
+.bw-window.minimized .bw-window-min {
+  transform: rotate(-90deg);
 }
+.bw-window-body {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* --- Controls content ------------------------------------------------------ */
+
 .ch-mode {
   font-size: 9.5px;
   font-weight: 600;
@@ -279,25 +367,12 @@ body {
   border-radius: 4px;
   padding: 1px 5px;
 }
-.controls-help.fly-active .ch-mode {
+.ch-mode.active {
   color: var(--accent-text);
   background: var(--accent);
   border-color: transparent;
 }
-.ch-chevron {
-  margin-left: auto;
-  font-size: 13px;
-  line-height: 1;
-  transition: transform 0.15s ease;
-}
-.controls-help.collapsed .ch-chevron {
-  transform: rotate(-90deg);
-}
-.controls-help.collapsed .ch-body {
-  display: none;
-}
-.ch-body {
-  padding: 4px 12px 12px;
+.ch-groups {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -306,7 +381,7 @@ body {
   border-radius: 8px;
   transition: background 0.15s ease;
 }
-.controls-help.fly-active .ch-group--fly {
+.ch-group--active {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
   margin: -6px -8px;
@@ -455,72 +530,102 @@ body {
   color: var(--text);
 }
 
-/* --- Welcome recents ------------------------------------------------------- */
+/* --- Welcome lists (workspace structures / recents) ------------------------ */
 
-.recents {
-  margin-top: 28px;
-  text-align: left;
+.welcome-lists {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.recents.hidden {
-  display: none;
-}
-/* Recent files + recent workspaces share the card width, side by side. A column
-   flexes to fill the row when the other is empty. */
-.recents-cols {
+/* Recent files + recent workspaces sit side by side; a column flexes to fill
+   the row when the other is absent. */
+.welcome-cols {
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: 14px;
 }
-.recents-cols > .recents {
+.welcome-cols > .list-card {
   flex: 1;
   min-width: 0;
-  margin-top: 28px;
 }
-.recents-cols:not(:has(> .recents:not(.hidden))) {
-  display: none;
+
+.list-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
 }
-.recents-head {
+.list-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px 8px;
+  gap: 8px;
+  padding: 10px 12px 8px;
 }
-.recents-head span {
+.list-title {
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
-.link {
+.list-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.list-search-wrap {
+  padding: 0 12px 6px;
+}
+.list-search {
   -webkit-app-region: no-drag;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
   font: inherit;
   font-size: 12px;
-  color: var(--accent);
-  background: transparent;
-  border: 0;
-  border-radius: 5px;
-  padding: 2px 5px;
-  cursor: pointer;
-}
-.link:hover {
+  color: var(--text);
   background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 7px;
 }
-.recents-list {
+.list-search::placeholder {
+  color: var(--text-muted);
+}
+.list-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.list-body {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 4px 6px 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-height: 196px;
+  max-height: 240px;
   overflow-y: auto;
   overflow-x: hidden;
 }
+.welcome-cols .list-body {
+  max-height: 200px;
+}
+.list-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Rows — shared by every welcome list. */
 .recent-row {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 7px 10px;
+  padding: 7px 9px;
   border-radius: 7px;
   cursor: pointer;
   min-width: 0;
@@ -542,58 +647,35 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.recents-search {
+
+/* Text-link button (Clear, re-roll, reset). */
+.link {
   -webkit-app-region: no-drag;
-  width: 100%;
-  box-sizing: border-box;
-  margin-bottom: 8px;
-  padding: 6px 9px;
   font: inherit;
   font-size: 12px;
-  color: var(--text);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  cursor: pointer;
 }
-.recents-search::placeholder {
-  color: var(--text-muted);
-}
-.recents-search:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.recents-empty {
-  padding: 7px 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-/* --- Inspector ------------------------------------------------------------- */
-
-.inspector {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  bottom: 12px;
-  width: 248px;
-  display: flex;
-  flex-direction: column;
+.link:hover {
   background: var(--panel-strong);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
 }
-.inspector.hidden {
-  display: none;
+.link:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
-.inspector-head {
-  padding: 14px 16px 12px;
+
+/* --- Inspector content ----------------------------------------------------- */
+
+.inspector-meta {
+  padding-bottom: 12px;
+  margin-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
-.inspector-head h2 {
+.inspector-meta h2 {
   font-size: 13px;
   font-weight: 600;
   margin: 0 0 12px;
@@ -625,9 +707,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .palette-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px;
+  padding: 2px 0;
 }
 .palette-row {
   display: flex;
@@ -845,70 +925,29 @@ body {
   padding: 10px 16px 14px;
 }
 
-/* --- Jigsaw panel (bottom-right, left of the inspector) -------------------- */
+/* --- Jigsaw content -------------------------------------------------------- */
 
-.jigsaw-panel {
-  position: absolute;
-  right: 272px;
-  bottom: 12px;
-  z-index: 40;
-  width: 280px;
-  max-height: 62%;
-  display: flex;
-  flex-direction: column;
-  font-size: 12px;
-  color: var(--text);
-  background: var(--panel-strong);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  overflow: hidden;
+.bw-count {
+  font-variant-numeric: tabular-nums;
 }
-.jigsaw-panel.hidden {
-  display: none;
-}
-.jp-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.jp-title {
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-.jp-count {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.jp-body {
-  padding: 10px 12px 12px;
-  overflow-y: auto;
-}
-.jp-controls {
+.bw-controls {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
-.jp-controls .btn {
-  padding: 4px 10px;
-  font-size: 12px;
-}
-.jp-field {
+.bw-field {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
 }
-.jp-field input {
+.bw-field input {
   -webkit-app-region: no-drag;
   width: 64px;
   padding: 3px 6px;
+  font: inherit;
   font-size: 12px;
   color: var(--text);
   background: var(--panel);
@@ -916,23 +955,19 @@ body {
   border-radius: 6px;
   accent-color: var(--accent);
 }
-.jp-reroll {
-  -webkit-app-region: no-drag;
-}
-.jp-note {
+.bw-note {
   color: var(--text-muted);
   line-height: 1.4;
   margin: 4px 0;
 }
-.jp-section {
+.bw-section {
   margin: 10px 0 6px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
-.jp-connectors,
-.jp-cand-list {
+.bw-rows {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -940,8 +975,7 @@ body {
   flex-direction: column;
   gap: 2px;
 }
-.jp-conn,
-.jp-cand {
+.bw-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -949,32 +983,28 @@ body {
   border-radius: 6px;
   cursor: pointer;
 }
-.jp-conn:hover,
-.jp-cand:hover {
+.bw-row:hover {
   background: var(--panel);
 }
-.jp-conn-name,
-.jp-conn-target,
-.jp-cand-name {
+.bw-row-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.jp-conn-arrow {
+.bw-row-arrow {
   color: var(--text-muted);
 }
-.jp-conn-pool,
-.jp-cand-weight {
+.bw-row-tag {
   margin-left: auto;
   font-size: 10px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
-.jp-ok {
+.bw-ok {
   margin: 2px 0 6px;
   color: var(--text-muted);
 }
-.jp-warn-list {
+.bw-warn-list {
   list-style: none;
   margin: 4px 0 0;
   padding: 0;
@@ -982,15 +1012,15 @@ body {
   flex-direction: column;
   gap: 4px;
 }
-.jp-warn {
+.bw-warn {
   padding: 5px 8px;
   border-radius: 6px;
   line-height: 1.35;
   background: color-mix(in srgb, #f59e0b 14%, var(--panel));
   border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);
 }
-.jp-warn--missing-structure,
-.jp-warn--unmatched-target {
+.bw-warn--missing-structure,
+.bw-warn--unmatched-target {
   background: color-mix(in srgb, #ef4444 14%, var(--panel));
   border-color: color-mix(in srgb, #ef4444 40%, transparent);
 }

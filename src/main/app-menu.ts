@@ -3,6 +3,7 @@
 // the usual shortcuts (copy, quit, devtools, …) keep working.
 import { Menu, app, dialog, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import type { WindowId, WindowsReport } from '@/shared/types';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/content-pack';
@@ -12,6 +13,8 @@ import {
   notifyOpenSettings,
   notifyRecents,
   notifyRecentWorkspaces,
+  notifyResetWindows,
+  notifyWindowToggle,
   openFile,
   openFileDialog,
 } from './window';
@@ -22,10 +25,25 @@ const isMac = process.platform === 'darwin';
 // renderer over IPC) — drives the enabled state of the Close File menu item.
 let fileOpen = false;
 
+// Floating-window state mirrored from the renderer (it owns the persisted
+// layout). Drives the View menu's per-window checkmarks/enabled state. Defaults
+// to "shown but unavailable" until the renderer reports and a file is open.
+let windowsState: WindowsReport = {
+  controls: { visible: true, available: false },
+  inspector: { visible: true, available: false },
+  jigsaw: { visible: true, available: false },
+};
+
 /** Update the open-file flag and rebuild the menu if it changed. */
 export function setFileOpen(open: boolean): void {
   if (open === fileOpen) return;
   fileOpen = open;
+  buildAppMenu();
+}
+
+/** Mirror the renderer's floating-window state and rebuild the View menu. */
+export function setWindowsState(state: WindowsReport): void {
+  windowsState = state;
   buildAppMenu();
 }
 
@@ -87,6 +105,37 @@ export function buildAppMenu(): void {
     ],
   };
 
+  // Custom View menu: per-window show/hide toggles, the zoom roles, one
+  // full-screen toggle, and a Layout ▸ Reset. No Reload/DevTools.
+  const windowItem = (id: WindowId, label: string, accelerator: string): MenuItemConstructorOptions => ({
+    label,
+    accelerator,
+    type: 'checkbox',
+    checked: windowsState[id].visible,
+    enabled: windowsState[id].available,
+    click: () => notifyWindowToggle(id),
+  });
+
+  const viewMenu: MenuItemConstructorOptions = {
+    label: 'View',
+    submenu: [
+      windowItem('controls', 'Controls', 'CmdOrCtrl+1'),
+      windowItem('inspector', 'Inspector', 'CmdOrCtrl+2'),
+      windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+3'),
+      { type: 'separator' },
+      { role: 'resetZoom', label: 'Actual Size' },
+      { role: 'zoomIn' },
+      { role: 'zoomOut' },
+      { type: 'separator' },
+      { role: 'togglefullscreen' },
+      { type: 'separator' },
+      {
+        label: 'Layout',
+        submenu: [{ label: 'Reset Window Positions', click: () => notifyResetWindows() }],
+      },
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [appMenu] : []),
     {
@@ -123,7 +172,7 @@ export function buildAppMenu(): void {
       ],
     },
     { role: 'editMenu' },
-    { role: 'viewMenu' },
+    viewMenu,
     { role: 'windowMenu' },
   ];
 

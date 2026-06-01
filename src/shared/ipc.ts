@@ -32,6 +32,8 @@ export const IPC_CHANNELS = {
   jigsawCandidates: 'jigsaw:candidates',
   /** Renderer tells main whether a structure is currently open (drives Close File). */
   setFileOpen: 'file:set-open',
+  /** Renderer reports its floating-window state so the View menu checkmarks stay in sync. */
+  windowsReport: 'windows:report',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -47,4 +49,8 @@ export const IPC_EVENTS = {
   closeStructure: 'close-structure',
   /** Request the renderer to open the Settings panel (native menu / Cmd+,). */
   openSettings: 'open-settings',
+  /** Toggle a floating window's visibility from the View menu — payload is its id. */
+  windowToggle: 'window-toggle',
+  /** Reset every floating window to its home position (View ▸ Layout). */
+  windowsReset: 'windows-reset',
 } as const;

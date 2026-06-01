@@ -161,6 +161,19 @@ export interface JigsawCandidate {
   placement: PlacedPiece;
 }
 
+/** The three standardized floating windows the View menu can show/hide. */
+export type WindowId = 'controls' | 'inspector' | 'jigsaw';
+
+/** Per-window state the renderer reports to main so the View menu reflects it.
+ *  `available` gates the menu item's enabled state (its content can exist);
+ *  `visible` drives the checkmark. */
+export interface WindowMenuState {
+  visible: boolean;
+  available: boolean;
+}
+
+export type WindowsReport = Record<WindowId, WindowMenuState>;
+
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
   openDialog: () => Promise<string | null>;
@@ -191,6 +204,8 @@ export interface BlockwrightApi {
   jigsawCandidates: (path: string, connectorIndex: number) => Promise<JigsawCandidate[]>;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
+  /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
+  reportWindows: (state: WindowsReport) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */
   pathExists: (path: string) => Promise<boolean>;
   /** Recently opened files, most-recent first. All return the updated list. */
@@ -210,6 +225,10 @@ export interface BlockwrightApi {
   onCloseStructure: (cb: () => void) => void;
   /** Notified when main requests opening the Settings panel (native menu / Cmd+,). */
   onOpenSettings: (cb: () => void) => void;
+  /** Notified when the View menu toggles a floating window's visibility. */
+  onToggleWindow: (cb: (id: WindowId) => void) => void;
+  /** Notified when the View ▸ Layout menu requests resetting window positions. */
+  onResetWindows: (cb: () => void) => void;
 }
 
 declare global {

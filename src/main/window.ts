@@ -74,6 +74,16 @@ export function notifyOpenSettings(): void {
   mainWindow?.webContents.send(IPC_EVENTS.openSettings);
 }
 
+/** Ask the renderer to toggle a floating window's visibility (View menu). */
+export function notifyWindowToggle(id: string): void {
+  mainWindow?.webContents.send(IPC_EVENTS.windowToggle, id);
+}
+
+/** Ask the renderer to reset all floating windows to their home positions. */
+export function notifyResetWindows(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.windowsReset);
+}
+
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1180,

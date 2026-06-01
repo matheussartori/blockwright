@@ -37,13 +37,18 @@ src/
       template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
       jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
-  renderer/
-    index.ts              Renderer entry: mountShell → Viewer → App
-    app.ts                Orchestration: open/load flow, wiring
-    jigsaw.ts             Jigsaw panel controller: drives assembly/manual modes + warnings
-    ui/shell.ts           Static chrome (titlebar/stage/statusbar) → typed element refs
-    ui/inspector.ts, statusbar.ts, html.ts, version-select.ts
-    viewer/               Three.js viewer + mesh/geometry/texture building (renders placed pieces)
+  renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
+    index.tsx             Entry: createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
+    App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
+    api.ts                Typed accessor for window.blockwright (the preload bridge)
+    components/           FloatingWindow (shared window chrome), Titlebar, Statusbar, Welcome,
+                          WorkspaceBadge/Suggest, Loading, SettingsModal, VersionSelectModal
+    windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
+    hooks/useStores.ts    useApp / useSettings / useWindows (React bindings over the vanilla stores)
+    state/                store.ts (main-mirrored + view state), settings.ts (prefs),
+                          windows.ts (floating-window layout, persisted)
+    ui/path.ts            basename/dirname helpers (no Node path across the bridge)
+    viewer/               Three.js Viewer + ViewerProvider (React bridge) + mesh/geometry/texture building
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types.ts              Type-only contracts shared by both bundles (incl. BlockwrightApi)
@@ -124,8 +129,15 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 - **Forge entry naming:** keep `src/main.ts` and `src/preload.ts` at the top level —
   Forge names the output bundles by entry basename, and `main` in package.json points at
   `.vite/build/main.js`.
-- **Renderer HTML safety:** UI is built by string templating into `innerHTML`; always run
-  user/file-derived strings through `escapeHtml` (`renderer/ui/html.ts`).
+- **Floating windows:** Controls / Inspector / Jigsaw share one chrome (`components/FloatingWindow.tsx`):
+  titled, draggable (clamped to the stage), minimize-only. Layout lives in `state/windows.ts`
+  (persisted). The native **View** menu shows/hides each window and offers Layout ▸ Reset Window
+  Positions; `App.tsx` reports `{visible,available}` per window to main (`reportWindows`) so the
+  menu's checkmarks/enabled state track the renderer (which owns the state). Don't inline window
+  positions — go through the store.
+- **Renderer is React:** UI is JSX (React escapes interpolated strings, so there's no `escapeHtml`).
+  The Viewer is imperative Three.js bridged via `viewer/ViewerProvider.tsx`; it's created once and
+  has no teardown, which is why `index.tsx` does **not** use StrictMode.
 - **Recents are owned by main:** `recents.ts` is the single source of truth. The native
   File menu and the renderer both mutate it via IPC; every mutation rebuilds the menu and
   broadcasts `recentsChanged`, which the welcome view re-renders from (don't keep a separate

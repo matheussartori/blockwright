@@ -2,6 +2,8 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "preserve",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
