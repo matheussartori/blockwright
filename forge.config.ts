@@ -10,6 +10,8 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // Ship the Minecraft content pack alongside the app (resolved at runtime).
+    extraResource: ['content'],
   },
   rebuildConfig: {},
   makers: [

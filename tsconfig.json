@@ -9,6 +9,9 @@
     "noImplicitAny": true,
     "sourceMap": true,
     "outDir": "dist",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }
