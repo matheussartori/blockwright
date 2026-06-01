@@ -47,6 +47,9 @@ const api: BlockwrightApi = {
   onCloseStructure: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.closeStructure, () => cb());
   },
+  onOpenSettings: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.openSettings, () => cb());
+  },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());
     window.addEventListener('drop', (e) => {

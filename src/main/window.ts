@@ -69,6 +69,11 @@ export function notifyClose(): void {
   mainWindow?.webContents.send(IPC_EVENTS.closeStructure);
 }
 
+/** Ask the renderer to open the Settings panel. */
+export function notifyOpenSettings(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openSettings);
+}
+
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1180,

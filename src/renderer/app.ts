@@ -6,6 +6,8 @@ import type { Viewer } from './viewer/viewer';
 import type { StructureData, Workspace } from '@/shared/types';
 import type { Shell } from './ui/shell';
 import { store, watch } from './state/store';
+import { watchSettings } from './state/settings';
+import { mountSettingsModal, type SettingsModal } from './ui/settings-modal';
 import { escapeHtml } from './ui/html';
 import { basename, dirname } from './ui/path';
 import { clearInspector, renderInspector } from './ui/inspector';
@@ -15,6 +17,7 @@ const api = window.blockwright;
 
 export class App {
   private readonly state = store.getState();
+  private readonly settings: SettingsModal = mountSettingsModal();
 
   constructor(
     private shell: Shell,
@@ -22,6 +25,7 @@ export class App {
   ) {
     this.wire();
     this.bindViews();
+    this.applySettings();
     this.probeContent();
     void this.initRecents();
     void this.initWorkspace();
@@ -49,6 +53,7 @@ export class App {
     api.onOpenPath((path) => this.load(path));
     api.onFileDrop((path) => this.load(path));
     api.onCloseStructure(() => this.close());
+    api.onOpenSettings(() => this.settings.open());
     // Recents and workspace are owned by main (and mutated by the native File
     // menu too), so we mirror the broadcasts into the store rather than keeping
     // a second authoritative copy here.
@@ -76,6 +81,15 @@ export class App {
       this.shell.emptyState.classList.toggle('hidden', open);
       this.shell.controlsHelp.classList.toggle('hidden', !open);
       api.setFileOpen(open); // keep the native Close File item enabled/disabled in sync
+    });
+  }
+
+  /** Push persisted settings into the viewer, now and on every change. */
+  private applySettings() {
+    watchSettings((s) => {
+      this.viewer.setLookSensitivity(s.lookSensitivity);
+      this.viewer.setInvertY(s.invertY);
+      this.viewer.setShowGrid(s.showGrid);
     });
   }
 

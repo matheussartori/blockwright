@@ -1,0 +1,71 @@
+// User preferences, owned entirely by the renderer and persisted to
+// localStorage (no IPC — the only thing main does is ask us to open the panel).
+// Kept separate from the main `store` (which mirrors main-owned state) since
+// these are durable, renderer-local knobs. Uses Zustand's vanilla store to
+// match the rest of the renderer.
+import { createStore } from 'zustand/vanilla';
+
+export interface Settings {
+  /** Mouse-look multiplier in fly mode. */
+  lookSensitivity: number;
+  /** Invert the vertical look axis in fly mode. */
+  invertY: boolean;
+  /** Show the ground grid in the viewer. */
+  showGrid: boolean;
+}
+
+export const SETTINGS_DEFAULTS: Settings = {
+  lookSensitivity: 1,
+  invertY: false,
+  showGrid: true,
+};
+
+const STORAGE_KEY = 'blockwright.settings';
+
+/** Load persisted settings, merged over defaults so new keys are picked up. */
+function load(): Settings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...SETTINGS_DEFAULTS };
+    return { ...SETTINGS_DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) };
+  } catch {
+    return { ...SETTINGS_DEFAULTS };
+  }
+}
+
+export interface SettingsState extends Settings {
+  /** Update one setting. */
+  set: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  /** Restore every setting to its default. */
+  reset: () => void;
+}
+
+export const settingsStore = createStore<SettingsState>((set) => ({
+  ...load(),
+  set: (key, value) => set({ [key]: value } as Partial<SettingsState>),
+  reset: () => set({ ...SETTINGS_DEFAULTS }),
+}));
+
+/** Snapshot of just the persisted slice (drops the action methods). */
+function snapshot(s: SettingsState): Settings {
+  return {
+    lookSensitivity: s.lookSensitivity,
+    invertY: s.invertY,
+    showGrid: s.showGrid,
+  };
+}
+
+// Persist on every change.
+settingsStore.subscribe((state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot(state)));
+  } catch {
+    /* storage unavailable — keep running with in-memory settings */
+  }
+});
+
+/** Subscribe to the persisted settings, invoking `run` immediately and on change. */
+export function watchSettings(run: (settings: Settings) => void): () => void {
+  run(snapshot(settingsStore.getState()));
+  return settingsStore.subscribe((state) => run(snapshot(state)));
+}

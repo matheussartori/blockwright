@@ -115,6 +115,8 @@ export interface BlockwrightApi {
   onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => void;
   /** Notified when main requests closing the current structure (native File menu). */
   onCloseStructure: (cb: () => void) => void;
+  /** Notified when main requests opening the Settings panel (native menu / Cmd+,). */
+  onOpenSettings: (cb: () => void) => void;
 }
 
 declare global {

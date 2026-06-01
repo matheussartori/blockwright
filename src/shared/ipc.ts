@@ -37,4 +37,6 @@ export const IPC_EVENTS = {
   recentWorkspacesChanged: 'recent-workspaces-changed',
   /** Request the renderer to close the current structure and return to welcome. */
   closeStructure: 'close-structure',
+  /** Request the renderer to open the Settings panel (native menu / Cmd+,). */
+  openSettings: 'open-settings',
 } as const;

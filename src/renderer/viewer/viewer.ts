@@ -31,7 +31,14 @@ export class Viewer {
   private timer = new THREE.Timer();
   /** Fly movement speed in world units/second; scaled to the structure on load. */
   private flySpeed = 8;
+  /** Mouse-look multiplier in fly mode (Settings). */
+  private lookSensitivity = 1;
+  /** Invert the vertical look axis in fly mode (Settings). */
+  private invertY = false;
+  /** Whether the ground grid is shown (Settings). */
+  private showGrid = true;
   private readonly dir = new THREE.Vector3();
+  private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
   /** Notified whenever the navigation mode changes (for the UI to reflect it). */
   onModeChange: ((mode: NavMode) => void) | null = null;
@@ -55,6 +62,11 @@ export class Viewer {
     this.controls.dampingFactor = 0.08;
 
     this.fly = new PointerLockControls(this.camera, this.renderer.domElement);
+    // We drive mouse-look ourselves (to support sensitivity + invert-Y from
+    // Settings), so neutralize PointerLockControls' own rotation while keeping
+    // its lock plumbing (isLocked, lock/unlock, moveRight, the unlock event).
+    this.fly.pointerSpeed = 0;
+    this.renderer.domElement.ownerDocument.addEventListener('mousemove', this.onMouseLook);
     // Losing the pointer lock (Esc, or the browser dropping it) is the canonical
     // signal to leave fly mode and hand the camera back to OrbitControls.
     this.fly.addEventListener('unlock', () => this.setMode('orbit'));
@@ -153,6 +165,35 @@ export class Viewer {
     this.flySpeed = THREE.MathUtils.clamp(this.flySpeed * factor, 1, 500);
   };
 
+  /** Pointer-lock mouse-look (mirrors PointerLockControls' math, but with the
+   *  user's sensitivity and optional Y inversion). */
+  private onMouseLook = (e: MouseEvent) => {
+    if (this.mode !== 'fly' || !this.fly.isLocked) return;
+    const factor = 0.002 * this.lookSensitivity;
+    this.euler.setFromQuaternion(this.camera.quaternion);
+    this.euler.y -= e.movementX * factor;
+    this.euler.x -= e.movementY * factor * (this.invertY ? -1 : 1);
+    // Clamp pitch so you can't flip over the poles.
+    this.euler.x = THREE.MathUtils.clamp(this.euler.x, -Math.PI / 2, Math.PI / 2);
+    this.camera.quaternion.setFromEuler(this.euler);
+  };
+
+  /** Mouse-look multiplier in fly mode (Settings). */
+  setLookSensitivity(value: number) {
+    this.lookSensitivity = value;
+  }
+
+  /** Invert the vertical look axis in fly mode (Settings). */
+  setInvertY(value: boolean) {
+    this.invertY = value;
+  }
+
+  /** Show or hide the ground grid (Settings). */
+  setShowGrid(show: boolean) {
+    this.showGrid = show;
+    if (this.grid) this.grid.visible = show;
+  }
+
   private onResize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
@@ -204,6 +245,7 @@ export class Viewer {
     grid.position.set(size[0] / 2, 0, size[2] / 2);
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.35;
+    grid.visible = this.showGrid;
     this.scene.add(grid);
     this.grid = grid;
   }

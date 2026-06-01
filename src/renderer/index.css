@@ -701,3 +701,116 @@ body {
 .warn {
   color: #ff9f0a;
 }
+
+/* --- Settings modal ------------------------------------------------------- */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-app-region: no-drag;
+}
+.settings-overlay.hidden {
+  display: none;
+}
+.settings-modal {
+  width: min(420px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  /* Opaque surface so the panel reads clearly over the busy welcome screen. */
+  background: #26272b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+@media (prefers-color-scheme: light) {
+  .settings-modal {
+    background: #fbfbfd;
+  }
+}
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.settings-close {
+  -webkit-app-region: no-drag;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+}
+.settings-close:hover {
+  color: var(--text);
+  background: var(--panel);
+}
+.settings-body {
+  padding: 8px 16px 4px;
+}
+.settings-group {
+  padding: 8px 0 12px;
+}
+.settings-group + .settings-group {
+  border-top: 1px solid var(--border);
+}
+.settings-group-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.setting-label {
+  font-size: 13px;
+}
+.setting-value {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+.setting-row input[type='range'] {
+  -webkit-app-region: no-drag;
+  width: 150px;
+  accent-color: var(--accent);
+}
+.setting-row input[type='checkbox'] {
+  -webkit-app-region: no-drag;
+  grid-column: 3;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.settings-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 16px 14px;
+}

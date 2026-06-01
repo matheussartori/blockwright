@@ -1,7 +1,7 @@
 // Builds the native application menu (the OS menu bar). The File menu carries
 // Open / Open Recent / Clear Recently Opened; the rest are standard roles so
 // the usual shortcuts (copy, quit, devtools, …) keep working.
-import { Menu, dialog, type MenuItemConstructorOptions } from 'electron';
+import { Menu, app, dialog, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
@@ -9,6 +9,7 @@ import { getActiveWorkspace } from './structure/content-pack';
 import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './workspace';
 import {
   notifyClose,
+  notifyOpenSettings,
   notifyRecents,
   notifyRecentWorkspaces,
   openFile,
@@ -60,8 +61,34 @@ export function buildAppMenu(): void {
       ]
     : [{ label: 'No Recent Workspaces', enabled: false }];
 
+  // The Settings item lives where each OS expects it: under the app menu on
+  // macOS (Cmd+,), and under File on Windows/Linux (Ctrl+,). Both route to the
+  // same renderer-side panel via IPC.
+  const settingsItem: MenuItemConstructorOptions = {
+    label: 'Settings…',
+    accelerator: 'CmdOrCtrl+,',
+    click: () => notifyOpenSettings(),
+  };
+
+  const appMenu: MenuItemConstructorOptions = {
+    label: app.name,
+    submenu: [
+      { role: 'about' },
+      { type: 'separator' },
+      settingsItem,
+      { type: 'separator' },
+      { role: 'services' },
+      { type: 'separator' },
+      { role: 'hide' },
+      { role: 'hideOthers' },
+      { role: 'unhide' },
+      { type: 'separator' },
+      { role: 'quit' },
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    ...(isMac ? [appMenu] : []),
     {
       label: 'File',
       submenu: [
@@ -91,6 +118,7 @@ export function buildAppMenu(): void {
           },
         },
         { type: 'separator' },
+        ...(isMac ? [] : [settingsItem, { type: 'separator' as const }]),
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
