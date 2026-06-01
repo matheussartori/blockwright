@@ -23,6 +23,10 @@ export interface Shell {
   workspaceStructures: HTMLElement;
   workspaceStructuresHead: HTMLElement;
   workspaceStructuresList: HTMLElement;
+  /** Top-left navigation cheatsheet shown while a structure is open. */
+  controlsHelp: HTMLElement;
+  /** Mode chip inside the cheatsheet (Orbit / Fly). */
+  controlsMode: HTMLElement;
   /** Bottom-left badge shown while a workspace is active. */
   workspaceBadge: HTMLElement;
   /** Bottom-left prompt offering to load a detected mod workspace (hidden by default). */
@@ -77,6 +81,34 @@ const TEMPLATE = `
         </div>
       </div>
     </div>
+    <div id="controls-help" class="controls-help hidden">
+      <button id="controls-help-toggle" class="ch-head" type="button">
+        <span class="ch-title">Controls</span>
+        <span id="controls-mode" class="ch-mode">Orbit</span>
+        <span class="ch-chevron">⌄</span>
+      </button>
+      <div class="ch-body">
+        <div class="ch-group ch-group--orbit">
+          <div class="ch-group-name">Orbit</div>
+          <ul>
+            <li><kbd>Drag</kbd><span>rotate</span></li>
+            <li><kbd>R-drag</kbd><span>pan</span></li>
+            <li><kbd>Scroll</kbd><span>zoom</span></li>
+            <li><kbd>F</kbd><span>enter fly</span></li>
+          </ul>
+        </div>
+        <div class="ch-group ch-group--fly">
+          <div class="ch-group-name">Fly · noclip</div>
+          <ul>
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>move</span></li>
+            <li><kbd>Space</kbd><kbd>Shift</kbd><span>up / down</span></li>
+            <li><kbd>Mouse</kbd><span>look</span></li>
+            <li><kbd>Scroll</kbd><span>speed</span></li>
+            <li><kbd>Esc</kbd><kbd>F</kbd><span>exit</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
     <div id="loading" class="loading hidden"><div class="spinner"></div></div>
     <div id="workspace-badge" class="workspace-badge hidden"></div>
     <div id="workspace-suggest" class="workspace-suggest hidden"></div>
@@ -110,6 +142,8 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     workspaceStructures: byId('workspace-structures'),
     workspaceStructuresHead: byId('workspace-structures-head'),
     workspaceStructuresList: byId('workspace-structures-list'),
+    controlsHelp: byId('controls-help'),
+    controlsMode: byId('controls-mode'),
     workspaceBadge: byId('workspace-badge'),
     workspaceSuggest: byId('workspace-suggest'),
   };

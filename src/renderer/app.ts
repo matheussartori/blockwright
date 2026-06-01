@@ -37,6 +37,15 @@ export class App {
     this.shell.recentWorkspacesClear.addEventListener('click', () => api.clearRecentWorkspaces());
     this.shell.openWorkspaceButton.addEventListener('click', () => api.openWorkspace());
 
+    // The controls cheatsheet collapses on click and reflects the live nav mode.
+    document
+      .getElementById('controls-help-toggle')!
+      .addEventListener('click', () => this.shell.controlsHelp.classList.toggle('collapsed'));
+    this.viewer.onModeChange = (mode) => {
+      this.shell.controlsHelp.classList.toggle('fly-active', mode === 'fly');
+      this.shell.controlsMode.textContent = mode === 'fly' ? 'Fly' : 'Orbit';
+    };
+
     api.onOpenPath((path) => this.load(path));
     api.onFileDrop((path) => this.load(path));
     api.onCloseStructure(() => this.close());
@@ -65,6 +74,7 @@ export class App {
     watch((s) => s.structure, (structure) => {
       const open = structure !== null;
       this.shell.emptyState.classList.toggle('hidden', open);
+      this.shell.controlsHelp.classList.toggle('hidden', !open);
       api.setFileOpen(open); // keep the native Close File item enabled/disabled in sync
     });
   }
