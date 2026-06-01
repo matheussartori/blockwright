@@ -5,6 +5,7 @@ import started from 'electron-squirrel-startup';
 import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-protocol';
 import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
+import { buildAppMenu } from '@/main/app-menu';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -24,6 +25,7 @@ app.on('ready', () => {
   registerTextureProtocol();
   registerIpc();
   createWindow();
+  buildAppMenu();
 });
 
 app.on('window-all-closed', () => {

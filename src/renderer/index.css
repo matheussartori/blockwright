@@ -221,6 +221,74 @@ body {
   font-size: 12px !important;
 }
 
+/* --- Welcome recents ------------------------------------------------------- */
+
+.recents {
+  margin-top: 28px;
+  text-align: left;
+}
+.recents.hidden {
+  display: none;
+}
+.recents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+}
+.recents-head span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.link {
+  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 5px;
+  cursor: pointer;
+}
+.link:hover {
+  background: var(--panel-strong);
+}
+.recents-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 196px;
+  overflow-y: auto;
+}
+.recent-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.recent-row:hover {
+  background: var(--panel-strong);
+}
+.recent-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.recent-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* --- Inspector ------------------------------------------------------------- */
 
 .inspector {

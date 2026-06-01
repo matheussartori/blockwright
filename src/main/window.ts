@@ -1,9 +1,10 @@
 // Owns the application window: creation, first-paint, the initial file to open
 // (via open-file/BW_OPEN), and the dev-only headless screenshot (BW_CAPTURE).
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { IPC_EVENTS } from '@/shared/ipc';
+import { getRecents } from './recents';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
@@ -19,6 +20,24 @@ export function openFile(filePath: string): void {
   } else {
     pendingOpenPath = filePath;
   }
+}
+
+/** Show the native open dialog (shared by the IPC handler and the File menu). */
+export async function openFileDialog(): Promise<string | null> {
+  const options: OpenDialogOptions = {
+    title: 'Open NBT structure',
+    properties: ['openFile'],
+    filters: [{ name: 'NBT structure', extensions: ['nbt'] }],
+  };
+  const result = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  return result.canceled ? null : result.filePaths[0];
+}
+
+/** Push the current recents list to the renderer (keeps the welcome view in sync). */
+export function notifyRecents(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());
 }
 
 export function createWindow(): BrowserWindow {

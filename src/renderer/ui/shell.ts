@@ -9,6 +9,10 @@ export interface Shell {
   statusbar: HTMLElement;
   openButtons: HTMLElement[];
   contentHint: HTMLElement | null;
+  /** Recents block on the welcome screen (hidden when empty). */
+  recents: HTMLElement;
+  recentsList: HTMLElement;
+  recentsClear: HTMLElement;
 }
 
 const TEMPLATE = `
@@ -32,6 +36,13 @@ const TEMPLATE = `
            or drop one anywhere on this window.</p>
         <button id="open-empty" class="btn primary lg">Open NBT file</button>
         <p class="hint" id="content-hint"></p>
+        <div id="recents" class="recents hidden">
+          <div class="recents-head">
+            <span>Recent</span>
+            <button id="recents-clear" class="link">Clear</button>
+          </div>
+          <ul id="recents-list" class="recents-list"></ul>
+        </div>
       </div>
     </div>
     <div id="loading" class="loading hidden"><div class="spinner"></div></div>
@@ -55,5 +66,8 @@ export function mountShell(root: HTMLElement, platform: string): Shell {
     statusbar: byId('statusbar'),
     openButtons: [byId('open-btn'), byId('open-empty')],
     contentHint: document.getElementById('content-hint'),
+    recents: byId('recents'),
+    recentsList: byId('recents-list'),
+    recentsClear: byId('recents-clear'),
   };
 }

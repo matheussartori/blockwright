@@ -73,8 +73,17 @@ export interface BlockwrightApi {
   /** Build a texture URL served by the custom protocol. */
   textureUrl: (key: string) => string;
   hasTexture: (key: string) => Promise<boolean>;
+  /** Whether a path still exists on disk (used to validate recents before opening). */
+  pathExists: (path: string) => Promise<boolean>;
+  /** Recently opened files, most-recent first. All return the updated list. */
+  listRecents: () => Promise<string[]>;
+  addRecent: (path: string) => Promise<string[]>;
+  removeRecent: (path: string) => Promise<string[]>;
+  clearRecents: () => Promise<string[]>;
   onOpenPath: (cb: (path: string) => void) => void;
   onFileDrop: (cb: (path: string) => void) => void;
+  /** Notified when the recents list changes in main (e.g. via the native menu). */
+  onRecentsChanged: (cb: (paths: string[]) => void) => void;
 }
 
 declare global {

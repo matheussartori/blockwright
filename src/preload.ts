@@ -9,8 +9,16 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.loadStructure, path),
   textureUrl: (key: string) => `bw-texture://${key}.png`,
   hasTexture: (key: string) => ipcRenderer.invoke(IPC_CHANNELS.hasTexture, key),
+  pathExists: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.pathExists, path),
+  listRecents: () => ipcRenderer.invoke(IPC_CHANNELS.recentsList),
+  addRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsAdd, path),
+  removeRecent: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.recentsRemove, path),
+  clearRecents: () => ipcRenderer.invoke(IPC_CHANNELS.recentsClear),
   onOpenPath: (cb: (path: string) => void) => {
     ipcRenderer.on(IPC_EVENTS.openPath, (_e, p: string) => cb(p));
+  },
+  onRecentsChanged: (cb: (paths: string[]) => void) => {
+    ipcRenderer.on(IPC_EVENTS.recentsChanged, (_e, paths: string[]) => cb(paths));
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());
