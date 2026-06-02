@@ -36,6 +36,20 @@ export const IPC_CHANNELS = {
   windowsReport: 'windows:report',
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
   captureConfig: 'capture:config',
+  /** Whether an Anthropic API key is configured (gates the AI generation UI). */
+  aiAvailable: 'ai:available',
+  /** Non-secret status of the stored API key (set?/masked hint/from env?). */
+  aiKeyInfo: 'ai:key-info',
+  /** Store the Anthropic API key (encrypted in userData) — payload: key string. */
+  aiSetKey: 'ai:set-key',
+  /** Remove the stored Anthropic API key. */
+  aiClearKey: 'ai:clear-key',
+  /** Generate/edit a structure for a session (payload: sessionId + prompt). */
+  aiGenerate: 'ai:generate',
+  /** Cancel the in-flight generation for a session (payload: sessionId). */
+  aiCancel: 'ai:cancel',
+  /** Forget a generation session's conversation (payload: sessionId). */
+  aiResetSession: 'ai:reset-session',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -55,4 +69,8 @@ export const IPC_EVENTS = {
   windowToggle: 'window-toggle',
   /** Reset every floating window to its home position (View ▸ Layout). */
   windowsReset: 'windows-reset',
+  /** Open the AI "New Structure" generation panel (File ▸ New Structure). */
+  newStructure: 'new-structure',
+  /** Live progress for an in-flight generation (payload: GenerateProgress). */
+  aiProgress: 'ai-progress',
 } as const;

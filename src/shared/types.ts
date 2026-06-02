@@ -165,6 +165,56 @@ export interface JigsawCandidate {
   placement: PlacedPiece;
 }
 
+// --- AI structure generation -------------------------------------------------
+
+/** A reference image attached to a generation prompt. `data` is base64 with no
+ *  `data:` URL prefix; `mediaType` is one Claude accepts (png/jpeg/gif/webp). */
+export interface GenerateImage {
+  mediaType: string;
+  data: string;
+}
+
+/** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
+ *  its metadata, or an error message for the UI to surface. */
+export type GenerateResult =
+  | {
+      ok: true;
+      /** Absolute path to the compiled `.nbt` version, ready to load in the viewer. */
+      path: string;
+      /** Monotonic version number within the session (1, 2, …). */
+      version: number;
+      /** The model's short note about the build (palette, features, assumptions). */
+      summary: string;
+      size: [number, number, number];
+      blockCount: number;
+    }
+  | { ok: false; error: string; canceled?: boolean };
+
+/** Coarse phase of an in-flight generation, for the progress indicator. */
+export type GeneratePhase = 'thinking' | 'building' | 'compiling';
+
+/** Live progress pushed from main during generation (see IPC_EVENTS.aiProgress). */
+export interface GenerateProgress {
+  sessionId: string;
+  phase: GeneratePhase;
+  /** Prompt (input) tokens consumed so far, summed across turns. */
+  inputTokens: number;
+  /** Generated (output) tokens so far, summed across turns. */
+  outputTokens: number;
+  /** Assistant turns started so far. */
+  turns: number;
+}
+
+/** Non-secret status of the stored Anthropic API key (the key itself never
+ *  crosses the bridge). `fromEnv` means it's pinned by ANTHROPIC_API_KEY and so
+ *  can't be edited in-app. */
+export interface ApiKeyInfo {
+  set: boolean;
+  /** A masked tail like `…1a2b`, or null when no key is set. */
+  hint: string | null;
+  fromEnv: boolean;
+}
+
 /** The three standardized floating windows the View menu can show/hide. */
 export type WindowId = 'controls' | 'inspector' | 'jigsaw';
 
@@ -210,6 +260,23 @@ export interface BlockwrightApi {
   assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
   /** Candidate pieces that can attach to one connector of a structure (manual mode). */
   jigsawCandidates: (path: string, connectorIndex: number) => Promise<JigsawCandidate[]>;
+  /** Whether an Anthropic API key is configured (gates the AI generation UI). */
+  aiAvailable: () => Promise<boolean>;
+  /** Non-secret status of the stored API key (for the Settings panel). */
+  aiKeyInfo: () => Promise<ApiKeyInfo>;
+  /** Store the Anthropic API key (encrypted, in the main process); returns its new status. */
+  aiSetKey: (key: string) => Promise<ApiKeyInfo>;
+  /** Remove the stored Anthropic API key; returns its new status. */
+  aiClearKey: () => Promise<ApiKeyInfo>;
+  /** Generate or edit a structure for a session; returns the written `.nbt` or an error.
+   *  Optional reference images are sent to the model as visual guidance. */
+  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[]) => Promise<GenerateResult>;
+  /** Cancel the in-flight generation for a session (resolves the pending aiGenerate as canceled). */
+  aiCancel: (sessionId: string) => Promise<void>;
+  /** Forget a generation session's conversation so the next prompt starts fresh. */
+  aiResetSession: (sessionId: string) => Promise<void>;
+  /** Notified with live token/phase progress while a generation is in flight. */
+  onAiProgress: (cb: (progress: GenerateProgress) => void) => void;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
@@ -237,6 +304,8 @@ export interface BlockwrightApi {
   onToggleWindow: (cb: (id: WindowId) => void) => void;
   /** Notified when the View ▸ Layout menu requests resetting window positions. */
   onResetWindows: (cb: () => void) => void;
+  /** Notified when File ▸ New Structure is chosen (opens the AI generation panel). */
+  onNewStructure: (cb: () => void) => void;
 }
 
 declare global {

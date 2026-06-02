@@ -11,6 +11,7 @@ import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './worksp
 import {
   notifyClose,
   notifyOpenSettings,
+  notifyNewStructure,
   notifyRecents,
   notifyRecentWorkspaces,
   notifyResetWindows,
@@ -142,6 +143,12 @@ export function buildAppMenu(): void {
     {
       label: 'File',
       submenu: [
+        {
+          label: 'New Structure…',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => notifyNewStructure(),
+        },
+        { type: 'separator' },
         {
           label: 'Open File',
           accelerator: 'CmdOrCtrl+O',

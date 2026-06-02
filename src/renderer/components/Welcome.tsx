@@ -11,10 +11,12 @@ export function Welcome({
   onOpen,
   onLoad,
   onActivateWorkspace,
+  onGenerate,
 }: {
   onOpen: () => void;
   onLoad: (path: string) => void;
   onActivateWorkspace: (ws: Workspace) => void;
+  onGenerate: () => void;
 }) {
   const recents = useApp((s) => s.recents);
   const recentWorkspaces = useApp((s) => s.recentWorkspaces);
@@ -63,7 +65,10 @@ export function Welcome({
               anywhere on this window.
             </p>
             <div className="welcome-actions">
-              <button className="btn primary lg" onClick={onOpen}>
+              <button className="btn primary lg" onClick={onGenerate}>
+                Generate with AI ✨
+              </button>
+              <button className="btn lg" onClick={onOpen}>
                 Open NBT file
               </button>
               <button className="btn lg" onClick={() => void api.openWorkspace()}>

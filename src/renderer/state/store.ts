@@ -46,6 +46,8 @@ export interface AppState {
   settingsOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
   versionPromptName: string | null;
+  /** Whether the AI "New Structure" generation panel is open. */
+  genOpen: boolean;
 
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
@@ -59,6 +61,7 @@ export interface AppState {
   setSuggest: (suggest: Suggestion | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
+  setGenOpen: (open: boolean) => void;
 }
 
 /** Fallback content-pack version until main reports the real one (its
@@ -78,6 +81,7 @@ export const store = createStore<AppState>((set) => ({
   suggest: null,
   settingsOpen: false,
   versionPromptName: null,
+  genOpen: false,
 
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
@@ -91,6 +95,7 @@ export const store = createStore<AppState>((set) => ({
   setSuggest: (suggest) => set({ suggest }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
+  setGenOpen: (genOpen) => set({ genOpen }),
 }));
 
 /** Subscribe to one derived slice, invoking `run` immediately and on change.

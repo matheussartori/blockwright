@@ -1,11 +1,13 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
-import type { AssembleOptions, Workspace, WindowsReport } from '@/shared/types';
-import { IPC_CHANNELS } from '@/shared/ipc';
+import type { AssembleOptions, GenerateImage, Workspace, WindowsReport } from '@/shared/types';
+import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
+import { aiAvailable, cancelGeneration, generateStructure, resetSession } from './ai/generate';
+import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
 import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
@@ -98,6 +100,22 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.jigsawCandidates, async (_e, filePath: string, index: number) =>
     jigsawCandidates(filePath, index),
   );
+
+  ipcMain.handle(IPC_CHANNELS.aiAvailable, async () => aiAvailable());
+  ipcMain.handle(IPC_CHANNELS.aiKeyInfo, async () => credentialInfo());
+  ipcMain.handle(IPC_CHANNELS.aiSetKey, async (_e, key: string) => {
+    setCredential(key);
+    return credentialInfo();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiClearKey, async () => {
+    clearCredential();
+    return credentialInfo();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[]) =>
+    generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p)),
+  );
+  ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
+  ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
 

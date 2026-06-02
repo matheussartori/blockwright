@@ -9,9 +9,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
-    // Ship the Minecraft content pack alongside the app (resolved at runtime).
-    extraResource: ['content'],
+    // Unpack the Claude Agent SDK and its platform-native `claude` binary from
+    // the asar so the SDK can spawn it (an executable can't run from inside the
+    // archive). generate.ts loads the SDK at runtime from node_modules.
+    asar: { unpack: '**/node_modules/{@anthropic-ai/claude-agent-sdk,@anthropic-ai/claude-agent-sdk-*}/**' },
+    // Ship the Minecraft content pack and the AI knowledge base alongside the
+    // app (both resolved at runtime).
+    extraResource: ['content', 'knowledge'],
   },
   rebuildConfig: {},
   makers: [

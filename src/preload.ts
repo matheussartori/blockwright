@@ -1,8 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import type {
+  ApiKeyInfo,
   AssembleOptions,
   BlockwrightApi,
+  GenerateImage,
+  GenerateProgress,
+  GenerateResult,
   JigsawCandidate,
   JigsawPlan,
   StructureData,
@@ -42,6 +46,19 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.jigsawAssemble, path, options),
   jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.jigsawCandidates, path, connectorIndex),
+  aiAvailable: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.aiAvailable),
+  aiKeyInfo: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiKeyInfo),
+  aiSetKey: (key: string): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiSetKey, key),
+  aiClearKey: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiClearKey),
+  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[]): Promise<GenerateResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images),
+  aiCancel: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiCancel, sessionId),
+  aiResetSession: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiResetSession, sessionId),
+  onAiProgress: (cb: (progress: GenerateProgress) => void) => {
+    ipcRenderer.on(IPC_EVENTS.aiProgress, (_e, p: GenerateProgress) => cb(p));
+  },
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
@@ -75,6 +92,9 @@ const api: BlockwrightApi = {
   },
   onResetWindows: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.windowsReset, () => cb());
+  },
+  onNewStructure: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.newStructure, () => cb());
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());

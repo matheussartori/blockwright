@@ -40,6 +40,11 @@ src/
       template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
       jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
+    ai/                     AI structure generation (File ▸ New Structure)
+      generate.ts           Drive Claude via the Agent SDK; emit_structure tool → compile-structure
+      credentials.ts        Claude Code login / token / API key resolution (safeStorage)
+      knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
+    structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
     App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
@@ -116,6 +121,43 @@ convention: `quarterTurns` maps to `group.rotation.y = q·π/2` and `offset` to 
 plan's coordinates land exactly where the meshes go. Jigsaw features are gated to validated versions
 via `isJigsawSupported`; unsupported versions show a notice instead. Pieces only resolve when the
 relevant data is reachable (an active workspace, or the vanilla pack for `minecraft:` pools).
+
+### AI structure generation
+
+File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation runs
+through the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`), *not* the raw Anthropic API —
+so it authenticates the way the Claude Code CLI does and runs on the user's **Pro/Max subscription**
+(their existing Claude Code login, no API credits). `generate.ts` gives the model the
+`knowledge/nbt` guides as its system prompt and a single in-process MCP tool, `emit_structure`,
+whose handler validates + compiles the authoring JSON (`compile-structure.ts`) to a versioned
+temp `.nbt`; validation errors are returned to the model so it self-corrects in the same turn. A
+per-panel session resumes the SDK conversation (`resume`) so follow-ups edit the current build.
+`credentials.ts` resolves auth: env (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`) wins, else an
+in-app credential (a `claude setup-token` token or an API key, encrypted via `safeStorage`), else
+the existing Claude Code keychain login. `aiAvailable()` is always true — a real auth failure
+surfaces as a clear error on first send (see `authHint`).
+
+- **Agent SDK is externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
+  loaded via dynamic `import()` in `generate.ts`. It must not be inlined: it spawns a bundled
+  native `claude` binary resolved relative to its own module path. **zod** is externalized too so
+  the SDK's `tool()` gets schemas from the same instance. When packaging, the SDK + its
+  platform-native package are asar-unpacked (`forge.config.ts`) so the binary is spawnable.
+- **Tool/MCP wiring:** pass the result of `createSdkMcpServer(...)` *directly* as the `mcpServers`
+  value (`{ blockwright: server }`) — do **not** re-wrap as `{ type:'sdk', instance: server }`
+  (the docs example is misleading; double-wrapping throws "connect is not a function"). Lock the
+  agent down with `tools: []` (no built-ins) + `allowedTools: ['mcp__blockwright__emit_structure']`
+  + `settingSources: []` (don't load this repo's own CLAUDE.md).
+- **Latency tuning:** the SDK reasons deeply by default, so with the big knowledge-base system
+  prompt the model would deliberate for minutes (or narrate thousands of tokens) before emitting.
+  Two levers fix it: `thinking: { type: 'disabled' }` and an **emit-first** system prompt ("call
+  the tool immediately, don't narrate"). The knowledge is still applied — it's reference, not a
+  cue to think aloud. Knobs: `BW_AI_THINKING_BUDGET`, `BW_AI_TIMEOUT_MS` (default 5 min).
+- **Progress + cancel:** `generateStructure` takes an `onProgress` callback; `ipc.ts` forwards it
+  to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Live tokens come
+  from `includePartialMessages` stream events — input includes cached context, output blends the
+  thinking-token estimate (during thinking) with a chars/4 estimate of the streamed tool JSON
+  (during building, since `message_delta` only reports the count at turn end). Cancel aborts a
+  per-session `AbortController` via `aiCancel` → `cancelGeneration`.
 
 ## Conventions / gotchas
 

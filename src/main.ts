@@ -1,5 +1,7 @@
 // Main-process entry point: wires app lifecycle to the window, IPC, and the
 // custom texture protocol. Implementation details live in ./main/* modules.
+// Load .env (ANTHROPIC_API_KEY for AI structure generation) before anything reads it.
+import 'dotenv/config';
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-protocol';

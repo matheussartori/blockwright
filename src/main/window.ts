@@ -84,6 +84,11 @@ export function notifyResetWindows(): void {
   mainWindow?.webContents.send(IPC_EVENTS.windowsReset);
 }
 
+/** Ask the renderer to open the AI "New Structure" generation panel. */
+export function notifyNewStructure(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.newStructure);
+}
+
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1180,

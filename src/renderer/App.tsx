@@ -19,6 +19,7 @@ import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { SettingsModal } from './components/SettingsModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
+import { NewStructurePanel } from './components/NewStructurePanel';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 
@@ -38,28 +39,30 @@ function Shell() {
   viewerRef.current = viewer;
   const pending = useRef<string | null>(null);
 
-  const load = useCallback(async (path: string, preserveCamera = false) => {
+  // `recent` is false for AI-generated temp versions: they shouldn't pollute the
+  // recent-files list or trigger the mod-workspace suggestion.
+  const load = useCallback(async (path: string, preserveCamera = false, recent = true) => {
     const st = store.getState();
     if (!viewerRef.current) {
       pending.current = path; // viewport not mounted yet — run on ready
       return;
     }
     if (!(await api.pathExists(path))) {
-      api.removeRecent(path); // main re-broadcasts the trimmed list
+      if (recent) api.removeRecent(path); // main re-broadcasts the trimmed list
       st.setNotice({ text: `${basename(path)} no longer exists — removed from Recent`, warn: true });
       return;
     }
     st.setLoading(true);
     try {
       const data = await api.loadStructure(path);
-      api.addRecent(path);
+      if (recent) api.addRecent(path);
       if (data.blocks.length === 0) {
         st.setNotice({ text: `${data.name} — no structure blocks found`, warn: true });
       } else {
         await viewerRef.current.show(data, preserveCamera);
         st.setStructure(data);
         st.setNotice(null);
-        void maybeSuggestWorkspace(path);
+        if (recent) void maybeSuggestWorkspace(path);
       }
     } catch (err) {
       st.setNotice({ text: `Failed to open: ${String(err)}`, warn: true });
@@ -127,6 +130,7 @@ function Shell() {
     api.onFileDrop((p) => void load(p));
     api.onCloseStructure(() => close());
     api.onOpenSettings(() => st.setSettingsOpen(true));
+    api.onNewStructure(() => st.setGenOpen(true));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
@@ -204,12 +208,14 @@ function Shell() {
     <>
       <Titlebar fileOpen={fileOpen} onClose={close} />
       <main className="stage">
+        <NewStructurePanel load={load} />
         <div className="stage-main">
           <Viewport />
           <Welcome
             onOpen={() => void open()}
             onLoad={(p) => void load(p)}
             onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
+            onGenerate={() => store.getState().setGenOpen(true)}
           />
           <FloatingPanels availability={availability} />
           <WorkspaceBadge />

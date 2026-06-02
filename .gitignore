@@ -93,3 +93,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# AI-generated structures (temp versions written by File ▸ New Structure)
+.generated/
