@@ -157,6 +157,7 @@ function Shell() {
       viewer.setInvertY(s.invertY);
       viewer.setShowGrid(s.showGrid);
       viewer.setShowJigsaw(s.showJigsaw);
+      viewer.setHideShell(s.hideShell);
     };
     apply();
     return settingsStore.subscribe(apply);

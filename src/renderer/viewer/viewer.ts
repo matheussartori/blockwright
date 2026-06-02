@@ -48,6 +48,8 @@ export class Viewer {
   private showGrid = true;
   /** Whether jigsaw blocks are rendered (Settings; off by default). */
   private showJigsaw = false;
+  /** Whether each piece's outer shell is hidden (Settings; off by default). */
+  private hideShell = false;
   /** Last rendered pieces, kept so a settings toggle can rebuild without a reload. */
   private lastPieces: AssemblyPiece[] | null = null;
   private readonly dir = new THREE.Vector3();
@@ -217,6 +219,14 @@ export class Viewer {
     if (this.lastPieces) void this.showAssembly(this.lastPieces, true);
   }
 
+  /** Hide each piece's outer shell or not (Settings). Rebuilds in place so the
+   *  change is immediate, keeping the camera where the user left it. */
+  setHideShell(hide: boolean) {
+    if (hide === this.hideShell) return;
+    this.hideShell = hide;
+    if (this.lastPieces) void this.showAssembly(this.lastPieces, true);
+  }
+
   private onResize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
@@ -246,7 +256,7 @@ export class Viewer {
 
     const parent = new THREE.Group();
     for (const p of pieces) {
-      const group = buildStructure(p.data, textures, this.showJigsaw);
+      const group = buildStructure(p.data, textures, this.showJigsaw, this.hideShell);
       group.rotation.y = (p.quarterTurns * Math.PI) / 2;
       group.position.set(p.offset[0], p.offset[1], p.offset[2]);
       parent.add(group);

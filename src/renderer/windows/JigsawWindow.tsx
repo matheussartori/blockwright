@@ -30,6 +30,7 @@ export function JigsawContent() {
   const workspace = useApp((s) => s.workspace);
   const contentVersion = useApp((s) => s.contentVersion);
   const showJigsaw = useSettings((s) => s.showJigsaw);
+  const hideShell = useSettings((s) => s.hideShell);
   const viewer = useViewer();
 
   const version = workspace ? workspace.minecraftVersion : contentVersion;
@@ -219,6 +220,14 @@ export function JigsawContent() {
           onChange={(e) => settingsStore.getState().set('showJigsaw', e.target.checked)}
         />
         <span>Show jigsaw blocks in viewer</span>
+      </label>
+      <label className="bw-toggle">
+        <input
+          type="checkbox"
+          checked={hideShell}
+          onChange={(e) => settingsStore.getState().set('hideShell', e.target.checked)}
+        />
+        <span>Hide piece shell (see inside)</span>
       </label>
       <ul className="bw-rows">
         {structure.jigsaws.map((j, i) => (

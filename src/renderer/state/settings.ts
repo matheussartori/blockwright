@@ -15,6 +15,9 @@ export interface Settings {
   /** Render jigsaw blocks. Off by default — they're worldgen markers, not real
    *  geometry (vanilla replaces each with its `final_state` during generation). */
   showJigsaw: boolean;
+  /** Hide each piece's outer shell — the blocks on the boundary of its occupied
+   *  bounding box — so you can see inside enclosed pieces / a jigsaw assembly. */
+  hideShell: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -22,6 +25,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   invertY: false,
   showGrid: true,
   showJigsaw: false,
+  hideShell: false,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -57,6 +61,7 @@ function snapshot(s: SettingsState): Settings {
     invertY: s.invertY,
     showGrid: s.showGrid,
     showJigsaw: s.showJigsaw,
+    hideShell: s.hideShell,
   };
 }
 
