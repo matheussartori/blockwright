@@ -18,7 +18,7 @@ import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage } f
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { loadKnowledge } from './knowledge';
 import { authEnv, claudeExecutablePath, hasConfiguredCredential } from './credentials';
-import { writeStructureFile, validateAuthoring, type AuthoringStructure } from '../structure/compile-structure';
+import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure } from '../structure/compile-structure';
 
 /** Model used for generation; override with BW_AI_MODEL. */
 const MODEL = process.env.BW_AI_MODEL || 'claude-sonnet-4-6';
@@ -30,10 +30,6 @@ const THINKING_BUDGET = Number(process.env.BW_AI_THINKING_BUDGET) || 0;
 const THINKING = THINKING_BUDGET > 0
   ? ({ type: 'enabled', budgetTokens: THINKING_BUDGET } as const)
   : ({ type: 'disabled' } as const);
-/** Bound the agent loop (one emit + a validation-retry or two). */
-const MAX_TURNS = Number(process.env.BW_AI_MAX_TURNS) || 8;
-/** Hard ceiling so a stuck request can't hang the panel forever (ms). */
-const TIMEOUT_MS = Number(process.env.BW_AI_TIMEOUT_MS) || 300_000;
 
 const EMIT_TOOL_NAME = 'mcp__blockwright__emit_structure';
 
@@ -119,6 +115,20 @@ to a real gzipped .nbt and renders in a live 3D preview.
 Output ONLY by calling the "emit_structure" tool, and call it right away with the COMPLETE structure \
 (not a diff). Do NOT write any plan, reasoning, or commentary before the tool call — put a 1-2 sentence \
 note in the tool's "summary" field instead. Go straight to the structure.
+
+Build with "ops" (volumetric operations) for almost everything — they are far cheaper to emit than \
+per-block entries, which is what makes generation fast. A solid box is one "fill"; a room shell is one \
+"hollow"; the 4 outer sides are one "walls"; a beam is one "line". Ops apply in order and later ops \
+overwrite earlier cells, so layer coarse-to-fine: lay shells, carve openings by filling an air index, \
+then add detail. Reserve the "blocks" array for the handful of cells that need block-entity nbt or one-off \
+detail. Prefer ops; do NOT enumerate large volumes block-by-block.
+
+CRITICAL — keep interiors empty. Any enclosed or habitable volume (a room, a house body, a tower) MUST be \
+a SHELL: use "hollow" (or "walls" + a floor "fill" + a ceiling "fill"), NEVER a solid "fill" of the whole \
+box. Use solid "fill" only for things that are genuinely solid (a floor slab, a foundation, a pillar, a \
+1-block-thin wall). If you "fill" a 3D box that has an inside, you bury the interior in stone and the \
+player cannot enter — that is always a bug. Build the shell first, then carve doors/windows, then place \
+interior detail in the empty space.
 
 Use the guides below as your reference and follow their hard rules exactly (1.21.1 block IDs only, \
 0-indexed positions within size, blockstate property values are strings, first palette entry is air by \
@@ -223,6 +233,24 @@ export async function generateStructure(
               }),
             )
             .describe('Distinct block states; property values are strings.'),
+          ops: z
+            .array(
+              z.object({
+                op: z.enum(['fill', 'hollow', 'walls', 'line', 'block']),
+                from: z.array(z.number().int()).optional().describe('[x,y,z] corner — for fill/hollow/walls/line.'),
+                to: z.array(z.number().int()).optional().describe('[x,y,z] corner — for fill/hollow/walls/line.'),
+                pos: z.array(z.number().int()).optional().describe('[x,y,z] — for the "block" op only.'),
+                state: z.number().int().describe('Palette index. Use an air index to carve.'),
+                nbt: z.record(z.string(), z.unknown()).optional().describe('Block-entity NBT — "block" op only.'),
+              }),
+            )
+            .optional()
+            .describe(
+              'PREFERRED bulk geometry, applied in order (later overwrites earlier): ' +
+                'fill (solid box from→to), hollow (6-face shell), walls (4 vertical sides only), ' +
+                'line (3D line from→to), block (single cell at pos). Describe big builds with ops — ' +
+                'one fill = a whole wall — instead of thousands of per-block entries.',
+            ),
           blocks: z
             .array(
               z.object({
@@ -231,13 +259,14 @@ export async function generateStructure(
                 nbt: z.record(z.string(), z.unknown()).optional(),
               }),
             )
-            .describe('Placed blocks: { state (palette index), pos: [x,y,z], nbt? }. Omit air.'),
+            .optional()
+            .describe('Per-block overlay on top of ops: { state, pos:[x,y,z], nbt? }. Omit air. Use for fine detail / block entities.'),
           entities: z
             .array(z.unknown())
             .optional()
             .describe('Usually empty; entities do not render in the preview.'),
         })
-        .describe('The authoring JSON: { DataVersion, size, palette, blocks, entities }.'),
+        .describe('The authoring JSON: { DataVersion, size, palette, ops (preferred bulk geometry), blocks (detail overlay), entities }.'),
     },
     async ({ summary, structure }) => {
       const authoring = structure as AuthoringStructure;
@@ -264,7 +293,7 @@ export async function generateStructure(
 
       session.version = version;
       const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
-      const blockCount = (authoring.blocks ?? []).length;
+      const blockCount = resolveBlocks(authoring).length;
       captured = { ok: true, path: nbtPath, version, summary: (summary ?? '').trim(), size, blockCount };
       captureError = null;
       return { content: [{ type: 'text', text: `Compiled and rendered as v${version} (${size.join('×')}, ${blockCount} blocks).` }] };
@@ -273,11 +302,6 @@ export async function generateStructure(
 
   const server = sdk.createSdkMcpServer({ name: 'blockwright', version: '1.0.0', tools: [emit] });
   const ac = new AbortController();
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    ac.abort();
-  }, TIMEOUT_MS);
   // Cancel any earlier run on the same session, then register this one.
   activeRuns.get(sessionId)?.abort();
   activeRuns.set(sessionId, ac);
@@ -297,7 +321,6 @@ export async function generateStructure(
         tools: [], // no built-in tools — emit_structure is the only one
         allowedTools: [EMIT_TOOL_NAME],
         settingSources: [], // isolate from any local CLAUDE.md / settings
-        maxTurns: MAX_TURNS,
         thinking: THINKING, // emit straight away instead of long reasoning
         includePartialMessages: true, // stream events → live token counts
         abortController: ac,
@@ -319,13 +342,10 @@ export async function generateStructure(
     }
   } catch (err) {
     if (ac.signal.aborted) {
-      return timedOut
-        ? { ok: false, error: 'Generation timed out. Try a simpler prompt (or raise BW_AI_TIMEOUT_MS).' }
-        : { ok: false, error: 'Canceled.', canceled: true };
+      return { ok: false, error: 'Canceled.', canceled: true };
     }
     return { ok: false, error: authHint(errMessage(err)) };
   } finally {
-    clearTimeout(timer);
     activeRuns.delete(sessionId);
   }
 
@@ -372,8 +392,7 @@ export async function generateStructure(
 
   if (captured) return captured;
   if (captureError) return { ok: false, error: captureError };
-  if (ac.signal.aborted && !timedOut) return { ok: false, error: 'Canceled.', canceled: true };
-  if (ac.signal.aborted) return { ok: false, error: 'Generation timed out. Try a simpler prompt.' };
+  if (ac.signal.aborted) return { ok: false, error: 'Canceled.', canceled: true };
   if (resultSubtype && resultSubtype !== 'success') {
     return { ok: false, error: authHint(`Generation failed (${resultSubtype}).`) };
   }

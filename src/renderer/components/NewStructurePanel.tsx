@@ -249,9 +249,22 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
         {messages.map((m, i) => (
           <div key={i} className={`gen-msg ${m.role}${m.error ? ' error' : ''}`}>
             {m.meta && (
-              <div className="gen-version">
-                v{m.meta.version} · {m.meta.size.join('×')} · {m.meta.blockCount} blocks
-                {m.meta.tookMs != null && ` · ${formatElapsed(m.meta.tookMs)}`}
+              <div className="gen-stats gen-result-stats">
+                <span className="gen-stat gen-stat-version">v{m.meta.version}</span>
+                <span className="gen-stat" title="Dimensions (W×H×D)">
+                  <span className="gen-stat-label">Size</span>
+                  <span className="gen-stat-value">{m.meta.size.join('×')}</span>
+                </span>
+                <span className="gen-stat" title="Block count">
+                  <span className="gen-stat-label">Blocks</span>
+                  <span className="gen-stat-value">{m.meta.blockCount.toLocaleString()}</span>
+                </span>
+                {m.meta.tookMs != null && (
+                  <span className="gen-stat" title="Generation time">
+                    <span className="gen-stat-label">Time</span>
+                    <span className="gen-stat-value">{formatElapsed(m.meta.tookMs)}</span>
+                  </span>
+                )}
               </div>
             )}
             {m.images && m.images.length > 0 && (
@@ -265,18 +278,29 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
           </div>
         ))}
         {busy && (
-          <div className="gen-msg assistant">
-            <div className="gen-progress">
-              <span className="gen-msg-text gen-thinking">
+          <div className="gen-msg assistant gen-live">
+            <div className="gen-progress-head">
+              <span className="gen-spinner" aria-hidden />
+              <span className="gen-phase">
                 {progress ? PHASE_LABEL[progress.phase] : 'Generating…'}
               </span>
-              <span className="gen-tokens gen-elapsed" title="Elapsed time">
-                {formatElapsed(elapsedMs)}
+            </div>
+            <div className="gen-stats">
+              <span className="gen-stat" title="Elapsed time">
+                <span className="gen-stat-label">Time</span>
+                <span className="gen-stat-value">{formatElapsed(elapsedMs)}</span>
               </span>
               {progress && progress.outputTokens > 0 && (
-                <span className="gen-tokens" title="Prompt ↑ / generated ↓ tokens so far">
-                  ↑{progress.inputTokens.toLocaleString()} ↓{progress.outputTokens.toLocaleString()} tok
-                </span>
+                <>
+                  <span className="gen-stat" title="Prompt tokens sent">
+                    <span className="gen-stat-label">↑ In</span>
+                    <span className="gen-stat-value">{progress.inputTokens.toLocaleString()}</span>
+                  </span>
+                  <span className="gen-stat" title="Tokens generated">
+                    <span className="gen-stat-label">↓ Out</span>
+                    <span className="gen-stat-value">{progress.outputTokens.toLocaleString()}</span>
+                  </span>
+                </>
               )}
             </div>
           </div>

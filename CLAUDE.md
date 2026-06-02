@@ -44,7 +44,9 @@ src/
       generate.ts           Drive Claude via the Agent SDK; emit_structure tool → compile-structure
       credentials.ts        Claude Code login / token / API key resolution (safeStorage)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
-    structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt
+    structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt.
+                          Expands volumetric `ops` (fill/hollow/walls/line/block) → block list
+                          before NBT (resolveBlocks), so the model emits ~ops not ~1000s of blocks.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
     App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
@@ -147,11 +149,16 @@ surfaces as a clear error on first send (see `authHint`).
   (the docs example is misleading; double-wrapping throws "connect is not a function"). Lock the
   agent down with `tools: []` (no built-ins) + `allowedTools: ['mcp__blockwright__emit_structure']`
   + `settingSources: []` (don't load this repo's own CLAUDE.md).
-- **Latency tuning:** the SDK reasons deeply by default, so with the big knowledge-base system
-  prompt the model would deliberate for minutes (or narrate thousands of tokens) before emitting.
-  Two levers fix it: `thinking: { type: 'disabled' }` and an **emit-first** system prompt ("call
-  the tool immediately, don't narrate"). The knowledge is still applied — it's reference, not a
-  cue to think aloud. Knobs: `BW_AI_THINKING_BUDGET`, `BW_AI_TIMEOUT_MS` (default 5 min).
+- **Latency tuning:** the dominant cost for any non-trivial build is **output tokens** — the model
+  must serialize every block, so a flat per-block list is `O(blocks)` to emit and a big build can
+  blow past the single-response output cap. The fix is the **volumetric `ops`** authoring primitive
+  (fill/hollow/walls/line/block, expanded in `compile-structure.ts`); the prompt + knowledge
+  (`knowledge/nbt/00-volumetric-ops.md`) steer the model to describe geometry as ops (one `fill` =
+  a whole wall) instead of thousands of blocks. Two more levers cut front-end latency: the SDK
+  reasons deeply by default (it would deliberate for minutes), so `thinking: { type: 'disabled' }`
+  + an **emit-first** system prompt ("call the tool immediately, don't narrate"). The knowledge is
+  still applied — reference, not a cue to think aloud. Knob: `BW_AI_THINKING_BUDGET`. (There is no
+  time/turn cap — generation runs until the model emits, finishes, errors, or the user cancels.)
 - **Progress + cancel:** `generateStructure` takes an `onProgress` callback; `ipc.ts` forwards it
   to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Live tokens come
   from `includePartialMessages` stream events — input includes cached context, output blends the

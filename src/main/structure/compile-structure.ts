@@ -13,9 +13,23 @@ export interface AuthoringStructure {
   DataVersion?: number;
   size?: [number, number, number];
   palette?: AuthoringPaletteEntry[];
+  /** Volumetric build ops, expanded to blocks before compile. Applied in order
+   *  (later ops overwrite earlier cells), then any explicit `blocks` overlay on
+   *  top. Lets the model describe big builds in ~ops instead of ~thousands of
+   *  per-block entries — the dominant generation cost (see knowledge 00). */
+  ops?: AuthoringOp[];
   blocks?: AuthoringBlock[];
   entities?: AuthoringEntity[];
 }
+
+/** A volumetric build op. `fill` = solid box; `hollow` = 6-face shell; `walls` =
+ *  the 4 vertical sides only (no floor/ceiling); `line` = a 3D line between two
+ *  cells; `block` = a single cell (the only op that may carry block-entity nbt).
+ *  Write an air palette index to carve. */
+export type AuthoringOp =
+  | { op: 'fill' | 'hollow' | 'walls'; from: [number, number, number]; to: [number, number, number]; state: number }
+  | { op: 'line'; from: [number, number, number]; to: [number, number, number]; state: number }
+  | { op: 'block'; pos: [number, number, number]; state: number; nbt?: Record<string, unknown> };
 
 interface AuthoringPaletteEntry {
   Name: string;
@@ -114,6 +128,92 @@ function entityEntry(entity: AuthoringEntity): Record<string, Tag> {
   return out;
 }
 
+/** Air block names that are placeholders, not geometry — omitted from output so
+ *  ops can write them to carve holes (and stray air in `blocks` is harmless). */
+function isAir(name: string): boolean {
+  const id = name.includes(':') ? name.slice(name.indexOf(':') + 1) : name;
+  return id === 'air' || id === 'cave_air' || id === 'void_air';
+}
+
+const posKey = (x: number, y: number, z: number): string => `${x},${y},${z}`;
+
+/** Integer 3D line (DDA over the dominant axis) between two inclusive endpoints. */
+function lineCells(a: [number, number, number], b: [number, number, number]): [number, number, number][] {
+  let [x, y, z] = a;
+  const [x1, y1, z1] = b;
+  const dx = Math.abs(x1 - x), dy = Math.abs(y1 - y), dz = Math.abs(z1 - z);
+  const sx = x < x1 ? 1 : -1, sy = y < y1 ? 1 : -1, sz = z < z1 ? 1 : -1;
+  const cells: [number, number, number][] = [];
+  if (dx >= dy && dx >= dz) {
+    let ey = 2 * dy - dx, ez = 2 * dz - dx;
+    for (let i = 0; i <= dx; i++) {
+      cells.push([x, y, z]);
+      if (ey > 0) { y += sy; ey -= 2 * dx; }
+      if (ez > 0) { z += sz; ez -= 2 * dx; }
+      ey += 2 * dy; ez += 2 * dz; x += sx;
+    }
+  } else if (dy >= dx && dy >= dz) {
+    let ex = 2 * dx - dy, ez = 2 * dz - dy;
+    for (let i = 0; i <= dy; i++) {
+      cells.push([x, y, z]);
+      if (ex > 0) { x += sx; ex -= 2 * dy; }
+      if (ez > 0) { z += sz; ez -= 2 * dy; }
+      ex += 2 * dx; ez += 2 * dz; y += sy;
+    }
+  } else {
+    let ex = 2 * dx - dz, ey = 2 * dy - dz;
+    for (let i = 0; i <= dz; i++) {
+      cells.push([x, y, z]);
+      if (ex > 0) { x += sx; ex -= 2 * dz; }
+      if (ey > 0) { y += sy; ey -= 2 * dz; }
+      ex += 2 * dx; ey += 2 * dy; z += sz;
+    }
+  }
+  return cells;
+}
+
+/** Apply one op into the cell map (keyed position → block). */
+function applyOp(op: AuthoringOp, cells: Map<string, AuthoringBlock>): void {
+  if (op.op === 'block') {
+    cells.set(posKey(...op.pos), { state: op.state, pos: op.pos, ...(op.nbt ? { nbt: op.nbt } : {}) });
+    return;
+  }
+  if (op.op === 'line') {
+    for (const pos of lineCells(op.from, op.to)) cells.set(posKey(...pos), { state: op.state, pos });
+    return;
+  }
+  const [ax, ay, az] = op.from, [bx, by, bz] = op.to;
+  const x0 = Math.min(ax, bx), x1 = Math.max(ax, bx);
+  const y0 = Math.min(ay, by), y1 = Math.max(ay, by);
+  const z0 = Math.min(az, bz), z1 = Math.max(az, bz);
+  for (let x = x0; x <= x1; x++) {
+    for (let y = y0; y <= y1; y++) {
+      for (let z = z0; z <= z1; z++) {
+        const onShell = x === x0 || x === x1 || y === y0 || y === y1 || z === z0 || z === z1;
+        const onWall = x === x0 || x === x1 || z === z0 || z === z1;
+        if (op.op === 'hollow' && !onShell) continue;
+        if (op.op === 'walls' && !onWall) continue;
+        cells.set(posKey(x, y, z), { state: op.state, pos: [x, y, z] });
+      }
+    }
+  }
+}
+
+/** Expand `ops` (in order) then overlay explicit `blocks`, dropping air cells.
+ *  This is the final block list compiled to NBT; `validateAuthoring` must pass
+ *  first (it bounds-checks the inputs). */
+export function resolveBlocks(s: AuthoringStructure): AuthoringBlock[] {
+  const palette = s.palette ?? [];
+  const cells = new Map<string, AuthoringBlock>();
+  for (const op of s.ops ?? []) applyOp(op, cells);
+  for (const b of s.blocks ?? []) cells.set(posKey(...b.pos), b);
+  const out: AuthoringBlock[] = [];
+  for (const b of cells.values()) {
+    if (!isAir(palette[b.state]?.Name ?? '')) out.push(b);
+  }
+  return out;
+}
+
 /** Validate the authoring JSON against the hard rules, throwing a human-readable
  *  message on the first violation so the AI loop gets actionable feedback. */
 export function validateAuthoring(s: AuthoringStructure): void {
@@ -127,19 +227,44 @@ export function validateAuthoring(s: AuthoringStructure): void {
   palette.forEach((p, i) => {
     if (!p || typeof p.Name !== 'string') throw new Error(`palette[${i}] is missing a string Name`);
   });
-  const blocks = s.blocks ?? [];
-  if (!Array.isArray(blocks) || blocks.length === 0) throw new Error('blocks must be a non-empty array');
-  blocks.forEach((b, i) => {
-    if (typeof b.state !== 'number' || b.state < 0 || b.state >= palette.length) {
-      throw new Error(`blocks[${i}].state ${b.state} is out of palette range (0..${palette.length - 1})`);
-    }
-    if (!Array.isArray(b.pos) || b.pos.length !== 3) throw new Error(`blocks[${i}].pos must be [x, y, z]`);
-    b.pos.forEach((c, axis) => {
-      if (typeof c !== 'number' || c < 0 || c >= size[axis]) {
-        throw new Error(`blocks[${i}].pos[${axis}] = ${c} is out of bounds (0..${size[axis] - 1})`);
+
+  // A position triple within bounds.
+  const checkPos = (pos: unknown, label: string): void => {
+    if (!Array.isArray(pos) || pos.length !== 3) throw new Error(`${label} must be [x, y, z]`);
+    pos.forEach((c, axis) => {
+      if (typeof c !== 'number' || !Number.isInteger(c) || c < 0 || c >= size[axis]) {
+        throw new Error(`${label}[${axis}] = ${c} is out of bounds (0..${size[axis] - 1})`);
       }
     });
+  };
+  const checkState = (state: unknown, label: string): void => {
+    if (typeof state !== 'number' || state < 0 || state >= palette.length) {
+      throw new Error(`${label} ${state} is out of palette range (0..${palette.length - 1})`);
+    }
+  };
+
+  const ops = s.ops ?? [];
+  if (!Array.isArray(ops)) throw new Error('ops must be an array');
+  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block'];
+  ops.forEach((o, i) => {
+    if (!o || !OP_KINDS.includes((o as AuthoringOp).op)) {
+      throw new Error(`ops[${i}].op must be one of ${OP_KINDS.join(', ')}`);
+    }
+    checkState((o as { state: unknown }).state, `ops[${i}].state`);
+    if (o.op === 'block') checkPos(o.pos, `ops[${i}].pos`);
+    else { checkPos(o.from, `ops[${i}].from`); checkPos(o.to, `ops[${i}].to`); }
   });
+
+  const blocks = s.blocks ?? [];
+  if (!Array.isArray(blocks)) throw new Error('blocks must be an array');
+  blocks.forEach((b, i) => {
+    checkState(b.state, `blocks[${i}].state`);
+    checkPos(b.pos, `blocks[${i}].pos`);
+  });
+
+  if (ops.length === 0 && blocks.length === 0) {
+    throw new Error('place at least one block via "ops" (preferred) or "blocks"');
+  }
 }
 
 /** Compile authoring JSON to a gzip-compressed `.nbt` buffer (Java big-endian). */
@@ -152,7 +277,7 @@ export function compileStructure(s: AuthoringStructure): Buffer {
       DataVersion: int(s.DataVersion ?? 3955),
       size: intList(s.size as [number, number, number]),
       palette: compoundList((s.palette ?? []).map(paletteEntry)),
-      blocks: compoundList((s.blocks ?? []).map(blockEntry)),
+      blocks: compoundList(resolveBlocks(s).map(blockEntry)),
       entities: compoundList((s.entities ?? []).map(entityEntry)),
     },
   };

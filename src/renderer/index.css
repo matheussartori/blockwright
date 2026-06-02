@@ -1515,27 +1515,78 @@ body {
   background: color-mix(in srgb, #ef4444 16%, var(--panel));
   border-color: color-mix(in srgb, #ef4444 45%, transparent);
 }
-.gen-version {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-  margin-bottom: 4px;
-}
-.gen-thinking {
-  color: var(--text-muted);
-  font-style: italic;
-}
-.gen-progress {
+/* Stat chips: a muted uppercase label + a bright value, used both for a
+   finished version's meta line and the live "generating" readout. */
+.gen-stats {
   display: flex;
-  align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 6px;
 }
-.gen-tokens {
-  font-size: 11px;
-  color: var(--text-muted);
+.gen-result-stats {
+  margin-bottom: 6px;
+}
+.gen-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.gen-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.gen-stat-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.gen-stat-version {
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: transparent;
+}
+
+/* Live "generating" card: a spinning indicator + the current phase, with the
+   stat chips below. Full-width so the chips have room to wrap. */
+.gen-live {
+  max-width: 100%;
+  width: 100%;
+}
+.gen-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.gen-phase {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.gen-spinner {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-top-color: var(--accent);
+  animation: gen-spin 0.7s linear infinite;
+}
+@keyframes gen-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .gen-cancel {
   align-self: flex-end;
@@ -1584,10 +1635,6 @@ body {
 }
 .gen-attach {
   -webkit-app-region: no-drag;
-}
-
-.gen-elapsed {
-  font-variant-numeric: tabular-nums;
 }
 
 /* Staged reference-image thumbnails above the textarea. */

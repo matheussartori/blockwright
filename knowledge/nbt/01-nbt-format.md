@@ -73,7 +73,9 @@ facing different directions are two different palette entries.
 ## JSON authoring schema (what the agent emits)
 
 Emit a single JSON object. This is intentionally close to the NBT tree, with the air-omission
-convenience and string-valued properties:
+convenience and string-valued properties. It also accepts an optional **`ops`** array
+(volumetric build operations expanded to blocks before compile) — **prefer `ops` over a large
+`blocks` list**; see [`00-volumetric-ops.md`](00-volumetric-ops.md).
 
 ```jsonc
 {
