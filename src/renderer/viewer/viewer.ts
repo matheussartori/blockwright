@@ -25,6 +25,9 @@ const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight',
 ]);
 
+/** How long the focus-a-block highlight stays on screen (ms). */
+const HIGHLIGHT_MS = 1000;
+
 export class Viewer {
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
@@ -34,6 +37,9 @@ export class Viewer {
   private current: THREE.Group | null = null;
   private grid: THREE.GridHelper | null = null;
   private textures = new TextureLoader();
+  /** Transient box drawn over a block the user clicked in the inspector. */
+  private highlight: THREE.Mesh | null = null;
+  private highlightUntil = 0;
 
   private mode: NavMode = 'orbit';
   private keys = new Set<string>();
@@ -108,8 +114,29 @@ export class Viewer {
     const dt = this.timer.getDelta();
     if (this.mode === 'fly') this.updateFly(dt);
     else this.controls.update();
+    this.updateHighlight();
     this.renderer.render(this.scene, this.camera);
   };
+
+  /** Fade out and eventually drop the focus highlight. */
+  private updateHighlight() {
+    if (!this.highlight) return;
+    const remaining = this.highlightUntil - performance.now();
+    if (remaining <= 0) {
+      this.removeHighlight();
+      return;
+    }
+    const t = remaining / HIGHLIGHT_MS; // 1 → 0
+    (this.highlight.material as THREE.MeshBasicMaterial).opacity = 0.2 + 0.55 * t;
+  }
+
+  private removeHighlight() {
+    if (!this.highlight) return;
+    this.scene.remove(this.highlight);
+    this.highlight.geometry.dispose();
+    (this.highlight.material as THREE.Material).dispose();
+    this.highlight = null;
+  }
 
   /** Integrate one frame of WASD/Space/Shift movement while flying. */
   private updateFly(dt: number) {
@@ -236,9 +263,11 @@ export class Viewer {
     this.renderer.setSize(w, h);
   }
 
-  /** Render a single structure (the common case). */
-  async show(data: StructureData): Promise<void> {
-    await this.showAssembly([{ data, offset: [0, 0, 0], quarterTurns: 0 }]);
+  /** Render a single structure (the common case). Pass `preserveCamera` to keep
+   *  the current view (e.g. re-rendering the same file with a workspace's
+   *  textures) instead of re-framing. */
+  async show(data: StructureData, preserveCamera = false): Promise<void> {
+    await this.showAssembly([{ data, offset: [0, 0, 0], quarterTurns: 0 }], preserveCamera);
   }
 
   /** Render one or more placed structures as a jigsaw assembly. Each piece is its
@@ -270,9 +299,44 @@ export class Viewer {
     else this.frame(box);
   }
 
+  /** Center the camera on a single block (local coords of the loaded structure)
+   *  and flash a translucent box over it for ~1s so it's easy to spot among
+   *  neighbours. Drawn without depth-testing so it shows through other blocks. */
+  focusBlock(pos: [number, number, number]) {
+    if (this.mode === 'fly') this.setMode('orbit');
+    const center = new THREE.Vector3(pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5);
+
+    // Keep the current view direction; pull in to a comfortable distance so the
+    // block fills the frame even when we were zoomed out over a big structure.
+    const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
+    const curDist = dir.length();
+    if (curDist < 1e-3) dir.set(0.8, 0.7, 0.9);
+    dir.normalize();
+    const dist = THREE.MathUtils.clamp(curDist, 3, 8);
+    this.controls.target.copy(center);
+    this.camera.position.copy(center).addScaledVector(dir, dist);
+    this.controls.update();
+
+    this.removeHighlight();
+    const geo = new THREE.BoxGeometry(1.06, 1.06, 1.06);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffd54a,
+      transparent: true,
+      opacity: 0.75,
+      depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(center);
+    mesh.renderOrder = 999;
+    this.scene.add(mesh);
+    this.highlight = mesh;
+    this.highlightUntil = performance.now() + HIGHLIGHT_MS;
+  }
+
   /** Remove the current structure and grid from the scene (back to empty). */
   clear() {
     this.lastPieces = null;
+    this.removeHighlight();
     this.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);

@@ -210,9 +210,7 @@ export function JigsawContent() {
         </div>
       )}
 
-      <div className="bw-section">
-        Connectors <span className="bw-count">{count}</span>
-      </div>
+      <div className="bw-section">View</div>
       <label className="bw-toggle">
         <input
           type="checkbox"
@@ -229,6 +227,10 @@ export function JigsawContent() {
         />
         <span>Hide piece shell (see inside)</span>
       </label>
+
+      <div className="bw-section">
+        Connectors <span className="bw-count">{count}</span>
+      </div>
       <ul className="bw-rows">
         {structure.jigsaws.map((j, i) => (
           <li key={i} className="bw-row static" title={j.orientation}>

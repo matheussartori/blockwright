@@ -38,7 +38,7 @@ function Shell() {
   viewerRef.current = viewer;
   const pending = useRef<string | null>(null);
 
-  const load = useCallback(async (path: string) => {
+  const load = useCallback(async (path: string, preserveCamera = false) => {
     const st = store.getState();
     if (!viewerRef.current) {
       pending.current = path; // viewport not mounted yet — run on ready
@@ -56,7 +56,7 @@ function Shell() {
       if (data.blocks.length === 0) {
         st.setNotice({ text: `${data.name} — no structure blocks found`, warn: true });
       } else {
-        await viewerRef.current.show(data);
+        await viewerRef.current.show(data, preserveCamera);
         st.setStructure(data);
         st.setNotice(null);
         void maybeSuggestWorkspace(path);
@@ -72,7 +72,13 @@ function Shell() {
     const st = store.getState();
     st.setSuggest(null);
     if (st.structure === null) return;
+    // Clear first: it nulls the viewer's lastPieces, so resetting hideShell below
+    // can't kick off an async rebuild that would re-add the (now closed) structure
+    // to the scene — which left a ghost render behind the welcome screen.
     viewerRef.current?.clear();
+    // "See inside" is a per-structure exploration aid, not a durable preference —
+    // reset it on close so the next file opens with its shell intact.
+    settingsStore.getState().set('hideShell', false);
     st.setStructure(null);
     st.setNotice(null);
   }, []);
@@ -93,7 +99,8 @@ function Shell() {
     if (!sug) return;
     const active = await api.activateWorkspace(sug.workspace);
     store.getState().setSuggest(null);
-    if (active) void load(sug.filePath); // re-render with the mod's textures
+    // Re-render with the mod's textures, keeping the camera where the user left it.
+    if (active) void load(sug.filePath, true);
   }, [load]);
 
   const onWorkspaceChanged = useCallback(
@@ -195,7 +202,7 @@ function Shell() {
 
   return (
     <>
-      <Titlebar onOpen={() => void open()} />
+      <Titlebar fileOpen={fileOpen} onClose={close} />
       <main className="stage">
         <div className="stage-main">
           <Viewport />
