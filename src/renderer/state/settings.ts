@@ -12,12 +12,16 @@ export interface Settings {
   invertY: boolean;
   /** Show the ground grid in the viewer. */
   showGrid: boolean;
+  /** Render jigsaw blocks. Off by default — they're worldgen markers, not real
+   *  geometry (vanilla replaces each with its `final_state` during generation). */
+  showJigsaw: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
   lookSensitivity: 1,
   invertY: false,
   showGrid: true,
+  showJigsaw: false,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -52,6 +56,7 @@ function snapshot(s: SettingsState): Settings {
     lookSensitivity: s.lookSensitivity,
     invertY: s.invertY,
     showGrid: s.showGrid,
+    showJigsaw: s.showJigsaw,
   };
 }
 

@@ -9,7 +9,8 @@ import type { JigsawWarning, PlacedPiece, StructureData } from '@/shared/types';
 import { isJigsawSupported } from '@/shared/mc-version';
 import { api } from '../api';
 import { useViewer } from '../viewer/ViewerProvider';
-import { useApp } from '../hooks/useStores';
+import { useApp, useSettings } from '../hooks/useStores';
+import { settingsStore } from '../state/settings';
 import type { AssemblyPiece } from '../viewer/viewer';
 
 const DEFAULT_DEPTH = 4;
@@ -28,6 +29,7 @@ export function JigsawContent() {
   const structure = useApp((s) => s.structure);
   const workspace = useApp((s) => s.workspace);
   const contentVersion = useApp((s) => s.contentVersion);
+  const showJigsaw = useSettings((s) => s.showJigsaw);
   const viewer = useViewer();
 
   const version = workspace ? workspace.minecraftVersion : contentVersion;
@@ -210,6 +212,14 @@ export function JigsawContent() {
       <div className="bw-section">
         Connectors <span className="bw-count">{count}</span>
       </div>
+      <label className="bw-toggle">
+        <input
+          type="checkbox"
+          checked={showJigsaw}
+          onChange={(e) => settingsStore.getState().set('showJigsaw', e.target.checked)}
+        />
+        <span>Show jigsaw blocks in viewer</span>
+      </label>
       <ul className="bw-rows">
         {structure.jigsaws.map((j, i) => (
           <li key={i} className="bw-row static" title={j.orientation}>

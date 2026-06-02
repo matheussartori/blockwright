@@ -46,6 +46,10 @@ export class Viewer {
   private invertY = false;
   /** Whether the ground grid is shown (Settings). */
   private showGrid = true;
+  /** Whether jigsaw blocks are rendered (Settings; off by default). */
+  private showJigsaw = false;
+  /** Last rendered pieces, kept so a settings toggle can rebuild without a reload. */
+  private lastPieces: AssemblyPiece[] | null = null;
   private readonly dir = new THREE.Vector3();
   private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
@@ -203,6 +207,16 @@ export class Viewer {
     if (this.grid) this.grid.visible = show;
   }
 
+  /** Render jigsaw blocks or not (Settings). Rebuilds the current scene so the
+   *  change is immediate, without a file reload. */
+  setShowJigsaw(show: boolean) {
+    if (show === this.showJigsaw) return;
+    this.showJigsaw = show;
+    // Toggling is an in-place rebuild, not a fresh load — keep the camera where
+    // the user left it instead of re-framing the (now slightly different) bounds.
+    if (this.lastPieces) void this.showAssembly(this.lastPieces, true);
+  }
+
   private onResize() {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
@@ -218,9 +232,12 @@ export class Viewer {
   }
 
   /** Render one or more placed structures as a jigsaw assembly. Each piece is its
-   *  own transformed group, so framing and the grid follow the combined bounds. */
-  async showAssembly(pieces: AssemblyPiece[]): Promise<void> {
+   *  own transformed group, so framing and the grid follow the combined bounds.
+   *  Pass `preserveCamera` to rebuild in place (e.g. a settings toggle) without
+   *  moving the camera or orbit target. */
+  async showAssembly(pieces: AssemblyPiece[], preserveCamera = false): Promise<void> {
     this.clear();
+    this.lastPieces = pieces;
     if (pieces.length === 0) return;
 
     const keys = new Set<string>();
@@ -229,7 +246,7 @@ export class Viewer {
 
     const parent = new THREE.Group();
     for (const p of pieces) {
-      const group = buildStructure(p.data, textures);
+      const group = buildStructure(p.data, textures, this.showJigsaw);
       group.rotation.y = (p.quarterTurns * Math.PI) / 2;
       group.position.set(p.offset[0], p.offset[1], p.offset[2]);
       parent.add(group);
@@ -239,11 +256,13 @@ export class Viewer {
 
     const box = new THREE.Box3().setFromObject(parent);
     this.addGrid(box);
-    this.frame(box);
+    if (preserveCamera) this.controls.update();
+    else this.frame(box);
   }
 
   /** Remove the current structure and grid from the scene (back to empty). */
   clear() {
+    this.lastPieces = null;
     this.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);

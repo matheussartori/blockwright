@@ -156,6 +156,7 @@ function Shell() {
       viewer.setLookSensitivity(s.lookSensitivity);
       viewer.setInvertY(s.invertY);
       viewer.setShowGrid(s.showGrid);
+      viewer.setShowJigsaw(s.showJigsaw);
     };
     apply();
     return settingsStore.subscribe(apply);

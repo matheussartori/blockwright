@@ -1205,6 +1205,26 @@ body {
   letter-spacing: 0.5px;
   color: var(--text-muted);
 }
+/* Inline checkbox toggle (e.g. "Show jigsaw blocks") inside the jigsaw panel. */
+.bw-toggle {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.bw-toggle:hover {
+  color: var(--text);
+}
+.bw-toggle input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .bw-rows {
   list-style: none;
   margin: 0;

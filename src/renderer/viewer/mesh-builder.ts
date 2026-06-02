@@ -5,9 +5,14 @@ import type { StructureData } from '@/shared/types';
 import type { LoadedTexture } from './texture-loader';
 import { addFallbackCube, addModel, type Accum, type GetAccum } from './model-geometry';
 
+/** Blocks that are worldgen markers rather than real geometry. Hidden unless the
+ *  matching setting is on; vanilla replaces a jigsaw with its `final_state`. */
+const JIGSAW_NAME = 'minecraft:jigsaw';
+
 export function buildStructure(
   data: StructureData,
   textures: Map<string, LoadedTexture>,
+  showJigsaw = false,
 ): THREE.Group {
   const accums = new Map<string, Accum>();
 
@@ -22,6 +27,7 @@ export function buildStructure(
 
   for (const block of data.blocks) {
     const entry = data.palette[block.state];
+    if (entry && !showJigsaw && entry.name === JIGSAW_NAME) continue;
     if (!entry || entry.air || entry.models.length === 0) {
       if (entry && !entry.air) {
         addFallbackCube(getAccum(`c:${entry.color.join(',')}`, false, undefined, entry.color), block.pos);
