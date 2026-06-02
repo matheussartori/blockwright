@@ -17,10 +17,10 @@ export function buildStructure(
 ): THREE.Group {
   const accums = new Map<string, Accum>();
 
-  const getAccum: GetAccum = (key, textured, tex, color) => {
+  const getAccum: GetAccum = (key, textured, tex, color, translucent) => {
     let a = accums.get(key);
     if (!a) {
-      a = { positions: [], normals: [], uvs: [], colors: [], textured, texture: tex, color };
+      a = { positions: [], normals: [], uvs: [], colors: [], textured, texture: tex, color, translucent };
       accums.set(key, a);
     }
     return a;
@@ -60,8 +60,17 @@ export function buildStructure(
     });
     if (a.textured && a.texture) {
       mat.map = a.texture;
-      mat.alphaTest = 0.5;
-      mat.transparent = false;
+      if (a.translucent) {
+        // Stained glass & panes: blend the partially-transparent body instead of
+        // discarding it. depthWrite off so blocks behind stay visible through it.
+        mat.transparent = true;
+        mat.alphaTest = 0;
+        mat.depthWrite = false;
+      } else {
+        // Opaque/cutout textures (incl. plain glass's binary alpha): hard cut.
+        mat.alphaTest = 0.5;
+        mat.transparent = false;
+      }
     } else if (a.color) {
       mat.color = new THREE.Color(a.color[0], a.color[1], a.color[2]);
     }

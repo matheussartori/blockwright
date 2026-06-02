@@ -14,6 +14,8 @@ const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
   building: 'Writing structure…',
   compiling: 'Compiling…',
+  rendering: 'Rendering preview…',
+  reviewing: 'Reviewing the result…',
 };
 
 /** Image MIME types Claude accepts as reference attachments. */

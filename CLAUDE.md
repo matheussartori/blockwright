@@ -47,6 +47,10 @@ src/
     structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt.
                           Expands volumetric `ops` (fill/hollow/walls/line/block) → block list
                           before NBT (resolveBlocks), so the model emits ~ops not ~1000s of blocks.
+                          Then connectBlocks derives connecting-block sides (panes/iron
+                          bars/fences/walls) from neighbours — the AI omits north/south/
+                          east/west, so without this an isolated pane renders as the bare
+                          `_post` column; it splits palette entries per side combination.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
     App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
@@ -132,8 +136,11 @@ so it authenticates the way the Claude Code CLI does and runs on the user's **Pr
 (their existing Claude Code login, no API credits). `generate.ts` gives the model the
 `knowledge/nbt` guides as its system prompt and a single in-process MCP tool, `emit_structure`,
 whose handler validates + compiles the authoring JSON (`compile-structure.ts`) to a versioned
-temp `.nbt`; validation errors are returned to the model so it self-corrects in the same turn. A
-per-panel session resumes the SDK conversation (`resume`) so follow-ups edit the current build.
+temp `.nbt`; validation errors are returned to the model so it self-corrects in the same turn. The
+handler then **renders that version and feeds screenshots back in the tool result** (see the visual
+self-review loop below), so the model sees its own build and refines it against the prompt/reference
+rather than building blind. A per-panel session resumes the SDK conversation (`resume`) so follow-ups
+edit the current build.
 `credentials.ts` resolves auth: env (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`) wins, else an
 in-app credential (a `claude setup-token` token or an API key, encrypted via `safeStorage`), else
 the existing Claude Code keychain login. `aiAvailable()` is always true — a real auth failure
@@ -149,22 +156,34 @@ surfaces as a clear error on first send (see `authHint`).
   (the docs example is misleading; double-wrapping throws "connect is not a function"). Lock the
   agent down with `tools: []` (no built-ins) + `allowedTools: ['mcp__blockwright__emit_structure']`
   + `settingSources: []` (don't load this repo's own CLAUDE.md).
-- **Latency tuning:** the dominant cost for any non-trivial build is **output tokens** — the model
-  must serialize every block, so a flat per-block list is `O(blocks)` to emit and a big build can
-  blow past the single-response output cap. The fix is the **volumetric `ops`** authoring primitive
-  (fill/hollow/walls/line/block, expanded in `compile-structure.ts`); the prompt + knowledge
-  (`knowledge/nbt/00-volumetric-ops.md`) steer the model to describe geometry as ops (one `fill` =
-  a whole wall) instead of thousands of blocks. Two more levers cut front-end latency: the SDK
-  reasons deeply by default (it would deliberate for minutes), so `thinking: { type: 'disabled' }`
-  + an **emit-first** system prompt ("call the tool immediately, don't narrate"). The knowledge is
-  still applied — reference, not a cue to think aloud. Knob: `BW_AI_THINKING_BUDGET`. (There is no
-  time/turn cap — generation runs until the model emits, finishes, errors, or the user cancels.)
+- **Visual self-review loop (quality > latency):** a single blind emit produces boxy massing and
+  broken roofs — the knowledge base's design audit is impossible if the model never sees the build.
+  So generation is an **emit → render → review → refine** loop, not one shot. After each
+  `emit_structure` the handler asks the renderer to load + screenshot the compiled `.nbt` and
+  returns those images as **image content blocks in the tool result**; the model critiques them
+  against the prompt/reference and re-emits a complete improved structure, stopping when it matches
+  (capped at `BW_AI_MAX_ROUNDS`, default 4). **Extended thinking is on by default** (`BW_AI_THINKING_BUDGET`,
+  default 8000 tokens, `0` disables) so it can plan geometry, and the system prompt tells it to plan
+  → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
+  callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +
+  `Viewer.capture()` (synchronous multi-angle PNGs, downscaled) → replies on
+  `IPC_CHANNELS.aiRenderResult`, which resolves the matching pending promise in `ipc.ts`
+  (`pendingRenders`, with a timeout so a stuck render doesn't hang generation). The user watches the
+  build evolve live since each version loads into the viewer.
+- **Output-token cost / volumetric `ops`:** the dominant cost for any non-trivial build is **output
+  tokens** — the model must serialize every block, so a flat per-block list is `O(blocks)` to emit
+  and a big build can blow past the single-response output cap. The fix is the **volumetric `ops`**
+  authoring primitive (fill/hollow/walls/line/block, expanded in `compile-structure.ts`); the prompt
+  + knowledge (`knowledge/nbt/00-volumetric-ops.md`) steer the model to describe geometry as ops
+  (one `fill` = a whole wall) instead of thousands of blocks. (There is no time cap — generation runs
+  until the model is satisfied, hits `BW_AI_MAX_ROUNDS`, errors, or the user cancels.)
 - **Progress + cancel:** `generateStructure` takes an `onProgress` callback; `ipc.ts` forwards it
-  to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Live tokens come
-  from `includePartialMessages` stream events — input includes cached context, output blends the
-  thinking-token estimate (during thinking) with a chars/4 estimate of the streamed tool JSON
-  (during building, since `message_delta` only reports the count at turn end). Cancel aborts a
-  per-session `AbortController` via `aiCancel` → `cancelGeneration`.
+  to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Phases include
+  `rendering`/`reviewing` for the self-review loop. Live tokens come from `includePartialMessages`
+  stream events — input includes cached context, output blends the thinking-token estimate (during
+  thinking) with a chars/4 estimate of the streamed tool JSON (during building, since `message_delta`
+  only reports the count at turn end). Cancel aborts a per-session `AbortController` via `aiCancel` →
+  `cancelGeneration`.
 
 ## Conventions / gotchas
 

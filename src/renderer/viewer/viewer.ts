@@ -393,4 +393,58 @@ export class Viewer {
     this.camera.updateProjectionMatrix();
     this.controls.update();
   }
+
+  /** Screenshot the current build from `angles` viewpoints orbited evenly around
+   *  the framed target (angle 0 = the current camera), returning PNG data URLs.
+   *  Used by the AI generator's self-review loop so the model can see its own
+   *  output. Each render→read happens synchronously (no rAF interleaves), so the
+   *  WebGL buffer is valid even without `preserveDrawingBuffer`; we copy it into a
+   *  downscaled 2D canvas (capped at `maxSize`) to keep the payload reasonable. */
+  capture(angles = 2, maxSize = 900): string[] {
+    if (!this.current) return [];
+    const wasFly = this.mode === 'fly';
+    if (wasFly) this.setMode('orbit');
+    this.removeHighlight();
+
+    const target = this.controls.target.clone();
+    const saved = this.camera.position.clone();
+    const offset = saved.clone().sub(target);
+    const radius = Math.hypot(offset.x, offset.z) || 1;
+    const elevation = offset.y;
+    const baseAngle = Math.atan2(offset.z, offset.x);
+
+    const src = this.renderer.domElement;
+    const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
+    const w = Math.max(1, Math.round(src.width * scale));
+    const h = Math.max(1, Math.round(src.height * scale));
+    const off = document.createElement('canvas');
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext('2d');
+
+    const shots: string[] = [];
+    for (let i = 0; i < angles; i++) {
+      const a = baseAngle + (i * 2 * Math.PI) / angles;
+      this.camera.position.set(
+        target.x + radius * Math.cos(a),
+        target.y + elevation,
+        target.z + radius * Math.sin(a),
+      );
+      this.camera.lookAt(target);
+      this.renderer.render(this.scene, this.camera);
+      if (ctx) {
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(src, 0, 0, w, h);
+        shots.push(off.toDataURL('image/png'));
+      } else {
+        shots.push(src.toDataURL('image/png'));
+      }
+    }
+
+    // Restore the user's viewpoint.
+    this.camera.position.copy(saved);
+    this.camera.lookAt(target);
+    this.controls.update();
+    return shots;
+  }
 }

@@ -139,6 +139,23 @@ function Shell() {
       w.setVisible(id, !w[id].visible);
     });
     api.onResetWindows(() => windowsStore.getState().resetAll());
+    // The AI generator (main) asks us to render each version it emits and hand
+    // back screenshot(s), so it can see its own build and refine it against the
+    // reference. We load it into the live viewer (so the user watches it evolve),
+    // then capture a couple of orbited angles.
+    api.onAiRenderRequest(async ({ requestId, path, version }) => {
+      try {
+        await load(path, version > 1, false);
+        const shots = viewerRef.current?.capture() ?? [];
+        const images = shots.map((url) => {
+          const [head, data] = url.split(',');
+          return { mediaType: head.slice(5, head.indexOf(';')), data };
+        });
+        api.sendRenderResult({ requestId, images });
+      } catch (err) {
+        api.sendRenderResult({ requestId, error: String(err) });
+      }
+    });
 
     void (async () => {
       st.setRecents(await api.listRecents());

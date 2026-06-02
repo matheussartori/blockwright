@@ -20,16 +20,28 @@ import { loadKnowledge } from './knowledge';
 import { authEnv, claudeExecutablePath, hasConfiguredCredential } from './credentials';
 import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure } from '../structure/compile-structure';
 
+/** Render a just-emitted version and return screenshot(s) of it (or an error),
+ *  so the model can see its own build and refine it. Supplied by the IPC layer,
+ *  which round-trips to the renderer (main can't render the Three.js scene). */
+export type CapturePreview = (
+  path: string,
+  version: number,
+) => Promise<{ images?: GenerateImage[]; error?: string }>;
+
 /** Model used for generation; override with BW_AI_MODEL. */
-const MODEL = process.env.BW_AI_MODEL || 'claude-sonnet-4-6';
-/** Extended thinking. The SDK default reasons deeply, so the model spends
- *  minutes thinking before it emits — wasteful here since the knowledge base
- *  already encodes the design rules. We disable it so it builds straight away;
- *  set BW_AI_THINKING_BUDGET to a token count to re-enable a bounded budget. */
-const THINKING_BUDGET = Number(process.env.BW_AI_THINKING_BUDGET) || 0;
+const MODEL = process.env.BW_AI_MODEL || 'claude-opus-4-8';
+/** Extended thinking budget (tokens). Spatial builds need real planning — roofs
+ *  and massing come out boxy/broken without it — so we enable it by default.
+ *  Set BW_AI_THINKING_BUDGET=0 to disable, or a token count to tune the budget. */
+const THINKING_BUDGET = process.env.BW_AI_THINKING_BUDGET !== undefined
+  ? Number(process.env.BW_AI_THINKING_BUDGET)
+  : 8000;
 const THINKING = THINKING_BUDGET > 0
   ? ({ type: 'enabled', budgetTokens: THINKING_BUDGET } as const)
   : ({ type: 'disabled' } as const);
+/** Max number of emit→render→review rounds before we force the model to stop, so
+ *  the self-correction loop can't run forever. Override with BW_AI_MAX_ROUNDS. */
+const MAX_ROUNDS = Number(process.env.BW_AI_MAX_ROUNDS) || 4;
 
 const EMIT_TOOL_NAME = 'mcp__blockwright__emit_structure';
 
@@ -110,18 +122,30 @@ export function resetSession(sessionId: string): void {
 
 const INSTRUCTIONS = `You are Blockwright's structure generator. You produce Minecraft Java 1.21.1 \
 (DataVersion 3955) ".nbt" structures in the Blockwright authoring JSON format, which the app compiles \
-to a real gzipped .nbt and renders in a live 3D preview.
+to a real gzipped .nbt and renders in a live 3D preview. Your output is meant to be USED in a mod — aim \
+for builds a player would be happy to find, not just technically valid boxes.
 
-Output ONLY by calling the "emit_structure" tool, and call it right away with the COMPLETE structure \
-(not a diff). Do NOT write any plan, reasoning, or commentary before the tool call — put a 1-2 sentence \
-note in the tool's "summary" field instead. Go straight to the structure.
+You work in a SEE-AND-REFINE loop, not one shot:
+1. PLAN first. Briefly think through the massing (footprint proportions, storeys, roof shape, where the \
+entrance and windows go) before emitting. Spatial builds — especially roofs — come out boxy and broken \
+when dumped without planning, so spend your thinking on geometry.
+2. EMIT the COMPLETE structure (not a diff) by calling "emit_structure". Keep prose out of the chat — \
+put a 1-2 sentence note in the tool's "summary" field.
+3. REVIEW. The tool result returns SCREENSHOTS of what you just built. Look at them critically against \
+the user's request and any reference image: is the silhouette/massing right (not a plain cube)? Does the \
+roof read as a real pitched/edged roof with an overhang, or is it a mess? Do the facades have depth and a \
+framed entrance? Are proportions and materials believable? Run the audit in 10-design-principles.md.
+4. REFINE. If the render clearly falls short, call "emit_structure" again with a complete improved \
+structure — fix the biggest problems first (massing and roof before trim). When the render genuinely \
+matches the intent, STOP and do not call the tool again. You get a limited number of revision rounds, so \
+make each one count; don't keep tweaking a build that is already good.
 
 Build with "ops" (volumetric operations) for almost everything — they are far cheaper to emit than \
-per-block entries, which is what makes generation fast. A solid box is one "fill"; a room shell is one \
-"hollow"; the 4 outer sides are one "walls"; a beam is one "line". Ops apply in order and later ops \
-overwrite earlier cells, so layer coarse-to-fine: lay shells, carve openings by filling an air index, \
-then add detail. Reserve the "blocks" array for the handful of cells that need block-entity nbt or one-off \
-detail. Prefer ops; do NOT enumerate large volumes block-by-block.
+per-block entries. A solid box is one "fill"; a room shell is one "hollow"; the 4 outer sides are one \
+"walls"; a beam is one "line". Ops apply in order and later ops overwrite earlier cells, so layer \
+coarse-to-fine: lay shells, carve openings by filling an air index, then add detail. Reserve the \
+"blocks" array for the handful of cells that need block-entity nbt or one-off detail. Do NOT enumerate \
+large volumes block-by-block.
 
 CRITICAL — keep interiors empty. Any enclosed or habitable volume (a room, a house body, a tower) MUST be \
 a SHELL: use "hollow" (or "walls" + a floor "fill" + a ceiling "fill"), NEVER a solid "fill" of the whole \
@@ -132,17 +156,18 @@ interior detail in the empty space.
 
 Use the guides below as your reference and follow their hard rules exactly (1.21.1 block IDs only, \
 0-indexed positions within size, blockstate property values are strings, first palette entry is air by \
-convention, omit air blocks, never renumber palette indices). Make builds that look intentional, not \
-just valid: 3-5 cohesive materials, surface depth, a pitched/edged roof with an overhang, a framed \
-entrance, a grounded base (knowledge/nbt/10-design-principles.md). The preview validates geometry, not \
-data — build interiors from block geometry (faux-furniture), since container/sign contents and entities \
-do not render. Favor a clear, complete build over an oversized one so it generates promptly. For follow-up requests, edit the current structure: keep the parts that work, change \
-only what was asked, append palette entries rather than mutating shared ones, and re-check bounds when \
-resizing. If the tool reports a validation error, fix it and call the tool again. Do not use any other \
-tools.
+convention, omit air blocks, never renumber palette indices). Make builds that look intentional: 3-5 \
+cohesive materials, surface depth, a pitched/edged roof with an overhang, a framed entrance, a grounded \
+base, articulated massing for larger builds (wings/sections with their own roofs rather than one giant \
+box). The preview validates geometry, not data — build interiors from block geometry (faux-furniture), \
+since container/sign contents and entities do not render. For follow-up requests, edit the current \
+structure: keep the parts that work, change only what was asked, append palette entries rather than \
+mutating shared ones, and re-check bounds when resizing. If the tool reports a validation error, fix it \
+and call the tool again. Do not use any other tools.
 
-If the user attaches reference image(s), treat them as visual guidance: match the overall shape, \
-proportions, materials, and colors you see, adapting them into buildable 1.21.1 blocks.`;
+If the user attaches reference image(s), treat them as the target: match the overall shape, proportions, \
+roofline, materials, and colors you see, adapting them into buildable 1.21.1 blocks, and use the \
+screenshots to check how close you got.`;
 
 function systemPrompt(): string {
   return `${INSTRUCTIONS}\n\n# NBT generation knowledge base\n\n${loadKnowledge()}`;
@@ -177,6 +202,7 @@ export async function generateStructure(
   prompt: string,
   images?: GenerateImage[],
   onProgress?: (p: GenerateProgress) => void,
+  capture?: CapturePreview,
 ): Promise<GenerateResult> {
   const session = getSession(sessionId);
   const { sdk, z } = await loadMods();
@@ -184,6 +210,10 @@ export async function generateStructure(
   // Captured by the tool handler below as the model emits the structure.
   let captured: Extract<GenerateResult, { ok: true }> | null = null;
   let captureError: string | null = null;
+  // Number of structures emitted this generation, and a flag set once we've hit
+  // the revision cap so the message loop can stop the model.
+  let rounds = 0;
+  let forceStop = false;
 
   // Live progress: input tokens accumulate across turns (including cached context
   // so the number reflects the real prompt size). Output is the committed total
@@ -296,7 +326,55 @@ export async function generateStructure(
       const blockCount = resolveBlocks(authoring).length;
       captured = { ok: true, path: nbtPath, version, summary: (summary ?? '').trim(), size, blockCount };
       captureError = null;
-      return { content: [{ type: 'text', text: `Compiled and rendered as v${version} (${size.join('×')}, ${blockCount} blocks).` }] };
+      rounds += 1;
+
+      // Render this version and feed screenshots back so the model can review its
+      // own build against the request/reference and refine it.
+      phase = 'rendering';
+      emitProgress(true);
+      let shot: { images?: GenerateImage[]; error?: string } = {};
+      if (capture) {
+        try {
+          shot = await capture(nbtPath, version);
+        } catch (err) {
+          shot = { error: errMessage(err) };
+        }
+      }
+      phase = 'reviewing';
+      emitProgress(true);
+
+      const atCap = rounds >= MAX_ROUNDS;
+      if (atCap) forceStop = true;
+
+      const head = `Compiled and rendered as v${version} (${size.join('×')}, ${blockCount} blocks).`;
+      const lines = [head];
+      const haveShots = !!shot.images && shot.images.length > 0;
+      if (haveShots) {
+        lines.push(
+          '',
+          'Screenshots of THIS build (a couple of orbited angles) follow. Compare them critically to the ' +
+            'request and any reference: silhouette/massing (not a plain cube), roofline (a real pitched/edged ' +
+            'roof with an overhang, no holes), facade depth and a framed entrance, proportions, materials, and ' +
+            'a readable interior. Run the audit in 10-design-principles.md.',
+        );
+      } else {
+        lines.push(shot.error ? `(Preview render unavailable: ${shot.error})` : '(No preview available.)');
+      }
+      lines.push(
+        '',
+        atCap
+          ? `This is the final allowed revision (round ${rounds}/${MAX_ROUNDS}). Do NOT call emit_structure again — finish now.`
+          : 'If the build clearly falls short, call emit_structure again with a COMPLETE improved structure ' +
+              '(fix the biggest problems first). If it already matches the intent well, stop and do not call the tool again.',
+      );
+
+      const content: Array<
+        { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+      > = [{ type: 'text', text: lines.join('\n') }];
+      for (const img of shot.images ?? []) {
+        content.push({ type: 'image', data: img.data, mimeType: img.mediaType });
+      }
+      return { content };
     },
   );
 
@@ -336,9 +414,14 @@ export async function generateStructure(
         currentThinking = msg.estimated_tokens; // live liveness during thinking
         emitProgress();
       } else if (msg.type === 'result') resultSubtype = msg.subtype;
-      // Once the structure is compiled we have what we need; stop early so the
-      // model doesn't spend another turn writing prose we discard.
-      if (captured) break;
+      // The model self-reviews each emitted version (see the tool handler) and
+      // re-emits until it's satisfied or it hits the round cap. When capped, we
+      // already have the final build, so stop the run instead of paying for
+      // another turn. Otherwise let the conversation end naturally.
+      if (forceStop) {
+        ac.abort();
+        break;
+      }
     }
   } catch (err) {
     if (ac.signal.aborted) {
@@ -369,6 +452,9 @@ export async function generateStructure(
       currentThinking = 0;
       streamedChars = 0;
       turns += 1;
+      // A new turn begins with reasoning (planning the build, or reviewing the
+      // previous render); reflect that until the tool call flips us to 'building'.
+      phase = 'thinking';
       emitProgress();
     } else if (e.type === 'content_block_start' && e.content_block?.type === 'tool_use') {
       phase = 'building';

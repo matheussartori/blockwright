@@ -37,6 +37,7 @@ export interface Accum {
   textured: boolean;
   texture?: THREE.Texture;
   color?: [number, number, number];
+  translucent?: boolean;
 }
 
 /** Factory that returns (creating on demand) the accumulator for a material key. */
@@ -45,6 +46,7 @@ export type GetAccum = (
   textured: boolean,
   tex?: THREE.Texture,
   color?: [number, number, number],
+  translucent?: boolean,
 ) => Accum;
 
 const tmpV = new THREE.Vector3();
@@ -146,7 +148,7 @@ export function addModel(
 
       const loaded = face.texture ? textures.get(face.texture) : undefined;
       const accum = loaded
-        ? getAccum(`t:${face.texture}`, true, loaded.texture)
+        ? getAccum(`t:${face.texture}`, true, loaded.texture, undefined, loaded.translucent)
         : getAccum(`c:${fallback.join(',')}`, false, undefined, fallback);
 
       const def = FACE_DEFS[dir];

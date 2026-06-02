@@ -7,6 +7,8 @@ import type {
   GenerateImage,
   GenerateProgress,
   GenerateResult,
+  RenderRequest,
+  RenderResult,
   JigsawCandidate,
   JigsawPlan,
   StructureData,
@@ -58,6 +60,12 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiResetSession, sessionId),
   onAiProgress: (cb: (progress: GenerateProgress) => void) => {
     ipcRenderer.on(IPC_EVENTS.aiProgress, (_e, p: GenerateProgress) => cb(p));
+  },
+  onAiRenderRequest: (cb: (req: RenderRequest) => void) => {
+    ipcRenderer.on(IPC_EVENTS.aiRenderRequest, (_e, req: RenderRequest) => cb(req));
+  },
+  sendRenderResult: (result: RenderResult) => {
+    ipcRenderer.invoke(IPC_CHANNELS.aiRenderResult, result);
   },
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);

@@ -1,12 +1,13 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
-import type { AssembleOptions, GenerateImage, Workspace, WindowsReport } from '@/shared/types';
+import { randomUUID } from 'node:crypto';
+import type { AssembleOptions, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
-import { aiAvailable, cancelGeneration, generateStructure, resetSession } from './ai/generate';
+import { aiAvailable, cancelGeneration, generateStructure, resetSession, type CapturePreview } from './ai/generate';
 import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
 import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
@@ -21,6 +22,13 @@ import {
 } from './workspace';
 import { notifyRecentWorkspaces, openFileDialog } from './window';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
+
+/** Pending preview-render requests, keyed by requestId, resolved when the
+ *  renderer replies on aiRenderResult (see the aiGenerate handler). */
+const pendingRenders = new Map<string, (result: RenderResult) => void>();
+/** How long to wait for the renderer to return a preview screenshot before
+ *  giving up so generation can continue without the visual feedback. */
+const RENDER_TIMEOUT_MS = 20000;
 
 export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
@@ -111,9 +119,30 @@ export function registerIpc(): void {
     clearCredential();
     return credentialInfo();
   });
-  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[]) =>
-    generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p)),
-  );
+  // Render round-trip for the generator's self-review loop: generate.ts calls the
+  // `capture` callback below per emitted version; we ask the renderer (over
+  // aiRenderRequest) to load + screenshot it and resolve the matching pending
+  // promise when its aiRenderResult reply arrives (or on timeout).
+  ipcMain.handle(IPC_CHANNELS.aiRenderResult, async (_e, result: RenderResult) => {
+    pendingRenders.get(result.requestId)?.(result);
+  });
+  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[]) => {
+    const capture: CapturePreview = (path, version) =>
+      new Promise((resolve) => {
+        const requestId = randomUUID();
+        const timer = setTimeout(() => {
+          pendingRenders.delete(requestId);
+          resolve({ error: 'Preview render timed out.' });
+        }, RENDER_TIMEOUT_MS);
+        pendingRenders.set(requestId, (res) => {
+          clearTimeout(timer);
+          pendingRenders.delete(requestId);
+          resolve({ images: res.images, error: res.error });
+        });
+        e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, path, version });
+      });
+    return generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture);
+  });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));
 

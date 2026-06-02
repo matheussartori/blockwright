@@ -190,8 +190,27 @@ export type GenerateResult =
     }
   | { ok: false; error: string; canceled?: boolean };
 
-/** Coarse phase of an in-flight generation, for the progress indicator. */
-export type GeneratePhase = 'thinking' | 'building' | 'compiling';
+/** Coarse phase of an in-flight generation, for the progress indicator.
+ *  `rendering` = the just-emitted build is being screenshotted for review;
+ *  `reviewing` = the model is comparing that render to the goal and deciding
+ *  whether to refine it. */
+export type GeneratePhase = 'thinking' | 'building' | 'compiling' | 'rendering' | 'reviewing';
+
+/** Payload of IPC_EVENTS.aiRenderRequest: main asks the renderer to load a
+ *  generated `.nbt` and screenshot it for the generator's self-review loop. */
+export interface RenderRequest {
+  requestId: string;
+  path: string;
+  version: number;
+}
+
+/** Renderer's reply to a RenderRequest (IPC_CHANNELS.aiRenderResult): the
+ *  captured preview image(s), or an error string if rendering failed. */
+export interface RenderResult {
+  requestId: string;
+  images?: GenerateImage[];
+  error?: string;
+}
 
 /** Live progress pushed from main during generation (see IPC_EVENTS.aiProgress). */
 export interface GenerateProgress {
@@ -277,6 +296,12 @@ export interface BlockwrightApi {
   aiResetSession: (sessionId: string) => Promise<void>;
   /** Notified with live token/phase progress while a generation is in flight. */
   onAiProgress: (cb: (progress: GenerateProgress) => void) => void;
+  /** Notified when main wants the just-generated `.nbt` rendered + screenshotted
+   *  for the generator's self-review loop. The handler should load the structure,
+   *  capture it, and reply via `sendRenderResult`. */
+  onAiRenderRequest: (cb: (req: RenderRequest) => void) => void;
+  /** Reply to an onAiRenderRequest with the captured image(s) or an error. */
+  sendRenderResult: (result: RenderResult) => void;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */

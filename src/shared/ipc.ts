@@ -50,6 +50,9 @@ export const IPC_CHANNELS = {
   aiCancel: 'ai:cancel',
   /** Forget a generation session's conversation (payload: sessionId). */
   aiResetSession: 'ai:reset-session',
+  /** Renderer's reply to an aiRenderRequest: the captured preview image(s) (or an
+   *  error). Payload: requestId + { images? , error? }. */
+  aiRenderResult: 'ai:render-result',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -73,4 +76,9 @@ export const IPC_EVENTS = {
   newStructure: 'new-structure',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
+  /** Ask the renderer to load a just-generated `.nbt` into the viewer and return
+   *  screenshot(s) of it, so the generator can see its own build and self-correct
+   *  against the reference. Payload: { requestId, path, version }; the renderer
+   *  replies on IPC_CHANNELS.aiRenderResult. */
+  aiRenderRequest: 'ai-render-request',
 } as const;
