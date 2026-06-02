@@ -1,32 +1,39 @@
-// Layout state for the standardized floating windows (Controls / Inspector /
-// Jigsaw). The renderer owns this — it persists to localStorage (like
+// Layout state for the inspector panels (Inspector / Jigsaw) and the keyboard
+// shortcuts popover. The renderer owns this — it persists to localStorage (like
 // `settings.ts`) and reports visibility/availability to main so the View menu's
-// checkmarks track it. Positions are stage-local (top-left origin), in px.
+// checkmarks track it.
+//
+// Each panel lives in the docked right sidebar by default (`floating: false`,
+// shown as a tab) and can be torn off into a free-floating window
+// (`floating: true`) positioned by `x/y`. `controls` is no longer a window — it
+// only carries `.visible`, which drives the keyboard-shortcuts popover.
 import { createStore } from 'zustand/vanilla';
 import type { WindowId } from '@/shared/types';
 
+/** The two dockable inspector panels (every WindowId except `controls`). */
+export type PanelId = 'inspector' | 'jigsaw';
+
 export interface WindowState {
   visible: boolean;
+  /** false = docked in the sidebar as a tab; true = torn off as a window. */
+  floating: boolean;
   minimized: boolean;
-  /** Top-left position within the stage (the area between titlebar and statusbar). */
+  /** Top-left position within the stage — used only while floating. */
   x: number;
   y: number;
 }
 
-export type WindowsState = Record<WindowId, WindowState>;
-
-/** Default widths — shared by the home-position math and the window chrome so a
- *  freshly-reset window sits flush in its corner. */
+/** Width of a panel when floating (matches the docked sidebar width in CSS). */
 export const WINDOW_WIDTHS: Record<WindowId, number> = {
   controls: 200,
-  inspector: 264,
+  inspector: 288,
   jigsaw: 288,
 };
 
 const TITLEBAR_H = 52;
 const STATUS_H = 30;
 const MARGIN = 12;
-/** Approximate jigsaw height, only used to seed its bottom-right home position. */
+/** Approximate jigsaw height, only used to seed its floating home position. */
 const JIGSAW_H = 360;
 
 const STORAGE_KEY = 'blockwright.windows';
@@ -39,7 +46,7 @@ function stageSize(): { w: number; h: number } {
   };
 }
 
-/** Each window's home corner, recomputed from the live stage size. */
+/** A panel's home position when floating (recomputed from the live stage). */
 export function homePosition(id: WindowId): { x: number; y: number } {
   const { w, h } = stageSize();
   switch (id) {
@@ -48,8 +55,6 @@ export function homePosition(id: WindowId): { x: number; y: number } {
     case 'inspector':
       return { x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - MARGIN), y: MARGIN };
     case 'jigsaw':
-      // Sits just left of the inspector column (its original relationship), so
-      // the two right-side windows don't overlap at their home positions.
       return {
         x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.jigsaw - MARGIN * 2),
         y: Math.max(MARGIN, h - JIGSAW_H - MARGIN),
@@ -58,38 +63,60 @@ export function homePosition(id: WindowId): { x: number; y: number } {
 }
 
 function freshWindow(id: WindowId): WindowState {
-  return { visible: true, minimized: false, ...homePosition(id) };
+  return { visible: true, floating: false, minimized: false, ...homePosition(id) };
 }
 
-function defaults(): WindowsState {
+interface WindowsLayout {
+  controls: WindowState;
+  inspector: WindowState;
+  jigsaw: WindowState;
+  /** Which docked panel's tab is active. */
+  activeTab: PanelId;
+  /** When true the docked sidebar is collapsed to a thin rail. */
+  sidebarCollapsed: boolean;
+}
+
+function defaults(): WindowsLayout {
   return {
-    controls: freshWindow('controls'),
+    controls: { ...freshWindow('controls'), visible: false },
     inspector: freshWindow('inspector'),
     jigsaw: freshWindow('jigsaw'),
+    activeTab: 'inspector',
+    sidebarCollapsed: false,
   };
 }
 
 /** Load persisted layout merged over fresh defaults (new keys are picked up). */
-function load(): WindowsState {
+function load(): WindowsLayout {
   const base = defaults();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return base;
-    const saved = JSON.parse(raw) as Partial<Record<WindowId, Partial<WindowState>>>;
-    for (const id of Object.keys(base) as WindowId[]) {
+    const saved = JSON.parse(raw) as Partial<WindowsLayout>;
+    // `controls` is intentionally NOT restored — the shortcuts popover always
+    // starts closed (it's an opt-in help affordance, not a persistent panel).
+    for (const id of ['inspector', 'jigsaw'] as const) {
       base[id] = { ...base[id], ...saved[id] };
     }
+    if (saved.activeTab === 'inspector' || saved.activeTab === 'jigsaw') {
+      base.activeTab = saved.activeTab;
+    }
+    if (typeof saved.sidebarCollapsed === 'boolean') base.sidebarCollapsed = saved.sidebarCollapsed;
     return base;
   } catch {
     return base;
   }
 }
 
-export interface WindowsStore extends WindowsState {
+export interface WindowsStore extends WindowsLayout {
   setPos: (id: WindowId, x: number, y: number) => void;
   toggleMinimized: (id: WindowId) => void;
   setVisible: (id: WindowId, visible: boolean) => void;
-  /** Snap every window back to its home position and re-show it. */
+  /** Tear a panel off into a window (true) or snap it back to the dock (false). */
+  setFloating: (id: PanelId, floating: boolean) => void;
+  setActiveTab: (id: PanelId) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  /** Re-dock every panel, re-show the sidebar, and reset floating positions. */
   resetAll: () => void;
 }
 
@@ -100,11 +127,23 @@ export const windowsStore = createStore<WindowsStore>((set) => ({
     set((s) => ({ [id]: { ...s[id], minimized: !s[id].minimized } }) as Partial<WindowsStore>),
   setVisible: (id, visible) =>
     set((s) => ({ [id]: { ...s[id], visible } }) as Partial<WindowsStore>),
+  setFloating: (id, floating) =>
+    set((s) => ({
+      [id]: { ...s[id], floating, ...(floating ? homePosition(id) : {}) },
+    }) as Partial<WindowsStore>),
+  setActiveTab: (id) => set({ activeTab: id }),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   resetAll: () => set(defaults()),
 }));
 
-function snapshot(s: WindowsStore): WindowsState {
-  return { controls: s.controls, inspector: s.inspector, jigsaw: s.jigsaw };
+function snapshot(s: WindowsStore): WindowsLayout {
+  return {
+    controls: s.controls,
+    inspector: s.inspector,
+    jigsaw: s.jigsaw,
+    activeTab: s.activeTab,
+    sidebarCollapsed: s.sidebarCollapsed,
+  };
 }
 
 // Persist on every change.

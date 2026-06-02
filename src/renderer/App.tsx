@@ -19,12 +19,19 @@ import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { SettingsModal } from './components/SettingsModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
-import { ControlsWindow } from './windows/ControlsWindow';
-import { InspectorWindow } from './windows/InspectorWindow';
-import { JigsawWindow } from './windows/JigsawWindow';
+import { InspectorDock, FloatingPanels } from './components/InspectorDock';
+import { ShortcutsHelp } from './components/ShortcutsHelp';
 
 function Shell() {
   const viewer = useViewer();
+  // Drives the inspector panels' availability (Info needs a file; Jigsaw needs
+  // jigsaw connectors). Subscribed so the dock/floating panels track the file.
+  const structure = useApp((s) => s.structure);
+  const fileOpen = structure !== null;
+  const availability = {
+    inspector: fileOpen,
+    jigsaw: structure !== null && structure.jigsaws.length > 0,
+  };
   // Handlers read the latest viewer from a ref so they can stay stable; a load
   // requested before the viewer is ready is queued and run once it exists.
   const viewerRef = useRef(viewer);
@@ -188,37 +195,27 @@ function Shell() {
     <>
       <Titlebar onOpen={() => void open()} />
       <main className="stage">
-        <Viewport />
-        <Welcome
-          onOpen={() => void open()}
-          onLoad={(p) => void load(p)}
-          onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
-        />
-        <Windows />
-        <WorkspaceBadge />
-        <WorkspaceSuggest
-          onAccept={() => void acceptSuggest()}
-          onDismiss={() => store.getState().setSuggest(null)}
-        />
-        <Loading />
+        <div className="stage-main">
+          <Viewport />
+          <Welcome
+            onOpen={() => void open()}
+            onLoad={(p) => void load(p)}
+            onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
+          />
+          <FloatingPanels availability={availability} />
+          <WorkspaceBadge />
+          <WorkspaceSuggest
+            onAccept={() => void acceptSuggest()}
+            onDismiss={() => store.getState().setSuggest(null)}
+          />
+          <ShortcutsHelp available={fileOpen} />
+          <Loading />
+        </div>
+        <InspectorDock availability={availability} />
       </main>
       <Statusbar />
       <SettingsModal />
       <VersionSelectModal />
-    </>
-  );
-}
-
-// The three floating windows, gated on the open structure (subscribed so their
-// availability — and thus the View-menu enabled state — stays reactive).
-function Windows() {
-  const structure = useApp((s) => s.structure);
-  const open = structure !== null;
-  return (
-    <>
-      <ControlsWindow available={open} />
-      <InspectorWindow available={open} />
-      <JigsawWindow available={open && structure.jigsaws.length > 0} />
     </>
   );
 }

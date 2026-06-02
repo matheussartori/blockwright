@@ -119,9 +119,10 @@ export function buildAppMenu(): void {
   const viewMenu: MenuItemConstructorOptions = {
     label: 'View',
     submenu: [
-      windowItem('controls', 'Controls', 'CmdOrCtrl+1'),
-      windowItem('inspector', 'Inspector', 'CmdOrCtrl+2'),
-      windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+3'),
+      windowItem('inspector', 'Inspector', 'CmdOrCtrl+1'),
+      windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+2'),
+      { type: 'separator' },
+      windowItem('controls', 'Keyboard Shortcuts', 'CmdOrCtrl+/'),
       { type: 'separator' },
       { role: 'resetZoom', label: 'Actual Size' },
       { role: 'zoomIn' },
@@ -131,7 +132,7 @@ export function buildAppMenu(): void {
       { type: 'separator' },
       {
         label: 'Layout',
-        submenu: [{ label: 'Reset Window Positions', click: () => notifyResetWindows() }],
+        submenu: [{ label: 'Reset Layout', click: () => notifyResetWindows() }],
       },
     ],
   };

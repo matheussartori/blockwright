@@ -3,12 +3,11 @@
 // drag (clamped to the stage) and a minimize-only collapse, both backed by the
 // persisted `windows` store. Showing/hiding a window is done from the View menu.
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import type { WindowId } from '@/shared/types';
-import { windowsStore, WINDOW_WIDTHS } from '../state/windows';
+import { windowsStore, WINDOW_WIDTHS, type PanelId } from '../state/windows';
 import { useWindows } from '../hooks/useStores';
 
 interface FloatingWindowProps {
-  id: WindowId;
+  id: PanelId;
   title: string;
   /** Optional chip/label shown next to the title (e.g. a connector count). */
   headerExtra?: ReactNode;
@@ -71,7 +70,17 @@ export function FloatingWindow({
         {headerExtra && <span className="bw-window-extra">{headerExtra}</span>}
         <button
           type="button"
-          className="bw-window-min"
+          className="bw-window-btn redock"
+          title="Dock to sidebar"
+          aria-label="Dock to sidebar"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => windowsStore.getState().setFloating(id, false)}
+        >
+          ⤢
+        </button>
+        <button
+          type="button"
+          className="bw-window-btn bw-window-min"
           title={state.minimized ? 'Expand' : 'Minimize'}
           aria-label={state.minimized ? 'Expand' : 'Minimize'}
           onPointerDown={(e) => e.stopPropagation()}

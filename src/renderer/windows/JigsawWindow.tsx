@@ -1,17 +1,13 @@
-// Jigsaw assembly window. The heavy lifting (pool resolution, alignment,
-// validation) runs in main over IPC; here we trigger it, load the resulting
-// pieces' meshes through the viewer, and present controls/connectors/warnings.
-// Version gating mirrors the active context (workspace, or the bundled pack).
+// Jigsaw assembly panel. The heavy lifting (pool resolution, alignment,
+// validation) runs in main over IPC; here we trigger a seeded random assembly,
+// load the resulting pieces' meshes through the viewer, and present the result.
+// Manual per-connector piece selection was removed — assembly is random-only.
+// Rendered as a tab in the docked sidebar (or a FloatingWindow when torn off);
+// the chrome lives in InspectorDock / FloatingPanels.
 import { useEffect, useRef, useState } from 'react';
-import type {
-  JigsawCandidate,
-  JigsawWarning,
-  PlacedPiece,
-  StructureData,
-} from '@/shared/types';
+import type { JigsawWarning, PlacedPiece, StructureData } from '@/shared/types';
 import { isJigsawSupported } from '@/shared/mc-version';
 import { api } from '../api';
-import { FloatingWindow } from '../components/FloatingWindow';
 import { useViewer } from '../viewer/ViewerProvider';
 import { useApp } from '../hooks/useStores';
 import type { AssemblyPiece } from '../viewer/viewer';
@@ -28,13 +24,7 @@ function randomSeed(): number {
   return Math.floor(Math.random() * 0x7fffffff);
 }
 
-interface CandidatePanel {
-  index: number;
-  loading: boolean;
-  list: JigsawCandidate[];
-}
-
-export function JigsawWindow({ available }: { available: boolean }) {
+export function JigsawContent() {
   const structure = useApp((s) => s.structure);
   const workspace = useApp((s) => s.workspace);
   const contentVersion = useApp((s) => s.contentVersion);
@@ -46,9 +36,9 @@ export function JigsawWindow({ available }: { available: boolean }) {
   const [seed, setSeed] = useState(randomSeed);
   const [depth, setDepth] = useState(DEFAULT_DEPTH);
   const [busy, setBusy] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const [warnings, setWarnings] = useState<JigsawWarning[]>([]);
   const [pieceCount, setPieceCount] = useState(1);
-  const [candidates, setCandidates] = useState<CandidatePanel | null>(null);
 
   // A run-scoped cache so re-rolls and repeated pieces don't reload the same file.
   const cache = useRef<Map<string, Promise<StructureData>>>(new Map());
@@ -60,7 +50,6 @@ export function JigsawWindow({ available }: { available: boolean }) {
     setSeed(randomSeed());
     setWarnings([]);
     setPieceCount(1);
-    setCandidates(null);
   }, [structure?.path]);
 
   // Dev-only (BW_ASSEMBLE): once the structure + viewer are ready, auto-run a
@@ -108,19 +97,26 @@ export function JigsawWindow({ available }: { available: boolean }) {
       })),
     );
 
-  const assemble = async () => {
+  // Assemble with a given seed (defaults to the current one). Re-roll passes a
+  // fresh seed directly since the state update is async.
+  const assemble = async (withSeed: number = seed) => {
     if (!viewer) return;
     const maxDepth = clamp(depth || DEFAULT_DEPTH, 1, 8);
     setBusy(true);
     try {
-      const plan = await api.assembleJigsaw(structure.path, { seed, maxDepth });
+      const plan = await api.assembleJigsaw(structure.path, { seed: withSeed, maxDepth });
       await viewer.showAssembly(await loadPieces(plan.pieces));
       setWarnings(plan.warnings);
       setPieceCount(plan.pieces.length);
-      setCandidates(null);
     } finally {
       setBusy(false);
     }
+  };
+
+  const reroll = () => {
+    const next = randomSeed();
+    setSeed(next);
+    void assemble(next);
   };
 
   const reset = async () => {
@@ -128,153 +124,102 @@ export function JigsawWindow({ available }: { available: boolean }) {
     await viewer.show(structure);
     setWarnings([]);
     setPieceCount(1);
-    setCandidates(null);
-  };
-
-  const reroll = () => {
-    const next = randomSeed();
-    setSeed(next);
-    // Assemble with the fresh seed directly (state update is async).
-    void (async () => {
-      if (!viewer) return;
-      const maxDepth = clamp(depth || DEFAULT_DEPTH, 1, 8);
-      setBusy(true);
-      try {
-        const plan = await api.assembleJigsaw(structure.path, { seed: next, maxDepth });
-        await viewer.showAssembly(await loadPieces(plan.pieces));
-        setWarnings(plan.warnings);
-        setPieceCount(plan.pieces.length);
-        setCandidates(null);
-      } finally {
-        setBusy(false);
-      }
-    })();
-  };
-
-  const openCandidates = async (index: number) => {
-    setCandidates({ index, loading: true, list: [] });
-    const list = await api.jigsawCandidates(structure.path, index);
-    setCandidates({ index, loading: false, list });
-  };
-
-  const showCandidate = async (candidate: JigsawCandidate) => {
-    if (!viewer) return;
-    const child = await loadData(candidate.structurePath);
-    await viewer.showAssembly([
-      { data: structure, offset: [0, 0, 0], quarterTurns: 0 },
-      {
-        data: child,
-        offset: candidate.placement.offset,
-        quarterTurns: candidate.placement.quarterTurns,
-      },
-    ]);
   };
 
   const count = structure.jigsaws.length;
-  const header = (
-    <span className="bw-count">
-      {count} connector{count === 1 ? '' : 's'}
-    </span>
-  );
+
+  if (!supported) {
+    return (
+      <p className="bw-note">
+        Jigsaw preview isn&apos;t supported for <strong>{version ?? 'this version'}</strong> yet.
+        It&apos;s currently validated on 1.21.x.
+      </p>
+    );
+  }
 
   return (
-    <FloatingWindow id="jigsaw" title="Jigsaw" available={available} headerExtra={header}>
-      {!supported ? (
-        <p className="bw-note">
-          Jigsaw preview isn&apos;t supported for <strong>{version ?? 'this version'}</strong> yet.
-          It&apos;s currently validated on 1.21.x.
-        </p>
-      ) : (
-        <>
-          <div className="bw-controls">
-            <button className="btn primary sm" type="button" disabled={busy} onClick={() => void assemble()}>
-              Auto-assemble
-            </button>
-            <button className="btn sm" type="button" onClick={() => void reset()}>
-              Single piece
-            </button>
-          </div>
-          <div className="bw-controls">
-            <label className="bw-field">
-              Depth
-              <input
-                type="number"
-                min={1}
-                max={8}
-                value={depth}
-                onChange={(e) => setDepth(Number(e.target.value))}
-              />
-            </label>
-            <label className="bw-field">
-              Seed
-              <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} />
-            </label>
-            <button
-              className="link"
-              type="button"
-              disabled={busy}
-              title="Randomize seed and re-assemble"
-              onClick={reroll}
-            >
-              ↻ re-roll
-            </button>
-          </div>
+    <>
+      <div className="bw-controls">
+        <button
+          className="btn primary sm grow"
+          type="button"
+          disabled={busy}
+          onClick={() => void assemble()}
+        >
+          Generate
+        </button>
+        <button
+          className="btn sm icon"
+          type="button"
+          disabled={busy}
+          title="Randomize seed and re-assemble"
+          aria-label="Re-roll"
+          onClick={reroll}
+        >
+          ↻
+        </button>
+      </div>
+      <div className="bw-controls">
+        <button className="btn sm grow" type="button" onClick={() => void reset()}>
+          Single piece
+        </button>
+      </div>
 
-          {(pieceCount > 1 || warnings.length > 0) && (
-            <div className="bw-warnings">
-              {pieceCount > 1 && <div className="bw-ok">Placed {pieceCount} pieces.</div>}
-              {warnings.length > 0 && (
-                <ul className="bw-warn-list">
-                  {warnings.map((w, i) => (
-                    <li key={i} className={`bw-warn bw-warn--${w.kind}`}>
-                      {w.message}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          <div className="bw-section">Connectors</div>
-          <ul className="bw-rows">
-            {structure.jigsaws.map((j, i) => (
-              <li
-                key={i}
-                className="bw-row"
-                title={j.orientation}
-                onClick={() => void openCandidates(i)}
-              >
-                <span className="bw-row-name">{short(j.name) || '(unnamed)'}</span>
-                <span className="bw-row-arrow">→</span>
-                <span className="bw-row-name">{short(j.target) || '(any)'}</span>
-                <span className="bw-row-tag">{short(j.pool)}</span>
-              </li>
-            ))}
-          </ul>
-
-          {candidates && (
-            <div className="bw-candidates">
-              {candidates.loading ? (
-                <p className="bw-note">Finding candidates…</p>
-              ) : candidates.list.length === 0 ? (
-                <p className="bw-note">No matching pieces for this connector.</p>
-              ) : (
-                <>
-                  <div className="bw-section">Attach a piece</div>
-                  <ul className="bw-rows">
-                    {candidates.list.map((c, i) => (
-                      <li key={i} className="bw-row" onClick={() => void showCandidate(c)}>
-                        <span className="bw-row-name">{short(c.structureId)}</span>
-                        <span className="bw-row-tag">w{c.weight}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
-          )}
-        </>
+      <button
+        className="bw-advanced-toggle"
+        type="button"
+        aria-expanded={advanced}
+        onClick={() => setAdvanced((v) => !v)}
+      >
+        <span className={`bw-caret${advanced ? ' open' : ''}`}>▸</span> Advanced
+      </button>
+      {advanced && (
+        <div className="bw-controls bw-advanced">
+          <label className="bw-field">
+            Depth
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={depth}
+              onChange={(e) => setDepth(Number(e.target.value))}
+            />
+          </label>
+          <label className="bw-field">
+            Seed
+            <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} />
+          </label>
+        </div>
       )}
-    </FloatingWindow>
+
+      {(pieceCount > 1 || warnings.length > 0) && (
+        <div className="bw-warnings">
+          {pieceCount > 1 && <div className="bw-ok">Placed {pieceCount} pieces.</div>}
+          {warnings.length > 0 && (
+            <ul className="bw-warn-list">
+              {warnings.map((w, i) => (
+                <li key={i} className={`bw-warn bw-warn--${w.kind}`}>
+                  {w.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="bw-section">
+        Connectors <span className="bw-count">{count}</span>
+      </div>
+      <ul className="bw-rows">
+        {structure.jigsaws.map((j, i) => (
+          <li key={i} className="bw-row static" title={j.orientation}>
+            <span className="bw-row-name">{short(j.name) || '(unnamed)'}</span>
+            <span className="bw-row-arrow">→</span>
+            <span className="bw-row-name">{short(j.target) || '(any)'}</span>
+            <span className="bw-row-tag">{short(j.pool)}</span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

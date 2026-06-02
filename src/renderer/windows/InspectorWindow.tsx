@@ -1,7 +1,8 @@
-// Structure metadata + the unique block palette (top-right by default).
+// Structure metadata + the unique block palette. Rendered as a tab in the docked
+// inspector sidebar, or inside a FloatingWindow when torn off — the chrome lives
+// in InspectorDock / FloatingPanels, this file is just the body.
 import { useMemo } from 'react';
 import type { StructureData } from '@/shared/types';
-import { FloatingWindow } from '../components/FloatingWindow';
 import { useApp } from '../hooks/useStores';
 
 function uniqueBlocks(data: StructureData) {
@@ -15,14 +16,14 @@ function uniqueBlocks(data: StructureData) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function InspectorWindow({ available }: { available: boolean }) {
+export function InspectorContent() {
   const structure = useApp((s) => s.structure);
   const blocks = useMemo(() => (structure ? uniqueBlocks(structure) : []), [structure]);
 
   if (!structure) return null;
 
   return (
-    <FloatingWindow id="inspector" title="Inspector" available={available}>
+    <>
       <div className="inspector-meta">
         <h2 title={structure.name}>{structure.name}</h2>
         <dl className="meta">
@@ -58,6 +59,6 @@ export function InspectorWindow({ available }: { available: boolean }) {
           </div>
         ))}
       </div>
-    </FloatingWindow>
+    </>
   );
 }
