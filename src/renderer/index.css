@@ -8,10 +8,10 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces sit over the window's native vibrancy on macOS (transparent --bg),
-     with --bg-solid as the opaque fallback (modals, Windows/Linux). */
-  --bg: transparent;
-  --bg-solid: #15171c;
+  /* Opaque app background (the viewer canvas is alpha:true, so this shows through
+     as the 3D scene's backdrop too). --bg-solid mirrors it for splash/native. */
+  --bg: #1a1d23;
+  --bg-solid: #1a1d23;
   --panel: rgba(255, 255, 255, 0.045);
   --panel-strong: rgba(255, 255, 255, 0.08);
   --elevated: #20232a; /* opaque raised surface (menus, modals) */
@@ -35,7 +35,7 @@
   --font:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
-  --titlebar-h: 40px; /* the single slim top bar; keep in sync with windows.ts */
+  --titlebar-h: 36px; /* the single slim top bar; keep in sync with windows.ts */
   --status-h: 30px;
 }
 
@@ -43,7 +43,8 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
     color-scheme: light;
-    --bg-solid: #f5f5f7;
+    --bg: #f5f6f8;
+    --bg-solid: #f5f6f8;
     --panel: rgba(0, 0, 0, 0.04);
     --panel-strong: rgba(0, 0, 0, 0.065);
     --elevated: #ffffff;
@@ -61,7 +62,8 @@
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --bg-solid: #f5f5f7;
+  --bg: #f5f6f8;
+  --bg-solid: #f5f6f8;
   --panel: rgba(0, 0, 0, 0.04);
   --panel-strong: rgba(0, 0, 0, 0.065);
   --elevated: #ffffff;
@@ -136,8 +138,12 @@ body {
 .shell {
   display: grid;
   /* Row 1 (auto) is the top bar: the titlebar plus the optional tab strip — so
-     the layout stays correct whether or not any tabs are open. */
+     the layout stays correct whether or not any tabs are open. The single column
+     is pinned to minmax(0, 1fr) so a crowded tab strip scrolls inside itself
+     instead of widening the whole window (its min-content would otherwise stretch
+     the grid past the viewport and shove the content sideways). */
   grid-template-rows: auto 1fr var(--status-h);
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -153,23 +159,32 @@ body {
 .tabbar {
   -webkit-app-region: drag;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 3px;
-  height: 40px;
+  height: 36px;
   padding: 0 8px;
+  min-width: 0; /* allow the strip to scroll rather than stretch the grid */
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+}
+/* No visible scrollbar in the slim strip (it would eat the 36px height); the
+   tabs shrink first, then scroll via trackpad / shift-wheel when full. */
+.tabbar::-webkit-scrollbar {
+  height: 0;
+  width: 0;
 }
 .platform-darwin .tabbar {
-  padding-left: 82px; /* clear the traffic lights */
+  padding-left: 92px; /* clear the traffic lights with breathing room */
 }
 .tab {
   -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
   gap: 7px;
+  flex: 0 1 auto;
+  min-width: 92px; /* shrink to here, then the strip scrolls */
   max-width: 200px;
-  margin: 5px 0;
+  height: 26px;
   padding: 0 6px 0 11px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -186,6 +201,7 @@ body {
   box-shadow: inset 0 0 0 1px var(--border);
 }
 .tab-title {
+  min-width: 0; /* let the title ellipsis when the tab shrinks */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -238,6 +254,37 @@ body {
 .tab-new:hover {
   background: var(--panel-strong);
   color: var(--text);
+}
+
+/* Home button: the app mark at the left of the strip (after the traffic lights),
+   returns to the Home screen and highlights when no tab is focused. */
+.tab-home {
+  -webkit-app-region: no-drag;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.tab-home picture,
+.tab-home img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.tab-home:hover {
+  background: var(--panel-strong);
+}
+.tab-home.active {
+  background: var(--panel-strong);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 @keyframes bw-spin {
@@ -1221,6 +1268,14 @@ body {
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 }
+/* Block-texture icon variant: render the pixel art crisp, top-left aligned so
+   animated strips show their first frame rather than squashing the whole strip. */
+.swatch-tex {
+  object-fit: cover;
+  object-position: top left;
+  image-rendering: pixelated;
+  background: var(--panel);
+}
 .block-name {
   white-space: nowrap;
   overflow: hidden;
@@ -1513,16 +1568,22 @@ body {
   padding-top: 18px;
 }
 .about-logo img {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25));
 }
 .about-name {
   margin-top: 12px;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 650;
   letter-spacing: -0.01em;
+}
+.about-version {
+  margin-top: 3px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-muted);
 }
 .about-tagline {
   margin: 4px 0 0;
@@ -1548,6 +1609,25 @@ body {
 .about-meta dd {
   margin: 0;
   font-size: 12px;
+}
+.about-meta > div:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.about-credits {
+  margin-top: 18px;
+  width: 100%;
+  text-align: center;
+}
+.about-credits p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.about-credits .about-built {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* --- Block Catalog (list/grid + 3D preview) -------------------------------- */
@@ -2332,6 +2412,108 @@ body {
 .gen-size-inputs {
   display: flex;
   gap: 4px;
+}
+
+/* Floor-plan editor above the textarea (mirrors .gen-details). */
+.gen-floors {
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gen-floors-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gen-floors-head > span:first-child {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+.gen-floors-hint,
+.gen-floors-empty {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0;
+}
+.gen-floor-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.gen-floor-row.active {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--accent-soft);
+}
+.gen-floor-name {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.gen-floor-y {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.gen-floor-y input {
+  width: 52px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.gen-floor-name:focus,
+.gen-floor-y input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.gen-floor-name:disabled,
+.gen-floor-y input:disabled {
+  opacity: 0.5;
+}
+.gen-floor-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.gen-floor-remove:hover:not(:disabled) {
+  background: var(--panel-strong);
+  color: var(--danger);
+}
+.gen-floor-add {
+  -webkit-app-region: no-drag;
+  align-self: flex-start;
 }
 .gen-size-inputs input {
   width: 100%;

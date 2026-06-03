@@ -41,6 +41,12 @@ export interface AppState {
   suggest: Suggestion | null;
   /** Whether the Settings modal is open. */
   settingsOpen: boolean;
+  /** Which Settings section to show when it opens (e.g. routed to 'about' from
+   *  the native About menu item). Consumed + reset by the modal. */
+  settingsSection: string | null;
+  /** True while the Generate panel's Floors section is open — lets the viewer
+   *  scope the floor-plan highlight when the matching setting is enabled. */
+  floorsEditing: boolean;
   /** Whether the Block Catalog modal is open. */
   catalogOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
@@ -57,6 +63,8 @@ export interface AppState {
   setNotice: (notice: Notice | null) => void;
   setSuggest: (suggest: Suggestion | null) => void;
   setSettingsOpen: (open: boolean) => void;
+  setSettingsSection: (section: string | null) => void;
+  setFloorsEditing: (editing: boolean) => void;
   setCatalogOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
@@ -76,6 +84,8 @@ export const store = createStore<AppState>((set) => ({
   notice: null,
   suggest: null,
   settingsOpen: false,
+  settingsSection: null,
+  floorsEditing: false,
   catalogOpen: false,
   versionPromptName: null,
   imagePreview: null,
@@ -89,6 +99,8 @@ export const store = createStore<AppState>((set) => ({
   setNotice: (notice) => set({ notice }),
   setSuggest: (suggest) => set({ suggest }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setSettingsSection: (settingsSection) => set({ settingsSection }),
+  setFloorsEditing: (floorsEditing) => set({ floorsEditing }),
   setCatalogOpen: (catalogOpen) => set({ catalogOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),

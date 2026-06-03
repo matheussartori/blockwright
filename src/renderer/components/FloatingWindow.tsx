@@ -1,7 +1,7 @@
 // The one chrome every floating window (Controls / Inspector / Jigsaw) wears, so
 // titles, spacing and typography read identically across the app. Title-bar
-// drag (clamped to the stage) and a minimize-only collapse, both backed by the
-// persisted `windows` store. Showing/hiding a window is done from the View menu.
+// drag (clamped to the stage), redock, minimize and close — all backed by the
+// persisted `windows` store. A closed window is reopened from the View menu.
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { windowsStore, WINDOW_WIDTHS, type PanelId } from '../state/windows';
 import { useWindows } from '../hooks/useStores';
@@ -93,6 +93,16 @@ export function FloatingWindow({
           onClick={() => windowsStore.getState().toggleMinimized(id)}
         >
           ⌄
+        </button>
+        <button
+          type="button"
+          className="bw-window-btn bw-window-close"
+          title="Close (reopen from the View menu)"
+          aria-label="Close window"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => windowsStore.getState().setVisible(id, false)}
+        >
+          ✕
         </button>
       </div>
       {!state.minimized && (

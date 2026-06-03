@@ -1,5 +1,5 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
-import { dialog, ipcMain, nativeTheme } from 'electron';
+import { app, dialog, ipcMain, nativeTheme } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { AssembleOptions, ChatRecord, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
@@ -80,6 +80,7 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IPC_CHANNELS.workspaceGet, async () => getActiveWorkspace());
   ipcMain.handle(IPC_CHANNELS.contentVersion, async () => contentPackVersion());
+  ipcMain.handle(IPC_CHANNELS.appVersion, async () => app.getVersion());
   ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
     listWorkspaceStructures(getActiveWorkspace()),
   );

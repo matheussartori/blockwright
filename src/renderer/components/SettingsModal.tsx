@@ -22,10 +22,22 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'about', label: 'About' },
 ];
 
+const TAB_IDS = TABS.map((t) => t.id);
+
 export function SettingsModal() {
   const open = useApp((s) => s.settingsOpen);
+  const section = useApp((s) => s.settingsSection);
   const [tab, setTab] = useState<TabId>('appearance');
   const close = () => store.getState().setSettingsOpen(false);
+
+  // When opened to a specific section (e.g. the native About menu), jump to that
+  // tab and clear the request so a later open lands on the user's last tab.
+  useEffect(() => {
+    if (section && (TAB_IDS as string[]).includes(section)) {
+      setTab(section as TabId);
+      store.getState().setSettingsSection(null);
+    }
+  }, [section]);
 
   return (
     <Modal
@@ -95,6 +107,27 @@ function ViewerTab() {
           <span className="setting-label">Show ground grid</span>
           <input type="checkbox" checked={settings.showGrid} onChange={(e) => set('showGrid', e.target.checked)} />
         </label>
+        <label className="setting-row">
+          <span className="setting-label">Block textures in the Info list</span>
+          <input
+            type="checkbox"
+            checked={settings.blockTextureIcons}
+            onChange={(e) => set('blockTextureIcons', e.target.checked)}
+          />
+        </label>
+        <p className="setting-note">Show each block’s texture instead of a flat color swatch.</p>
+        <label className="setting-row">
+          <span className="setting-label">Only highlight floors while editing</span>
+          <input
+            type="checkbox"
+            checked={settings.floorsOnlyWhenEditing}
+            onChange={(e) => set('floorsOnlyWhenEditing', e.target.checked)}
+          />
+        </label>
+        <p className="setting-note">
+          When off, a build’s floor-plan regions stay highlighted in the viewer; when on, they only
+          show while the Generate ▸ Floors section is open.
+        </p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">Fly mode</div>
@@ -121,17 +154,43 @@ function ViewerTab() {
 
 function AboutTab() {
   const contentVersion = useApp((s) => s.contentVersion);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    void api.getAppVersion().then(setAppVersion);
+  }, []);
+
   return (
     <section className="settings-group about">
-      <Logo size={64} className="about-logo" />
+      <Logo size={72} className="about-logo" />
       <div className="about-name">Blockwright</div>
+      {appVersion && <div className="about-version">Version {appVersion}</div>}
       <p className="about-tagline">Build, view, and AI-generate Minecraft structures in 3D.</p>
+
       <dl className="about-meta">
         <div>
-          <dt>Target version</dt>
+          <dt>App version</dt>
+          <dd className="stat-num">{appVersion ?? '—'}</dd>
+        </div>
+        <div>
+          <dt>Target Minecraft</dt>
           <dd className="stat-num">{contentVersion ?? '—'}</dd>
         </div>
+        <div>
+          <dt>Renderer</dt>
+          <dd className="stat-num">Three.js</dd>
+        </div>
       </dl>
+
+      <div className="about-credits">
+        <p>
+          Crafted by <strong>Matheus Sartori</strong>. AI generation runs on your Claude
+          subscription via Claude Code.
+        </p>
+        <p className="about-built">
+          Built with Electron, Vite, React &amp; Three.js. Structure parsing by prismarine-nbt.
+        </p>
+      </div>
     </section>
   );
 }

@@ -100,9 +100,10 @@ export function notifyClose(): void {
   mainWindow?.webContents.send(IPC_EVENTS.closeStructure);
 }
 
-/** Ask the renderer to open the Settings panel. */
-export function notifyOpenSettings(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openSettings);
+/** Ask the renderer to open the Settings panel, optionally on a given section
+ *  (e.g. 'about' when invoked from the native About menu item). */
+export function notifyOpenSettings(section?: string): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openSettings, section);
 }
 
 /** Ask the renderer to toggle a floating window's visibility (View menu). */
@@ -136,11 +137,10 @@ export function createWindow(): BrowserWindow {
     minHeight: 520,
     show: false,
     icon: windowIcon(),
-    backgroundColor: process.platform === 'darwin' ? '#00000000' : '#1c1c1e',
+    // Opaque themed background (the app uses solid theme surfaces, not vibrancy).
+    backgroundColor: '#1a1d23',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 16, y: 18 },
-    vibrancy: process.platform === 'darwin' ? 'under-window' : undefined,
-    visualEffectState: 'active',
+    trafficLightPosition: { x: 16, y: 12 }, // centred in the 36px top bar
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },

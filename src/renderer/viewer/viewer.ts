@@ -11,6 +11,14 @@ import { TextureLoader } from './texture-loader';
 
 export type NavMode = 'orbit' | 'fly';
 
+/** A named vertical band highlighted in the viewer (one per floor-plan level),
+ *  spanning the inclusive y range `from`..`to`. */
+export interface FloorRegion {
+  name: string;
+  from: number;
+  to: number;
+}
+
 /** One structure placed in the scene: its data plus a rigid transform. Rotation
  *  is quarter-turns about +Y, offset is the position of its local origin — the
  *  exact convention shared/jigsaw computes, so the meshes land where planned. */
@@ -40,6 +48,10 @@ export class Viewer {
   /** Transient box drawn over a block the user clicked in the inspector. */
   private highlight: THREE.Mesh | null = null;
   private highlightUntil = 0;
+  /** Floor-plan highlight: one translucent band per named level, persisted across
+   *  builds. `floorRegions` is the desired state; `floorGroup` the live meshes. */
+  private floorRegions: FloorRegion[] = [];
+  private floorGroup: THREE.Group | null = null;
 
   private mode: NavMode = 'orbit';
   private keys = new Set<string>();
@@ -309,6 +321,9 @@ export class Viewer {
 
     const box = new THREE.Box3().setFromObject(parent);
     this.addGrid(box);
+    // Re-apply the floor-plan bands against the new footprint (clear() dropped
+    // the meshes but kept the desired regions).
+    this.renderFloorRegions();
     if (preserveCamera) this.controls.update();
     else this.frame(box);
   }
@@ -347,10 +362,135 @@ export class Viewer {
     this.highlightUntil = performance.now() + HIGHLIGHT_MS;
   }
 
+  /** Set (or clear) the floor-plan highlight: one translucent band per named
+   *  level, spanning the build's footprint over the level's inclusive y range.
+   *  The bands persist across orbit and re-render with each build (the App drives
+   *  this from the active doc's floor plan + the user's settings). */
+  setFloorRegions(regions: FloorRegion[]) {
+    this.floorRegions = regions;
+    this.renderFloorRegions();
+  }
+
+  /** (Re)build the floor-band meshes from `this.floorRegions` against the current
+   *  footprint. Called by setFloorRegions and after each structure load (which
+   *  clears the scene). */
+  private renderFloorRegions() {
+    this.removeFloorRegions();
+    if (this.floorRegions.length === 0) return;
+
+    // Footprint from the current build, padded out a little; fall back to a
+    // comfortable pad centred on the origin for a fresh (empty) tab.
+    let minX = -1;
+    let maxX = 15;
+    let minZ = -1;
+    let maxZ = 15;
+    if (this.current) {
+      const box = new THREE.Box3().setFromObject(this.current);
+      minX = box.min.x - 1;
+      maxX = box.max.x + 1;
+      minZ = box.min.z - 1;
+      maxZ = box.max.z + 1;
+    }
+    const w = Math.max(maxX - minX, 2);
+    const d = Math.max(maxZ - minZ, 2);
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+
+    const group = new THREE.Group();
+    this.floorRegions.forEach((r, i) => {
+      const from = Math.min(r.from, r.to);
+      const to = Math.max(r.from, r.to);
+      // Layer `to` occupies y=to..to+1, so the band's top is at to+1.
+      const h = to + 1 - from;
+      const cy = from + h / 2;
+      // A distinct hue per level so stacked bands read apart.
+      const color = new THREE.Color().setHSL((i * 0.13 + 0.58) % 1, 0.6, 0.6);
+
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, d),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: 0.1,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      box.position.set(cx, cy, cz);
+      group.add(box);
+
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(box.geometry),
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }),
+      );
+      edges.position.copy(box.position);
+      group.add(edges);
+
+      const text = r.name.trim()
+        ? `${r.name.trim()} · y ${from}${to > from ? `–${to}` : ''}`
+        : `y ${from}${to > from ? `–${to}` : ''}`;
+      const sprite = this.makeLabel(text);
+      sprite.position.set(cx, to + 1 + 0.6, cz);
+      group.add(sprite);
+    });
+
+    group.renderOrder = 998;
+    this.scene.add(group);
+    this.floorGroup = group;
+  }
+
+  private removeFloorRegions() {
+    if (!this.floorGroup) return;
+    this.scene.remove(this.floorGroup);
+    this.floorGroup.traverse((o) => {
+      const obj = o as Partial<THREE.Mesh> & { material?: THREE.Material | THREE.Material[] };
+      obj.geometry?.dispose();
+      const mat = obj.material as (THREE.Material & { map?: THREE.Texture }) | undefined;
+      if (mat) {
+        mat.map?.dispose();
+        mat.dispose();
+      }
+    });
+    this.floorGroup = null;
+  }
+
+  /** A small canvas-textured sprite used to caption the level plane. */
+  private makeLabel(text: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    const pad = 12;
+    const font = 'bold 40px -apple-system, sans-serif';
+    const ctx = canvas.getContext('2d')!;
+    ctx.font = font;
+    const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
+    const h = 56 + pad;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.font = font;
+    ctx.fillStyle = 'rgba(20,24,32,0.78)';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 12);
+    ctx.fill();
+    ctx.fillStyle = '#dce6ff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, pad, h / 2);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }),
+    );
+    // Scale to world units (~1 unit tall), preserving the canvas aspect.
+    sprite.scale.set((w / h) * 1.1, 1.1, 1);
+    return sprite;
+  }
+
   /** Remove the current structure and grid from the scene (back to empty). */
   clear() {
     this.lastPieces = null;
     this.removeHighlight();
+    // Drop the live band meshes but keep `floorRegions` so the next build
+    // re-renders the same plan (re-applied at the end of showAssembly).
+    this.removeFloorRegions();
     this.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);

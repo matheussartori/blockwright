@@ -218,6 +218,17 @@ export interface ChatMessage {
   meta?: { version: number; size: [number, number, number]; blockCount: number; tookMs?: number };
 }
 
+/** A named vertical level the user defined for a generated build, used as context
+ *  for the AI (so "the basement" / "the top floor" map to concrete y ranges) and
+ *  highlighted as a region in the viewer. The level spans the inclusive y range
+ *  `from`..`to` (Minecraft is Y-up; y=0 is the lowest layer). */
+export interface FloorDef {
+  id: string;
+  name: string;
+  from: number;
+  to: number;
+}
+
 /** Persisted per-NBT chat history (main/chat-history.ts), keyed by file path (or
  *  the session id for an Untitled build). Carries the SDK session id + version so
  *  reopening a file can resume the same Claude conversation. */
@@ -230,6 +241,9 @@ export interface ChatRecord {
    *  when the build was flattened via "Clear versions" so the iterated build,
    *  not the untouched on-disk file, is the v0. Absent = use the file path. */
   baselinePath?: string | null;
+  /** Named vertical levels the user defined for this build (the "floor plan");
+   *  folded into every AI prompt as context. Absent = none defined. */
+  floors?: FloorDef[];
   updatedAt?: number;
 }
 
@@ -323,6 +337,8 @@ export interface BlockwrightApi {
   getWorkspace: () => Promise<Workspace | null>;
   /** Minecraft version of the active content pack (its version.json), or null. */
   getContentVersion: () => Promise<string | null>;
+  /** The app's own version (from package.json), for the About panel. */
+  getAppVersion: () => Promise<string>;
   /** Activate a known/detected workspace; returns it, or null if it no longer exists. */
   activateWorkspace: (workspace: Workspace) => Promise<Workspace | null>;
   /** Detect whether a `.nbt` path belongs to a mod project (returns its Workspace or null). */
@@ -407,7 +423,7 @@ export interface BlockwrightApi {
   /** Notified when main requests closing the current structure (native File menu). */
   onCloseStructure: (cb: () => void) => void;
   /** Notified when main requests opening the Settings panel (native menu / Cmd+,). */
-  onOpenSettings: (cb: () => void) => void;
+  onOpenSettings: (cb: (section?: string) => void) => void;
   /** Notified when the View menu toggles a floating window's visibility. */
   onToggleWindow: (cb: (id: WindowId) => void) => void;
   /** Notified when the View ▸ Layout menu requests resetting window positions. */

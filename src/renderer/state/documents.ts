@@ -9,7 +9,7 @@
 // Like the other renderer stores this is a framework-agnostic Zustand vanilla
 // store, consumed in components via the `useDocuments` / `useActiveDoc` hooks.
 import { createStore } from 'zustand/vanilla';
-import type { StructureData, GenerateProgress, ChatMessage, VersionInfo } from '@/shared/types';
+import type { StructureData, GenerateProgress, ChatMessage, VersionInfo, FloorDef } from '@/shared/types';
 import { basename } from '../ui/path';
 
 /** One message in a document's AI chat transcript. Same shape the composer shows
@@ -54,6 +54,10 @@ export interface Document {
    *  starting point: the current `.nbt` (not the untouched on-disk file) becomes
    *  the v0 the next edit builds on. null = use `filePath` (the default). */
   baselinePath: string | null;
+  /** Named vertical levels the user defined for this build (the "floor plan"):
+   *  folded into every AI prompt as context, and previewable as a plane in the
+   *  viewer. Persisted with the chat history; empty by default. */
+  floors: FloorDef[];
   /** True once persisted chat history (if any) has been loaded for this doc. */
   hydrated: boolean;
 }
@@ -70,10 +74,14 @@ export interface DocumentsState {
   openDoc: (filePath: string) => string;
   closeDoc: (id: string) => void;
   setActive: (id: string) => void;
+  /** Deselect every tab and return to the Home screen (tabs stay open). */
+  goHome: () => void;
   /** Shallow-merge `partial` into the doc with `id` (no-op if it's gone). */
   patchDoc: (id: string, partial: Partial<Document>) => void;
   appendChat: (id: string, msg: DocChatMessage) => void;
   setChat: (id: string, chat: DocChatMessage[]) => void;
+  /** Replace a document's floor-plan levels. */
+  setFloors: (id: string, floors: FloorDef[]) => void;
 }
 
 function freshDoc(over: Partial<Document> = {}): Document {
@@ -94,6 +102,7 @@ function freshDoc(over: Partial<Document> = {}): Document {
     versions: [],
     viewingVersion: null,
     baselinePath: null,
+    floors: [],
     hydrated: false,
     ...over,
   };
@@ -136,6 +145,8 @@ export const documentsStore = createStore<DocumentsState>((set, get) => ({
 
   setActive: (id) => set({ activeId: id }),
 
+  goHome: () => set({ activeId: null }),
+
   patchDoc: (id, partial) =>
     set((s) => ({
       documents: s.documents.map((d) => (d.id === id ? { ...d, ...partial } : d)),
@@ -149,6 +160,11 @@ export const documentsStore = createStore<DocumentsState>((set, get) => ({
   setChat: (id, chat) =>
     set((s) => ({
       documents: s.documents.map((d) => (d.id === id ? { ...d, chat } : d)),
+    })),
+
+  setFloors: (id, floors) =>
+    set((s) => ({
+      documents: s.documents.map((d) => (d.id === id ? { ...d, floors } : d)),
     })),
 }));
 

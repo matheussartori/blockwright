@@ -200,6 +200,19 @@ surfaces as a clear error on first send (see `authHint`).
   size, floors, rooms, basement, materials, decay, interior, lighting). All optional; they're folded
   into the prompt as a structured "[Build details]" brief (renderer-side, no IPC change) and cleared
   after sending, so follow-up edits don't re-send stale hints.
+- **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
+  levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
+  `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the
+  chat history (`ChatRecord.floors`, written eagerly via `persistDoc` on every edit), so — unlike the
+  one-shot Details brief — they ride along as a `[Floor plan]` context block on **every** prompt
+  (`buildFloorPlan` in `state/generation.ts`, appended to `promptText` only, never the visible
+  transcript). That's what lets a follow-up like "redo the basement" map to a concrete y range.
+  Each level is highlighted as a translucent band in the viewer (`Viewer.setFloorRegions` — one
+  hued box + labelled sprite per level spanning the footprint, re-applied after every load since
+  `clear()` drops the meshes but keeps the desired regions). The bands are driven from `App` against
+  the active doc's plan; the `floorsOnlyWhenEditing` setting (default off → always shown) scopes them
+  to when the Floors section is open (`store.floorsEditing`). "New" clears the plan; "Clear versions"
+  keeps it. The Details size fields prefill from the open structure's `size`.
 - **Progress + cancel:** `generateStructure` takes an `onProgress` callback; `ipc.ts` forwards it
   to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Phases include
   `rendering`/`reviewing` for the self-review loop. Live tokens come from `includePartialMessages`
@@ -234,11 +247,20 @@ surfaces as a clear error on first send (see `authHint`).
   Forge names the output bundles by entry basename, and `main` in package.json points at
   `.vite/build/main.js`.
 - **Floating windows:** Controls / Inspector / Jigsaw share one chrome (`components/FloatingWindow.tsx`):
-  titled, draggable (clamped to the stage), minimize-only. Layout lives in `state/windows.ts`
-  (persisted). The native **View** menu shows/hides each window and offers Layout ▸ Reset Window
-  Positions; `App.tsx` reports `{visible,available}` per window to main (`reportWindows`) so the
-  menu's checkmarks/enabled state track the renderer (which owns the state). Don't inline window
-  positions — go through the store.
+  titled, draggable (clamped to the stage), redock / minimize / **close** (close hides via
+  `setVisible(false)` — reopen from the View menu). Layout lives in `state/windows.ts`
+  (persisted; `generate.visible` is restored now, not force-hidden). The native **View** menu
+  shows/hides each window and offers Layout ▸ Reset Window Positions; `App.tsx` reports
+  `{visible,available}` per window to main (`reportWindows`) so the menu's checkmarks/enabled state
+  track the renderer (which owns the state). Don't inline window positions — go through the store.
+- **Home / tabs:** `activeId === null` (documents store) is the **Home** state — the Welcome screen
+  shows whenever there's no active doc, even with tabs still open. The title-bar logo button
+  (`TabBar`, `goHome()`) returns there; clicking a tab restores it. The Generate dock tab has no
+  close button (close it from View ▸ Generate, like Info/Versions).
+- **About is one place:** there's a single About — Settings ▸ About (`SettingsModal` `AboutTab`,
+  app version via `getAppVersion` IPC). The native macOS "About" menu item routes to it
+  (`notifyOpenSettings('about')` → `store.settingsSection`), so the default Electron panel never
+  shows.
 - **Renderer is React:** UI is JSX (React escapes interpolated strings, so there's no `escapeHtml`).
   The Viewer is imperative Three.js bridged via `viewer/ViewerProvider.tsx`; it's created once and
   has no teardown, which is why `index.tsx` does **not** use StrictMode.
@@ -246,21 +268,24 @@ surfaces as a clear error on first send (see `authHint`).
   File menu and the renderer both mutate it via IPC; every mutation rebuilds the menu and
   broadcasts `recentsChanged`, which the welcome view re-renders from (don't keep a separate
   authoritative copy in the renderer).
-- **macOS chrome:** the window uses `hiddenInset` titlebar + vibrancy. There is no separate
-  titlebar component anymore — `TabBar` is the single slim top bar (`.tabbar`, height 40, kept in
-  sync with `windows.ts` `TITLEBAR_H`); it's the drag region (`-webkit-app-region: drag`) with
-  traffic-light clearance on mac, and interactive children opt out with `no-drag`.
-- **Theming:** colors are CSS variables in `index.css` (`--panel`, `--text`, `--accent`, …);
-  components reference tokens, never hardcoded colors. Two things move together: (1) CSS — base
-  `:root` is dark, the OS drives the *default* via `@media (prefers-color-scheme: light)
-  { :root:not([data-theme]) }`, and an explicit choice sets `[data-theme="light|dark"]` (wins;
-  strict CSP forbids a no-FOUC inline script, so don't add bare `prefers-color-scheme` rules —
-  scope them to `:not([data-theme])`). (2) **`nativeTheme.themeSource`** (set from `state/theme.ts`
-  via the `themeSet` IPC) — this is what makes a forced theme actually work: it flips the macOS
-  **vibrancy material** + traffic lights AND the renderer's `prefers-color-scheme` (so a forced
-  light theme isn't dark text on a dark vibrancy backdrop). The themed `Logo` (`<picture>`) and the
-  boot splash rely on that `prefers-color-scheme` tracking. `settings.theme` is 'system'|'light'|
-  'dark' (default system). `--mono` is for numeric/dimensional data (sizes, counts, coords).
+- **macOS chrome:** the window uses `hiddenInset` titlebar with an **opaque themed background**
+  (no vibrancy — it made light mode look washed out and the splash mismatch the bg). There is no
+  separate titlebar component — `TabBar` is the single slim top bar (`.tabbar`, height 36, kept in
+  sync with `windows.ts` `TITLEBAR_H` and `--titlebar-h`; `trafficLightPosition.y` centres the
+  lights in it). It's the drag region (`-webkit-app-region: drag`) with traffic-light clearance on
+  mac; interactive children opt out with `no-drag`.
+- **Theming:** colors are CSS variables in `index.css` (`--bg`, `--panel`, `--text`, `--accent`, …);
+  components reference tokens, never hardcoded colors. **`--bg` is opaque** and theme-aware — it's
+  the app/window background AND (because the viewer's WebGL canvas is `alpha:true`) the 3D scene's
+  backdrop, so the welcome and the NBT viewer share one background. Two things move together:
+  (1) CSS — base `:root` is dark, the OS drives the *default* via `@media (prefers-color-scheme:
+  light) { :root:not([data-theme]) }`, and an explicit choice sets `[data-theme="light|dark"]`
+  (wins; strict CSP forbids a no-FOUC inline script, so don't add bare `prefers-color-scheme`
+  rules — scope them to `:not([data-theme])`). (2) **`nativeTheme.themeSource`** (set from
+  `state/theme.ts` via the `themeSet` IPC) so the renderer's `prefers-color-scheme` (and the native
+  traffic lights / dialogs) follow a forced theme — the themed `Logo` (`<picture>`) and the boot
+  splash rely on that tracking. `settings.theme` is 'system'|'light'|'dark' (default system).
+  `--mono` is for numeric/dimensional data (sizes, counts, coords).
 - **App icon / logos:** the in-app logos live in `public/` (`logo-dark.png`, `logo-light.png`),
   referenced relatively (`logo-dark.png`, not `/logo-dark.png`) so they resolve under `file://` when
   packaged; the `Logo` component swaps them by theme. The app/dock icon is the standardized
@@ -268,7 +293,9 @@ surfaces as a clear error on first send (see `authHint`).
   packaged bundle icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`).
   Regenerate the icon from `build/icon-master.png` (or re-trim from `public/logo-dark.png`).
 - **Boot splash:** static markup + inline `<style>` in `index.html` inside `#app`; React's
-  `createRoot(...).render()` replaces it on mount, so the window never shows empty.
+  `createRoot(...).render()` replaces it on mount, so the window never shows empty. Its background
+  is hardcoded to the same values as `--bg` (light/dark via `prefers-color-scheme`) — keep them in
+  sync so there's no jump when the app mounts.
 
 ## Visual testing (no screen-recording permission needed)
 

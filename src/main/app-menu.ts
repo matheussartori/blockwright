@@ -95,7 +95,9 @@ export function buildAppMenu(): void {
   const appMenu: MenuItemConstructorOptions = {
     label: app.name,
     submenu: [
-      { role: 'about' },
+      // Route the native About to the in-app About (Settings ▸ About) so there's
+      // one place for version/credits, not the default Electron panel.
+      { label: `About ${app.name}`, click: () => notifyOpenSettings('about') },
       { type: 'separator' },
       settingsItem,
       { type: 'separator' },

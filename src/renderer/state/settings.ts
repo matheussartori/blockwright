@@ -23,6 +23,12 @@ export interface Settings {
   /** Hide each piece's outer shell — the blocks on the boundary of its occupied
    *  bounding box — so you can see inside enclosed pieces / a jigsaw assembly. */
   hideShell: boolean;
+  /** Show each block's actual texture (not a flat color swatch) as its icon in
+   *  the Info block list. On by default — textures are easier to recognize. */
+  blockTextureIcons: boolean;
+  /** Only highlight floor-plan regions in the viewer while the Generate floors
+   *  panel is open. Off by default, so the plan stays visible as you build. */
+  floorsOnlyWhenEditing: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -32,6 +38,8 @@ export const SETTINGS_DEFAULTS: Settings = {
   showGrid: true,
   showJigsaw: false,
   hideShell: false,
+  blockTextureIcons: true,
+  floorsOnlyWhenEditing: false,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -69,6 +77,8 @@ function snapshot(s: SettingsState): Settings {
     showGrid: s.showGrid,
     showJigsaw: s.showJigsaw,
     hideShell: s.hideShell,
+    blockTextureIcons: s.blockTextureIcons,
+    floorsOnlyWhenEditing: s.floorsOnlyWhenEditing,
   };
 }
 

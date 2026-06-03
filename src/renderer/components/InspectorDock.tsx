@@ -17,7 +17,7 @@ const PANELS: Record<PanelId, { title: string; Content: FC }> = {
   inspector: { title: 'Info', Content: InspectorContent },
   jigsaw: { title: 'Jigsaw', Content: JigsawContent },
   versions: { title: 'Versions', Content: VersionsContent },
-  generate: { title: 'Generate ✨', Content: GenerateContent },
+  generate: { title: 'Generate', Content: GenerateContent },
 };
 
 const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];

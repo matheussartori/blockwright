@@ -6,13 +6,32 @@
 // traffic-light space persist on the welcome screen.
 import { useDocuments } from '../hooks/useStores';
 import { documentsStore } from '../state/documents';
+import { Logo } from './ui/Logo';
 
 export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: string) => void }) {
   const documents = useDocuments((s) => s.documents);
   const activeId = useDocuments((s) => s.activeId);
 
+  // Translate vertical wheel into horizontal scroll so the overflowing tabs are
+  // reachable with an ordinary mouse (not every mouse has a horizontal wheel).
+  // A real horizontal gesture (trackpad / tilt wheel) still scrolls natively.
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return; // nothing to scroll
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY;
+  };
+
   return (
-    <div className="tabbar" role="tablist">
+    <div className="tabbar" role="tablist" onWheel={onWheel}>
+      <button
+        type="button"
+        className={`tab-home${activeId === null ? ' active' : ''}`}
+        title="Home"
+        aria-label="Home"
+        onClick={() => documentsStore.getState().goHome()}
+      >
+        <Logo size={20} />
+      </button>
       {documents.map((d) => (
         <div
           key={d.id}

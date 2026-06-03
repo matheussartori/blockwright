@@ -38,6 +38,7 @@ const api: BlockwrightApi = {
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
   getWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
   getContentVersion: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentVersion),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.appVersion),
   activateWorkspace: (ws: Workspace): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),
   detectFileWorkspace: (path: string): Promise<Workspace | null> =>
@@ -108,8 +109,8 @@ const api: BlockwrightApi = {
   onCloseStructure: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.closeStructure, () => cb());
   },
-  onOpenSettings: (cb: () => void) => {
-    ipcRenderer.on(IPC_EVENTS.openSettings, () => cb());
+  onOpenSettings: (cb: (section?: string) => void) => {
+    ipcRenderer.on(IPC_EVENTS.openSettings, (_e, section?: string) => cb(section));
   },
   onToggleWindow: (cb: (id: WindowId) => void) => {
     ipcRenderer.on(IPC_EVENTS.windowToggle, (_e, id: WindowId) => cb(id));

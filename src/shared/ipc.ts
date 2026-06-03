@@ -18,6 +18,8 @@ export const IPC_CHANNELS = {
   workspaceStructures: 'workspace:structures',
   /** The Minecraft version of the active content pack (from its version.json). */
   contentVersion: 'content:version',
+  /** The app's own version (app.getVersion()), for the About panel. */
+  appVersion: 'app:version',
   /** Activate a known/detected workspace (payload Workspace) — returns it or null if stale. */
   workspaceActivate: 'workspace:activate',
   /** Detect whether a `.nbt` path belongs to a mod project — returns a Workspace or null. */

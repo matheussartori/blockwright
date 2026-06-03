@@ -11,12 +11,11 @@
 // (input text + staged attachments).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
-import { windowsStore } from '../state/windows';
 import { documentsStore } from '../state/documents';
-import { runGeneration, cancelGeneration, resetDocChat, clearVersioning } from '../state/generation';
+import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc } from '../hooks/useStores';
 import { api } from '../api';
-import type { GenerateProgress } from '@/shared/types';
+import type { GenerateProgress, FloorDef } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
@@ -126,13 +125,18 @@ export function GenerateContent() {
   const progress = doc?.progress ?? null;
   const startedAt = doc?.startedAt ?? null;
 
+  const structure = doc?.structure ?? null;
+  const floors = doc?.floors ?? [];
+
   const [available, setAvailable] = useState<boolean | null>(null);
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showDetails, setShowDetails] = useState(false);
+  const [showFloors, setShowFloors] = useState(false);
   const [details, setDetails] = useState<BuildDetails>(EMPTY_DETAILS);
   const [nowTick, setNowTick] = useState(Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
+  const prevDocId = useRef<string | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const elapsedMs = busy && startedAt ? nowTick - startedAt : 0;
 
@@ -143,9 +147,13 @@ export function GenerateContent() {
     void api.aiAvailable().then(setAvailable);
   }, [settingsOpen]);
 
-  // Keep the newest message in view (also when switching to a tab with history).
+  // Keep the newest message in view. Jump instantly when switching tabs (so the
+  // transcript just appears at the bottom — no scroll-down animation on open),
+  // and scroll smoothly for new messages within the same conversation.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    const behavior: ScrollBehavior = prevDocId.current === doc?.id ? 'smooth' : 'auto';
+    prevDocId.current = doc?.id;
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior });
   }, [chat.length, busy, doc?.id]);
 
   // Tick a live elapsed-time counter while a generation is in flight.
@@ -155,7 +163,59 @@ export function GenerateContent() {
     return () => clearInterval(id);
   }, [busy]);
 
-  const close = () => windowsStore.getState().setVisible('generate', false);
+  // Tell the viewer (via the app store) when the Floors section is open, so it
+  // can scope the floor-plan highlight if "only while editing" is enabled. The
+  // highlight itself is driven from App against the active doc's floor plan.
+  useEffect(() => {
+    store.getState().setFloorsEditing(showFloors);
+    return () => store.getState().setFloorsEditing(false);
+  }, [showFloors]);
+
+  // Pre-fill the Details size from the open structure (an existing .nbt, or a
+  // generated build) so editing starts from its real dimensions — but only while
+  // the user hasn't typed their own size yet. size is [W, H, D].
+  useEffect(() => {
+    const sz = structure?.size;
+    if (!sz) return;
+    setDetails((d) =>
+      d.width || d.depth || d.height
+        ? d
+        : { ...d, width: String(sz[0]), height: String(sz[1]), depth: String(sz[2]) },
+    );
+  }, [structure?.size]);
+
+  // Floor edits persist immediately (with the chat history) so a defined plan
+  // survives a restart even before the next prompt is sent.
+  const setFloors = useCallback(
+    (next: FloorDef[]) => {
+      if (!doc) return;
+      documentsStore.getState().setFloors(doc.id, next);
+      persistDoc(doc.id);
+    },
+    [doc],
+  );
+
+  const addFloor = useCallback(() => {
+    if (!doc) return;
+    // Stack the new level a storey (~5 blocks) above the current top, so a stack
+    // of floors lands at sensible, non-overlapping ranges out of the box.
+    const top = floors.reduce((m, f) => Math.max(m, f.to), -1);
+    const from = floors.length ? top + 1 : 0;
+    const f: FloorDef = { id: crypto.randomUUID(), name: '', from, to: from + 4 };
+    documentsStore.getState().setFloors(doc.id, [...floors, f]);
+    persistDoc(doc.id);
+  }, [doc, floors]);
+
+  const updateFloor = useCallback(
+    (id: string, patch: Partial<FloorDef>) =>
+      setFloors(floors.map((f) => (f.id === id ? { ...f, ...patch } : f))),
+    [floors, setFloors],
+  );
+
+  const removeFloor = useCallback(
+    (id: string) => setFloors(floors.filter((f) => f.id !== id)),
+    [floors, setFloors],
+  );
 
   const addFiles = useCallback(async (files: Iterable<File>) => {
     const added = await readImages(files);
@@ -195,6 +255,7 @@ export function GenerateContent() {
     setAttachments([]);
     setDetails(EMPTY_DETAILS);
     setShowDetails(false);
+    setShowFloors(false);
     await runGeneration(
       docId,
       composed,
@@ -212,6 +273,7 @@ export function GenerateContent() {
     setAttachments([]);
     setDetails(EMPTY_DETAILS);
     setShowDetails(false);
+    setShowFloors(false);
   }, [doc]);
 
   const setField = useCallback(
@@ -247,9 +309,6 @@ export function GenerateContent() {
           onClick={() => store.getState().setCatalogOpen(true)}
         >
           Blocks
-        </button>
-        <button className="modal-close" title="Close" aria-label="Close" onClick={close}>
-          ✕
         </button>
       </div>
 
@@ -446,6 +505,66 @@ export function GenerateContent() {
             </div>
           </div>
         )}
+        {showFloors && (
+          <div className="gen-floors">
+            <div className="gen-floors-head">
+              <span>Floor plan</span>
+              <span className="gen-floors-hint">
+                Give each level a name and the Y where it starts and ends (y=0 is the ground). The
+                ranges are highlighted in the viewer and sent as context, so you can later say
+                “redo the basement”.
+              </span>
+            </div>
+            {floors.length === 0 && (
+              <p className="gen-floors-empty">
+                No floors yet. Add one to give the AI a vertical layout — e.g. Basement y 0–4,
+                Ground floor y 5–9, Upper floor y 10–14.
+              </p>
+            )}
+            {floors.map((f) => (
+              <div key={f.id} className="gen-floor-row">
+                <input
+                  className="gen-floor-name"
+                  type="text"
+                  placeholder="Floor name (e.g. Basement)"
+                  value={f.name}
+                  disabled={busy}
+                  onChange={(e) => updateFloor(f.id, { name: e.target.value })}
+                />
+                <label className="gen-floor-y">
+                  <span>From</span>
+                  <input
+                    type="number"
+                    value={f.from}
+                    disabled={busy}
+                    onChange={(e) => updateFloor(f.id, { from: Math.trunc(Number(e.target.value)) || 0 })}
+                  />
+                </label>
+                <label className="gen-floor-y">
+                  <span>To</span>
+                  <input
+                    type="number"
+                    value={f.to}
+                    disabled={busy}
+                    onChange={(e) => updateFloor(f.id, { to: Math.trunc(Number(e.target.value)) || 0 })}
+                  />
+                </label>
+                <button
+                  className="gen-floor-remove"
+                  title="Remove floor"
+                  aria-label="Remove floor"
+                  disabled={busy}
+                  onClick={() => removeFloor(f.id)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <button className="btn sm gen-floor-add" onClick={addFloor} disabled={busy}>
+              + Add floor
+            </button>
+          </div>
+        )}
         <textarea
           className="gen-input"
           placeholder="Describe a structure…"
@@ -490,6 +609,15 @@ export function GenerateContent() {
             onClick={() => setShowDetails((v) => !v)}
           >
             ⚙ Details{hasDetails(details) ? ' •' : ''}
+          </button>
+          <button
+            className={`btn sm gen-details-toggle${floors.length > 0 ? ' has-details' : ''}`}
+            title="Define the build's vertical levels (floors) as context for the AI"
+            aria-pressed={showFloors}
+            disabled={busy}
+            onClick={() => setShowFloors((v) => !v)}
+          >
+            ▦ Floors{floors.length > 0 ? ` (${floors.length})` : ''}
           </button>
           {busy ? (
             <button className="btn gen-send gen-cancel" onClick={cancel}>

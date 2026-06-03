@@ -9,7 +9,7 @@
 // its conversation and the SDK session can resume.
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage } from '@/shared/types';
+import type { GenerateImage, FloorDef } from '@/shared/types';
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
  *  it's the active tab. Provided by App, which owns the viewers.
@@ -33,7 +33,7 @@ function chatKey(doc: Document): string {
 }
 
 /** Persist a document's current chat + session info so it survives restarts. */
-function persist(docId: string): void {
+export function persistDoc(docId: string): void {
   const doc = documentsStore.getState().documents.find((d) => d.id === docId);
   if (!doc) return;
   void api.chatHistorySave(chatKey(doc), {
@@ -42,7 +42,36 @@ function persist(docId: string): void {
     version: doc.version,
     messages: doc.chat,
     baselinePath: doc.baselinePath,
+    floors: doc.floors,
   });
+}
+
+/** Normalize a floor's range to ascending [from, to], tolerating legacy records
+ *  that only stored a base `y` (treated as a single-layer level at that y). */
+export function normalizeFloor(f: FloorDef & { y?: number }): FloorDef {
+  const from = f.from ?? f.y ?? 0;
+  const to = f.to ?? f.y ?? from;
+  return { id: f.id, name: f.name, from: Math.min(from, to), to: Math.max(from, to) };
+}
+
+/** Build the floor-plan context block appended to every AI prompt, or '' if no
+ *  levels are defined. Sorted bottom-up; each level states its inclusive y range,
+ *  so the model can map "the basement"/"the top floor" to concrete y values and
+ *  keep the layout consistent across edits. */
+export function buildFloorPlan(floors: Document['floors']): string {
+  if (!floors.length) return '';
+  const sorted = [...floors].map(normalizeFloor).sort((a, b) => a.from - b.from);
+  const lines = sorted.map((f, i) => {
+    const name = f.name.trim() || `Level ${i + 1}`;
+    const range = f.to > f.from ? `y ${f.from}–${f.to}` : `y ${f.from}`;
+    return `- ${name}: ${range}`;
+  });
+  return (
+    `\n\n[Floor plan — named vertical levels the user defined for this build. ` +
+    `Minecraft is Y-up and y=0 is the lowest layer. Build each level within its ` +
+    `inclusive y range and keep this layout consistent across edits, so a request ` +
+    `like "add windows to the basement" maps to the right y range.]\n${lines.join('\n')}`
+  );
 }
 
 /** Record a compiled version on the document (deduped by number) and mark it as
@@ -114,6 +143,7 @@ export async function hydrateDoc(docId: string): Promise<void> {
       viewingVersion: null,
       chat: rec.messages,
       baselinePath: rec.baselinePath ?? null,
+      floors: (rec.floors ?? []).map(normalizeFloor),
       hydrated: true,
     });
     await api.aiPrimeSession(rec.sessionId, rec.sdkSessionId, rec.version);
@@ -140,11 +170,16 @@ export async function runGeneration(
     const [head, data] = url.split(',');
     return { mediaType: head.slice(5, head.indexOf(';')), data };
   });
-  const promptText = prompt || 'Build a Minecraft structure based on the reference image(s).';
+  // The user's floor plan rides along as context on every turn (so a follow-up
+  // like "redo the basement" knows which y range that is), but it stays out of
+  // the visible transcript — only the raw prompt is shown in the chat.
+  const promptText =
+    (prompt || 'Build a Minecraft structure based on the reference image(s).') +
+    buildFloorPlan(doc.floors);
 
   docs.appendChat(docId, { role: 'user', text: prompt, images: imageUrls.length ? imageUrls : undefined });
   docs.patchDoc(docId, { busy: true, startedAt: Date.now(), progress: null });
-  persist(docId);
+  persistDoc(docId);
 
   // Seed the model with the structure this tab already has open so a first
   // "change X" edits it rather than building anew (main ignores its own outputs).
@@ -177,7 +212,7 @@ export async function runGeneration(
     docs.appendChat(docId, { role: 'assistant', text: String(err), error: true });
   } finally {
     documentsStore.getState().patchDoc(docId, { busy: false, progress: null, startedAt: null });
-    persist(docId);
+    persistDoc(docId);
   }
 }
 
@@ -202,6 +237,7 @@ export function resetDocChat(docId: string): void {
     viewingVersion: null,
     chat: [],
     baselinePath: null, // back to the on-disk file as the source
+    floors: [], // a fresh build starts with no floor plan
   });
   // For a file-backed doc the chat key (its path) is unchanged, so overwrite its
   // record empty; an Untitled doc's key just moves to the new session id.
@@ -211,6 +247,7 @@ export function resetDocChat(docId: string): void {
     version: 0,
     messages: [],
     baselinePath: null,
+    floors: [],
   });
 }
 
@@ -245,5 +282,6 @@ export function clearVersioning(docId: string): void {
     version: 0,
     messages: [],
     baselinePath,
+    floors: doc.floors, // the build is kept, so keep its floor plan
   });
 }

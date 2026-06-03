@@ -15,7 +15,7 @@ import { documentsStore, activeDocument, docBySession } from './state/documents'
 import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration, recordVersion } from './state/generation';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import type { Viewer } from './viewer/viewer';
-import { useActiveDoc, useDocuments } from './hooks/useStores';
+import { useActiveDoc } from './hooks/useStores';
 import { TabBar } from './components/TabBar';
 import { Statusbar } from './components/Statusbar';
 import { Loading } from './components/Loading';
@@ -49,7 +49,6 @@ function Shell() {
   const viewer = useViewer();
   const captureViewer = useCaptureViewer();
   const activeDoc = useActiveDoc();
-  const docCount = useDocuments((s) => s.documents.length);
   const structure = activeDoc?.structure ?? null;
   const fileOpen = structure !== null;
   const availability = {
@@ -237,7 +236,10 @@ function Shell() {
     api.onOpenPath((p) => void openFile(p));
     api.onFileDrop((p) => void openFile(p));
     api.onCloseStructure(() => close());
-    api.onOpenSettings(() => st.setSettingsOpen(true));
+    api.onOpenSettings((section) => {
+      if (section) st.setSettingsSection(section);
+      st.setSettingsOpen(true);
+    });
     api.onNewStructure(() => newDoc());
     api.onExportFile(() => void exportActive());
     api.onRecentsChanged((paths) => st.setRecents(paths));
@@ -328,6 +330,29 @@ function Shell() {
     return settingsStore.subscribe(apply);
   }, [viewer]);
 
+  // Drive the floor-plan highlight from the active doc's floor plan. Shown
+  // whenever floors are defined; the "only while editing" setting scopes it to
+  // when the Generate floors section is open (store.floorsEditing).
+  useEffect(() => {
+    if (!viewer) return;
+    const apply = () => {
+      const doc = activeDocument(documentsStore.getState());
+      const floors = doc?.floors ?? [];
+      const onlyEditing = settingsStore.getState().floorsOnlyWhenEditing;
+      const show = floors.length > 0 && (!onlyEditing || store.getState().floorsEditing);
+      viewer.setFloorRegions(
+        show ? floors.map((f) => ({ name: f.name, from: f.from, to: f.to })) : [],
+      );
+    };
+    apply();
+    const subs = [
+      documentsStore.subscribe(apply),
+      settingsStore.subscribe(apply),
+      store.subscribe(apply),
+    ];
+    return () => subs.forEach((u) => u());
+  }, [viewer]);
+
   // Mirror file-open + window state to main (drives Close File and the View
   // menu). Only re-sends when the *reported* shape changes.
   useEffect(() => {
@@ -368,7 +393,7 @@ function Shell() {
       <main className="stage">
         <div className="stage-main">
           <Viewport />
-          {docCount === 0 && (
+          {!activeDoc && (
             <Welcome
               onOpen={() => void open()}
               onLoad={(p) => void openFile(p)}
@@ -376,7 +401,7 @@ function Shell() {
               onGenerate={newDoc}
             />
           )}
-          {docCount > 0 && !fileOpen && !activeDoc?.loading && (
+          {activeDoc && !fileOpen && !activeDoc.loading && (
             <div className="empty-tab">
               <p>This tab is empty.</p>
               <p className="empty-tab-hint">

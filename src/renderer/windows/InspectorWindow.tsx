@@ -6,15 +6,43 @@
 // every occurrence in the .nbt. Clicking an occurrence focuses the camera on that
 // block and flashes it (see Viewer.focusBlock) — handy in dense builds.
 import { useMemo, useState } from 'react';
-import type { StructureData } from '@/shared/types';
-import { useActiveDoc } from '../hooks/useStores';
+import type { StructureData, PaletteEntry } from '@/shared/types';
+import { api } from '../api';
+import { useActiveDoc, useSettings } from '../hooks/useStores';
 import { useViewer } from '../viewer/ViewerProvider';
 
 interface BlockGroup {
   name: string;
   color: [number, number, number];
+  /** A representative texture key (namespace/path) for the icon, or null. */
+  texture: string | null;
   resolved: boolean;
   positions: [number, number, number][];
+}
+
+/** Pick one texture key to represent a block in the list — prefer a side face
+ *  (the most recognizable), then top/bottom, scanning the resolved models. */
+function representativeTexture(entry: PaletteEntry): string | null {
+  const order: ('south' | 'north' | 'east' | 'west' | 'up' | 'down')[] = [
+    'south', 'north', 'east', 'west', 'up', 'down',
+  ];
+  for (const model of entry.models) {
+    for (const el of model.elements) {
+      for (const dir of order) {
+        const tex = el.faces[dir]?.texture;
+        if (tex) return tex;
+      }
+    }
+  }
+  // Fall back to any face on any element if none of the preferred sides resolved.
+  for (const model of entry.models) {
+    for (const el of model.elements) {
+      for (const face of Object.values(el.faces)) {
+        if (face?.texture) return face.texture;
+      }
+    }
+  }
+  return null;
 }
 
 /** Group every non-air block instance by its (namespace-stripped) name. */
@@ -26,11 +54,18 @@ function groupBlocks(data: StructureData): BlockGroup[] {
     const name = entry.name.replace('minecraft:', '');
     let g = groups.get(name);
     if (!g) {
-      g = { name, color: entry.color, resolved: entry.models.length > 0, positions: [] };
+      g = {
+        name,
+        color: entry.color,
+        texture: representativeTexture(entry),
+        resolved: entry.models.length > 0,
+        positions: [],
+      };
       groups.set(name, g);
     }
     // A name with any resolved state counts as resolved (no "flat" chip).
     if (entry.models.length > 0) g.resolved = true;
+    if (!g.texture) g.texture = representativeTexture(entry);
     g.positions.push(b.pos);
   }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -42,6 +77,7 @@ function rgb(color: [number, number, number]): string {
 
 export function InspectorContent() {
   const structure = useActiveDoc()?.structure ?? null;
+  const textureIcons = useSettings((s) => s.blockTextureIcons);
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
   const paletteCount = useMemo(
@@ -97,7 +133,11 @@ export function InspectorContent() {
                 onClick={() => toggle(g.name)}
               >
                 <span className={`bw-caret${open ? ' open' : ''}`}>▸</span>
-                <span className="swatch" style={{ background: rgb(g.color) }} />
+                {textureIcons && g.texture ? (
+                  <img className="swatch swatch-tex" src={api.textureUrl(g.texture)} alt="" draggable={false} />
+                ) : (
+                  <span className="swatch" style={{ background: rgb(g.color) }} />
+                )}
                 <span className="block-name">{g.name}</span>
                 {!g.resolved && <span className="chip">flat</span>}
                 <span className="block-count">({g.positions.length})</span>
