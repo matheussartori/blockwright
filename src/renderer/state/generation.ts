@@ -41,6 +41,7 @@ function persist(docId: string): void {
     sdkSessionId: doc.sdkSessionId,
     version: doc.version,
     messages: doc.chat,
+    baselinePath: doc.baselinePath,
   });
 }
 
@@ -53,10 +54,13 @@ export function recordVersion(docId: string, version: number, path: string): voi
   if (!doc) return;
   const entries = [...doc.versions.filter((v) => v.version !== version), { version, path }];
   // For a file-backed doc (an EDIT of an existing .nbt, not a from-scratch
-  // creation) keep the untouched original as a baseline "v0" the user can flip
-  // back to. Untitled (created) docs have no original, so they get none.
-  if (doc.filePath && !entries.some((v) => v.version === 0)) {
-    entries.push({ version: 0, path: doc.filePath });
+  // creation) keep the original as a baseline "v0" the user can flip back to.
+  // That baseline is the untouched on-disk file by default, or — after "Clear
+  // versions" flattened the build — the iterated build it pinned (baselinePath).
+  // Untitled (created) docs have no original, so they get none.
+  const baseline = doc.baselinePath ?? doc.filePath;
+  if (baseline && !entries.some((v) => v.version === 0)) {
+    entries.push({ version: 0, path: baseline });
   }
   const versions = entries.sort((a, b) => a.version - b.version);
   docs.patchDoc(docId, { versions, viewingVersion: version });
@@ -98,8 +102,9 @@ export async function hydrateDoc(docId: string): Promise<void> {
     // and surface its compiled versions (read from disk) in the Versions panel.
     // For a file-backed doc, prepend the untouched original as the "v0" baseline.
     const versions = await api.aiListVersions(rec.sessionId);
-    if (doc.filePath && versions.length > 0 && !versions.some((v) => v.version === 0)) {
-      versions.unshift({ version: 0, path: doc.filePath });
+    const baseline = rec.baselinePath ?? doc.filePath;
+    if (baseline && versions.length > 0 && !versions.some((v) => v.version === 0)) {
+      versions.unshift({ version: 0, path: baseline });
     }
     docs.patchDoc(docId, {
       sessionId: rec.sessionId,
@@ -108,6 +113,7 @@ export async function hydrateDoc(docId: string): Promise<void> {
       versions,
       viewingVersion: null,
       chat: rec.messages,
+      baselinePath: rec.baselinePath ?? null,
       hydrated: true,
     });
     await api.aiPrimeSession(rec.sessionId, rec.sdkSessionId, rec.version);
@@ -188,7 +194,15 @@ export function resetDocChat(docId: string): void {
   if (!doc) return;
   void api.aiResetSession(doc.sessionId);
   const sessionId = crypto.randomUUID();
-  docs.patchDoc(docId, { sessionId, sdkSessionId: null, version: 0, versions: [], viewingVersion: null, chat: [] });
+  docs.patchDoc(docId, {
+    sessionId,
+    sdkSessionId: null,
+    version: 0,
+    versions: [],
+    viewingVersion: null,
+    chat: [],
+    baselinePath: null, // back to the on-disk file as the source
+  });
   // For a file-backed doc the chat key (its path) is unchanged, so overwrite its
   // record empty; an Untitled doc's key just moves to the new session id.
   void api.chatHistorySave(doc.filePath ?? sessionId, {
@@ -196,5 +210,40 @@ export function resetDocChat(docId: string): void {
     sdkSessionId: null,
     version: 0,
     messages: [],
+    baselinePath: null,
+  });
+}
+
+/** Clear a document's version history + chat and adopt the CURRENT build as a
+ *  fresh "original". Unlike "New" (resetDocChat), which keeps the untouched
+ *  on-disk file as the source, this pins the build you've iterated to
+ *  (`doc.path`) as the new baseline: it starts a fresh AI session, empties the
+ *  chat and versions list, and leaves that build in the viewer so the next edit
+ *  builds on it from a clean slate. */
+export function clearVersioning(docId: string): void {
+  const docs = documentsStore.getState();
+  const doc = docs.documents.find((d) => d.id === docId);
+  if (!doc) return;
+  void api.aiResetSession(doc.sessionId);
+  const sessionId = crypto.randomUUID();
+  // The current build becomes the new baseline. For a file-backed doc that means
+  // the edited build supersedes the on-disk file as the "Original" the version
+  // chain hangs off; fall back to the prior baseline / file if nothing is loaded.
+  const baselinePath = doc.path ?? doc.baselinePath ?? doc.filePath;
+  docs.patchDoc(docId, {
+    sessionId,
+    sdkSessionId: null,
+    version: 0,
+    versions: [],
+    viewingVersion: null,
+    chat: [],
+    baselinePath,
+  });
+  void api.chatHistorySave(doc.filePath ?? sessionId, {
+    sessionId,
+    sdkSessionId: null,
+    version: 0,
+    messages: [],
+    baselinePath,
   });
 }

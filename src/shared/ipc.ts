@@ -32,6 +32,9 @@ export const IPC_CHANNELS = {
   jigsawCandidates: 'jigsaw:candidates',
   /** Renderer tells main whether a structure is currently open (drives Close File). */
   setFileOpen: 'file:set-open',
+  /** Copy the current build's `.nbt` to a user-chosen location via a Save dialog
+   *  (payload: srcPath + suggestedName) → ExportResult. */
+  exportFile: 'file:export',
   /** Renderer reports its floating-window state so the View menu checkmarks stay in sync. */
   windowsReport: 'windows:report',
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
@@ -82,6 +85,9 @@ export const IPC_EVENTS = {
   windowsReset: 'windows-reset',
   /** Open the AI "New Structure" generation panel (File ▸ New Structure). */
   newStructure: 'new-structure',
+  /** Ask the renderer to export the current build (File ▸ Export File). The
+   *  renderer picks the source path + suggested name and calls IPC_CHANNELS.exportFile. */
+  exportFile: 'export-file',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
   /** Ask the renderer to load a just-generated `.nbt` into the viewer and return

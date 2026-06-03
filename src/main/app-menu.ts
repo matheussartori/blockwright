@@ -10,6 +10,7 @@ import { getActiveWorkspace } from './structure/content-pack';
 import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './workspace';
 import {
   notifyClose,
+  notifyExportFile,
   notifyOpenSettings,
   notifyNewStructure,
   notifyRecents,
@@ -163,6 +164,12 @@ export function buildAppMenu(): void {
           },
         },
         { label: 'Open Recent', submenu: openRecent },
+        {
+          label: 'Export File…',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          enabled: fileOpen,
+          click: () => notifyExportFile(),
+        },
         { label: 'Close File', enabled: fileOpen, click: () => notifyClose() },
         { type: 'separator' },
         {

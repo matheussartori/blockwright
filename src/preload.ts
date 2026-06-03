@@ -5,6 +5,7 @@ import type {
   AssembleOptions,
   BlockwrightApi,
   ChatRecord,
+  ExportResult,
   GenerateImage,
   GenerateProgress,
   GenerateResult,
@@ -80,6 +81,8 @@ const api: BlockwrightApi = {
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
+  exportStructure: (srcPath: string, suggestedName: string): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName),
   reportWindows: (state: WindowsReport) => {
     ipcRenderer.invoke(IPC_CHANNELS.windowsReport, state);
   },
@@ -113,6 +116,9 @@ const api: BlockwrightApi = {
   },
   onNewStructure: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.newStructure, () => cb());
+  },
+  onExportFile: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.exportFile, () => cb());
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());

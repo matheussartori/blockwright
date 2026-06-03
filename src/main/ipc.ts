@@ -21,7 +21,7 @@ import {
   promptOpenWorkspace,
   setWorkspaceVersion,
 } from './workspace';
-import { notifyRecentWorkspaces, openFileDialog } from './window';
+import { exportStructure, notifyRecentWorkspaces, openFileDialog } from './window';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
 
 /** Pending preview-render requests, keyed by requestId, resolved when the
@@ -157,6 +157,10 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
+
+  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string) =>
+    exportStructure(srcPath, suggestedName),
+  );
 
   ipcMain.handle(IPC_CHANNELS.windowsReport, async (_e, state: WindowsReport) =>
     setWindowsState(state),

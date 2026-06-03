@@ -192,6 +192,12 @@ export type GenerateResult =
     }
   | { ok: false; error: string; canceled?: boolean };
 
+/** Result of exporting (copying) the current build's `.nbt` to a user-chosen
+ *  location via the native Save dialog. */
+export type ExportResult =
+  | { ok: true; path: string }
+  | { ok: false; canceled?: boolean; error?: string };
+
 /** A compiled version of a generation session, living on disk as `vN.nbt`. The
  *  Versions panel lists these so the user can flip between earlier builds for
  *  viewing (editing always continues from the latest). */
@@ -220,6 +226,10 @@ export interface ChatRecord {
   sdkSessionId: string | null;
   version: number;
   messages: ChatMessage[];
+  /** Overrides the file path as the version chain's "Original" baseline — set
+   *  when the build was flattened via "Clear versions" so the iterated build,
+   *  not the untouched on-disk file, is the v0. Absent = use the file path. */
+  baselinePath?: string | null;
   updatedAt?: number;
 }
 
@@ -352,6 +362,10 @@ export interface BlockwrightApi {
   sendRenderResult: (result: RenderResult) => void;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
+  /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
+   *  `suggestedName` seeds the dialog's filename. Returns where it landed, or a
+   *  canceled/error result. */
+  exportStructure: (srcPath: string, suggestedName: string) => Promise<ExportResult>;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
   reportWindows: (state: WindowsReport) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */
@@ -379,6 +393,9 @@ export interface BlockwrightApi {
   onResetWindows: (cb: () => void) => void;
   /** Notified when File ▸ New Structure is chosen (opens the AI generation panel). */
   onNewStructure: (cb: () => void) => void;
+  /** Notified when File ▸ Export File is chosen; the handler picks the build to
+   *  save and calls `exportStructure`. */
+  onExportFile: (cb: () => void) => void;
 }
 
 declare global {

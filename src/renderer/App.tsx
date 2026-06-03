@@ -157,6 +157,28 @@ function Shell() {
     void hydrateDoc(id);
   }, []);
 
+  // Export the active tab's CURRENT build to a location the user picks. We export
+  // exactly what's on screen: a previewed earlier version if one is being viewed,
+  // otherwise the working build (`path`). The source is a real `.nbt` on disk, so
+  // main just copies it. Suggest the file's own name, or "<title>.nbt" for an
+  // untitled AI build.
+  const exportActive = useCallback(async () => {
+    const doc = activeDocument(documentsStore.getState());
+    if (!doc) return;
+    const preview = doc.viewingVersion != null
+      ? doc.versions.find((v) => v.version === doc.viewingVersion)
+      : null;
+    const src = preview?.path ?? doc.path;
+    if (!src) return; // nothing loaded to export
+    const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
+    const result = await api.exportStructure(src, suggested);
+    if (result.ok) {
+      store.getState().setNotice({ text: `Exported to ${basename(result.path)}`, warn: false });
+    } else if (!result.canceled) {
+      store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
+    }
+  }, []);
+
   // Close the active tab; the active-tab effect re-points the viewer afterwards.
   const close = useCallback(() => {
     const id = documentsStore.getState().activeId;
@@ -217,6 +239,7 @@ function Shell() {
     api.onCloseStructure(() => close());
     api.onOpenSettings(() => st.setSettingsOpen(true));
     api.onNewStructure(() => newDoc());
+    api.onExportFile(() => void exportActive());
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
@@ -268,7 +291,7 @@ function Shell() {
       const version = await api.getContentVersion();
       if (version) st.setContentVersion(version);
     })();
-  }, [openFile, close, newDoc, onWorkspaceChanged]);
+  }, [openFile, close, newDoc, onWorkspaceChanged, exportActive]);
 
   // The on-screen viewer follows the active tab: when the focused tab changes,
   // show its structure (re-framed) or clear the scene. Structure updates within

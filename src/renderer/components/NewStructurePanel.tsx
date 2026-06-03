@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { windowsStore } from '../state/windows';
 import { documentsStore } from '../state/documents';
-import { runGeneration, cancelGeneration, resetDocChat } from '../state/generation';
+import { runGeneration, cancelGeneration, resetDocChat, clearVersioning } from '../state/generation';
 import { useApp, useActiveDoc } from '../hooks/useStores';
 import { api } from '../api';
 import type { GenerateProgress } from '@/shared/types';
@@ -154,11 +154,27 @@ export function GenerateContent() {
     setAttachments([]);
   }, [doc]);
 
+  // Number of generated builds (v0/source excluded) — there's only something to
+  // flatten once at least one version exists.
+  const generatedCount = doc?.versions.filter((v) => v.version >= 1).length ?? 0;
+
+  const clearVersions = useCallback(() => {
+    if (doc) clearVersioning(doc.id);
+  }, [doc]);
+
   return (
     <div className="gen-content" role="dialog" aria-label="Generate structure">
       <div className="gen-bar">
         <button className="btn sm" onClick={reset} disabled={busy || chat.length === 0}>
           New
+        </button>
+        <button
+          className="btn sm"
+          title="Clear the chat and version history, keeping the current build as a fresh original"
+          onClick={clearVersions}
+          disabled={busy || generatedCount === 0}
+        >
+          Clear versions
         </button>
         <button className="settings-close" title="Close" aria-label="Close" onClick={close}>
           ✕

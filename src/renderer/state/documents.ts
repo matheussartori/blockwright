@@ -49,6 +49,11 @@ export interface Document {
    *  working/latest structure. Set only while the user is previewing an earlier
    *  build (editing always continues from the latest). */
   viewingVersion: number | null;
+  /** Overrides `filePath` as the "Original" baseline of the version chain. Set by
+   *  "Clear versions", which flattens the build you've iterated to into a fresh
+   *  starting point: the current `.nbt` (not the untouched on-disk file) becomes
+   *  the v0 the next edit builds on. null = use `filePath` (the default). */
+  baselinePath: string | null;
   /** True once persisted chat history (if any) has been loaded for this doc. */
   hydrated: boolean;
 }
@@ -88,6 +93,7 @@ function freshDoc(over: Partial<Document> = {}): Document {
     version: 0,
     versions: [],
     viewingVersion: null,
+    baselinePath: null,
     hydrated: false,
     ...over,
   };
