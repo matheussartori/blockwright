@@ -1,16 +1,22 @@
-// The AI "New Structure" panel: a left-docked chat where the user describes a
-// build, Claude (in main) generates the authoring JSON, the app compiles it to a
-// versioned temp `.nbt`, and we load that into the viewer for a live preview.
-// Follow-up messages edit the current structure (the generate→preview→iterate
-// loop from knowledge/nbt/07-workflow.md). Chat state is local; the conversation
-// the model sees lives in main, keyed by this panel's session id.
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { api } from '../api';
+// The AI "Generate" panel: a chat where the user describes a build, Claude (in
+// main) generates the authoring JSON, the app compiles it to a versioned temp
+// `.nbt`, and loads it into the viewer for a live preview. Follow-up messages
+// edit the current build (the generate→preview→iterate loop from
+// knowledge/nbt/07-workflow.md).
+//
+// This component is a VIEW over the ACTIVE document: the chat transcript, the AI
+// session and the in-flight generation state all live on the document (so they
+// follow tabs and keep running in the background — see state/documents.ts and
+// state/generation.ts). The panel only owns the composer's transient state
+// (input text + staged attachments).
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { windowsStore } from '../state/windows';
-import { useApp } from '../hooks/useStores';
-import type { GenerateProgress, GenerateImage } from '@/shared/types';
+import { documentsStore } from '../state/documents';
+import { runGeneration, cancelGeneration, resetDocChat } from '../state/generation';
+import { useApp, useActiveDoc } from '../hooks/useStores';
+import { api } from '../api';
+import type { GenerateProgress } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
@@ -26,7 +32,7 @@ const ACCEPTED_IMAGE = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 /** A reference image staged in the composer (and echoed into the sent message). */
 interface Attachment {
   id: string;
-  /** Full `data:<mime>;base64,…` URL — used both for the <img> preview and, split, for IPC. */
+  /** Full `data:<mime>;base64,…` URL — used for the <img> preview and, split, for IPC. */
   dataUrl: string;
 }
 
@@ -54,27 +60,6 @@ function readImages(files: Iterable<File>): Promise<Attachment[]> {
   return Promise.all(reads);
 }
 
-/** Mirror of App's `load` (extra args optional). Temp versions load with
- *  `recent: false` so they never enter the recent-files list. */
-type LoadFn = (path: string, preserveCamera?: boolean, recent?: boolean) => Promise<void>;
-
-// The generate panel is rendered inside the generic dock/floating chrome, which
-// can't thread App's `load` down through its panel map — so it flows via context.
-const LoadContext = createContext<LoadFn | null>(null);
-
-export function GenerateLoadProvider({ load, children }: { load: LoadFn; children: ReactNode }) {
-  return <LoadContext.Provider value={load}>{children}</LoadContext.Provider>;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  text: string;
-  error?: boolean;
-  /** Reference image data URLs shown as thumbnails (user messages only). */
-  images?: string[];
-  meta?: { version: number; size: [number, number, number]; blockCount: number; tookMs?: number };
-}
-
 const EXAMPLES = [
   'A small oak cottage with a furnished interior',
   'A stone watchtower, 5×5 footprint, 12 blocks tall',
@@ -85,46 +70,37 @@ const EXAMPLES = [
  *  provides the title bar, detach/redock and minimize), so it only owns its own
  *  toolbar (New / Close), the warning, the transcript and the composer. */
 export function GenerateContent() {
-  const load = useContext(LoadContext);
-  if (!load) throw new Error('GenerateContent must be rendered within GenerateLoadProvider');
   const settingsOpen = useApp((s) => s.settingsOpen);
+  const doc = useActiveDoc();
+  const chat = doc?.chat ?? [];
+  const busy = doc?.busy ?? false;
+  const progress = doc?.progress ?? null;
+  const startedAt = doc?.startedAt ?? null;
+
   const [available, setAvailable] = useState<boolean | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<GenerateProgress | null>(null);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const sessionId = useRef<string>(crypto.randomUUID());
+  const [nowTick, setNowTick] = useState(Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const elapsedMs = busy && startedAt ? nowTick - startedAt : 0;
 
-  // Live token/phase progress pushed from main during generation. Registered
-  // once; we filter to this panel's current session.
-  useEffect(() => {
-    api.onAiProgress((p) => {
-      if (p.sessionId === sessionId.current) setProgress(p);
-    });
-  }, []);
-
-  // Probe whether an API key is configured when the panel mounts, and re-probe
+  // Probe whether a credential is configured when the panel mounts, and re-probe
   // whenever the Settings panel closes (the key may have just been added there).
   useEffect(() => {
     if (settingsOpen) return;
     void api.aiAvailable().then(setAvailable);
   }, [settingsOpen]);
 
-  // Keep the newest message in view.
+  // Keep the newest message in view (also when switching to a tab with history).
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy]);
+  }, [chat.length, busy, doc?.id]);
 
   // Tick a live elapsed-time counter while a generation is in flight.
   useEffect(() => {
     if (!busy) return;
-    const start = Date.now();
-    setElapsedMs(0);
-    const id = setInterval(() => setElapsedMs(Date.now() - start), 250);
+    const id = setInterval(() => setNowTick(Date.now()), 250);
     return () => clearInterval(id);
   }, [busy]);
 
@@ -153,75 +129,35 @@ export function GenerateContent() {
   const send = useCallback(async () => {
     const prompt = input.trim();
     const staged = attachments;
-    if ((!prompt && staged.length === 0) || busy) return;
-    // Reference images can't ride a string prompt; split off the data-URL prefix
-    // so main forwards just the base64 payload + media type to the model.
-    const images: GenerateImage[] = staged.map((a) => {
-      const [head, data] = a.dataUrl.split(',');
-      return { mediaType: head.slice(5, head.indexOf(';')), data };
-    });
-    const promptText = prompt || 'Build a Minecraft structure based on the reference image(s).';
+    if (!prompt && staged.length === 0) return;
+    // Generate into the active tab; if the panel was opened with no tab open,
+    // create one so the build has somewhere to live.
+    const ds = documentsStore.getState();
+    const docId = ds.activeId ?? ds.newDoc();
+    if (ds.documents.find((d) => d.id === docId)?.busy) return;
     setInput('');
     setAttachments([]);
-    setMessages((m) => [
-      ...m,
-      { role: 'user', text: prompt, images: staged.map((a) => a.dataUrl) },
-    ]);
-    setProgress(null);
-    setBusy(true);
-    const startedAt = Date.now();
-    // Seed the model with the structure currently open in the viewer so a first
-    // prompt like "change the blocks" edits it rather than building anew. Main
-    // only uses this on a fresh session and ignores files it generated itself.
-    const basePath = store.getState().structure?.path;
-    try {
-      const result = await api.aiGenerate(sessionId.current, promptText, images, basePath);
-      if (result.ok) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: 'assistant',
-            text: result.summary || 'Structure generated.',
-            meta: {
-              version: result.version,
-              size: result.size,
-              blockCount: result.blockCount,
-              tookMs: Date.now() - startedAt,
-            },
-          },
-        ]);
-        // First version frames the build; later versions keep the camera so the
-        // user sees exactly what changed.
-        await load(result.path, result.version > 1, false);
-      } else if (result.canceled) {
-        setMessages((m) => [...m, { role: 'assistant', text: 'Canceled.' }]);
-      } else {
-        setMessages((m) => [...m, { role: 'assistant', text: result.error, error: true }]);
-      }
-    } catch (err) {
-      setMessages((m) => [...m, { role: 'assistant', text: String(err), error: true }]);
-    } finally {
-      setBusy(false);
-      setProgress(null);
-    }
-  }, [input, attachments, busy, load]);
+    await runGeneration(
+      docId,
+      prompt,
+      staged.map((a) => a.dataUrl),
+    );
+  }, [input, attachments]);
 
   const cancel = useCallback(() => {
-    void api.aiCancel(sessionId.current);
-  }, []);
+    if (doc) cancelGeneration(doc.id);
+  }, [doc]);
 
   const reset = useCallback(() => {
-    void api.aiResetSession(sessionId.current);
-    sessionId.current = crypto.randomUUID();
-    setMessages([]);
+    if (doc) resetDocChat(doc.id);
     setInput('');
     setAttachments([]);
-  }, []);
+  }, [doc]);
 
   return (
     <div className="gen-content" role="dialog" aria-label="Generate structure">
       <div className="gen-bar">
-        <button className="btn sm" onClick={reset} disabled={busy || messages.length === 0}>
+        <button className="btn sm" onClick={reset} disabled={busy || chat.length === 0}>
           New
         </button>
         <button className="settings-close" title="Close" aria-label="Close" onClick={close}>
@@ -240,7 +176,7 @@ export function GenerateContent() {
       )}
 
       <div className="gen-messages" ref={scrollRef}>
-        {messages.length === 0 && (
+        {chat.length === 0 && (
           <div className="gen-empty">
             <p>
               Describe a structure for Claude to build. It reads the Blockwright NBT guides, generates
@@ -261,7 +197,7 @@ export function GenerateContent() {
             </ul>
           </div>
         )}
-        {messages.map((m, i) => (
+        {chat.map((m, i) => (
           <div key={i} className={`gen-msg ${m.role}${m.error ? ' error' : ''}`}>
             {m.meta && (
               <div className="gen-stats gen-result-stats">
@@ -285,7 +221,14 @@ export function GenerateContent() {
             {m.images && m.images.length > 0 && (
               <div className="gen-msg-images">
                 {m.images.map((src, j) => (
-                  <img key={j} className="gen-msg-thumb" src={src} alt="reference" />
+                  <img
+                    key={j}
+                    className="gen-msg-thumb"
+                    src={src}
+                    alt="reference"
+                    title="Click to preview"
+                    onClick={() => store.getState().setImagePreview(src)}
+                  />
                 ))}
               </div>
             )}

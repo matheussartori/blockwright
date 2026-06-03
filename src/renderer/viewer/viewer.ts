@@ -64,7 +64,12 @@ export class Viewer {
   /** Notified whenever the navigation mode changes (for the UI to reflect it). */
   onModeChange: ((mode: NavMode) => void) | null = null;
 
-  constructor(private container: HTMLElement) {
+  /** `offscreen` builds a headless capture-only viewer: it skips all global
+   *  interaction wiring (keyboard / mouse-look / wheel) and the rAF render loop,
+   *  so a second instance used purely for background-tab screenshots never steals
+   *  input from the on-screen viewer. Its capture methods render explicitly, so
+   *  no animation loop is needed. */
+  constructor(private container: HTMLElement, private offscreen = false) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -87,10 +92,6 @@ export class Viewer {
     // Settings), so neutralize PointerLockControls' own rotation while keeping
     // its lock plumbing (isLocked, lock/unlock, moveRight, the unlock event).
     this.fly.pointerSpeed = 0;
-    this.renderer.domElement.ownerDocument.addEventListener('mousemove', this.onMouseLook);
-    // Losing the pointer lock (Esc, or the browser dropping it) is the canonical
-    // signal to leave fly mode and hand the camera back to OrbitControls.
-    this.fly.addEventListener('unlock', () => this.setMode('orbit'));
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.05));
     const sun = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -100,17 +101,22 @@ export class Viewer {
     fill.position.set(-0.5, 0.4, -0.6);
     this.scene.add(fill);
 
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-    // Release all held movement keys when the window loses focus. Without this,
-    // a key down at blur time (e.g. Shift in a screenshot shortcut) never gets
-    // its keyup, so the camera would keep drifting — notoriously "flying down"
-    // forever when a screenshot grab steals focus mid-Shift.
-    window.addEventListener('blur', this.onBlur);
-    this.renderer.domElement.addEventListener('wheel', this.onWheel, { passive: false });
-
-    new ResizeObserver(() => this.onResize()).observe(container);
-    this.animate();
+    if (!offscreen) {
+      this.renderer.domElement.ownerDocument.addEventListener('mousemove', this.onMouseLook);
+      // Losing the pointer lock (Esc, or the browser dropping it) is the canonical
+      // signal to leave fly mode and hand the camera back to OrbitControls.
+      this.fly.addEventListener('unlock', () => this.setMode('orbit'));
+      window.addEventListener('keydown', this.onKeyDown);
+      window.addEventListener('keyup', this.onKeyUp);
+      // Release all held movement keys when the window loses focus. Without this,
+      // a key down at blur time (e.g. Shift in a screenshot shortcut) never gets
+      // its keyup, so the camera would keep drifting — notoriously "flying down"
+      // forever when a screenshot grab steals focus mid-Shift.
+      window.addEventListener('blur', this.onBlur);
+      this.renderer.domElement.addEventListener('wheel', this.onWheel, { passive: false });
+      new ResizeObserver(() => this.onResize()).observe(container);
+      this.animate();
+    }
   }
 
   private animate = () => {

@@ -67,11 +67,20 @@ one of these before handing off:
   fall if the cell under them is air — keep a solid block beneath them.
 - **Floor fixtures rest ON the floor — they are never on the ceiling or stuck to a wall.** A
   `cauldron`, `anvil`, `furnace`/`smoker`/`blast_furnace`, `flower_pot`/`potted_*`, `composter`,
-  `decorated_pot`, `brewing_stand`, `cake`, `chest`/`barrel`, `campfire`, and floor `lantern`/`torch`
-  all sit on top of a solid block, the right way up. **Never** hang a cauldron, furnace, or pot from a
-  ceiling or float it high on a wall — it reads as a glitch (a cauldron stuck to the ceiling is
-  nonsense). If you want something *hanging* from above, use the blocks made for it: `chain` →
-  `lantern[hanging=true]`, a `*_hanging_sign`, or `vine`/`glow_lichen` — not a floor fixture.
+  `decorated_pot`, `brewing_stand`, `cake`, `chest`/`barrel`, `campfire`, `candle`s, and floor
+  `lantern`/`torch` all sit on top of a solid block, the right way up. **Never** hang a cauldron,
+  furnace, or pot from a ceiling or float it high on a wall — it reads as a glitch (a cauldron stuck
+  to the ceiling is nonsense). And never perch one over air or above a stairwell where it floats and
+  blocks the passage. If you want something *hanging* from above, use the blocks made for it: `chain`
+  → `lantern[hanging=true]`, a `*_hanging_sign`, or `vine`/`glow_lichen` — not a floor fixture.
+- **Thin "floor decals" need a solid block directly beneath them or they pop off on spawn.**
+  `*_carpet`, `*_pressure_plate`, rails, `candle`s, `flower`s/`sapling`s, `snow` layers, and
+  `redstone` all break the instant the structure is placed if the cell under them is air. Lay them
+  only on solid ground — never floated or bridging a gap/stairwell.
+- **Containers face the player, not the wall.** A `chest`/`barrel`/`furnace` `facing` is the side
+  you open from; aim it at the open room or aisle, **never into an adjacent wall or block** (a chest
+  whose front is buried can't be opened and looks like a bug). Back against the wall, front to the
+  room; a wall-side barrel can use `facing:up` instead.
 - **Cobweb is sparse decoration, not a building material.** `cobweb` is **not** a stair, ladder,
   scaffold, floor, or path — you cannot climb it or walk up it, and a diagonal run of cobwebs is not
   a staircase, it's just floating junk. Use it only as the occasional *single* strand tucked into a
@@ -108,6 +117,11 @@ one of these before handing off:
 > block still be here, attached to something, and serve its purpose?"* If no, fix it.
 
 ## Walls & facades — kill the flat plane
+
+> This section is the *principles*. For the **block-by-block construction recipes** of the facade
+> moves below — timber framing panels, exposed rafters, dormers, balconies, porches, towers,
+> chimney pots, window mullions — plus **exterior style archetypes** and **mansion massing &
+> formal grounds**, see [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md).
 
 A blank wall is the most common failure. Techniques, cheapest first:
 
@@ -147,8 +161,10 @@ Roof technique notes:
 
 - **Slope/pitch:** simplest is `oak_stairs` stepping in 1 block per layer (45°). For a gentler
   pitch, alternate `slab` and `stairs` (e.g. slab, stair, stair pattern) to rise ~5 over 7.
-- **Ridge:** cap with `*_slab type:top` or two opposed `*_stairs half:top`, run it continuously —
-  a broken ridge is an obvious hole.
+- **Ridge:** cap the peak with a **solid** top course — a continuous row of full blocks, or two
+  opposed `*_stairs` meeting to close the peak — run continuously (a broken ridge is an obvious
+  hole). Avoid a lone `*_slab type:top` ridge: floating thin above the gap between the slopes, it
+  looks unfinished; the topmost course of a roof should read as a solid block.
 - **Material:** roofs read best in a block *different* from the walls — `*_stairs` in
   `dark_oak`/`spruce`/`deepslate_tile`/`bricks`/`nether_brick` over light walls. Add a
   contrasting **trim course** (a line of slabs) along the eave.
@@ -235,6 +251,10 @@ Catch these in the preview ([`07`](07-workflow.md)):
 - ❌ One block for the whole build → ✅ 3–5 cohesive materials + accents.
 - ❌ Every wall flat → ✅ framing, insets/projections, base + corner trim.
 - ❌ Flat or no overhang roof → ✅ pitched roof, 1-block eaves, contrasting material, ridge.
+- ❌ Ridge capped with a lone thin top-slab → ✅ solid peak: a full-block top course or opposed
+  stairs meeting.
+- ❌ Oversized/lollipop chimney (thin stalk, fat cap) → ✅ modest constant-width 1×1 column off the
+  roof/wall, ~1–3 blocks above the ridge.
 - ❌ Door is a bare hole → ✅ framed/recessed entrance with steps and lights.
 - ❌ Air gap beside a door → ✅ wall sealed flush to both jambs so the door actually blocks the way.
 - ❌ Perfect symmetric cube → ✅ rectangular/L-shaped footprint, wing/bay/tower, distinct front.
@@ -247,6 +267,15 @@ Catch these in the preview ([`07`](07-workflow.md)):
   stair/ladder is a supported run that connects two reachable floors.
 - ❌ Cauldron/furnace/pot stuck to a ceiling or wall → ✅ floor fixtures rest the right way up on a
   solid block; hang things with `chain`+`lantern` or hanging signs instead.
+- ❌ Chest/barrel floating over a stairwell or facing into a wall → ✅ on a solid block, opening
+  faced at the open room.
+- ❌ Carpet/candle/pressure plate floating over air → ✅ laid directly on a solid block (they break
+  on spawn otherwise).
+- ❌ Table with a full-block/double-slab top or a leg hovering over air → ✅ thin top (single
+  `slab type:top`/carpet/plate) on a post that reaches the floor.
+- ❌ Staircase with a floating, open underside → ✅ fill under each step with a full block or
+  mirrored `half:top` stair.
+- ❌ Bed stranded mid-floor or at an odd angle → ✅ head against a wall, foot to the room.
 - ❌ Cobweb used as a staircase/ladder/path → ✅ real stairs or a wall-backed ladder; cobweb only as
   a stray corner strand for an abandoned mood.
 - ❌ Lantern/prop blocking a corridor, doorway, or stair → ✅ walking lane kept clear; props against

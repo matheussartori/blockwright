@@ -50,9 +50,15 @@ export const IPC_CHANNELS = {
   aiCancel: 'ai:cancel',
   /** Forget a generation session's conversation (payload: sessionId). */
   aiResetSession: 'ai:reset-session',
+  /** Restore a session's SDK conversation id + version (payload: sessionId, sdkSessionId, version). */
+  aiPrimeSession: 'ai:prime-session',
   /** Renderer's reply to an aiRenderRequest: the captured preview image(s) (or an
    *  error). Payload: requestId + { images? , error? }. */
   aiRenderResult: 'ai:render-result',
+  /** Load persisted per-NBT chat history for a key (payload: key). */
+  chatHistoryGet: 'chat-history:get',
+  /** Persist per-NBT chat history (payload: key + ChatRecord). */
+  chatHistorySave: 'chat-history:save',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */

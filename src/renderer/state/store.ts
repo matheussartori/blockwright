@@ -1,11 +1,12 @@
 // Central renderer state. The main process stays the source of truth for
 // recents and the active workspace (they arrive via IPC broadcasts); this store
-// mirrors them plus view-local state (the open structure, transient notices,
-// modal flags) so React components subscribe to just the slice they render.
+// mirrors them plus app-global view state (transient notices, modal flags).
+// Per-document state (the open structure, loading, chat) lives in the documents
+// store (state/documents.ts) so the app can hold multiple tabs at once.
 // Uses Zustand's framework-agnostic vanilla store, consumed in components via
 // `useStore`.
 import { createStore } from 'zustand/vanilla';
-import type { StructureData, Workspace } from '@/shared/types';
+import type { Workspace } from '@/shared/types';
 
 export type NavMode = 'orbit' | 'fly';
 
@@ -30,10 +31,6 @@ export interface AppState {
   recentWorkspaces: Workspace[];
   /** Absolute paths of the active workspace's `.nbt` structures. */
   workspaceStructures: string[];
-  /** True while a file is being parsed/rendered. */
-  loading: boolean;
-  /** The currently displayed structure, or null on the welcome screen. */
-  structure: StructureData | null;
   /** Live viewer navigation mode, reflected by the Controls window. */
   navMode: NavMode;
   /** Minecraft version of the active content pack (from its version.json). */
@@ -46,19 +43,20 @@ export interface AppState {
   settingsOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
   versionPromptName: string | null;
+  /** A chat image being shown full-size in the lightbox overlay, or null. */
+  imagePreview: string | null;
 
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
   setRecentWorkspaces: (workspaces: Workspace[]) => void;
   setWorkspaceStructures: (paths: string[]) => void;
-  setLoading: (loading: boolean) => void;
-  setStructure: (structure: StructureData | null) => void;
   setNavMode: (mode: NavMode) => void;
   setContentVersion: (version: string | null) => void;
   setNotice: (notice: Notice | null) => void;
   setSuggest: (suggest: Suggestion | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
+  setImagePreview: (src: string | null) => void;
 }
 
 /** Fallback content-pack version until main reports the real one (its
@@ -70,27 +68,25 @@ export const store = createStore<AppState>((set) => ({
   workspace: null,
   recentWorkspaces: [],
   workspaceStructures: [],
-  loading: false,
-  structure: null,
   navMode: 'orbit',
   contentVersion: FALLBACK_CONTENT_VERSION,
   notice: null,
   suggest: null,
   settingsOpen: false,
   versionPromptName: null,
+  imagePreview: null,
 
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
   setRecentWorkspaces: (recentWorkspaces) => set({ recentWorkspaces }),
   setWorkspaceStructures: (workspaceStructures) => set({ workspaceStructures }),
-  setLoading: (loading) => set({ loading }),
-  setStructure: (structure) => set({ structure }),
   setNavMode: (navMode) => set({ navMode }),
   setContentVersion: (contentVersion) => set({ contentVersion }),
   setNotice: (notice) => set({ notice }),
   setSuggest: (suggest) => set({ suggest }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
+  setImagePreview: (imagePreview) => set({ imagePreview }),
 }));
 
 /** Subscribe to one derived slice, invoking `run` immediately and on change.

@@ -9,7 +9,7 @@ import type { JigsawWarning, PlacedPiece, StructureData } from '@/shared/types';
 import { isJigsawSupported } from '@/shared/mc-version';
 import { api } from '../api';
 import { useViewer } from '../viewer/ViewerProvider';
-import { useApp, useSettings } from '../hooks/useStores';
+import { useApp, useSettings, useActiveDoc } from '../hooks/useStores';
 import { settingsStore } from '../state/settings';
 import type { AssemblyPiece } from '../viewer/viewer';
 
@@ -26,7 +26,7 @@ function randomSeed(): number {
 }
 
 export function JigsawContent() {
-  const structure = useApp((s) => s.structure);
+  const structure = useActiveDoc()?.structure ?? null;
   const workspace = useApp((s) => s.workspace);
   const contentVersion = useApp((s) => s.contentVersion);
   const showJigsaw = useSettings((s) => s.showJigsaw);

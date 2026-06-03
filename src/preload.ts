@@ -4,6 +4,7 @@ import type {
   ApiKeyInfo,
   AssembleOptions,
   BlockwrightApi,
+  ChatRecord,
   GenerateImage,
   GenerateProgress,
   GenerateResult,
@@ -58,6 +59,12 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiCancel, sessionId),
   aiResetSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiResetSession, sessionId),
+  aiPrimeSession: (sessionId: string, sdkSessionId: string | null, version: number): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiPrimeSession, sessionId, sdkSessionId, version),
+  chatHistoryGet: (key: string): Promise<ChatRecord | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.chatHistoryGet, key),
+  chatHistorySave: (key: string, record: ChatRecord): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.chatHistorySave, key, record),
   onAiProgress: (cb: (progress: GenerateProgress) => void) => {
     ipcRenderer.on(IPC_EVENTS.aiProgress, (_e, p: GenerateProgress) => cb(p));
   },

@@ -87,7 +87,8 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
   lantern is a light, **not a support** — never place one under a pillar/beam as if it holds the
   block up. For a chandelier, hang `chain` → `lantern[hanging=true]` from the ceiling.
 - `glowstone`, `sea_lantern`, `shroomlight`, `froglight`s — full-block lights.
-- `candle` (1–4, `candles` count + `lit`).
+- `candle` (1–4, `candles` count + `lit`). A candle **sits on top of a solid block** — it can't
+  hang, and on air it breaks when the structure is placed. Put it on a table/slab/shelf.
 
 ### Glass & panes
 `glass`, `*_stained_glass` (16 colors), `tinted_glass`. Panes: `glass_pane`,
@@ -112,6 +113,8 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 ### Block-entity blocks (carry `nbt`) — see [`04`](04-block-entities.md)
 `chest` (`facing`,`type`), `trapped_chest`, `barrel` (`facing`,`open`), `furnace`/`blast_furnace`/`smoker`
 (`facing`,`lit`), `*_sign` & `*_hanging_sign`/`*_wall_sign`, `*_shulker_box`, `brewing_stand`,
+<!-- note: a chest/furnace/barrel `facing` is the side that faces the player who opens it; point it
+at the open room/aisle, never into a wall. A wall-side barrel can use `facing:up` instead. -->
 `beacon`, `bell`, `lectern`, `decorated_pot`, `jukebox`, `note_block`, `crafter`
 (`orientation`,`triggered`,`crafting` — new in 1.21).
 

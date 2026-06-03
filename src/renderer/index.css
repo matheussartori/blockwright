@@ -88,8 +88,16 @@ body {
 
 .shell {
   display: grid;
-  grid-template-rows: var(--titlebar-h) 1fr var(--status-h);
+  /* Row 1 (auto) is the top bar: the titlebar plus the optional tab strip — so
+     the layout stays correct whether or not any tabs are open. */
+  grid-template-rows: auto 1fr var(--status-h);
   height: 100%;
+}
+
+.topbar {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
 }
 
 /* --- Titlebar -------------------------------------------------------------- */
@@ -99,8 +107,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: var(--titlebar-h);
   padding: 0 16px;
-  border-bottom: 1px solid var(--border);
 }
 .platform-darwin .titlebar {
   padding-left: 86px; /* clear the traffic lights */
@@ -129,6 +137,101 @@ body {
   -webkit-app-region: no-drag;
   display: flex;
   gap: 8px;
+}
+
+/* --- Tab strip ------------------------------------------------------------- */
+
+/* Sits inside `.topbar`, beneath the titlebar. Each open `.nbt` is a tab; the
+   on-screen viewer + Generate chat follow the active one. Not a drag region so
+   tabs stay clickable. */
+.tabbar {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 8px;
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 200px;
+  padding: 0 8px 0 12px;
+  height: 34px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  user-select: none;
+}
+.tab:hover {
+  background: var(--panel, rgba(255, 255, 255, 0.04));
+}
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.tab-spinner {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: bw-spin 0.7s linear infinite;
+}
+.tab-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tab-close:hover {
+  opacity: 1;
+  background: var(--panel-strong);
+}
+.tab-new {
+  -webkit-app-region: no-drag;
+  flex: none;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tab-new:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+@keyframes bw-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- Buttons --------------------------------------------------------------- */
@@ -1702,4 +1805,67 @@ body {
   max-height: 120px;
   border-radius: 8px;
   display: block;
+  cursor: zoom-in;
+  transition: filter 0.12s ease;
+}
+.gen-msg-thumb:hover {
+  filter: brightness(1.08);
+}
+
+/* --- Empty tab + image preview lightbox ------------------------------------ */
+
+.empty-tab {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.empty-tab p {
+  margin: 0;
+}
+.empty-tab-hint {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: zoom-out;
+}
+.image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+.image-preview-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.image-preview-close:hover {
+  background: rgba(255, 255, 255, 0.22);
 }

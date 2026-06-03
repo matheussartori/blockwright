@@ -8,14 +8,24 @@ canonical recipes. Mix and match, keep materials cohesive with the build.
 > Reminder: Blockwright renders block geometry but not item-frame contents or sign text. So
 > these faux-furniture shapes preview accurately, which makes them ideal to validate.
 
+> This file is the **placement & room-composition** layer (what furniture, which wall, how dense).
+> For the **block-by-block construction grammar** — how to actually build a convincing sofa,
+> fireplace, dining set, chandelier, layered rug, or beamed ceiling at reference quality — see
+> [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md).
+
 ## Faux-furniture recipes
 
 Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 
 ### Tables
 - **Small table**: `oak_fence` (or any fence) at `@`, with a **carpet** or **pressure plate**
-  on top (`@ y+1`). For a wider table, put fences under each corner and slabs on top, or use a
-  row of `*_slab type:top`.
+  on top (`@ y+1`). For a wider table, put fences under each corner and a `*_slab type:top` on
+  top, or use a row of `*_slab type:top`.
+- **Keep the top thin, and the leg on the floor.** The tabletop is a *single* `*_slab type:top`,
+  carpet, or pressure plate — **never a full block or a `double` slab** (that reads as a thick,
+  clumsy slab, not a table). And the fence/post leg must run down to a real floor: a table whose
+  top hovers with air under the leg is floating. Post at `@ y`, thin top at `@ y+1`, floor at
+  `@ y-1`.
 - **Desk**: a `*_stairs` upside-down (`half:top`) reads as a desk/counter with knee space.
 
 ### Chairs / stools / benches
@@ -36,9 +46,18 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 ### Storage
 - `chest`/`barrel` for storage (set `facing`). Stacks of `barrel`s with `trapdoor` doors read
   as a cupboard. `bookshelf` walls + `lectern` = a study/library.
+- **Face the opening at open space, and stand it on a block.** A `chest`'s `facing` (and a
+  `barrel`'s `facing`) is the side you **open from** — point it at the room/aisle the player
+  stands in, **never into an adjacent wall or another block** (a chest opening into a wall is
+  unusable and reads as a bug). Push the chest's *back* against the wall and its front into the
+  open. A wall-side `barrel` can instead use `facing:up` (lid on top). And like every floor
+  fixture, a chest/barrel must rest **on a solid block** — never floating over air or perched
+  above a stairwell where it blocks the passage.
 
 ### Beds & bedrooms
-- `*_bed` (2 blocks, see [`03`](03-blocks-and-blockstates.md)), foot toward the room.
+- `*_bed` (2 blocks, see [`03`](03-blocks-and-blockstates.md)): put the **head against a wall**
+  and the **foot toward the room** so it reads as a real bed. Don't strand it floating, mid-floor,
+  or wedged at an odd angle — a bed belongs along a wall or in a corner.
 - **Nightstand**: a `barrel` or `oak_slab`-on-fence beside the bed head, with a `lantern`,
   `candle`, or `flower_pot` on top.
 - **Headboard**: trapdoors or a banner on the wall behind the head.
@@ -50,7 +69,10 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
   `froglight` (modern). Aim for a light source roughly every ~6 blocks.
 
 ### Soft furnishings
-- **Rug/carpet**: `*_carpet` (16 colors) on the floor. Layer two colors for a patterned rug.
+- **Rug/carpet**: `*_carpet` (16 colors) on the floor — and **always directly on top of a solid
+  block.** A carpet (like a pressure plate, rail, or torch) has nothing to cling to over air and
+  **breaks the instant the structure is placed in-game**, so never float one or lay it across a
+  gap/stairwell. Layer two colors for a patterned rug.
 - **Curtains**: columns of `*_wool`/`*_carpet`-on-wall (use banners for hanging cloth).
 - **Cushions/sofa**: stairs in a U with carpet/slab tops, wool accents.
 
@@ -117,7 +139,13 @@ empty. When in doubt for these builds, add one more piece against a wall rather 
 - Bare walls. Hang art/banners/shelves/plants; don't decorate only the floor.
 - Furniture floating or blocking the door. Keep furniture against walls and the door/path clear.
 - A lantern or candle "floating" with nothing under or above it — set lights on a block or hang
-  them with `hanging:true` (see [`10`](10-design-principles.md) §Physical validity).
+  them with `hanging:true` (see [`10`](10-design-principles.md) §Physical validity). **`candle`s
+  always sit on top of a solid block** (table, slab, shelf) — they can't hang and they break if
+  placed on air.
+- A carpet, pressure plate, torch, or rail laid over air or a gap — these need a solid block
+  directly beneath or they break on spawn; never float them or run them across a stairwell.
+- A `chest`/`barrel` facing into a wall (you can't open it) or perched over a stairwell blocking
+  the passage — face the opening at the open room and stand it on a solid block.
 - A floor lantern/torch/prop dropped in the middle of a corridor, doorway, or stair, blocking the
   walking path — keep lights against walls or hung from the ceiling, never in the lane the player walks.
 - A cauldron/furnace/pot stuck to a ceiling or wall — these are floor fixtures; they rest upright on

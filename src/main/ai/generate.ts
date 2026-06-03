@@ -132,6 +132,21 @@ export function resetSession(sessionId: string): void {
   sessions.delete(sessionId);
 }
 
+/** Restore a session's SDK conversation id + version from persisted chat history
+ *  so a follow-up prompt after an app restart resumes the same Claude
+ *  conversation instead of starting fresh. The session dir is deterministic from
+ *  the id. No-op once the session is live in memory (don't clobber a running one). */
+export function primeSession(
+  sessionId: string,
+  sdkSessionId: string | null,
+  version: number,
+): void {
+  if (sessions.has(sessionId)) return;
+  const dir = sessionDir(sessionId);
+  fs.mkdirSync(dir, { recursive: true });
+  sessions.set(sessionId, { sdkSessionId, version, dir });
+}
+
 const INSTRUCTIONS = `You are Blockwright's structure generator. You produce Minecraft Java 1.21.1 \
 (DataVersion 3955) ".nbt" structures in the Blockwright authoring JSON format, which the app compiles \
 to a real gzipped .nbt and renders in a live 3D preview. Your output is meant to be USED in a mod — aim \
@@ -499,7 +514,15 @@ export async function generateStructure(
       session.version = version;
       const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
       const blockCount = resolveBlocks(authoring).blocks.length;
-      captured = { ok: true, path: nbtPath, version, summary: (summary ?? '').trim(), size, blockCount };
+      captured = {
+        ok: true,
+        path: nbtPath,
+        version,
+        summary: (summary ?? '').trim(),
+        size,
+        blockCount,
+        sdkSessionId: session.sdkSessionId,
+      };
       captureError = null;
       rounds += 1;
       // On the first emit, size the revision budget to the build (unless pinned).
@@ -684,6 +707,9 @@ export async function generateStructure(
     }
   }
 
+  // `captured` already carries the SDK session id (set in the tool handler, by
+  // which point the stream has established it) so the renderer can persist it for
+  // resume across restarts.
   if (captured) return captured;
   if (captureError) return { ok: false, error: captureError };
   if (ac.signal.aborted) return { ok: false, error: 'Canceled.', canceled: true };

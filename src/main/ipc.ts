@@ -2,13 +2,14 @@
 import { dialog, ipcMain } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, ChatRecord, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
-import { aiAvailable, cancelGeneration, generateStructure, resetSession, type CapturePreview } from './ai/generate';
+import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, type CapturePreview } from './ai/generate';
 import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
+import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
@@ -139,12 +140,20 @@ export function registerIpc(): void {
           pendingRenders.delete(requestId);
           resolve({ images: res.images, error: res.error });
         });
-        e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, path, version });
+        e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, sessionId, path, version });
       });
     return generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath);
   });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));
+  ipcMain.handle(IPC_CHANNELS.aiPrimeSession, async (_e, sessionId: string, sdkSessionId: string | null, version: number) =>
+    primeSession(sessionId, sdkSessionId, version),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.chatHistoryGet, async (_e, key: string) => getChat(key));
+  ipcMain.handle(IPC_CHANNELS.chatHistorySave, async (_e, key: string, record: ChatRecord) =>
+    saveChat(key, record),
+  );
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
 

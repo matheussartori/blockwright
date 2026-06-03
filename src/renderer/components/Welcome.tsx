@@ -21,7 +21,6 @@ export function Welcome({
   const recents = useApp((s) => s.recents);
   const recentWorkspaces = useApp((s) => s.recentWorkspaces);
   const workspaceStructures = useApp((s) => s.workspaceStructures);
-  const structure = useApp((s) => s.structure);
 
   const [query, setQuery] = useState('');
   const [hint, setHint] = useState('');
@@ -47,8 +46,6 @@ export function Welcome({
       ? sortedStructures.filter((p) => basename(p).toLowerCase().includes(q))
       : sortedStructures;
   }, [sortedStructures, query]);
-
-  if (structure) return null;
 
   const total = sortedStructures.length;
   const hasLists = total > 0 || recents.length > 0 || recentWorkspaces.length > 0;

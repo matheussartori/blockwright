@@ -1,9 +1,9 @@
 // The bottom status bar: a transient notice (e.g. a load error) overrides the
 // structure summary; otherwise it shows the open structure or the idle line.
-import { useApp } from '../hooks/useStores';
+import { useApp, useActiveDoc } from '../hooks/useStores';
 
 export function Statusbar() {
-  const structure = useApp((s) => s.structure);
+  const structure = useActiveDoc()?.structure ?? null;
   const notice = useApp((s) => s.notice);
 
   if (notice) {

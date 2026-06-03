@@ -7,7 +7,7 @@
 // block and flashes it (see Viewer.focusBlock) — handy in dense builds.
 import { useMemo, useState } from 'react';
 import type { StructureData } from '@/shared/types';
-import { useApp } from '../hooks/useStores';
+import { useActiveDoc } from '../hooks/useStores';
 import { useViewer } from '../viewer/ViewerProvider';
 
 interface BlockGroup {
@@ -41,7 +41,7 @@ function rgb(color: [number, number, number]): string {
 }
 
 export function InspectorContent() {
-  const structure = useApp((s) => s.structure);
+  const structure = useActiveDoc()?.structure ?? null;
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
   const paletteCount = useMemo(

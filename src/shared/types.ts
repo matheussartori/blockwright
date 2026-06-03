@@ -187,8 +187,31 @@ export type GenerateResult =
       summary: string;
       size: [number, number, number];
       blockCount: number;
+      /** The SDK conversation id, so the renderer can persist it for resume. */
+      sdkSessionId: string | null;
     }
   | { ok: false; error: string; canceled?: boolean };
+
+/** One message in a document's AI chat transcript (persisted + shown in the UI). */
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  error?: boolean;
+  /** Reference image data URLs shown as thumbnails (user messages only). */
+  images?: string[];
+  meta?: { version: number; size: [number, number, number]; blockCount: number; tookMs?: number };
+}
+
+/** Persisted per-NBT chat history (main/chat-history.ts), keyed by file path (or
+ *  the session id for an Untitled build). Carries the SDK session id + version so
+ *  reopening a file can resume the same Claude conversation. */
+export interface ChatRecord {
+  sessionId: string;
+  sdkSessionId: string | null;
+  version: number;
+  messages: ChatMessage[];
+  updatedAt?: number;
+}
 
 /** Coarse phase of an in-flight generation, for the progress indicator.
  *  `rendering` = the just-emitted build is being screenshotted for review;
@@ -197,9 +220,12 @@ export type GenerateResult =
 export type GeneratePhase = 'thinking' | 'building' | 'compiling' | 'rendering' | 'reviewing';
 
 /** Payload of IPC_EVENTS.aiRenderRequest: main asks the renderer to load a
- *  generated `.nbt` and screenshot it for the generator's self-review loop. */
+ *  generated `.nbt` and screenshot it for the generator's self-review loop. The
+ *  `sessionId` lets the renderer route the capture to the right tab — its own
+ *  on-screen viewer if active, else the headless capture viewer. */
 export interface RenderRequest {
   requestId: string;
+  sessionId: string;
   path: string;
   version: number;
 }
@@ -296,6 +322,13 @@ export interface BlockwrightApi {
   aiCancel: (sessionId: string) => Promise<void>;
   /** Forget a generation session's conversation so the next prompt starts fresh. */
   aiResetSession: (sessionId: string) => Promise<void>;
+  /** Restore a session's SDK conversation id + version from persisted history so a
+   *  follow-up after restart resumes the same Claude conversation. */
+  aiPrimeSession: (sessionId: string, sdkSessionId: string | null, version: number) => Promise<void>;
+  /** Load persisted chat history for a key (a file path, or a session id), or null. */
+  chatHistoryGet: (key: string) => Promise<ChatRecord | null>;
+  /** Persist chat history for a key (debounced by the caller). */
+  chatHistorySave: (key: string, record: ChatRecord) => Promise<void>;
   /** Notified with live token/phase progress while a generation is in flight. */
   onAiProgress: (cb: (progress: GenerateProgress) => void) => void;
   /** Notified when main wants the just-generated `.nbt` rendered + screenshotted

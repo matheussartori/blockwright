@@ -71,6 +71,19 @@ Replace selected wall cells (usually at `y=2`, the "eye level" course) with `gla
 `glass`. A nice rhythm: windows two wide, separated by one wall block. Add `oak_trapdoor`
 shutters on the outside for charm, or a `oak_slab`/`stairs` sill below.
 
+## Stairs between floors
+
+A staircase climbing to an upper floor reads much better when the **underside is filled**, not
+left as a row of stairs floating over empty air:
+
+- Under each `*_stairs` step, place a **full block** (matching `planks`/stone) so the run sits on
+  a solid stringer — or use a second `*_stairs half:top` tucked beneath, mirroring the step, for a
+  clean zig-zag underside. Either kills the ugly floating-step look.
+- The run must climb **through a hole cut in the ceiling/floor above** onto real walkable space —
+  never into a solid ceiling or a blank wall (see [`10`](10-design-principles.md) §Physical validity).
+- Keep the steps clear: don't park a chest, barrel, or carpet on or directly above the staircase —
+  it blocks the passage.
+
 ## Ceiling & roofs
 
 ### Flat ceiling
@@ -84,7 +97,10 @@ ridge. For a roof over a `W`-wide building running along `z` (ridge along the z-
 - Layer `r=0` (just above walls): a course of stairs around the eaves, `facing` outward,
   e.g. west eave `oak_stairs facing:east half:bottom`, east eave `facing:west`.
 - Each higher layer, inset by 1 on the sloped sides, stepping the stairs up.
-- At the ridge, place a row of **upside-down stairs** facing each other, or top slabs.
+- **Cap the ridge with a solid peak, not a lone top-slab.** Run a continuous row of **full blocks**
+  along the very top, or two opposed `*_stairs half:bottom` meeting to close the peak. A bare
+  `*_slab type:top` floating above the gap between the two slopes looks thin and unfinished — the
+  topmost course of the roof should read as solid.
 
 Mini cross-section (W=7, slope on x, `/`=stair facing east, `\`=stair facing west, `=`=slab):
 ```
@@ -94,9 +110,10 @@ y+1        /         \
 y+0      /             \         eaves (sit on wall top)
 x:     0  1  2   3   4  5  6
 ```
-Translate each `/` to `oak_stairs facing:east`, each `\` to `facing:west`, ridge `=` to
-`oak_slab type:top` or paired top stairs. Fill any gap under the slope with planks if you want
-a solid (non-hollow) roof, or leave hollow for an attic.
+Translate each `/` to `oak_stairs facing:east`, each `\` to `facing:west`, and cap the ridge `=`
+with a **full block** row (or two opposed stairs meeting at the peak) — not a lone `slab type:top`,
+which looks thin and floating up there. Fill any gap under the slope with planks if you want a
+solid (non-hollow) roof, or leave hollow for an attic.
 
 ### Hip roof
 Slope inward on **all four** sides; use corner stairs (`shape: outer_*`) at the corners. More
@@ -111,12 +128,20 @@ let the build's bottom be the foundation.
 
 ## Chimneys, porches, extensions
 
-- **Chimney**: a 1×1 (or 2×2) column of `bricks`/`stone_bricks` rising past the roofline, top
-  capped with a `campfire` (smoke) or trapdoors.
+- **Chimney**: a **1×1** column of `bricks`/`stone_bricks` (use 2×2 only on a genuinely large/grand
+  build) that **starts at the roof or a wall and runs the same width all the way up**, rising only
+  ~1–3 blocks past the ridge, capped with a `campfire` (smoke) or trapdoors. Keep it **modest** — a
+  chimney that's much wider/taller than its house, or a thin 1×1 stalk topped with an oversized 2×2
+  cap (a "lollipop"), looks wrong. Constant width, short, anchored to the build — not a tower.
 - **Porch**: extend the floor out past the entrance, add `oak_fence` posts holding a small
   slab/stair roof.
 - **Bay window / wing**: bump the footprint out by 1–2 blocks on one side; keep walls/roof
   consistent.
+
+> For the full **exterior detailing grammar** — timber framing, exposed rafters, dormers,
+> balconies, porte-cochères, towers, chimney pots, window mullions, plus **style archetypes**
+> (Tudor, Gothic manor, grand symmetric mansion, A-frame) and **mansion-scale massing & formal
+> grounds** — see [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md).
 
 ## Quality checklist for the shell
 
