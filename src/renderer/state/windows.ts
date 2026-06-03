@@ -75,6 +75,15 @@ function freshWindow(id: WindowId): WindowState {
   return { visible: true, floating: false, minimized: false, ...homePosition(id) };
 }
 
+/** Whether a floating panel at (x,y) still has at least its title bar on the
+ *  visible stage. A panel whose persisted position is now off-screen (smaller
+ *  window than last time, external monitor gone) would toggle "visible" yet show
+ *  nothing — we use this to snap it home when it's opened. */
+function onStage(x: number, y: number): boolean {
+  const { w, h } = stageSize();
+  return x >= 0 && y >= 0 && x <= Math.max(0, w - 40) && y <= Math.max(0, h - 24);
+}
+
 interface WindowsLayout {
   controls: WindowState;
   inspector: WindowState;
@@ -156,10 +165,16 @@ export const windowsStore = createStore<WindowsStore>((set) => ({
   setVisible: (id, visible) =>
     set((s) => ({ [id]: { ...s[id], visible } }) as Partial<WindowsStore>),
   openPanel: (id) =>
-    set((s) => ({
-      [id]: { ...s[id], visible: true, minimized: false },
-      ...(s[id].floating ? {} : { activeTab: id, sidebarCollapsed: false }),
-    }) as Partial<WindowsStore>),
+    set((s) => {
+      const cur = s[id];
+      // Rescue a floating panel whose persisted position is now off-screen, so
+      // opening it (e.g. View ▸ Generate) always actually reveals it.
+      const reposition = cur.floating && !onStage(cur.x, cur.y) ? homePosition(id) : null;
+      return {
+        [id]: { ...cur, visible: true, minimized: false, ...(reposition ?? {}) },
+        ...(cur.floating ? {} : { activeTab: id, sidebarCollapsed: false }),
+      } as Partial<WindowsStore>;
+    }),
   setFloating: (id, floating) =>
     set((s) => ({
       [id]: { ...s[id], floating, ...(floating ? homePosition(id) : {}) },

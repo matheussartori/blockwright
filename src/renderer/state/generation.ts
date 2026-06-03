@@ -51,8 +51,14 @@ export function recordVersion(docId: string, version: number, path: string): voi
   const docs = documentsStore.getState();
   const doc = docs.documents.find((d) => d.id === docId);
   if (!doc) return;
-  const without = doc.versions.filter((v) => v.version !== version);
-  const versions = [...without, { version, path }].sort((a, b) => a.version - b.version);
+  const entries = [...doc.versions.filter((v) => v.version !== version), { version, path }];
+  // For a file-backed doc (an EDIT of an existing .nbt, not a from-scratch
+  // creation) keep the untouched original as a baseline "v0" the user can flip
+  // back to. Untitled (created) docs have no original, so they get none.
+  if (doc.filePath && !entries.some((v) => v.version === 0)) {
+    entries.push({ version: 0, path: doc.filePath });
+  }
+  const versions = entries.sort((a, b) => a.version - b.version);
   docs.patchDoc(docId, { versions, viewingVersion: version });
 }
 
@@ -90,7 +96,11 @@ export async function hydrateDoc(docId: string): Promise<void> {
   if (rec && rec.messages.length > 0) {
     // Adopt the persisted session so a follow-up resumes the same conversation,
     // and surface its compiled versions (read from disk) in the Versions panel.
+    // For a file-backed doc, prepend the untouched original as the "v0" baseline.
     const versions = await api.aiListVersions(rec.sessionId);
+    if (doc.filePath && versions.length > 0 && !versions.some((v) => v.version === 0)) {
+      versions.unshift({ version: 0, path: doc.filePath });
+    }
     docs.patchDoc(docId, {
       sessionId: rec.sessionId,
       sdkSessionId: rec.sdkSessionId,

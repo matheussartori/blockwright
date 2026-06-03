@@ -125,9 +125,21 @@ function Shell() {
       const ds = documentsStore.getState();
       const existing = ds.documents.find((d) => d.filePath === path);
       const id = ds.openDoc(path); // focuses an existing tab or creates a new one
-      if (existing && existing.structure && existing.path === path) return; // already loaded
+      if (existing && existing.structure) return; // already open + loaded — just focus it
       await hydrateDoc(id);
-      await load(id, path, { recent: true });
+      // If this file has AI generation history, resume on its LATEST version so
+      // reopening lands exactly where the user left off (and the viewer matches the
+      // Versions panel's highlight, instead of showing the original file). Recents
+      // and workspace detection still key off the real file the user opened.
+      const doc = documentsStore.getState().documents.find((d) => d.id === id);
+      const latest = doc && doc.versions.length > 0 ? doc.versions[doc.versions.length - 1] : null;
+      if (latest) {
+        api.addRecent(path);
+        await load(id, latest.path, { recent: false });
+        void maybeSuggestWorkspace(path);
+      } else {
+        await load(id, path, { recent: true });
+      }
     },
     [load],
   );
@@ -167,9 +179,17 @@ function Shell() {
     const active = await api.activateWorkspace(sug.workspace);
     store.getState().setSuggest(null);
     if (!active) return;
-    // Re-render the file (with the mod's textures) in its tab, keeping the camera.
+    // Re-render with the mod's textures, keeping the camera — and re-render the
+    // structure CURRENTLY shown (the latest version, or whichever version is being
+    // previewed), not the original file, which would jump the viewer back to the
+    // baseline while the Versions panel still says v3.
     const doc = documentsStore.getState().documents.find((d) => d.filePath === sug.filePath);
-    if (doc) void load(doc.id, sug.filePath, { preserveCamera: true, recent: true });
+    if (!doc) return;
+    const preview = doc.viewingVersion != null
+      ? doc.versions.find((v) => v.version === doc.viewingVersion)
+      : null;
+    const path = preview?.path ?? doc.path ?? sug.filePath;
+    void load(doc.id, path, { preserveCamera: true, recent: false, working: preview == null });
   }, [load]);
 
   const onWorkspaceChanged = useCallback(async (ws: Workspace | null) => {
