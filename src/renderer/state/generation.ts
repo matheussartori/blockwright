@@ -12,11 +12,14 @@ import { documentsStore, docBySession, type Document } from './documents';
 import type { GenerateImage } from '@/shared/types';
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
- *  it's the active tab. Provided by App, which owns the viewers. */
+ *  it's the active tab. Provided by App, which owns the viewers.
+ *  `working` (default true) updates the doc's working path (the edit base for the
+ *  next AI turn); pass false to *preview* a version in the viewer without changing
+ *  what the next edit builds on. */
 export type DocLoader = (
   docId: string,
   path: string,
-  opts?: { preserveCamera?: boolean; recent?: boolean },
+  opts?: { preserveCamera?: boolean; recent?: boolean; working?: boolean },
 ) => Promise<void>;
 
 let docLoader: DocLoader | null = null;
@@ -41,6 +44,30 @@ function persist(docId: string): void {
   });
 }
 
+/** Record a compiled version on the document (deduped by number) and mark it as
+ *  the one being shown — so the viewer always follows the latest build as it's
+ *  emitted. Called for every version the generator renders (live + final). */
+export function recordVersion(docId: string, version: number, path: string): void {
+  const docs = documentsStore.getState();
+  const doc = docs.documents.find((d) => d.id === docId);
+  if (!doc) return;
+  const without = doc.versions.filter((v) => v.version !== version);
+  const versions = [...without, { version, path }].sort((a, b) => a.version - b.version);
+  docs.patchDoc(docId, { versions, viewingVersion: version });
+}
+
+/** Preview a version in the viewer for visualization only — loads `vN.nbt` into
+ *  the active viewer (and the doc's structure, so the inspector matches) WITHOUT
+ *  touching the working path, so the next AI edit still builds on the latest. */
+export async function viewVersion(docId: string, version: number): Promise<void> {
+  const doc = documentsStore.getState().documents.find((d) => d.id === docId);
+  if (!doc) return;
+  const entry = doc.versions.find((v) => v.version === version);
+  if (!entry) return;
+  documentsStore.getState().patchDoc(docId, { viewingVersion: version });
+  await docLoader?.(docId, entry.path, { preserveCamera: true, recent: false, working: false });
+}
+
 let progressBound = false;
 /** Bind the single global progress listener once; routes each update to the
  *  document running that session (so a background tab updates its own spinner). */
@@ -61,11 +88,15 @@ export async function hydrateDoc(docId: string): Promise<void> {
   if (!doc || doc.hydrated) return;
   const rec = await api.chatHistoryGet(chatKey(doc));
   if (rec && rec.messages.length > 0) {
-    // Adopt the persisted session so a follow-up resumes the same conversation.
+    // Adopt the persisted session so a follow-up resumes the same conversation,
+    // and surface its compiled versions (read from disk) in the Versions panel.
+    const versions = await api.aiListVersions(rec.sessionId);
     docs.patchDoc(docId, {
       sessionId: rec.sessionId,
       sdkSessionId: rec.sdkSessionId,
       version: rec.version,
+      versions,
+      viewingVersion: null,
       chat: rec.messages,
       hydrated: true,
     });
@@ -116,8 +147,10 @@ export async function runGeneration(
         },
       });
       docs.patchDoc(docId, { sdkSessionId: result.sdkSessionId, version: result.version });
-      // First version frames the build; later versions keep the camera so the
-      // user sees exactly what changed.
+      // Record the final version (live renders already recorded intermediate ones)
+      // and always show the latest. First version frames the build; later versions
+      // keep the camera so the user sees exactly what changed.
+      recordVersion(docId, result.version, result.path);
       await docLoader?.(docId, result.path, { preserveCamera: result.version > 1, recent: false });
     } else if (result.canceled) {
       docs.appendChat(docId, { role: 'assistant', text: 'Canceled.' });
@@ -145,7 +178,7 @@ export function resetDocChat(docId: string): void {
   if (!doc) return;
   void api.aiResetSession(doc.sessionId);
   const sessionId = crypto.randomUUID();
-  docs.patchDoc(docId, { sessionId, sdkSessionId: null, version: 0, chat: [] });
+  docs.patchDoc(docId, { sessionId, sdkSessionId: null, version: 0, versions: [], viewingVersion: null, chat: [] });
   // For a file-backed doc the chat key (its path) is unchanged, so overwrite its
   // record empty; an Untitled doc's key just moves to the new session id.
   void api.chatHistorySave(doc.filePath ?? sessionId, {

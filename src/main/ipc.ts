@@ -7,7 +7,7 @@ import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
-import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, type CapturePreview } from './ai/generate';
+import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
 import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/template-pool';
@@ -149,6 +149,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.aiPrimeSession, async (_e, sessionId: string, sdkSessionId: string | null, version: number) =>
     primeSession(sessionId, sdkSessionId, version),
   );
+  ipcMain.handle(IPC_CHANNELS.aiListVersions, async (_e, sessionId: string) => listVersions(sessionId));
 
   ipcMain.handle(IPC_CHANNELS.chatHistoryGet, async (_e, key: string) => getChat(key));
   ipcMain.handle(IPC_CHANNELS.chatHistorySave, async (_e, key: string, record: ChatRecord) =>

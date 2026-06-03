@@ -11,7 +11,7 @@ import { createStore } from 'zustand/vanilla';
 import type { WindowId } from '@/shared/types';
 
 /** The dockable panels (every WindowId except `controls`). */
-export type PanelId = 'inspector' | 'jigsaw' | 'generate';
+export type PanelId = 'inspector' | 'jigsaw' | 'generate' | 'versions';
 
 export interface WindowState {
   visible: boolean;
@@ -29,6 +29,7 @@ export const WINDOW_WIDTHS: Record<WindowId, number> = {
   inspector: 288,
   jigsaw: 288,
   generate: 380,
+  versions: 240,
 };
 
 const TITLEBAR_H = 52;
@@ -62,6 +63,11 @@ export function homePosition(id: WindowId): { x: number; y: number } {
       };
     case 'generate':
       return { x: MARGIN, y: MARGIN };
+    case 'versions':
+      return {
+        x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.versions - MARGIN * 2),
+        y: MARGIN,
+      };
   }
 }
 
@@ -74,6 +80,7 @@ interface WindowsLayout {
   inspector: WindowState;
   jigsaw: WindowState;
   generate: WindowState;
+  versions: WindowState;
   /** Which docked panel's tab is active. */
   activeTab: PanelId;
   /** When true the docked sidebar is collapsed to a thin rail. */
@@ -88,6 +95,9 @@ function defaults(): WindowsLayout {
     // Generate starts hidden and floating: it's opened on demand (File ▸ New
     // Structure / View ▸ Generate) as a movable window the user can dock right.
     generate: { ...freshWindow('generate'), visible: false, floating: true },
+    // Versions docks as a sidebar tab and (like inspector/jigsaw) shows itself
+    // whenever it's available — i.e. once the tab has a generated build.
+    versions: freshWindow('versions'),
     activeTab: 'inspector',
     sidebarCollapsed: false,
   };
@@ -102,7 +112,7 @@ function load(): WindowsLayout {
     const saved = JSON.parse(raw) as Partial<WindowsLayout>;
     // `controls` is intentionally NOT restored — the shortcuts popover always
     // starts closed (it's an opt-in help affordance, not a persistent panel).
-    for (const id of ['inspector', 'jigsaw'] as const) {
+    for (const id of ['inspector', 'jigsaw', 'versions'] as const) {
       base[id] = { ...base[id], ...saved[id] };
     }
     // Generate restores its float/position/minimized but always starts hidden —
@@ -111,7 +121,8 @@ function load(): WindowsLayout {
     if (
       saved.activeTab === 'inspector' ||
       saved.activeTab === 'jigsaw' ||
-      saved.activeTab === 'generate'
+      saved.activeTab === 'generate' ||
+      saved.activeTab === 'versions'
     ) {
       base.activeTab = saved.activeTab;
     }
@@ -164,6 +175,7 @@ function snapshot(s: WindowsStore): WindowsLayout {
     inspector: s.inspector,
     jigsaw: s.jigsaw,
     generate: s.generate,
+    versions: s.versions,
     activeTab: s.activeTab,
     sidebarCollapsed: s.sidebarCollapsed,
   };

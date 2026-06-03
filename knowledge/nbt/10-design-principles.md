@@ -60,9 +60,24 @@ one of these before handing off:
 - **Lanterns and hanging fixtures attach, they don't hold things up.** A `lantern` either **sits on
   a solid block below it** (floor lantern) or **hangs with `hanging:"true"` from a solid block
   above it** (ceiling/chain/fence). A lantern is **not a structural support** — never put a lantern
-  under a pillar, beam, or block and pretend it's holding it up. That's backwards: the heavy block
-  supports the light, never the reverse. Hang a chandelier as `chain` → `lantern[hanging=true]`
-  *descending from the ceiling*, not as a lantern propping up a post.
+  under a pillar, beam, or block and pretend it's holding it up, and **never embed a lantern in the
+  middle of a pillar/column** (a lantern partway up a solid post reads as a glitch). That's
+  backwards: the heavy block supports the light, never the reverse. Hang a chandelier as `chain` →
+  `lantern[hanging=true]` *descending from the ceiling*, not as a lantern propping up a post. A
+  hanging lantern with **nothing above it** (no ceiling/beam/chain it attaches to) is floating —
+  put it on the floor instead, or give it something solid directly above to hang from.
+- **Chains hang from a solid block above — and stay short.** A `chain` must connect to a solid block
+  (or another chain) **at its top**; a chain with air above it floats and breaks. A pendant light is
+  `chain[axis=y]` → `lantern[hanging=true]` dropping **a block or two** from the ceiling/beam — **do
+  not run a long chain all the way down to the floor** to hold a lantern (it looks wrong and the
+  point of a chain is to suspend a light *near the ceiling*). If a light needs to be low, set a floor
+  `lantern` on a block instead of trailing a chain down to it.
+- **Wall-mounted torches use `wall_torch`, not `torch`.** To put a torch *on a wall*, use
+  `wall_torch`/`soul_wall_torch`/`redstone_wall_torch` with `facing` = the direction **away from the
+  wall** (a torch on a north wall is `facing:south`) so it leans on the wall behind it. A plain
+  `torch`/`redstone_torch` is the **floor** variant — it needs a solid block **directly beneath** it
+  and pops off on spawn if floated against a wall face. Never leave a torch hanging in the air off a
+  wall; pick the `wall_*` variant and back it with a solid block.
 - **Gravity blocks need a floor.** `sand`, `red_sand`, `gravel`, `*_concrete_powder`, and anvils
   fall if the cell under them is air — keep a solid block beneath them.
 - **Floor fixtures rest ON the floor — they are never on the ceiling or stuck to a wall.** A
@@ -76,7 +91,11 @@ one of these before handing off:
 - **Thin "floor decals" need a solid block directly beneath them or they pop off on spawn.**
   `*_carpet`, `*_pressure_plate`, rails, `candle`s, `flower`s/`sapling`s, `snow` layers, and
   `redstone` all break the instant the structure is placed if the cell under them is air. Lay them
-  only on solid ground — never floated or bridging a gap/stairwell.
+  only on solid ground — never floated or bridging a gap/stairwell. **A `candle` rests on a *full
+  solid block* — never on top of another candle**, slab, or fence: stacking a candle over a candle
+  cell leaves the upper one floating (it can't stand on the candle below). To show more candles,
+  raise the `candles` count (1–4) within the *same* block or spread them across separate
+  solid-topped surfaces, not vertically.
 - **Containers face the player, not the wall.** A `chest`/`barrel`/`furnace` `facing` is the side
   you open from; aim it at the open room or aisle, **never into an adjacent wall or block** (a chest
   whose front is buried can't be opened and looks like a bug). Back against the wall, front to the
@@ -102,6 +121,13 @@ one of these before handing off:
   middle of a room or in open air to "fill" it.** A pile of free-floating stairs sitting in a room is
   the clearest "fake build" tell of all — every stair must be part of a supported staircase, roof,
   or furniture piece, resting on or attached to something solid.
+- **A staircase is built from `*_stairs` blocks, with headroom, and a hole sized to the run.** Make
+  the steps **actual `*_stairs`** climbing one block per step — *not* a zig-zag of full blocks (a
+  "staircase" of stacked full cubes reads as unfinished rubble). Above every step keep **2 blocks of
+  clear headroom** so a player can walk up/down without hitting the ceiling, and cut the
+  floor/ceiling opening to **just the footprint of the stair run** — a player should *descend the
+  stairs*, not drop through an oversized hole next to them. No open shaft you fall down: the hole is
+  the width of the stairs, the run fills it step by step, and there's solid floor at the bottom.
 - **Walkways and rooms stay clear — don't block your own circulation.** A floor `lantern`, `torch`,
   `campfire`, pot, or any prop dropped in the middle of a corridor, doorway, or stair run blocks the
   path the player walks. Keep lights and props against walls or hang them from the ceiling so the
@@ -112,6 +138,11 @@ one of these before handing off:
   cellar must have an actual way down into it (a staircase or ladder through a hole in the floor
   above), not be a sealed box buried under the build. If you can't trace a walkable route from the
   entrance to a room, either connect it or don't build it.
+- **Interior partition walls join flush to the shell — no gap at the seam.** A wall that divides two
+  rooms must meet the outer walls, floor, and ceiling **solidly along its whole edge**, leaving only
+  the intended doorway. A partition that stops a block short of the outer wall (or the ceiling)
+  leaves a vertical air gap you can see/walk through — the division reads as broken. Run the
+  partition all the way into the structure it abuts and fill the seam.
 
 > Quick mental test for any block: *"If a player loaded this build in a fresh world, would this
 > block still be here, attached to something, and serve its purpose?"* If no, fix it.
@@ -165,6 +196,14 @@ Roof technique notes:
   opposed `*_stairs` meeting to close the peak — run continuously (a broken ridge is an obvious
   hole). Avoid a lone `*_slab type:top` ridge: floating thin above the gap between the slopes, it
   looks unfinished; the topmost course of a roof should read as a solid block.
+- **The roof surface is solid — you can't see through it.** Each sloped course must be a *continuous*
+  line of stairs/slabs with **no gaps between steps** that open straight into the attic/sky; if
+  stepping stairs leave a notch, back it with a slab or full block so the slope reads as a closed
+  surface. A roof you can see the sky through is unfinished, not "vented."
+- **Fill the gable ends.** The triangular wall under each end of a gable roof must be **filled in
+  solid** (matching wall or roof material) up to the ridge — a roof left open at the gable is a hole.
+  If you want light or interest there, put a **window, vent, or small dormer** in the filled gable,
+  not a ragged opening.
 - **Material:** roofs read best in a block *different* from the walls — `*_stairs` in
   `dark_oak`/`spruce`/`deepslate_tile`/`bricks`/`nether_brick` over light walls. Add a
   contrasting **trim course** (a line of slabs) along the eave.
@@ -265,6 +304,21 @@ Catch these in the preview ([`07`](07-workflow.md)):
   ladders flush to a wall, lights hung from above or set on a block.
 - ❌ Stairs into a ceiling or to nowhere / a pile of loose stairs floating in a room → ✅ every
   stair/ladder is a supported run that connects two reachable floors.
+- ❌ "Staircase" of stacked full blocks, no headroom, or an oversized drop-hole beside it → ✅ real
+  `*_stairs`, 2-block headroom, hole sized to the run so you walk down rather than fall.
+- ❌ Roof slope you can see sky through, or an open triangular gable end → ✅ continuous solid slope;
+  gable filled, with a window/dormer if you want an opening.
+- ❌ Wall-face torch floating off the wall / floor `torch` against a wall → ✅ `wall_torch[facing]`
+  leaning on a backing block.
+- ❌ Long chain trailed to the floor for a lantern, or a chain/hanging lantern with air above it →
+  ✅ short `chain`→`lantern[hanging=true]` near the ceiling, or a floor lantern on a block.
+- ❌ Candle stacked on another candle (floating) → ✅ candle on a full solid block; raise the
+  `candles` count for more.
+- ❌ Lantern embedded mid-pillar → ✅ lights against wall faces, on the floor, or hung from above.
+- ❌ Partition wall stopping short of the shell, leaving a gap → ✅ partitions join the outer
+  walls/floor/ceiling flush, only the doorway open.
+- ❌ Bare, primitively-decorated basement → ✅ cellars are full rooms — storage, racks, lighting,
+  and theme like any other room.
 - ❌ Cauldron/furnace/pot stuck to a ceiling or wall → ✅ floor fixtures rest the right way up on a
   solid block; hang things with `chain`+`lantern` or hanging signs instead.
 - ❌ Chest/barrel floating over a stairwell or facing into a wall → ✅ on a solid block, opening

@@ -8,6 +8,7 @@ import { useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
 import { JigsawContent } from '../windows/JigsawWindow';
+import { VersionsContent } from '../windows/VersionsWindow';
 import { GenerateContent } from './NewStructurePanel';
 
 type Availability = Record<PanelId, boolean>;
@@ -15,23 +16,25 @@ type Availability = Record<PanelId, boolean>;
 const PANELS: Record<PanelId, { title: string; Content: FC }> = {
   inspector: { title: 'Info', Content: InspectorContent },
   jigsaw: { title: 'Jigsaw', Content: JigsawContent },
+  versions: { title: 'Versions', Content: VersionsContent },
   generate: { title: 'Generate ✨', Content: GenerateContent },
 };
 
-const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'generate'];
+const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];
 
 /** The chat panel manages its own layout (pinned composer), so its container
  *  drops the default padding/scroll the static panels rely on. */
-const FLUSH: Record<PanelId, boolean> = { inspector: false, jigsaw: false, generate: true };
+const FLUSH: Record<PanelId, boolean> = { inspector: false, jigsaw: false, versions: false, generate: true };
 
 export function InspectorDock({ availability }: { availability: Availability }) {
   const inspector = useWindows((s) => s.inspector);
   const jigsaw = useWindows((s) => s.jigsaw);
+  const versions = useWindows((s) => s.versions);
   const generate = useWindows((s) => s.generate);
   const activeTab = useWindows((s) => s.activeTab);
   const collapsed = useWindows((s) => s.sidebarCollapsed);
 
-  const state: Record<PanelId, typeof inspector> = { inspector, jigsaw, generate };
+  const state: Record<PanelId, typeof inspector> = { inspector, jigsaw, versions, generate };
   // Tabs are the panels that are shown, docked (not floating), and available.
   const tabs = PANEL_IDS.filter(
     (id) => availability[id] && state[id].visible && !state[id].floating,

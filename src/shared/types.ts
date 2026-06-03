@@ -192,6 +192,16 @@ export type GenerateResult =
     }
   | { ok: false; error: string; canceled?: boolean };
 
+/** A compiled version of a generation session, living on disk as `vN.nbt`. The
+ *  Versions panel lists these so the user can flip between earlier builds for
+ *  viewing (editing always continues from the latest). */
+export interface VersionInfo {
+  /** Monotonic version number within the session (1, 2, …). */
+  version: number;
+  /** Absolute path to the compiled `vN.nbt`, loadable in the viewer. */
+  path: string;
+}
+
 /** One message in a document's AI chat transcript (persisted + shown in the UI). */
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -261,7 +271,7 @@ export interface ApiKeyInfo {
 }
 
 /** The standardized panels/windows the View menu can show/hide. */
-export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate';
+export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions';
 
 /** Per-window state the renderer reports to main so the View menu reflects it.
  *  `available` gates the menu item's enabled state (its content can exist);
@@ -325,6 +335,9 @@ export interface BlockwrightApi {
   /** Restore a session's SDK conversation id + version from persisted history so a
    *  follow-up after restart resumes the same Claude conversation. */
   aiPrimeSession: (sessionId: string, sdkSessionId: string | null, version: number) => Promise<void>;
+  /** List the compiled versions (`vN.nbt`) on disk for a generation session, so the
+   *  Versions panel can offer earlier builds to view. Empty when none/unknown. */
+  aiListVersions: (sessionId: string) => Promise<VersionInfo[]>;
   /** Load persisted chat history for a key (a file path, or a session id), or null. */
   chatHistoryGet: (key: string) => Promise<ChatRecord | null>;
   /** Persist chat history for a key (debounced by the caller). */

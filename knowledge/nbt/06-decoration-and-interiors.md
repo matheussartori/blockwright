@@ -18,14 +18,18 @@ canonical recipes. Mix and match, keep materials cohesive with the build.
 Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 
 ### Tables
-- **Small table**: `oak_fence` (or any fence) at `@`, with a **carpet** or **pressure plate**
-  on top (`@ y+1`). For a wider table, put fences under each corner and a `*_slab type:top` on
-  top, or use a row of `*_slab type:top`.
-- **Keep the top thin, and the leg on the floor.** The tabletop is a *single* `*_slab type:top`,
-  carpet, or pressure plate — **never a full block or a `double` slab** (that reads as a thick,
-  clumsy slab, not a table). And the fence/post leg must run down to a real floor: a table whose
-  top hovers with air under the leg is floating. Post at `@ y`, thin top at `@ y+1`, floor at
-  `@ y-1`.
+- **Small table (canonical):** `oak_fence` (or any fence) leg at `@ y`, a **carpet** or
+  **`*_pressure_plate`** on top at `@ y+1`, standing on solid floor at `@ y-1`. The fence post is the
+  full leg height; the carpet/plate is the thin surface. For a wider table, put a fence leg under
+  **each corner** and lay `*_carpet`/`*_pressure_plate` (or, if you must, a single `*_slab type:top`)
+  across the top.
+- **Keep the top thin, and every leg on the floor.** The tabletop is a *single* thin layer —
+  `*_carpet`, `*_pressure_plate`, or a *single* `*_slab type:top` — **never a full block, a `double`
+  slab, or stacked slabs** (that reads as a thick, clumsy block, not a table). The leg(s) must run
+  **down to a real floor**: a top hovering with air beneath it is floating.
+- **The most common broken table (don't do this):** a `*_slab`/`double_slab`/full block sitting on a
+  single short post or on **air** — too thick *and* floating. If you see a chunky top or a gap under
+  the leg in the preview, rebuild it as fence-leg(s)-to-floor + a thin carpet/plate top.
 - **Desk**: a `*_stairs` upside-down (`half:top`) reads as a desk/counter with knee space.
 
 ### Chairs / stools / benches
@@ -89,7 +93,9 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 ### Decorative details that sell a room
 - `item_frame`s with maps/tools as wall art (entities — keep modest).
 - `painting`s.
-- `chain` + `lantern` hanging fixtures.
+- `chain` + `lantern` hanging fixtures — `chain[axis:y]` attached to the **ceiling/beam** dropping a
+  block or two to a `lantern[hanging:true]`. Keep the chain **short** (near the ceiling); never trail
+  a long chain down to the floor to hold a low lantern (see [`10`](10-design-principles.md)).
 - `decorated_pot`, `*_banner`, `bookshelf`/`chiseled_bookshelf`, `armor_stand` (entity),
   `cake`, `brewing_stand` (lab), `bell`, `note_block`, `jukebox`.
 - `cobweb` as a *single stray strand* tucked in a corner or ceiling angle for "abandoned" — never a
@@ -123,6 +129,13 @@ area** with furniture, storage, and decoration, with the rest as deliberate open
 means *avoiding random clutter in the walking path* — it does **not** mean leaving rooms nearly
 empty. When in doubt for these builds, add one more piece against a wall rather than leaving it bare.
 
+**Scale decoration to the room — big rooms need *more*, not the same handful.** A large hall with a
+couple of props lost in the middle is the worst version of the empty-room failure: the bigger the
+floor, the more anchors, perimeter furniture, lights, and wall detail it needs to stay at the
+⅓–½ density target. If a room is so large it feels cavernous, either **fill it to scale** (multiple
+seating/work zones, columns, ceiling beams, a feature wall, more lighting) or **subdivide it** into
+smaller purposeful rooms with partition walls. Never leave a big volume nearly bare.
+
 ## Style presets (quick starting points)
 
 - **Cozy cottage**: oak + wool, lanterns, rugs, flower pots, bookshelf nook, fireplace.
@@ -130,6 +143,14 @@ empty. When in doubt for these builds, add one more piece against a wall rather 
 - **Modern**: quartz/concrete/glass, hidden lighting, froglight, minimal props, flat surfaces.
 - **Medieval**: stone bricks + dark oak, banners, chandeliers (chain+lantern), brewing/anvil.
 - **Abandoned/ruined**: cobwebs, cracked/mossy variants, missing blocks, vines, no light.
+- **Cellar / basement**: a basement is a **full room, decorated like any other** — not a bare stone
+  box. Dress it for a purpose: a wine cellar (rows of `barrel`s on `*_slab`/`*_stairs` racks, bottles
+  via `*_fence`+`flower_pot`, cobwebs in the corners), a storeroom (stacked `barrel`s/`chest`s,
+  crates, `decorated_pot`s, sacks of `hay_block`), a brewing/alchemy room (`brewing_stand`,
+  `cauldron`s on the floor, `bookshelf`s, `candle`s), or a dungeon/prison (`iron_bars` cells,
+  `soul_lantern`). Always light it (`lantern`/`soul_lantern`/`candle`s ~every 6 blocks), give the
+  walls and floor texture (mixed brick/`mossy_`/`cobblestone`, a rug), and reach it by a real
+  staircase down — see [`11`](11-furniture-and-interior-detailing.md) for the construction grammar.
 
 ## Common decoration mistakes to avoid
 
@@ -148,8 +169,10 @@ empty. When in doubt for these builds, add one more piece against a wall rather 
   the passage — face the opening at the open room and stand it on a solid block.
 - A floor lantern/torch/prop dropped in the middle of a corridor, doorway, or stair, blocking the
   walking path — keep lights against walls or hung from the ceiling, never in the lane the player walks.
-- A cauldron/furnace/pot stuck to a ceiling or wall — these are floor fixtures; they rest upright on
-  a solid block. Use `chain`+`lantern` or a hanging sign for anything that should hang from above.
+- A cauldron/furnace/pot stuck to a ceiling or wall, **capping a stairwell/ladder shaft, or sitting
+  on top of a ladder** — these are floor fixtures; they rest upright on a solid floor block in a
+  sensible spot, never over a hole/passage or on a climbable. Use `chain`+`lantern` or a hanging sign
+  for anything that should hang from above.
 - Cobwebs used as a staircase, ladder, or path — cobweb can't be climbed or walked on; build real
   stairs or a wall-backed ladder instead, and keep cobweb to a stray corner strand.
 - Over-cluttering the *walking path*. Keep the centre open — but that's not a license to leave

@@ -9,7 +9,7 @@
 // Like the other renderer stores this is a framework-agnostic Zustand vanilla
 // store, consumed in components via the `useDocuments` / `useActiveDoc` hooks.
 import { createStore } from 'zustand/vanilla';
-import type { StructureData, GenerateProgress, ChatMessage } from '@/shared/types';
+import type { StructureData, GenerateProgress, ChatMessage, VersionInfo } from '@/shared/types';
 import { basename } from '../ui/path';
 
 /** One message in a document's AI chat transcript. Same shape the composer shows
@@ -41,6 +41,14 @@ export interface Document {
   sdkSessionId: string | null;
   /** Latest emitted version number in this session (0 before any build). */
   version: number;
+  /** Every compiled version of this session's build (`vN.nbt`), ascending — the
+   *  Versions panel lists these so the user can flip between earlier builds for
+   *  viewing. Empty for a file-backed doc with no generation history. */
+  versions: VersionInfo[];
+  /** Which version is currently shown in the viewer, or null when showing the
+   *  working/latest structure. Set only while the user is previewing an earlier
+   *  build (editing always continues from the latest). */
+  viewingVersion: number | null;
   /** True once persisted chat history (if any) has been loaded for this doc. */
   hydrated: boolean;
 }
@@ -78,6 +86,8 @@ function freshDoc(over: Partial<Document> = {}): Document {
     chat: [],
     sdkSessionId: null,
     version: 0,
+    versions: [],
+    viewingVersion: null,
     hydrated: false,
     ...over,
   };

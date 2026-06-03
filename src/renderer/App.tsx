@@ -12,7 +12,7 @@ import { store } from './state/store';
 import { settingsStore } from './state/settings';
 import { windowsStore } from './state/windows';
 import { documentsStore, activeDocument, docBySession } from './state/documents';
-import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration } from './state/generation';
+import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration, recordVersion } from './state/generation';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import type { Viewer } from './viewer/viewer';
 import { useActiveDoc, useDocuments } from './hooks/useStores';
@@ -58,6 +58,8 @@ function Shell() {
     // Generate is always available — you can author from scratch or iterate on
     // whatever .nbt the active tab holds.
     generate: true,
+    // Versions is available once this tab has at least one generated build.
+    versions: (activeDoc?.versions.length ?? 0) > 0,
   };
   // Handlers read the latest viewers from refs so they can stay stable.
   const viewerRef = useRef(viewer);
@@ -80,9 +82,12 @@ function Shell() {
   // `recent` is false for AI-generated temp versions so they never pollute the
   // recent-files list or trigger the mod-workspace suggestion.
   const load = useCallback(
-    async (docId: string, path: string, opts?: { preserveCamera?: boolean; recent?: boolean }) => {
+    async (docId: string, path: string, opts?: { preserveCamera?: boolean; recent?: boolean; working?: boolean }) => {
       const recent = opts?.recent ?? true;
       const preserveCamera = opts?.preserveCamera ?? false;
+      // When previewing an earlier version (working:false) we show it in the
+      // viewer but leave the doc's working `path` (the AI edit base) on the latest.
+      const working = opts?.working ?? true;
       const ds = documentsStore.getState();
       if (!ds.documents.some((d) => d.id === docId)) return; // tab closed mid-load
       if (!(await api.pathExists(path))) {
@@ -95,11 +100,11 @@ function Shell() {
         const data = await api.loadStructure(path);
         if (recent) api.addRecent(path);
         if (data.blocks.length === 0) {
-          documentsStore.getState().patchDoc(docId, { loading: false, path });
+          documentsStore.getState().patchDoc(docId, { loading: false, ...(working ? { path } : {}) });
           store.getState().setNotice({ text: `${data.name} — no structure blocks found`, warn: true });
           return;
         }
-        documentsStore.getState().patchDoc(docId, { structure: data, path, loading: false });
+        documentsStore.getState().patchDoc(docId, { structure: data, loading: false, ...(working ? { path } : {}) });
         store.getState().setNotice(null);
         if (documentsStore.getState().activeId === docId && viewerRef.current) {
           await viewerRef.current.show(data, preserveCamera);
@@ -211,7 +216,11 @@ function Shell() {
         const doc = docBySession(sessionId);
         const isActive = !!doc && documentsStore.getState().activeId === doc.id;
         const data = await api.loadStructure(path);
-        if (doc) documentsStore.getState().patchDoc(doc.id, { structure: data, path });
+        if (doc) {
+          documentsStore.getState().patchDoc(doc.id, { structure: data, path });
+          // Surface this just-rendered version in the Versions panel and follow it.
+          recordVersion(doc.id, version, path);
+        }
         let target: Viewer | null;
         if (isActive && viewerRef.current) {
           await viewerRef.current.show(data, version > 1);
@@ -285,11 +294,13 @@ function Shell() {
       const doc = activeDocument(documentsStore.getState());
       const open = doc?.structure != null;
       const hasJigsaw = open && doc!.structure!.jigsaws.length > 0;
+      const hasVersions = (doc?.versions.length ?? 0) > 0;
       const report: WindowsReport = {
         controls: { visible: w.controls.visible, available: open },
         inspector: { visible: w.inspector.visible, available: open },
         jigsaw: { visible: w.jigsaw.visible, available: hasJigsaw },
         generate: { visible: w.generate.visible, available: true },
+        versions: { visible: w.versions.visible, available: hasVersions },
       };
       const key = JSON.stringify({ open, report });
       if (key === lastKey.current) return;

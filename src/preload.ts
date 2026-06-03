@@ -13,6 +13,7 @@ import type {
   JigsawCandidate,
   JigsawPlan,
   StructureData,
+  VersionInfo,
   Workspace,
   WindowId,
   WindowsReport,
@@ -61,6 +62,8 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiResetSession, sessionId),
   aiPrimeSession: (sessionId: string, sdkSessionId: string | null, version: number): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiPrimeSession, sessionId, sdkSessionId, version),
+  aiListVersions: (sessionId: string): Promise<VersionInfo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiListVersions, sessionId),
   chatHistoryGet: (key: string): Promise<ChatRecord | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.chatHistoryGet, key),
   chatHistorySave: (key: string, record: ChatRecord): Promise<void> =>

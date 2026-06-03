@@ -14,7 +14,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage } from '@/shared/types';
+import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, VersionInfo } from '@/shared/types';
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { loadKnowledge } from './knowledge';
 import { authEnv, claudeExecutablePath, hasConfiguredCredential } from './credentials';
@@ -130,6 +130,26 @@ function getSession(sessionId: string): Session {
  *  The next prompt starts a fresh SDK session. */
 export function resetSession(sessionId: string): void {
   sessions.delete(sessionId);
+}
+
+/** List the compiled `vN.nbt` versions on disk for a session, ascending. Used by
+ *  the renderer's Versions panel to offer earlier builds for viewing — robust
+ *  across restarts since it reads the deterministic session dir rather than
+ *  relying on in-memory state. */
+export function listVersions(sessionId: string): VersionInfo[] {
+  const dir = sessionDir(sessionId);
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return []; // no session dir yet
+  }
+  const out: VersionInfo[] = [];
+  for (const name of names) {
+    const m = /^v(\d+)\.nbt$/.exec(name);
+    if (m) out.push({ version: Number(m[1]), path: path.join(dir, name) });
+  }
+  return out.sort((a, b) => a.version - b.version);
 }
 
 /** Restore a session's SDK conversation id + version from persisted chat history

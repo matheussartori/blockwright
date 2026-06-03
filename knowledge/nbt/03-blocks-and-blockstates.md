@@ -55,6 +55,14 @@ entries share `facing`/`hinge`/`open`; they differ in `half`.
 - `facing`: direction the door faces when **closed** (the side you approach from).
 - `hinge`: `left` / `right` — which side the hinge is on.
 
+**Double doors (two leaves side by side):** both leaves share the same `facing`; the two leaves take
+**opposite `hinge` values** so the **hinges sit on the two outer jambs and the leaves meet (handles
+together) in the centre**. Set the leaf on one side `hinge:left` and the other `hinge:right`. The
+correct pairing depends on `facing`, so **confirm in the preview**: you should see the two handles
+meeting in the middle and the hinges against the outer frame. If instead the handles are on the
+outside and the seam/hinges are in the middle, **swap the two `hinge` values** (left↔right). Frame
+both outer jambs with solid blocks — no air gap beside the pair.
+
 ### Trapdoors — `facing`, `half`, `open`, `waterlogged`
 `oak_trapdoor`, etc. `half`: `top`/`bottom`; `open`: `true`/`false`; `facing`: hinge side.
 Great for shutters, shelves, table-edge details.
@@ -81,14 +89,21 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 
 ### Torches & lights
 - `torch` (on floor) vs `wall_torch` (`facing`). Same for `soul_torch`/`soul_wall_torch`,
-  `redstone_torch`/`redstone_wall_torch`.
+  `redstone_torch`/`redstone_wall_torch`. **To mount a torch on a wall, use the `wall_*` variant**
+  with `facing` = the direction **away from the wall** (a torch on a north wall = `facing:south`) so
+  it leans on the wall and survives placement. Plain `torch`/`redstone_torch` is the **floor** form —
+  it needs a solid block directly **beneath** it; placed against a wall face with air below it pops
+  off on spawn. Never float a torch off a wall.
 - `lantern`: `hanging` (`true`/`false`). `soul_lantern` likewise. A floor lantern sits on a solid
   block **below** it; `hanging:"true"` hangs from a solid block (or `chain`/fence) **above** it. A
   lantern is a light, **not a support** — never place one under a pillar/beam as if it holds the
   block up. For a chandelier, hang `chain` → `lantern[hanging=true]` from the ceiling.
 - `glowstone`, `sea_lantern`, `shroomlight`, `froglight`s — full-block lights.
-- `candle` (1–4, `candles` count + `lit`). A candle **sits on top of a solid block** — it can't
-  hang, and on air it breaks when the structure is placed. Put it on a table/slab/shelf.
+- `candle` (1–4, `candles` count + `lit`). A candle **sits on top of a full solid block** — it can't
+  hang, and on air it breaks when the structure is placed. Put it on a table/slab/shelf. **Never
+  stack a candle on top of another candle** (the upper one floats — a candle can't stand on a
+  candle); for more flames raise the `candles` count (1–4) in the *same* block, or place separate
+  candles on separate solid surfaces.
 
 ### Glass & panes
 `glass`, `*_stained_glass` (16 colors), `tinted_glass`. Panes: `glass_pane`,
@@ -144,7 +159,11 @@ the mood.
 - **Crafter** (auto-crafter): a block entity, see above.
 
 ### Useful structural / decorative blocks often forgotten
-- `scaffolding` (`bottom`,`distance`), `chain` (`axis`), `lightning_rod` (`facing`,`powered`).
+- `scaffolding` (`bottom`,`distance`), `chain` (`axis`), `lightning_rod` (`facing`,`powered`). A
+  `chain` must connect to a **solid block (or another chain) at its top** — a chain with air above it
+  floats. Use it to suspend a `lantern[hanging=true]` **a block or two below the ceiling/beam**;
+  **don't run a long chain down to the floor** to hold a low lantern (set a floor lantern on a block
+  instead). See [`10`](10-design-principles.md) §Physical validity.
 - `iron_bars` (connection props auto-resolve like panes).
 - `end_rod` (`facing`) — thin white pole/light, great for modern fixtures.
 - `amethyst_cluster`/`*_amethyst_bud` (`facing`), `pointed_dripstone` (`vertical_direction`,`thickness`).

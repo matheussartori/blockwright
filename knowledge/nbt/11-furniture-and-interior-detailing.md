@@ -158,8 +158,10 @@ Bare interior walls and flat ceilings are the #1 "unfinished" tell. The referenc
 
 [`06`](06-decoration-and-interiors.md)/[`10`](10-design-principles.md) cover *where*; here's *how*:
 
-- **Pendant lantern:** `chain` → `lantern hanging:"true"` from the ceiling/beam over a table or
-  seating group — the most-used fixture in the references.
+- **Pendant lantern:** `chain[axis:y]` → `lantern hanging:"true"` from the ceiling/beam over a table
+  or seating group — the most-used fixture in the references. The chain's **top must attach to the
+  ceiling/beam** and stay **short** (a block or two); never trail a long chain to the floor or hang a
+  lantern with air above it ([`10`](10-design-principles.md) §Physical validity).
 - **Chandelier (cottage):** a hub block (`*_fence`/`*_wall`/`*_log`) hung on `chain`, with
   `lantern hanging:"true"` and short `chain` arms radiating.
 - **Grand-hall chandelier:** a tall central `chain`/`iron_bars`/`end_rod` spine descending from the

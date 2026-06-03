@@ -52,6 +52,8 @@ export const IPC_CHANNELS = {
   aiResetSession: 'ai:reset-session',
   /** Restore a session's SDK conversation id + version (payload: sessionId, sdkSessionId, version). */
   aiPrimeSession: 'ai:prime-session',
+  /** List a session's compiled versions on disk (payload: sessionId) → VersionInfo[]. */
+  aiListVersions: 'ai:list-versions',
   /** Renderer's reply to an aiRenderRequest: the captured preview image(s) (or an
    *  error). Payload: requestId + { images? , error? }. */
   aiRenderResult: 'ai:render-result',

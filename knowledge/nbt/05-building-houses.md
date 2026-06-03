@@ -57,6 +57,11 @@ L # # # # # L
 L # # # W # L      (door opening handled separately)
 ```
 
+**Interior partition walls** (dividing rooms) must join the shell **flush**: run them from the
+outer wall to the opposite wall and from floor to ceiling, leaving only the intended **doorway**.
+A partition that stops a block short of the outer wall or the ceiling leaves a vertical air gap you
+can see/walk through — fill the seam so the division is solid.
+
 ## Door opening (south wall, centered)
 
 Leave the two cells `(x=mid, y=1, z=L-1)` and `(x=mid, y=2, z=L-1)` for the door. Place a
@@ -73,16 +78,22 @@ shutters on the outside for charm, or a `oak_slab`/`stairs` sill below.
 
 ## Stairs between floors
 
-A staircase climbing to an upper floor reads much better when the **underside is filled**, not
-left as a row of stairs floating over empty air:
+Build the steps from **actual `*_stairs` blocks**, one block up per step — *not* a zig-zag of
+stacked full blocks (that reads as rubble, not a staircase). A run climbs much better when the
+**underside is filled**, not left as a row of stairs floating over empty air:
 
 - Under each `*_stairs` step, place a **full block** (matching `planks`/stone) so the run sits on
   a solid stringer — or use a second `*_stairs half:top` tucked beneath, mirroring the step, for a
   clean zig-zag underside. Either kills the ugly floating-step look.
 - The run must climb **through a hole cut in the ceiling/floor above** onto real walkable space —
   never into a solid ceiling or a blank wall (see [`10`](10-design-principles.md) §Physical validity).
-- Keep the steps clear: don't park a chest, barrel, or carpet on or directly above the staircase —
-  it blocks the passage.
+- **Headroom & hole size.** Leave **2 blocks of clear air above every step** so a player can walk
+  the run without hitting the ceiling, and cut the ceiling/floor opening to **just the footprint of
+  the stair run** — a player should *walk down the stairs*, not drop through an oversized hole beside
+  them. No open shaft to fall down: the hole is the width of the stairs and the run fills it step by
+  step, meeting solid floor at the bottom.
+- Keep the steps clear: don't park a chest, barrel, cauldron, or carpet on or directly above the
+  staircase — it blocks the passage.
 
 ## Ceiling & roofs
 
@@ -115,6 +126,14 @@ with a **full block** row (or two opposed stairs meeting at the peak) — not a 
 which looks thin and floating up there. Fill any gap under the slope with planks if you want a
 solid (non-hollow) roof, or leave hollow for an attic.
 
+**The roof surface and gable ends must read as solid — no see-through holes:**
+- Keep each sloped course a **continuous** line of stairs with **no gaps between steps** that open
+  straight to the sky/attic. If stepping stairs leave a notch, back it with a `*_slab`/full block so
+  the slope is a closed surface.
+- **Fill the triangular gable ends** (the wall under each end of the roof) solid up to the ridge,
+  in wall or roof material. A roof open at the gable is a hole. Want light there? Put a **window or
+  small dormer** in the filled gable — never leave a ragged opening.
+
 ### Hip roof
 Slope inward on **all four** sides; use corner stairs (`shape: outer_*`) at the corners. More
 work — only when asked for it.
@@ -145,8 +164,12 @@ let the build's bottom be the foundation.
 
 ## Quality checklist for the shell
 
-- Walls fully enclose (no accidental gaps except intended windows/door).
-- Door is 2 tall and reachable (air in front and behind at `y=1..2`).
-- Roof has no holes where slopes meet; ridge is continuous.
+- Walls fully enclose (no accidental gaps except intended windows/door); interior partitions join
+  the shell flush (no gap at the seam), leaving only the doorway.
+- Door is 2 tall and reachable (air in front and behind at `y=1..2`); double doors meet in the
+  middle (opposite `hinge`, hinges on the outer jambs).
+- Stairs use real `*_stairs` with 2-block headroom and a hole sized to the run (no fall-through).
+- Roof has no holes where slopes meet, no see-through gaps in the slope, gable ends filled solid;
+  ridge is continuous.
 - Corners use posts/contrast so it doesn't read as a plain cube.
 - Interior has ≥3 air height. Then move to [`06`](06-decoration-and-interiors.md).
