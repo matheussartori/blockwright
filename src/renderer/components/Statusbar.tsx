@@ -24,11 +24,13 @@ export function Statusbar() {
 
   return (
     <footer className="statusbar">
-      <span>{structure.name}</span>
+      <span className="status-name">{structure.name}</span>
       <span className="sep">·</span>
-      <span className="muted">{structure.size.join('×')}</span>
+      <span className="muted stat-num">{structure.size.join('×')}</span>
       <span className="sep">·</span>
-      <span className="muted">{structure.blockCount.toLocaleString()} blocks</span>
+      <span className="muted">
+        <span className="stat-num">{structure.blockCount.toLocaleString()}</span> blocks
+      </span>
       <span className="spacer" />
       <span className="mode">
         <span className={`dot ${structure.hasContent ? 'ok' : 'warn-dot'}`} />

@@ -1,15 +1,15 @@
-// The tab strip beneath the titlebar: one tab per open document. Clicking a tab
-// focuses it (the viewer + chat follow the active doc); the trailing "+" opens a
-// blank Untitled generate tab. A tab spins while its build is generating, so you
-// can watch a background tab work while you edit another. Hidden when no tabs
-// are open (the welcome screen takes over).
+// The slim top bar: the app's only chrome row (no separate titlebar). It's the
+// macOS drag region (with traffic-light clearance) and holds one tab per open
+// document; the trailing "+" opens a blank Untitled generate tab. A tab spins
+// while its build is generating, so you can watch a background tab work while you
+// edit another. Always rendered (even with no docs) so the drag region and
+// traffic-light space persist on the welcome screen.
 import { useDocuments } from '../hooks/useStores';
 import { documentsStore } from '../state/documents';
 
 export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: string) => void }) {
   const documents = useDocuments((s) => s.documents);
   const activeId = useDocuments((s) => s.activeId);
-  if (documents.length === 0) return null;
 
   return (
     <div className="tabbar" role="tablist">

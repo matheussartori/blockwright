@@ -2,7 +2,9 @@
 // custom texture protocol. Implementation details live in ./main/* modules.
 // Load .env (ANTHROPIC_API_KEY for AI structure generation) before anything reads it.
 import 'dotenv/config';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-protocol';
 import { registerIpc } from '@/main/ipc';
@@ -24,7 +26,22 @@ app.on('open-file', (event, filePath) => {
   openFile(filePath);
 });
 
+/** The app/dock icon (the standardized logo-dark, `build/icon.png`). The packaged
+ *  bundle icon comes from `build/icon.icns` (forge.config); this drives the dev
+ *  dock icon. */
+function appIconPath(): string | null {
+  const candidates = [
+    path.join(app.getAppPath(), 'build', 'icon.png'),
+    path.join(process.resourcesPath ?? '', 'build', 'icon.png'),
+  ];
+  return candidates.find((p) => p && fs.existsSync(p)) ?? null;
+}
+
 app.on('ready', () => {
+  // Set the dock icon (macOS dev) / fallback runtime icon to logo-dark. Packaged
+  // builds also get it from build/icon.icns via forge.config.
+  const icon = appIconPath();
+  if (icon && process.platform === 'darwin') app.dock?.setIcon(nativeImage.createFromPath(icon));
   registerTextureProtocol();
   registerIpc();
   // Dev-only: activate a mod workspace on startup (used for automated checks).

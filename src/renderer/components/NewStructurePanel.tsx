@@ -66,6 +66,55 @@ const EXAMPLES = [
   'A cozy cabin with a pitched spruce roof and a porch',
 ];
 
+/** Optional, non-binding hints the user can set to steer a fresh build. They're
+ *  folded into the prompt as a structured brief — every field is optional. */
+interface BuildDetails {
+  buildType: string;
+  style: string;
+  width: string;
+  depth: string;
+  height: string;
+  floors: string;
+  rooms: string;
+  basement: string;
+  materials: string;
+  decay: string;
+  furnished: string;
+  lighting: string;
+}
+
+const EMPTY_DETAILS: BuildDetails = {
+  buildType: '', style: '', width: '', depth: '', height: '', floors: '',
+  rooms: '', basement: '', materials: '', decay: '', furnished: '', lighting: '',
+};
+
+const BUILD_TYPES = ['House', 'Tower', 'Cabin', 'Ruin', 'Bridge', 'Wall', 'Dungeon room', 'Shrine', 'Barn', 'Tree house', 'Other'];
+const BASEMENTS = ['None', 'Small', 'Large'];
+const DECAYS = ['None', 'Light', 'Moderate', 'Heavy'];
+const FURNISHINGS = ['Empty', 'Basic', 'Detailed'];
+const LIGHTINGS = ['Dim', 'Medium', 'Bright'];
+
+/** Build the structured-hints block appended to the prompt, or '' if nothing set. */
+function buildBrief(d: BuildDetails): string {
+  const lines: string[] = [];
+  if (d.buildType) lines.push(`- Type: ${d.buildType}`);
+  if (d.style) lines.push(`- Style/theme: ${d.style}`);
+  if (d.width || d.depth || d.height) {
+    lines.push(`- Approx footprint W×D / height: ${d.width || '?'}×${d.depth || '?'} / ${d.height || '?'}`);
+  }
+  if (d.floors) lines.push(`- Floors: ${d.floors}`);
+  if (d.rooms) lines.push(`- Rooms: ${d.rooms}`);
+  if (d.basement) lines.push(`- Basement: ${d.basement}`);
+  if (d.materials) lines.push(`- Preferred materials: ${d.materials}`);
+  if (d.decay) lines.push(`- Decay / ruin level: ${d.decay}`);
+  if (d.furnished) lines.push(`- Interior: ${d.furnished}`);
+  if (d.lighting) lines.push(`- Lighting: ${d.lighting}`);
+  if (lines.length === 0) return '';
+  return `\n\n[Build details — optional hints from the user; honor them unless they conflict with the request above or with sound building.]\n${lines.join('\n')}`;
+}
+
+const hasDetails = (d: BuildDetails): boolean => Object.values(d).some((v) => v.trim() !== '');
+
 /** The generate chat body. Rendered inside the dock/floating chrome (which
  *  provides the title bar, detach/redock and minimize), so it only owns its own
  *  toolbar (New / Close), the warning, the transcript and the composer. */
@@ -80,6 +129,8 @@ export function GenerateContent() {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showDetails, setShowDetails] = useState(false);
+  const [details, setDetails] = useState<BuildDetails>(EMPTY_DETAILS);
   const [nowTick, setNowTick] = useState(Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -129,20 +180,27 @@ export function GenerateContent() {
   const send = useCallback(async () => {
     const prompt = input.trim();
     const staged = attachments;
-    if (!prompt && staged.length === 0) return;
+    const brief = buildBrief(details);
+    if (!prompt && staged.length === 0 && !brief) return;
     // Generate into the active tab; if the panel was opened with no tab open,
     // create one so the build has somewhere to live.
     const ds = documentsStore.getState();
     const docId = ds.activeId ?? ds.newDoc();
     if (ds.documents.find((d) => d.id === docId)?.busy) return;
+    // Fold the optional details into the prompt as a structured brief. They steer
+    // a fresh build, so clear them after sending (follow-up edits shouldn't keep
+    // re-sending stale hints).
+    const composed = prompt ? prompt + brief : brief ? `Generate a structure with these details:${brief}` : prompt;
     setInput('');
     setAttachments([]);
+    setDetails(EMPTY_DETAILS);
+    setShowDetails(false);
     await runGeneration(
       docId,
-      prompt,
+      composed,
       staged.map((a) => a.dataUrl),
     );
-  }, [input, attachments]);
+  }, [input, attachments, details]);
 
   const cancel = useCallback(() => {
     if (doc) cancelGeneration(doc.id);
@@ -152,7 +210,14 @@ export function GenerateContent() {
     if (doc) resetDocChat(doc.id);
     setInput('');
     setAttachments([]);
+    setDetails(EMPTY_DETAILS);
+    setShowDetails(false);
   }, [doc]);
+
+  const setField = useCallback(
+    (key: keyof BuildDetails, value: string) => setDetails((d) => ({ ...d, [key]: value })),
+    [],
+  );
 
   // Number of generated builds (v0/source excluded) — there's only something to
   // flatten once at least one version exists.
@@ -176,7 +241,14 @@ export function GenerateContent() {
         >
           Clear versions
         </button>
-        <button className="settings-close" title="Close" aria-label="Close" onClick={close}>
+        <button
+          className="btn sm"
+          title="Browse the content pack's blocks and copy their ids"
+          onClick={() => store.getState().setCatalogOpen(true)}
+        >
+          Blocks
+        </button>
+        <button className="modal-close" title="Close" aria-label="Close" onClick={close}>
           ✕
         </button>
       </div>
@@ -309,6 +381,71 @@ export function GenerateContent() {
             ))}
           </div>
         )}
+        {showDetails && (
+          <div className="gen-details">
+            <div className="gen-details-grid">
+              <label className="gen-field">
+                <span>Type</span>
+                <select value={details.buildType} onChange={(e) => setField('buildType', e.target.value)} disabled={busy}>
+                  <option value="">Any</option>
+                  {BUILD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <label className="gen-field gen-field-wide">
+                <span>Style / theme</span>
+                <input type="text" value={details.style} placeholder="cozy, abandoned, medieval…" onChange={(e) => setField('style', e.target.value)} disabled={busy} />
+              </label>
+              <label className="gen-field gen-field-size">
+                <span>Size (W×D×H)</span>
+                <span className="gen-size-inputs">
+                  <input type="number" min={1} value={details.width} placeholder="W" onChange={(e) => setField('width', e.target.value)} disabled={busy} />
+                  <input type="number" min={1} value={details.depth} placeholder="D" onChange={(e) => setField('depth', e.target.value)} disabled={busy} />
+                  <input type="number" min={1} value={details.height} placeholder="H" onChange={(e) => setField('height', e.target.value)} disabled={busy} />
+                </span>
+              </label>
+              <label className="gen-field gen-field-sm">
+                <span>Floors</span>
+                <input type="number" min={1} value={details.floors} placeholder="—" onChange={(e) => setField('floors', e.target.value)} disabled={busy} />
+              </label>
+              <label className="gen-field gen-field-sm">
+                <span>Rooms</span>
+                <input type="number" min={1} value={details.rooms} placeholder="—" onChange={(e) => setField('rooms', e.target.value)} disabled={busy} />
+              </label>
+              <label className="gen-field">
+                <span>Basement</span>
+                <select value={details.basement} onChange={(e) => setField('basement', e.target.value)} disabled={busy}>
+                  <option value="">—</option>
+                  {BASEMENTS.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </label>
+              <label className="gen-field gen-field-wide">
+                <span>Materials</span>
+                <input type="text" value={details.materials} placeholder="spruce, cobblestone, dark oak…" onChange={(e) => setField('materials', e.target.value)} disabled={busy} />
+              </label>
+              <label className="gen-field">
+                <span>Decay</span>
+                <select value={details.decay} onChange={(e) => setField('decay', e.target.value)} disabled={busy}>
+                  <option value="">—</option>
+                  {DECAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </label>
+              <label className="gen-field">
+                <span>Interior</span>
+                <select value={details.furnished} onChange={(e) => setField('furnished', e.target.value)} disabled={busy}>
+                  <option value="">—</option>
+                  {FURNISHINGS.map((f) => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </label>
+              <label className="gen-field">
+                <span>Lighting</span>
+                <select value={details.lighting} onChange={(e) => setField('lighting', e.target.value)} disabled={busy}>
+                  <option value="">—</option>
+                  {LIGHTINGS.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
         <textarea
           className="gen-input"
           placeholder="Describe a structure…"
@@ -344,6 +481,15 @@ export function GenerateContent() {
             onClick={() => fileInput.current?.click()}
           >
             🖼 Image
+          </button>
+          <button
+            className={`btn sm gen-details-toggle${hasDetails(details) ? ' has-details' : ''}`}
+            title="Optional build details (type, size, materials…)"
+            aria-pressed={showDetails}
+            disabled={busy || available === false}
+            onClick={() => setShowDetails((v) => !v)}
+          >
+            ⚙ Details{hasDetails(details) ? ' •' : ''}
           </button>
           {busy ? (
             <button className="btn gen-send gen-cancel" onClick={cancel}>

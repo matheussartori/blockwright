@@ -1,5 +1,5 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
-import { dialog, ipcMain } from 'electron';
+import { dialog, ipcMain, nativeTheme } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { AssembleOptions, ChatRecord, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
@@ -7,6 +7,7 @@ import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
+import { listCatalog, previewBlock } from './structure/block-catalog';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
 import { getChat, saveChat } from './chat-history';
@@ -150,6 +151,16 @@ export function registerIpc(): void {
     primeSession(sessionId, sdkSessionId, version),
   );
   ipcMain.handle(IPC_CHANNELS.aiListVersions, async (_e, sessionId: string) => listVersions(sessionId));
+
+  ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
+  ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));
+
+  // Drive the native appearance so a forced light/dark theme also flips the macOS
+  // vibrancy material (otherwise dark text lands on a dark vibrancy backdrop) and
+  // the renderer's prefers-color-scheme.
+  ipcMain.handle(IPC_CHANNELS.themeSet, async (_e, pref: 'system' | 'light' | 'dark') => {
+    nativeTheme.themeSource = pref;
+  });
 
   ipcMain.handle(IPC_CHANNELS.chatHistoryGet, async (_e, key: string) => getChat(key));
   ipcMain.handle(IPC_CHANNELS.chatHistorySave, async (_e, key: string, record: ChatRecord) =>

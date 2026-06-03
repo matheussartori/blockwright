@@ -36,6 +36,14 @@ src/
                            chest.ts, bed.ts, banner.ts (wall), index.ts (dispatcher)
       fluid.ts             Water/lava: full-cube from the animated "still" strip (water blue-tinted)
       fallback-color.ts    Deterministic per-block color when textures are missing
+      templates/           Parameterized building presets (abandoned_house, large_basement),
+                           expanded by the `template` op in compile-structure: the model emits one
+                           op, the code produces the geometry. Pure (box+params)→ops; interns its
+                           own palette by block name. Register a new one in templates/index.ts.
+      block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
+                           namespace-aware) + a representative texture per block → the Block Catalog.
+                           `previewBlock(id)` resolves one block into a 1×1×1 StructureData for the
+                           catalog's live 3D preview (renderer reuses buildStructure on it).
       jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
       template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
       jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
@@ -52,15 +60,20 @@ src/
                           east/west, so without this an isolated pane renders as the bare
                           `_post` column; it splits palette entries per side combination.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
-    index.tsx             Entry: createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
+    index.tsx             Entry: initTheme() then createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
     App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
     api.ts                Typed accessor for window.blockwright (the preload bridge)
-    components/           FloatingWindow (shared window chrome), Titlebar, Statusbar, Welcome,
-                          WorkspaceBadge/Suggest, Loading, SettingsModal, VersionSelectModal
+    components/           FloatingWindow (shared window chrome), Statusbar, Welcome (themed Logo + action
+                          cards), TabBar (the single slim top bar — no separate titlebar), WorkspaceBadge/
+                          Suggest, Loading, SettingsModal (tabbed), VersionSelectModal, CatalogModal
+                          (Block Catalog: list/grid + 3D preview — store.catalogOpen)
+    components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
+                          (themed <picture>), BlockPreview (standalone Three.js single-block render).
+                          Build dialogs/controls from these so fonts/spacing/styles stay consistent.
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows (React bindings over the vanilla stores)
-    state/                store.ts (main-mirrored + view state), settings.ts (prefs),
-                          windows.ts (floating-window layout, persisted)
+    state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
+                          windows.ts (floating-window layout, persisted), theme.ts (apply light/dark)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     viewer/               Three.js Viewer + ViewerProvider (React bridge) + mesh/geometry/texture building
   shared/
@@ -177,6 +190,16 @@ surfaces as a clear error on first send (see `authHint`).
   + knowledge (`knowledge/nbt/00-volumetric-ops.md`) steer the model to describe geometry as ops
   (one `fill` = a whole wall) instead of thousands of blocks. (There is no time cap — generation runs
   until the model is satisfied, hits `BW_AI_MAX_ROUNDS`, errors, or the user cancels.)
+- **Templates (`template` op):** the cheapest geometry primitive — `{ op:'template', name, from,
+  to, params }` expands a named preset (`structure/templates/`) into ops at compile time, so the
+  model stands up a whole building shell in ~5 lines and then layers its own ops on top. Documented
+  for the model in `knowledge/nbt/13-templates.md`; block-name params are validated against the real
+  content pack in `generate.ts` (templates intern their own palette, so those names never reach
+  `palette`). Add a preset in `templates/index.ts` + its block-name params in `BLOCK_PARAM_KEYS`.
+- **Optional build details:** `NewStructurePanel`'s composer has a "⚙ Details" section (type, style,
+  size, floors, rooms, basement, materials, decay, interior, lighting). All optional; they're folded
+  into the prompt as a structured "[Build details]" brief (renderer-side, no IPC change) and cleared
+  after sending, so follow-up edits don't re-send stale hints.
 - **Progress + cancel:** `generateStructure` takes an `onProgress` callback; `ipc.ts` forwards it
   to the renderer as `IPC_EVENTS.aiProgress` (the panel filters by session id). Phases include
   `rendering`/`reviewing` for the self-review loop. Live tokens come from `includePartialMessages`
@@ -223,9 +246,29 @@ surfaces as a clear error on first send (see `authHint`).
   File menu and the renderer both mutate it via IPC; every mutation rebuilds the menu and
   broadcasts `recentsChanged`, which the welcome view re-renders from (don't keep a separate
   authoritative copy in the renderer).
-- **macOS chrome:** the window uses `hiddenInset` titlebar + vibrancy; the titlebar is a
-  custom drag region (`-webkit-app-region: drag`). Interactive elements inside it need
-  `-webkit-app-region: no-drag`.
+- **macOS chrome:** the window uses `hiddenInset` titlebar + vibrancy. There is no separate
+  titlebar component anymore — `TabBar` is the single slim top bar (`.tabbar`, height 40, kept in
+  sync with `windows.ts` `TITLEBAR_H`); it's the drag region (`-webkit-app-region: drag`) with
+  traffic-light clearance on mac, and interactive children opt out with `no-drag`.
+- **Theming:** colors are CSS variables in `index.css` (`--panel`, `--text`, `--accent`, …);
+  components reference tokens, never hardcoded colors. Two things move together: (1) CSS — base
+  `:root` is dark, the OS drives the *default* via `@media (prefers-color-scheme: light)
+  { :root:not([data-theme]) }`, and an explicit choice sets `[data-theme="light|dark"]` (wins;
+  strict CSP forbids a no-FOUC inline script, so don't add bare `prefers-color-scheme` rules —
+  scope them to `:not([data-theme])`). (2) **`nativeTheme.themeSource`** (set from `state/theme.ts`
+  via the `themeSet` IPC) — this is what makes a forced theme actually work: it flips the macOS
+  **vibrancy material** + traffic lights AND the renderer's `prefers-color-scheme` (so a forced
+  light theme isn't dark text on a dark vibrancy backdrop). The themed `Logo` (`<picture>`) and the
+  boot splash rely on that `prefers-color-scheme` tracking. `settings.theme` is 'system'|'light'|
+  'dark' (default system). `--mono` is for numeric/dimensional data (sizes, counts, coords).
+- **App icon / logos:** the in-app logos live in `public/` (`logo-dark.png`, `logo-light.png`),
+  referenced relatively (`logo-dark.png`, not `/logo-dark.png`) so they resolve under `file://` when
+  packaged; the `Logo` component swaps them by theme. The app/dock icon is the standardized
+  **logo-dark**: `build/icon-master.png` (a trimmed, centered 1024² master) → `build/icon.icns` (the
+  packaged bundle icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`).
+  Regenerate the icon from `build/icon-master.png` (or re-trim from `public/logo-dark.png`).
+- **Boot splash:** static markup + inline `<style>` in `index.html` inside `#app`; React's
+  `createRoot(...).render()` replaces it on mount, so the window never shows empty.
 
 ## Visual testing (no screen-recording permission needed)
 

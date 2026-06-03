@@ -1,11 +1,35 @@
-// The welcome / empty screen: open actions, the active workspace's structures
-// (searchable), and the recent files / recent workspaces lists. Shown whenever
-// no structure is open. Scrolls when content is tall so nothing is ever cut off.
+// The welcome / empty screen: a hero, the primary entry actions as cards, and
+// the active workspace's structures plus recent files / workspaces. Shown
+// whenever no structure is open. Scrolls when content is tall so nothing is cut.
 import { useEffect, useMemo, useState } from 'react';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
 import { basename, dirname } from '../ui/path';
 import { useApp } from '../hooks/useStores';
+import { store } from '../state/store';
+import { Logo } from './ui/Logo';
+
+/** Minimal stroke icons for the action cards (no icon-font dependency). */
+const ICONS = {
+  spark: (
+    <path
+      d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5 10.2 7.7 12 3z"
+      fill="currentColor"
+      stroke="none"
+    />
+  ),
+  file: <path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9l-6-6z M13 3v6h6" />,
+  folder: <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h7A1.5 1.5 0 0 1 19 9v8.5A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5v-11z" />,
+  grid: <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />,
+} as const;
+
+function ActionIcon({ name }: { name: keyof typeof ICONS }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
+      {ICONS[name]}
+    </svg>
+  );
+}
 
 export function Welcome({
   onOpen,
@@ -23,17 +47,11 @@ export function Welcome({
   const workspaceStructures = useApp((s) => s.workspaceStructures);
 
   const [query, setQuery] = useState('');
-  const [hint, setHint] = useState('');
+  const [hasPack, setHasPack] = useState<boolean | null>(null);
 
   // Probe the content pack once for the empty-state hint.
   useEffect(() => {
-    void api.hasTexture('minecraft/block/stone').then((present) =>
-      setHint(
-        present
-          ? 'Content pack detected — full textures available'
-          : 'No content pack found — blocks render as flat colors',
-      ),
-    );
+    void api.hasTexture('minecraft/block/stone').then(setHasPack);
   }, []);
 
   const sortedStructures = useMemo(
@@ -42,9 +60,7 @@ export function Welcome({
   );
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q
-      ? sortedStructures.filter((p) => basename(p).toLowerCase().includes(q))
-      : sortedStructures;
+    return q ? sortedStructures.filter((p) => basename(p).toLowerCase().includes(q)) : sortedStructures;
   }, [sortedStructures, query]);
 
   const total = sortedStructures.length;
@@ -54,26 +70,49 @@ export function Welcome({
     <div className="welcome">
       <div className="welcome-inner">
         <div className="welcome-content">
-          <div className="welcome-hero">
-            <div className="welcome-icon" />
-            <h1>View Minecraft structures in 3D</h1>
-            <p>
-              Open an <code>.nbt</code> file to render it from your content pack — or drop one
-              anywhere on this window.
-            </p>
-            <div className="welcome-actions">
-              <button className="btn primary lg" onClick={onGenerate}>
-                Generate with AI ✨
-              </button>
-              <button className="btn lg" onClick={onOpen}>
-                Open NBT file
-              </button>
-              <button className="btn lg" onClick={() => void api.openWorkspace()}>
-                Open mod workspace…
-              </button>
-            </div>
-            {hint && <span className="welcome-hint">{hint}</span>}
+          <header className="welcome-hero">
+            <Logo size={72} className="welcome-mark" />
+            <h1>Blockwright</h1>
+            <p className="welcome-tagline">Build, view, and AI-generate Minecraft structures in 3D.</p>
+          </header>
+
+          <div className="welcome-actions">
+            <button className="action-card accent" onClick={onGenerate}>
+              <span className="action-ic"><ActionIcon name="spark" /></span>
+              <span className="action-body">
+                <span className="action-title">Generate with AI</span>
+                <span className="action-sub">Describe a build, get a structure</span>
+              </span>
+            </button>
+            <button className="action-card" onClick={onOpen}>
+              <span className="action-ic"><ActionIcon name="file" /></span>
+              <span className="action-body">
+                <span className="action-title">Open NBT file</span>
+                <span className="action-sub">View an existing structure</span>
+              </span>
+            </button>
+            <button className="action-card" onClick={() => void api.openWorkspace()}>
+              <span className="action-ic"><ActionIcon name="folder" /></span>
+              <span className="action-body">
+                <span className="action-title">Open mod workspace</span>
+                <span className="action-sub">Load a mod's blocks &amp; structures</span>
+              </span>
+            </button>
+            <button className="action-card" onClick={() => store.getState().setCatalogOpen(true)}>
+              <span className="action-ic"><ActionIcon name="grid" /></span>
+              <span className="action-body">
+                <span className="action-title">Block catalog</span>
+                <span className="action-sub">Browse every available block</span>
+              </span>
+            </button>
           </div>
+
+          {hasPack !== null && (
+            <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
+              <span className="welcome-hint-dot" />
+              {hasPack ? 'Content pack detected — full textures available' : 'No content pack — blocks render as flat colors'}
+            </span>
+          )}
 
           {hasLists && (
             <div className="welcome-lists">

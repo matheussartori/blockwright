@@ -120,6 +120,14 @@ export function notifyNewStructure(): void {
   mainWindow?.webContents.send(IPC_EVENTS.newStructure);
 }
 
+/** Window icon (the standardized logo-dark) for Windows/Linux — macOS uses the
+ *  app bundle icon. */
+function windowIcon(): string | undefined {
+  if (process.platform === 'darwin') return undefined;
+  const icon = path.join(app.getAppPath(), 'build', 'icon.png');
+  return fs.existsSync(icon) ? icon : undefined;
+}
+
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1180,
@@ -127,6 +135,7 @@ export function createWindow(): BrowserWindow {
     minWidth: 720,
     minHeight: 520,
     show: false,
+    icon: windowIcon(),
     backgroundColor: process.platform === 'darwin' ? '#00000000' : '#1c1c1e',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 18 },

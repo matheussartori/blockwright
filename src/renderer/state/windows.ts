@@ -32,7 +32,7 @@ export const WINDOW_WIDTHS: Record<WindowId, number> = {
   versions: 240,
 };
 
-const TITLEBAR_H = 52;
+const TITLEBAR_H = 40; // the single slim top bar (see .tabbar)
 const STATUS_H = 30;
 const MARGIN = 12;
 /** Approximate jigsaw height, only used to seed its floating home position. */

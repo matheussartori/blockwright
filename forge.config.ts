@@ -9,6 +9,9 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const config: ForgeConfig = {
   packagerConfig: {
+    // App icon (logo-dark). Forge/packager appends the platform extension:
+    // build/icon.icns on macOS, build/icon.ico on Windows.
+    icon: './build/icon',
     // Unpack the Claude Agent SDK and its platform-native `claude` binary from
     // the asar so the SDK can spawn it (an executable can't run from inside the
     // archive). generate.ts loads the SDK at runtime from node_modules.

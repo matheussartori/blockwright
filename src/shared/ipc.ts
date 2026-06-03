@@ -60,6 +60,12 @@ export const IPC_CHANNELS = {
   /** Renderer's reply to an aiRenderRequest: the captured preview image(s) (or an
    *  error). Payload: requestId + { images? , error? }. */
   aiRenderResult: 'ai:render-result',
+  /** List all placeable blocks in the active content (vanilla + workspace) → CatalogBlock[]. */
+  catalogList: 'catalog:list',
+  /** Resolve a single block (name[+props]) into a 1×1×1 StructureData for the catalog 3D preview. */
+  previewBlock: 'catalog:preview-block',
+  /** Drive the native theme (vibrancy + traffic lights + prefers-color-scheme): 'system'|'light'|'dark'. */
+  themeSet: 'theme:set',
   /** Load persisted per-NBT chat history for a key (payload: key). */
   chatHistoryGet: 'chat-history:get',
   /** Persist per-NBT chat history (payload: key + ChatRecord). */

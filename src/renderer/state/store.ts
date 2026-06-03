@@ -41,6 +41,8 @@ export interface AppState {
   suggest: Suggestion | null;
   /** Whether the Settings modal is open. */
   settingsOpen: boolean;
+  /** Whether the Block Catalog modal is open. */
+  catalogOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
   versionPromptName: string | null;
   /** A chat image being shown full-size in the lightbox overlay, or null. */
@@ -55,6 +57,7 @@ export interface AppState {
   setNotice: (notice: Notice | null) => void;
   setSuggest: (suggest: Suggestion | null) => void;
   setSettingsOpen: (open: boolean) => void;
+  setCatalogOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
 }
@@ -73,6 +76,7 @@ export const store = createStore<AppState>((set) => ({
   notice: null,
   suggest: null,
   settingsOpen: false,
+  catalogOpen: false,
   versionPromptName: null,
   imagePreview: null,
 
@@ -85,6 +89,7 @@ export const store = createStore<AppState>((set) => ({
   setNotice: (notice) => set({ notice }),
   setSuggest: (suggest) => set({ suggest }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setCatalogOpen: (catalogOpen) => set({ catalogOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),
 }));

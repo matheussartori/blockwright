@@ -20,6 +20,7 @@ import { loadKnowledge } from './knowledge';
 import { authEnv, claudeExecutablePath, hasConfiguredCredential } from './credentials';
 import { writeStructureFile, validateAuthoring, resolveBlocks, readAuthoring, type AuthoringStructure } from '../structure/compile-structure';
 import { unknownBlockIds } from '../structure/content-pack';
+import { templateBlockNames } from '../structure/templates';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),
  *  so the model can see its own build and refine it. Supplied by the IPC layer,
@@ -402,10 +403,12 @@ export async function generateStructure(
           ops: z
             .array(
               z.object({
-                op: z.enum(['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof']),
-                from: z.array(z.number().int()).optional().describe('[x,y,z] corner — for fill/hollow/walls/line/mirror/rotate/repeat/roof.'),
+                op: z.enum(['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'template']),
+                from: z.array(z.number().int()).optional().describe('[x,y,z] corner — for fill/hollow/walls/line/mirror/rotate/repeat/roof/template.'),
                 to: z.array(z.number().int()).optional().describe('[x,y,z] opposite corner — same ops as "from".'),
                 pos: z.array(z.number().int()).optional().describe('[x,y,z] — for the "block" op only.'),
+                name: z.string().optional().describe('template op: which preset to expand (e.g. "abandoned_house", "large_basement"). See the Templates guide for each preset\'s params.'),
+                params: z.record(z.string(), z.unknown()).optional().describe('template op: preset parameters (block names like "minecraft:cobblestone", counts like floors, decay 0..1). All optional — sensible defaults apply.'),
                 state: z.number().int().optional().describe('Palette index. Required for fill/hollow/walls/line/block/roof (roof: a *_stairs block). Use an air index to carve. Omit for mirror/rotate/repeat.'),
                 axis: z.enum(['x', 'y', 'z']).optional().describe('mirror: "x" or "z" (reflection plane). repeat: "x"/"y"/"z" (tiling direction).'),
                 turns: z.number().int().optional().describe('rotate: clockwise quarter-turns (1, 2 or 3) about the pivot, viewed from above.'),
@@ -427,8 +430,10 @@ export async function generateStructure(
                 'region onto itself across its centre plane — build half a symmetric facade, then mirror ' +
                 'it), rotate (turn a region about a pivot — build one arm of a cross/tower, rotate it 4×), ' +
                 'repeat (tile a region along an axis — window bays, columns). roof lays a pitched *_stairs ' +
-                'roof over an eave rectangle. Describe big builds with ops — one fill = a whole wall, one ' +
-                'mirror = a whole symmetric half — instead of thousands of per-block entries.',
+                'roof over an eave rectangle. template expands a named preset (abandoned_house, ' +
+                'large_basement) over its from/to box from a few params — use it as a starting massing, ' +
+                'then layer your own ops on top to customise. Describe big builds with ops — one fill = a ' +
+                'whole wall, one template = a whole building shell — instead of thousands of per-block entries.',
             ),
           blocks: z
             .array(
@@ -505,7 +510,12 @@ export async function generateStructure(
       // Reject unknown/misspelled block IDs: they render as a flat fallback colour
       // in the preview and place as nothing (missing block) in-game, so catch them
       // here against the real content-pack block set and have the model fix the ID.
-      const unknown = unknownBlockIds((authoring.palette ?? []).map((p) => p.Name));
+      // Template ops intern their own palette entries on expand, so also check the
+      // block-name params they carry (which never reach `palette`).
+      const templateNames = (authoring.ops ?? []).flatMap((op) =>
+        op.op === 'template' ? templateBlockNames(op.name, op.params ?? {}) : [],
+      );
+      const unknown = unknownBlockIds([...(authoring.palette ?? []).map((p) => p.Name), ...templateNames]);
       if (unknown.length > 0) {
         captureError = `Unknown block ID(s): ${unknown.join(', ')}`;
         return {

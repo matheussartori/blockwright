@@ -293,6 +293,19 @@ export interface WindowMenuState {
 
 export type WindowsReport = Record<WindowId, WindowMenuState>;
 
+/** One block in the content catalog: a placeable block discovered in the active
+ *  content (vanilla pack + the mod workspace's namespace), with a representative
+ *  texture key for a thumbnail (null when none could be resolved). */
+export interface CatalogBlock {
+  /** Full `namespace:id` (e.g. `minecraft:stone`, `theplacebeyond:ashen_block`). */
+  id: string;
+  namespace: string;
+  /** The bare block id (no namespace). */
+  block: string;
+  /** Texture key ("namespace/path") for the thumbnail, or null if unresolved. */
+  texture: string | null;
+}
+
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE), or
@@ -370,6 +383,14 @@ export interface BlockwrightApi {
   reportWindows: (state: WindowsReport) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */
   pathExists: (path: string) => Promise<boolean>;
+  /** All placeable blocks in the active content (vanilla pack + workspace namespace),
+   *  each with a representative texture key — for the Block Catalog browser. */
+  listCatalog: () => Promise<CatalogBlock[]>;
+  /** Resolve a single block into a 1×1×1 StructureData (for the catalog's 3D preview). */
+  previewBlock: (id: string) => Promise<StructureData>;
+  /** Drive the native appearance (macOS vibrancy + traffic lights + the renderer's
+   *  prefers-color-scheme) so a forced theme isn't fighting a vibrancy stuck on the OS. */
+  setThemeSource: (pref: 'system' | 'light' | 'dark') => Promise<void>;
   /** Recently opened files, most-recent first. All return the updated list. */
   listRecents: () => Promise<string[]>;
   addRecent: (path: string) => Promise<string[]>;

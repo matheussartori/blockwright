@@ -16,7 +16,6 @@ import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration, rec
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import type { Viewer } from './viewer/viewer';
 import { useActiveDoc, useDocuments } from './hooks/useStores';
-import { Titlebar } from './components/Titlebar';
 import { TabBar } from './components/TabBar';
 import { Statusbar } from './components/Statusbar';
 import { Loading } from './components/Loading';
@@ -24,6 +23,7 @@ import { Welcome } from './components/Welcome';
 import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { SettingsModal } from './components/SettingsModal';
+import { CatalogModal } from './components/CatalogModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
@@ -363,7 +363,6 @@ function Shell() {
   return (
     <>
       <div className="topbar">
-        <Titlebar />
         <TabBar onNew={newDoc} onClose={closeDocById} />
       </div>
       <main className="stage">
@@ -398,6 +397,7 @@ function Shell() {
       </main>
       <Statusbar />
       <SettingsModal />
+      <CatalogModal />
       <VersionSelectModal />
       <ImagePreview />
     </>

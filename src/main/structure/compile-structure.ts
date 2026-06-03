@@ -6,6 +6,7 @@
 import fs from 'node:fs/promises';
 import zlib from 'node:zlib';
 import * as nbt from 'prismarine-nbt';
+import { expandTemplate, isTemplateName, TEMPLATE_NAMES } from './templates';
 
 /** The loose JSON the agent emits. Mirrors the structure tag tree, but untyped
  *  (the compiler applies the NBT type rules) with the air-omission convenience. */
@@ -40,7 +41,8 @@ export type AuthoringOp =
   | { op: 'mirror'; from: [number, number, number]; to: [number, number, number]; axis: 'x' | 'z' }
   | { op: 'rotate'; from: [number, number, number]; to: [number, number, number]; turns: number; pivot?: [number, number] }
   | { op: 'repeat'; from: [number, number, number]; to: [number, number, number]; axis: 'x' | 'y' | 'z'; step: number; count: number }
-  | { op: 'roof'; from: [number, number, number]; to: [number, number, number]; state: number; style?: 'gable' | 'hip'; ridge?: 'x' | 'z'; fill?: number };
+  | { op: 'roof'; from: [number, number, number]; to: [number, number, number]; state: number; style?: 'gable' | 'hip'; ridge?: 'x' | 'z'; fill?: number }
+  | { op: 'template'; name: string; from: [number, number, number]; to: [number, number, number]; params?: Record<string, unknown> };
 
 interface AuthoringPaletteEntry {
   Name: string;
@@ -345,6 +347,16 @@ function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx): void {
  *  read cells placed by earlier ops and may intern new palette entries. */
 function applyOp(op: AuthoringOp, ctx: OpCtx): void {
   const { cells, palette, intern, size } = ctx;
+  if (op.op === 'template') {
+    // Expand the template into ordinary ops (interning palette entries by block
+    // name) and apply them in order, exactly as if the model had authored them.
+    const internByName = (name: string, props?: Record<string, string>): number =>
+      intern({ Name: name, Properties: props });
+    for (const inner of expandTemplate(op.name, op.from, op.to, op.params ?? {}, internByName)) {
+      applyOp(inner, ctx);
+    }
+    return;
+  }
   if (op.op === 'block') {
     cells.set(posKey(...op.pos), { state: op.state, pos: op.pos, ...(op.nbt ? { nbt: op.nbt } : {}) });
     return;
@@ -606,7 +618,7 @@ export function validateAuthoring(s: AuthoringStructure): void {
 
   const ops = s.ops ?? [];
   if (!Array.isArray(ops)) throw new Error('ops must be an array');
-  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof'];
+  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'template'];
   ops.forEach((o, i) => {
     const op = o as AuthoringOp;
     if (!o || !OP_KINDS.includes(op.op)) {
@@ -615,6 +627,19 @@ export function validateAuthoring(s: AuthoringStructure): void {
     if (op.op === 'block') {
       checkState(op.state, `ops[${i}].state`);
       checkPos(op.pos, `ops[${i}].pos`);
+      return;
+    }
+    if (op.op === 'template') {
+      // Template ops carry a name + bounding box (no palette index — the template
+      // interns its own entries on expand). The box must sit inside `size`.
+      if (!isTemplateName(op.name)) {
+        throw new Error(`ops[${i}].name "${op.name}" is not a known template (${TEMPLATE_NAMES.join(', ')})`);
+      }
+      checkPos(op.from, `ops[${i}].from`);
+      checkPos(op.to, `ops[${i}].to`);
+      if (op.params !== undefined && (typeof op.params !== 'object' || op.params === null || Array.isArray(op.params))) {
+        throw new Error(`ops[${i}].params must be an object`);
+      }
       return;
     }
     // All remaining ops take a from/to box.

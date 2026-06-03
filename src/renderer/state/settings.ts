@@ -5,7 +5,12 @@
 // match the rest of the renderer.
 import { createStore } from 'zustand/vanilla';
 
+/** Color theme: follow the OS, or force light/dark. */
+export type ThemePref = 'system' | 'light' | 'dark';
+
 export interface Settings {
+  /** Color theme. `system` follows the OS appearance (the default). */
+  theme: ThemePref;
   /** Mouse-look multiplier in fly mode. */
   lookSensitivity: number;
   /** Invert the vertical look axis in fly mode. */
@@ -21,6 +26,7 @@ export interface Settings {
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
+  theme: 'system',
   lookSensitivity: 1,
   invertY: false,
   showGrid: true,
@@ -57,6 +63,7 @@ export const settingsStore = createStore<SettingsState>((set) => ({
 /** Snapshot of just the persisted slice (drops the action methods). */
 function snapshot(s: SettingsState): Settings {
   return {
+    theme: s.theme,
     lookSensitivity: s.lookSensitivity,
     invertY: s.invertY,
     showGrid: s.showGrid,
