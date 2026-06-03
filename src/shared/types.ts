@@ -1,5 +1,6 @@
 // Shared, type-only contracts between the main and renderer processes.
 // (No runtime code lives here so both Vite bundles can import it safely.)
+import type { AiConfig, AiProviderId } from './ai';
 
 export type FaceDir = 'down' | 'up' | 'north' | 'south' | 'east' | 'west';
 
@@ -189,8 +190,12 @@ export type GenerateResult =
       blockCount: number;
       /** The SDK conversation id, so the renderer can persist it for resume. */
       sdkSessionId: string | null;
+      /** Prompt (input) tokens consumed across the whole turn, incl. cached context. */
+      tokensIn: number;
+      /** Generated (output) tokens across the whole turn. */
+      tokensOut: number;
     }
-  | { ok: false; error: string; canceled?: boolean };
+  | { ok: false; error: string; canceled?: boolean; tokensIn?: number; tokensOut?: number };
 
 /** Result of exporting (copying) the current build's `.nbt` to a user-chosen
  *  location via the native Save dialog. */
@@ -215,7 +220,20 @@ export interface ChatMessage {
   error?: boolean;
   /** Reference image data URLs shown as thumbnails (user messages only). */
   images?: string[];
-  meta?: { version: number; size: [number, number, number]; blockCount: number; tookMs?: number };
+  /** Footer stats shown under an assistant message. Present on every completed
+   *  turn — success, cancel, or error — so the run's time/token cost is never
+   *  hidden. Build fields (version/size/blockCount) only exist on a successful emit. */
+  meta?: {
+    version?: number;
+    size?: [number, number, number];
+    blockCount?: number;
+    /** Wall-clock duration of the turn (ms). */
+    tookMs?: number;
+    /** Prompt (input) tokens consumed this turn. */
+    tokensIn?: number;
+    /** Generated (output) tokens this turn. */
+    tokensOut?: number;
+  };
 }
 
 /** A named vertical level the user defined for a generated build, used as context
@@ -284,16 +302,6 @@ export interface GenerateProgress {
   turns: number;
 }
 
-/** Non-secret status of the stored Anthropic API key (the key itself never
- *  crosses the bridge). `fromEnv` means it's pinned by ANTHROPIC_API_KEY and so
- *  can't be edited in-app. */
-export interface ApiKeyInfo {
-  set: boolean;
-  /** A masked tail like `…1a2b`, or null when no key is set. */
-  hint: string | null;
-  fromEnv: boolean;
-}
-
 /** The standardized panels/windows the View menu can show/hide. */
 export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions';
 
@@ -354,14 +362,18 @@ export interface BlockwrightApi {
   assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
   /** Candidate pieces that can attach to one connector of a structure (manual mode). */
   jigsawCandidates: (path: string, connectorIndex: number) => Promise<JigsawCandidate[]>;
-  /** Whether an Anthropic API key is configured (gates the AI generation UI). */
+  /** Whether the active AI provider is usable right now (gates the generation UI). */
   aiAvailable: () => Promise<boolean>;
-  /** Non-secret status of the stored API key (for the Settings panel). */
-  aiKeyInfo: () => Promise<ApiKeyInfo>;
-  /** Store the Anthropic API key (encrypted, in the main process); returns its new status. */
-  aiSetKey: (key: string) => Promise<ApiKeyInfo>;
-  /** Remove the stored Anthropic API key; returns its new status. */
-  aiClearKey: () => Promise<ApiKeyInfo>;
+  /** The full multi-provider AI config (providers + active selection) for Settings. */
+  aiGetConfig: () => Promise<AiConfig>;
+  /** Set which provider generation runs on; returns the updated config. */
+  aiSetActiveProvider: (id: AiProviderId) => Promise<AiConfig>;
+  /** Set a provider's chosen model; returns the updated config. */
+  aiSetModel: (id: AiProviderId, model: string) => Promise<AiConfig>;
+  /** Store a provider's credential (encrypted, in the main process); returns the updated config. */
+  aiSetCredential: (id: AiProviderId, secret: string) => Promise<AiConfig>;
+  /** Remove a provider's stored credential; returns the updated config. */
+  aiClearCredential: (id: AiProviderId) => Promise<AiConfig>;
   /** Generate or edit a structure for a session; returns the written `.nbt` or an error.
    *  Optional reference images are sent to the model as visual guidance. `basePath` is
    *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model with

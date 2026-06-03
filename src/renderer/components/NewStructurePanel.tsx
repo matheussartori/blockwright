@@ -348,19 +348,37 @@ export function GenerateContent() {
           <div key={i} className={`gen-msg ${m.role}${m.error ? ' error' : ''}`}>
             {m.meta && (
               <div className="gen-stats gen-result-stats">
-                <span className="gen-stat gen-stat-version">v{m.meta.version}</span>
-                <span className="gen-stat" title="Dimensions (W×H×D)">
-                  <span className="gen-stat-label">Size</span>
-                  <span className="gen-stat-value">{m.meta.size.join('×')}</span>
-                </span>
-                <span className="gen-stat" title="Block count">
-                  <span className="gen-stat-label">Blocks</span>
-                  <span className="gen-stat-value">{m.meta.blockCount.toLocaleString()}</span>
-                </span>
+                {m.meta.version != null && (
+                  <span className="gen-stat gen-stat-version">v{m.meta.version}</span>
+                )}
+                {m.meta.size && (
+                  <span className="gen-stat" title="Dimensions (W×H×D)">
+                    <span className="gen-stat-label">Size</span>
+                    <span className="gen-stat-value">{m.meta.size.join('×')}</span>
+                  </span>
+                )}
+                {m.meta.blockCount != null && (
+                  <span className="gen-stat" title="Block count">
+                    <span className="gen-stat-label">Blocks</span>
+                    <span className="gen-stat-value">{m.meta.blockCount.toLocaleString()}</span>
+                  </span>
+                )}
                 {m.meta.tookMs != null && (
                   <span className="gen-stat" title="Generation time">
                     <span className="gen-stat-label">Time</span>
                     <span className="gen-stat-value">{formatElapsed(m.meta.tookMs)}</span>
+                  </span>
+                )}
+                {m.meta.tokensIn != null && (
+                  <span className="gen-stat" title="Prompt tokens sent (incl. cached context)">
+                    <span className="gen-stat-label">↑ In</span>
+                    <span className="gen-stat-value">{m.meta.tokensIn.toLocaleString()}</span>
+                  </span>
+                )}
+                {m.meta.tokensOut != null && (
+                  <span className="gen-stat" title="Tokens generated">
+                    <span className="gen-stat-label">↓ Out</span>
+                    <span className="gen-stat-value">{m.meta.tokensOut.toLocaleString()}</span>
                   </span>
                 )}
               </div>

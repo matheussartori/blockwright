@@ -12,10 +12,15 @@ const config: ForgeConfig = {
     // App icon (logo-dark). Forge/packager appends the platform extension:
     // build/icon.icns on macOS, build/icon.ico on Windows.
     icon: './build/icon',
-    // Unpack the Claude Agent SDK and its platform-native `claude` binary from
-    // the asar so the SDK can spawn it (an executable can't run from inside the
-    // archive). generate.ts loads the SDK at runtime from node_modules.
-    asar: { unpack: '**/node_modules/{@anthropic-ai/claude-agent-sdk,@anthropic-ai/claude-agent-sdk-*}/**' },
+    // Unpack the agentic SDKs and their platform-native binaries from the asar so
+    // they can be spawned (an executable can't run from inside the archive): the
+    // Claude Agent SDK's `claude` binary and the Codex SDK's `codex` binary (which
+    // lives in the @openai/codex* native packages). The driver modules load these
+    // at runtime from node_modules.
+    asar: {
+      unpack:
+        '**/node_modules/{@anthropic-ai/claude-agent-sdk,@anthropic-ai/claude-agent-sdk-*,@openai/codex-sdk,@openai/codex,@openai/codex-*}/**',
+    },
     // Ship the Minecraft content pack and the AI knowledge base alongside the
     // app (both resolved at runtime).
     extraResource: ['content', 'knowledge'],

@@ -96,10 +96,20 @@ one of these before handing off:
   cell leaves the upper one floating (it can't stand on the candle below). To show more candles,
   raise the `candles` count (1–4) within the *same* block or spread them across separate
   solid-topped surfaces, not vertically.
-- **Containers face the player, not the wall.** A `chest`/`barrel`/`furnace` `facing` is the side
-  you open from; aim it at the open room or aisle, **never into an adjacent wall or block** (a chest
-  whose front is buried can't be opened and looks like a bug). Back against the wall, front to the
-  room; a wall-side barrel can use `facing:up` instead.
+- **Interactive blocks face the player, not the wall.** Any openable/usable block — `chest`/
+  `trapped_chest`, `barrel`, `furnace`/`smoker`/`blast_furnace`, `loom`, `lectern`, `stonecutter`,
+  `grindstone`, `anvil` — has a `facing` that is the side you open/use it from. When it's pushed
+  against a wall (it almost always is), aim its **front at the open room** and its **back at the
+  wall** — a `furnace` on a south wall is `facing:north`. A block whose front points **into** the
+  wall (back to the room) can't be opened and reads as **placed backwards** — one of the most glaring
+  mistakes, so set `facing` deliberately for each. Never bury the front; keep the cell in front of it
+  clear so the player can reach it. A wall-side `barrel` can use `facing:up` instead.
+- **Decoration never overwrites structure.** Furniture, lights, pots, carpets, and trim go in the
+  **empty** cells of the build — they must not replace a wall, floor, ceiling, pillar, or any
+  structural/load-bearing block. Because later ops overwrite earlier cells, dropping a decoration op
+  on a cell already holding a wall or floor block **punches a hole** in the structure (a wall with a
+  chest-shaped gap, a missing floor tile under a rug). Build the shell first, then place decor *into
+  the air* beside/against it — never on top of a block the structure needs.
 - **Cobweb is sparse decoration, not a building material.** `cobweb` is **not** a stair, ladder,
   scaffold, floor, or path — you cannot climb it or walk up it, and a diagonal run of cobwebs is not
   a staircase, it's just floating junk. Use it only as the occasional *single* strand tucked into a
@@ -321,8 +331,12 @@ Catch these in the preview ([`07`](07-workflow.md)):
   and theme like any other room.
 - ❌ Cauldron/furnace/pot stuck to a ceiling or wall → ✅ floor fixtures rest the right way up on a
   solid block; hang things with `chain`+`lantern` or hanging signs instead.
-- ❌ Chest/barrel floating over a stairwell or facing into a wall → ✅ on a solid block, opening
-  faced at the open room.
+- ❌ Chest/barrel/furnace floating over a stairwell or facing **into** the wall (back to the room) →
+  ✅ on a solid block, front faced at the open room, back to the wall.
+- ❌ Decoration op carved a hole in a wall/floor (a chest-shaped gap, a missing floor tile) → ✅ decor
+  placed into empty cells; never overwriting a structural block.
+- ❌ A chest front / stair landing / doorway buried behind decoration → ✅ accesses kept clear and
+  reachable.
 - ❌ Carpet/candle/pressure plate floating over air → ✅ laid directly on a solid block (they break
   on spawn otherwise).
 - ❌ Table with a full-block/double-slab top or a leg hovering over air → ✅ thin top (single

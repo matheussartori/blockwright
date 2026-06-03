@@ -8,7 +8,7 @@ import { api } from '../api';
 import { settingsStore } from '../state/settings';
 import { store } from '../state/store';
 import { useApp, useSettings } from '../hooks/useStores';
-import type { ApiKeyInfo } from '@/shared/types';
+import { AI_PROVIDERS, type AiConfig, type AiProviderId, type AiProviderState } from '@/shared/ai';
 import type { ThemePref } from '../state/settings';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
@@ -68,7 +68,7 @@ export function SettingsModal() {
       <div className="settings-pane">
         {tab === 'appearance' && <AppearanceTab />}
         {tab === 'viewer' && <ViewerTab />}
-        {tab === 'ai' && <ApiKeySection />}
+        {tab === 'ai' && <AiTab />}
         {tab === 'about' && <AboutTab />}
       </div>
     </Modal>
@@ -184,8 +184,8 @@ function AboutTab() {
 
       <div className="about-credits">
         <p>
-          Crafted by <strong>Matheus Sartori</strong>. AI generation runs on your Claude
-          subscription via Claude Code.
+          Crafted by <strong>Matheus Sartori</strong>. AI generation runs on the provider you choose in
+          Settings ▸ AI — your Claude or ChatGPT subscription, or an Anthropic, OpenAI, or Gemini API key.
         </p>
         <p className="about-built">
           Built with Electron, Vite, React &amp; Three.js. Structure parsing by prismarine-nbt.
@@ -195,75 +195,143 @@ function AboutTab() {
   );
 }
 
-/** Anthropic API key entry. The key is stored (encrypted) in the main process;
- *  we only ever read back a "set?" flag and a masked hint, never the secret. */
-function ApiKeySection() {
-  const [info, setInfo] = useState<ApiKeyInfo | null>(null);
+/** AI provider configuration: pick the active backend, choose its model, and
+ *  manage per-provider credentials. Secrets are stored (encrypted) in the main
+ *  process; only a "configured?" flag, a masked hint, and the chosen model ever
+ *  cross the bridge. */
+function AiTab() {
+  const [config, setConfig] = useState<AiConfig | null>(null);
+
+  useEffect(() => {
+    void api.aiGetConfig().then(setConfig);
+  }, []);
+
+  if (!config) return <section className="settings-group" />;
+
+  const stateOf = (id: AiProviderId): AiProviderState =>
+    config.providers.find((p) => p.id === id) ?? { id, configured: false, fromEnv: false, hint: null, model: '' };
+
+  return (
+    <>
+      <section className="settings-group">
+        <div className="settings-group-name">Active provider</div>
+        <label className="setting-row">
+          <span className="setting-label">Generate with</span>
+          <select
+            className="input setting-select"
+            value={config.activeProvider}
+            onChange={(e) => void api.aiSetActiveProvider(e.target.value as AiProviderId).then(setConfig)}
+          >
+            {AI_PROVIDERS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+                {stateOf(m.id).configured ? '' : m.authKind === 'api-key' ? ' — needs a key' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="setting-note">
+          Choose which backend builds your structures. You can configure several below and switch any time.
+        </p>
+      </section>
+
+      {AI_PROVIDERS.map((meta) => (
+        <ProviderCard
+          key={meta.id}
+          meta={meta}
+          state={stateOf(meta.id)}
+          active={config.activeProvider === meta.id}
+          onChange={setConfig}
+        />
+      ))}
+    </>
+  );
+}
+
+function ProviderCard({
+  meta,
+  state,
+  active,
+  onChange,
+}: {
+  meta: (typeof AI_PROVIDERS)[number];
+  state: AiProviderState;
+  active: boolean;
+  onChange: (c: AiConfig) => void;
+}) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Refresh the status when the tab mounts (it may have changed elsewhere).
-  useEffect(() => {
-    setDraft('');
-    void api.aiKeyInfo().then(setInfo);
-  }, []);
-
   const save = async () => {
-    const key = draft.trim();
-    if (!key || busy) return;
+    const secret = draft.trim();
+    if (!secret || busy) return;
     setBusy(true);
     try {
-      setInfo(await api.aiSetKey(key));
+      onChange(await api.aiSetCredential(meta.id, secret));
       setDraft('');
     } finally {
       setBusy(false);
     }
   };
-
   const remove = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      setInfo(await api.aiClearKey());
+      onChange(await api.aiClearCredential(meta.id));
     } finally {
       setBusy(false);
     }
   };
 
+  const status = state.fromEnv
+    ? 'From environment'
+    : state.configured
+      ? `Configured (${state.hint})`
+      : meta.authKind === 'subscription'
+        ? 'CLI login'
+        : 'Not set';
+
   return (
-    <section className="settings-group">
-      <div className="settings-group-name">AI structure generation</div>
-      {info?.fromEnv ? (
+    <section className="settings-group ai-provider">
+      <div className="ai-provider-head">
+        <span className="settings-group-name">{meta.label}</span>
+        {active && <span className="ai-pill ai-pill-active">Active</span>}
+        <span className={`ai-pill${state.configured || state.fromEnv ? ' ai-pill-ok' : ''}`}>{status}</span>
+      </div>
+      <p className="setting-note">{meta.blurb}</p>
+
+      <label className="setting-row">
+        <span className="setting-label">Model</span>
+        <select
+          className="input setting-select"
+          value={state.model}
+          onChange={(e) => void api.aiSetModel(meta.id, e.target.value).then(onChange)}
+        >
+          {meta.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {state.fromEnv ? (
         <p className="setting-note">
-          Using the credential from your environment (<code>CLAUDE_CODE_OAUTH_TOKEN</code> or{' '}
-          <code>ANTHROPIC_API_KEY</code>). Unset it to manage the credential here instead.
+          Pinned by <code>{meta.envVars.join('</code> / <code>')}</code> in your environment. Unset it to manage the credential here.
         </p>
       ) : (
         <>
-          <p className="setting-note">
-            Generation runs on your Claude subscription through Claude Code. If you're{' '}
-            <strong>already logged into Claude Code</strong> on this machine, there's nothing to set here — it
-            just works.
-          </p>
-          <p className="setting-note">
-            {info?.set ? (
-              <>
-                A credential is saved (<code>{info.hint}</code>), stored encrypted on this device. Enter a new
-                one below to replace it.
-              </>
-            ) : (
-              <>
-                Otherwise, paste a token from <code>claude setup-token</code> (uses your Pro/Max plan) or an
-                Anthropic API key. It's stored encrypted on this device and only handed to the Claude Code
-                process.
-              </>
-            )}
-          </p>
+          {meta.authKind === 'subscription' && (
+            <p className="setting-note">
+              Sign in via the CLI (Claude Code / <code>codex login</code>) and it just works — a token below is
+              optional, for machines without an interactive login.
+            </p>
+          )}
           <div className="setting-key-row">
             <input
               className="input setting-key-input"
               type="password"
-              placeholder="sk-ant-oat… or sk-ant-api…"
+              placeholder={meta.keyPlaceholder}
               autoComplete="off"
               spellCheck={false}
               value={draft}
@@ -277,7 +345,7 @@ function ApiKeySection() {
             <button className="btn primary sm" onClick={() => void save()} disabled={busy || !draft.trim()}>
               Save
             </button>
-            {info?.set && (
+            {state.configured && (
               <button className="btn sm" onClick={() => void remove()} disabled={busy}>
                 Remove
               </button>

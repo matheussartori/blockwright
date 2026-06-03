@@ -1,99 +1,265 @@
-// Auth for AI structure generation. Generation runs through the Claude Agent
-// SDK (see generate.ts), which authenticates the same way the Claude Code CLI
-// does — so on a machine where the user is already logged into Claude Code, it
-// uses that login (their Pro/Max subscription) with no extra setup.
+// Auth + per-provider configuration for AI structure generation.
 //
-// For machines without an interactive login, the user can paste a credential in
-// Settings: either a long-lived token from `claude setup-token` (subscription)
-// or a plain Anthropic API key. It's encrypted at rest via the OS keychain
-// (Electron `safeStorage`) and only ever leaves the main process as an env var
-// handed to the SDK subprocess. Environment variables, when present, win.
+// Blockwright can drive several backends (see shared/ai.ts). Each carries its own
+// credential: a subscription/CLI login or token (Claude Code, Codex) or a paid
+// API key (Anthropic, OpenAI, Gemini). Secrets are stored together in one blob,
+// encrypted at rest via the OS keychain (Electron `safeStorage`), and only ever
+// leave the main process as the right env var / client option handed to the
+// provider. Environment variables, when present, win and lock the field in-app.
+//
+// Non-secret preferences (the active provider, and the chosen model per provider)
+// live in a separate plaintext JSON so they survive even when encryption is
+// unavailable.
 import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ApiKeyInfo } from '@/shared/types';
+import {
+  AI_PROVIDERS,
+  DEFAULT_PROVIDER,
+  providerMeta,
+  type AiConfig,
+  type AiProviderId,
+  type AiProviderMeta,
+  type AiProviderState,
+} from '@/shared/ai';
 
-// undefined = not loaded from disk yet; null = loaded, nothing stored.
-let cache: string | null | undefined;
+// --- on-disk locations -------------------------------------------------------
 
-function storeFile(): string {
+function secretsFile(): string {
+  return path.join(app.getPath('userData'), 'ai-credentials.bin');
+}
+function prefsFile(): string {
+  return path.join(app.getPath('userData'), 'ai-config.json');
+}
+/** The pre-multi-provider single-credential file (Claude only). Migrated on first read. */
+function legacyFile(): string {
   return path.join(app.getPath('userData'), 'claude-credential.bin');
 }
 
-/** OAuth tokens from `claude setup-token` start with `sk-ant-oat`; anything else
- *  (e.g. `sk-ant-api…`) is treated as a plain API key. */
-function isOAuthToken(secret: string): boolean {
-  return secret.startsWith('sk-ant-oat');
-}
+// --- secrets (encrypted map) -------------------------------------------------
 
-function readStored(): string | null {
+// undefined = not loaded from disk yet.
+let secretsCache: Partial<Record<AiProviderId, string>> | undefined;
+
+function readSecrets(): Partial<Record<AiProviderId, string>> {
   try {
-    const buf = fs.readFileSync(storeFile());
-    if (!safeStorage.isEncryptionAvailable()) return null;
-    return safeStorage.decryptString(buf).trim() || null;
+    const buf = fs.readFileSync(secretsFile());
+    if (!safeStorage.isEncryptionAvailable()) return {};
+    const json = safeStorage.decryptString(buf);
+    const parsed = JSON.parse(json) as Partial<Record<AiProviderId, string>>;
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
-    return null;
+    return migrateLegacy();
   }
 }
 
-/** The credential saved in-app (not counting the environment). */
-export function getStoredCredential(): string | null {
-  if (cache === undefined) cache = readStored();
-  return cache;
-}
-
-/** Persist (encrypted) or, given an empty string, clear the credential. */
-export function setCredential(secret: string): void {
-  const trimmed = secret.trim();
-  if (!trimmed) {
-    clearCredential();
-    return;
-  }
-  cache = trimmed;
+/** Migrate the old single Claude credential into the new map (best-effort). */
+function migrateLegacy(): Partial<Record<AiProviderId, string>> {
   try {
-    if (safeStorage.isEncryptionAvailable()) {
-      fs.writeFileSync(storeFile(), safeStorage.encryptString(trimmed));
-    }
+    const buf = fs.readFileSync(legacyFile());
+    if (!safeStorage.isEncryptionAvailable()) return {};
+    const secret = safeStorage.decryptString(buf).trim();
+    if (!secret) return {};
+    // An `sk-ant-api…` key is an API key; an `sk-ant-oat…` token is the subscription.
+    const id: AiProviderId = secret.startsWith('sk-ant-api') ? 'claude-api' : 'claude-subscription';
+    const map: Partial<Record<AiProviderId, string>> = { [id]: secret };
+    writeSecrets(map);
+    fs.rmSync(legacyFile(), { force: true });
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+function writeSecrets(map: Partial<Record<AiProviderId, string>>): void {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return;
+    fs.writeFileSync(secretsFile(), safeStorage.encryptString(JSON.stringify(map)));
   } catch {
     // Best-effort: a failed write just means it won't survive a restart.
   }
 }
 
-export function clearCredential(): void {
-  cache = null;
+function secrets(): Partial<Record<AiProviderId, string>> {
+  if (secretsCache === undefined) secretsCache = readSecrets();
+  return secretsCache;
+}
+
+/** The credential saved in-app for a provider (not counting the environment). */
+export function getStoredCredential(id: AiProviderId): string | null {
+  return secrets()[id]?.trim() || null;
+}
+
+/** Persist (encrypted) or, given an empty string, clear a provider's credential. */
+export function setCredential(id: AiProviderId, secret: string): void {
+  const map = { ...secrets() };
+  const trimmed = secret.trim();
+  if (trimmed) map[id] = trimmed;
+  else delete map[id];
+  secretsCache = map;
+  writeSecrets(map);
+}
+
+export function clearCredential(id: AiProviderId): void {
+  setCredential(id, '');
+}
+
+// --- preferences (plaintext) -------------------------------------------------
+
+interface Prefs {
+  activeProvider: AiProviderId;
+  models: Partial<Record<AiProviderId, string>>;
+}
+let prefsCache: Prefs | undefined;
+
+function readPrefs(): Prefs {
   try {
-    fs.rmSync(storeFile(), { force: true });
+    const parsed = JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) as Partial<Prefs>;
+    return {
+      activeProvider: parsed.activeProvider && providerMeta(parsed.activeProvider)
+        ? parsed.activeProvider
+        : DEFAULT_PROVIDER,
+      models: parsed.models ?? {},
+    };
+  } catch {
+    return { activeProvider: DEFAULT_PROVIDER, models: {} };
+  }
+}
+
+function prefs(): Prefs {
+  if (prefsCache === undefined) prefsCache = readPrefs();
+  return prefsCache;
+}
+
+function writePrefs(next: Prefs): void {
+  prefsCache = next;
+  try {
+    fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2));
   } catch {
     // Best-effort.
   }
 }
 
-function envToken(): string | null {
-  return process.env.CLAUDE_CODE_OAUTH_TOKEN?.trim() || null;
-}
-function envApiKey(): string | null {
-  return process.env.ANTHROPIC_API_KEY?.trim() || null;
+export function setActiveProvider(id: AiProviderId): void {
+  if (!providerMeta(id)) return;
+  writePrefs({ ...prefs(), activeProvider: id });
 }
 
-/** The environment the Agent SDK subprocess should run with. The SDK *replaces*
- *  the subprocess environment, so we pass the full `process.env` through (for
- *  PATH/HOME) and layer the right credential var on top when one is configured
- *  in-app and the environment doesn't already pin one. */
-export function authEnv(): Record<string, string | undefined> {
+export function setModel(id: AiProviderId, model: string): void {
+  const meta = providerMeta(id);
+  if (!meta) return;
+  writePrefs({ ...prefs(), models: { ...prefs().models, [id]: model.trim() || meta.defaultModel } });
+}
+
+/** The model chosen for a provider, falling back to its default. */
+export function modelFor(id: AiProviderId): string {
+  const meta = providerMeta(id);
+  return prefs().models[id]?.trim() || meta?.defaultModel || '';
+}
+
+// --- environment-pinned credentials ------------------------------------------
+
+/** First non-empty env var among a provider's recognised names, or null. */
+function envCredential(meta: AiProviderMeta): string | null {
+  for (const name of meta.envVars) {
+    const v = process.env[name]?.trim();
+    if (v) return v;
+  }
+  return null;
+}
+
+/** The effective credential for a provider: env wins, else the stored secret. */
+function effectiveCredential(id: AiProviderId): { value: string | null; fromEnv: boolean } {
+  const meta = providerMeta(id);
+  if (!meta) return { value: null, fromEnv: false };
+  const env = envCredential(meta);
+  if (env) return { value: env, fromEnv: true };
+  return { value: getStoredCredential(id), fromEnv: false };
+}
+
+// --- resolved config for the drivers + UI ------------------------------------
+
+/** A provider's credential resolved for use by its driver. */
+export interface ResolvedCredential {
+  id: AiProviderId;
+  authKind: AiProviderMeta['authKind'];
+  /** The secret (token/API key), or null — subscription providers may still work
+   *  via an existing CLI login when null. */
+  value: string | null;
+  fromEnv: boolean;
+  model: string;
+}
+
+/** Resolve everything a driver needs for the active provider. */
+export function activeCredential(): ResolvedCredential {
+  const id = prefs().activeProvider;
+  const meta = providerMeta(id) ?? AI_PROVIDERS[0];
+  const { value, fromEnv } = effectiveCredential(id);
+  // BW_AI_MODEL overrides the chosen model for whichever provider is active.
+  const model = process.env.BW_AI_MODEL?.trim() || modelFor(id);
+  return { id: meta.id, authKind: meta.authKind, value, fromEnv, model };
+}
+
+/** Whether the *active* provider is usable right now (drives the panel's hint).
+ *  Subscription providers are optimistic (a CLI login may exist); api-key
+ *  providers need a key. */
+export function aiAvailable(): boolean {
+  const id = prefs().activeProvider;
+  const meta = providerMeta(id);
+  if (!meta) return false;
+  if (meta.authKind === 'subscription') return true;
+  return !!effectiveCredential(id).value;
+}
+
+/** Mask a secret down to a short tail like `…1a2b`. */
+function mask(secret: string): string {
+  return `…${secret.slice(-4)}`;
+}
+
+/** The full, non-secret AI config for the Settings panel. */
+export function getConfig(): AiConfig {
+  const providers: AiProviderState[] = AI_PROVIDERS.map((meta) => {
+    const { value, fromEnv } = effectiveCredential(meta.id);
+    return {
+      id: meta.id,
+      configured: !!value,
+      fromEnv,
+      hint: value ? mask(value) : null,
+      model: modelFor(meta.id),
+    };
+  });
+  return { providers, activeProvider: prefs().activeProvider };
+}
+
+// --- subprocess env for the SDK-based providers ------------------------------
+
+/** The environment the Claude Agent SDK / Codex CLI subprocess should run with.
+ *  The SDK replaces the subprocess environment, so we pass the full `process.env`
+ *  through (for PATH/HOME) and layer the right credential var on top when one is
+ *  configured in-app and the environment doesn't already pin it. `id` selects
+ *  which provider's credential to apply. */
+export function authEnv(id: AiProviderId): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env };
   env.CLAUDE_AGENT_SDK_CLIENT_APP = 'blockwright';
-  if (!envToken() && !envApiKey()) {
-    const stored = getStoredCredential();
-    if (stored) {
-      if (isOAuthToken(stored)) env.CLAUDE_CODE_OAUTH_TOKEN = stored;
-      else env.ANTHROPIC_API_KEY = stored;
+  const meta = providerMeta(id);
+  if (!meta) return env;
+  const { value, fromEnv } = effectiveCredential(id);
+  if (value && !fromEnv) {
+    if (id === 'claude-subscription') {
+      if (value.startsWith('sk-ant-api')) env.ANTHROPIC_API_KEY = value;
+      else env.CLAUDE_CODE_OAUTH_TOKEN = value;
+    } else if (id === 'claude-api') {
+      env.ANTHROPIC_API_KEY = value;
+    } else if (id === 'codex') {
+      env.CODEX_API_KEY = value;
+      env.OPENAI_API_KEY = value;
     }
   }
   return env;
 }
 
-/** Path to the SDK's bundled `claude` binary. In dev the SDK resolves it from
- *  node_modules itself; when packaged it's unpacked from the asar (see
+/** Path to the Agent SDK's bundled `claude` binary. In dev the SDK resolves it
+ *  from node_modules itself; when packaged it's unpacked from the asar (see
  *  forge.config.ts) so the subprocess is spawnable. */
 export function claudeExecutablePath(): string | undefined {
   if (process.env.BW_CLAUDE_BIN) return process.env.BW_CLAUDE_BIN;
@@ -101,20 +267,4 @@ export function claudeExecutablePath(): string | undefined {
   const pkg = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
   const bin = process.platform === 'win32' ? 'claude.exe' : 'claude';
   return path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', pkg, bin);
-}
-
-/** Whether a credential is explicitly configured (env or in-app). Note this can
- *  be false while generation still works via an existing Claude Code login. */
-export function hasConfiguredCredential(): boolean {
-  return !!(envToken() || envApiKey() || getStoredCredential());
-}
-
-/** Non-secret status for the Settings panel. */
-export function credentialInfo(): ApiKeyInfo {
-  const active = envToken() || envApiKey() || getStoredCredential() || null;
-  return {
-    set: !!active,
-    hint: active ? `…${active.slice(-4)}` : null,
-    fromEnv: !!(envToken() || envApiKey()),
-  };
 }

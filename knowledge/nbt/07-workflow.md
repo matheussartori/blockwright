@@ -112,6 +112,15 @@ it bigger"*:
 - Re-run the sanity checks (a bigger build means new `size` and possibly out-of-bounds risk).
 - Re-preview and confirm only the intended thing changed.
 
+**Removing means deleting, not refilling.** When the request is to *remove* something — *"take off
+the facade"*, *"remove the door"*, *"get rid of the porch"*, *"delete that decoration"* — set the
+cells that made up that feature back to **air** (or to the plain wall/floor block that belongs there
+underneath it). Walling a removed doorway up with `cobblestone`, or plugging a stripped-off facade
+with `stone`, is **not** removing it — it's replacing one thing with another, and the user will see
+a patch of filler where they expected open space. With ops: `fill` exactly the feature's cells with
+the **air** palette index (index 0 by convention), and pull the now-unused decoration blocks out.
+Take out *only* the removed feature's blocks and leave the rest of the build untouched and clean.
+
 ## What to return alongside the NBT
 
 A short note helps the user and future edits:

@@ -9,7 +9,8 @@ import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './st
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/block-catalog';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
-import { credentialInfo, clearCredential, setCredential } from './ai/credentials';
+import { getConfig, setActiveProvider, setModel, setCredential, clearCredential } from './ai/credentials';
+import type { AiProviderId } from '@/shared/ai';
 import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
@@ -113,14 +114,22 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.aiAvailable, async () => aiAvailable());
-  ipcMain.handle(IPC_CHANNELS.aiKeyInfo, async () => credentialInfo());
-  ipcMain.handle(IPC_CHANNELS.aiSetKey, async (_e, key: string) => {
-    setCredential(key);
-    return credentialInfo();
+  ipcMain.handle(IPC_CHANNELS.aiGetConfig, async () => getConfig());
+  ipcMain.handle(IPC_CHANNELS.aiSetActiveProvider, async (_e, id: AiProviderId) => {
+    setActiveProvider(id);
+    return getConfig();
   });
-  ipcMain.handle(IPC_CHANNELS.aiClearKey, async () => {
-    clearCredential();
-    return credentialInfo();
+  ipcMain.handle(IPC_CHANNELS.aiSetModel, async (_e, id: AiProviderId, model: string) => {
+    setModel(id, model);
+    return getConfig();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiSetCredential, async (_e, id: AiProviderId, secret: string) => {
+    setCredential(id, secret);
+    return getConfig();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiClearCredential, async (_e, id: AiProviderId) => {
+    clearCredential(id);
+    return getConfig();
   });
   // Render round-trip for the generator's self-review loop: generate.ts calls the
   // `capture` callback below per emitted version; we ask the renderer (over

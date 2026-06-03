@@ -1932,6 +1932,47 @@ body {
   font-family: var(--mono);
   font-size: 12px;
 }
+.setting-select {
+  -webkit-app-region: no-drag;
+  grid-column: 2 / 4;
+  justify-self: end;
+  min-width: 180px;
+  font-size: 12px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+/* --- AI provider cards ----------------------------------------------------- */
+
+.ai-provider-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ai-provider-head .settings-group-name {
+  margin-bottom: 0;
+}
+.ai-pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text-muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.ai-pill-ok {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.ai-pill-active {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
 
 /* --- Jigsaw content -------------------------------------------------------- */
 

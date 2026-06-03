@@ -177,9 +177,20 @@ export async function runGeneration(
     (prompt || 'Build a Minecraft structure based on the reference image(s).') +
     buildFloorPlan(doc.floors);
 
+  // Track the start locally: patchDoc replaces the doc object immutably, so the
+  // `doc` captured above keeps its old startedAt — read the elapsed time from this.
+  const startedAt = Date.now();
   docs.appendChat(docId, { role: 'user', text: prompt, images: imageUrls.length ? imageUrls : undefined });
-  docs.patchDoc(docId, { busy: true, startedAt: Date.now(), progress: null });
+  docs.patchDoc(docId, { busy: true, startedAt, progress: null });
   persistDoc(docId);
+
+  // The run's cost footer (time + tokens), attached to the assistant message on
+  // every outcome — success, cancel, or error — so it's never omitted.
+  const stats = (r: { tokensIn?: number; tokensOut?: number }) => ({
+    tookMs: Date.now() - startedAt,
+    tokensIn: r.tokensIn,
+    tokensOut: r.tokensOut,
+  });
 
   // Seed the model with the structure this tab already has open so a first
   // "change X" edits it rather than building anew (main ignores its own outputs).
@@ -194,7 +205,7 @@ export async function runGeneration(
           version: result.version,
           size: result.size,
           blockCount: result.blockCount,
-          tookMs: doc.startedAt ? Date.now() - doc.startedAt : undefined,
+          ...stats(result),
         },
       });
       docs.patchDoc(docId, { sdkSessionId: result.sdkSessionId, version: result.version });
@@ -204,12 +215,12 @@ export async function runGeneration(
       recordVersion(docId, result.version, result.path);
       await docLoader?.(docId, result.path, { preserveCamera: result.version > 1, recent: false });
     } else if (result.canceled) {
-      docs.appendChat(docId, { role: 'assistant', text: 'Canceled.' });
+      docs.appendChat(docId, { role: 'assistant', text: 'Canceled.', meta: stats(result) });
     } else {
-      docs.appendChat(docId, { role: 'assistant', text: result.error, error: true });
+      docs.appendChat(docId, { role: 'assistant', text: result.error, error: true, meta: stats(result) });
     }
   } catch (err) {
-    docs.appendChat(docId, { role: 'assistant', text: String(err), error: true });
+    docs.appendChat(docId, { role: 'assistant', text: String(err), error: true, meta: { tookMs: Date.now() - startedAt } });
   } finally {
     documentsStore.getState().patchDoc(docId, { busy: false, progress: null, startedAt: null });
     persistDoc(docId);

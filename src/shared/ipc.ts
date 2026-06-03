@@ -41,14 +41,18 @@ export const IPC_CHANNELS = {
   windowsReport: 'windows:report',
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
   captureConfig: 'capture:config',
-  /** Whether an Anthropic API key is configured (gates the AI generation UI). */
+  /** Whether the active AI provider is usable (gates the AI generation UI). */
   aiAvailable: 'ai:available',
-  /** Non-secret status of the stored API key (set?/masked hint/from env?). */
-  aiKeyInfo: 'ai:key-info',
-  /** Store the Anthropic API key (encrypted in userData) — payload: key string. */
-  aiSetKey: 'ai:set-key',
-  /** Remove the stored Anthropic API key. */
-  aiClearKey: 'ai:clear-key',
+  /** The full multi-provider AI config (providers + active selection). */
+  aiGetConfig: 'ai:get-config',
+  /** Set the active provider — payload: AiProviderId. */
+  aiSetActiveProvider: 'ai:set-active-provider',
+  /** Set a provider's chosen model — payload: id + model. */
+  aiSetModel: 'ai:set-model',
+  /** Store a provider's credential (encrypted) — payload: id + secret. */
+  aiSetCredential: 'ai:set-credential',
+  /** Remove a provider's stored credential — payload: id. */
+  aiClearCredential: 'ai:clear-credential',
   /** Generate/edit a structure for a session (payload: sessionId + prompt). */
   aiGenerate: 'ai:generate',
   /** Cancel the in-flight generation for a session (payload: sessionId). */

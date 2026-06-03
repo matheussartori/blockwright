@@ -49,8 +49,14 @@ src/
       jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     ai/                     AI structure generation (File ▸ New Structure)
-      generate.ts           Drive Claude via the Agent SDK; emit_structure tool → compile-structure
-      credentials.ts        Claude Code login / token / API key resolution (safeStorage)
+      generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→
+                            review handler, round budget + progress; dispatches to a provider driver
+      schema.ts             Shared system prompt + emit_structure schema (rich JSON Schema for
+                            Anthropic/OpenAI; flat string-schema for Gemini/Codex)
+      credentials.ts        Multi-provider credential store (per-provider secret via safeStorage) +
+                            active-provider/model prefs + env precedence
+      providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
+                            index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
     structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt.
                           Expands volumetric `ops` (fill/hollow/walls/line/block) → block list
@@ -143,27 +149,51 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 
 ### AI structure generation
 
-File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation runs
-through the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`), *not* the raw Anthropic API —
-so it authenticates the way the Claude Code CLI does and runs on the user's **Pro/Max subscription**
-(their existing Claude Code login, no API credits). `generate.ts` gives the model the
-`knowledge/nbt` guides as its system prompt and a single in-process MCP tool, `emit_structure`,
-whose handler validates + compiles the authoring JSON (`compile-structure.ts`) to a versioned
-temp `.nbt`; validation errors are returned to the model so it self-corrects in the same turn. The
-handler then **renders that version and feeds screenshots back in the tool result** (see the visual
-self-review loop below), so the model sees its own build and refines it against the prompt/reference
-rather than building blind. A per-panel session resumes the SDK conversation (`resume`) so follow-ups
-edit the current build.
-`credentials.ts` resolves auth: env (`CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`) wins, else an
-in-app credential (a `claude setup-token` token or an API key, encrypted via `safeStorage`), else
-the existing Claude Code keychain login. `aiAvailable()` is always true — a real auth failure
-surfaces as a clear error on first send (see `authHint`).
+File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation is
+**provider-agnostic** (`src/main/ai/`): `generate.ts` owns everything backend-neutral — sessions, the
+`emit_structure` handler that validates + compiles the authoring JSON (`compile-structure.ts`) to a
+versioned temp `.nbt`, the emit→render→**review** loop (screenshots fed back so the model refines
+against the prompt/reference, not blind), the round budget, and the live token/phase progress — then
+dispatches the LLM transport to a **provider driver** (`providers/`). The shared contract lives in
+`providers/types.ts` (`Driver` + `onEmit` + `DriverProgress`); the shared system prompt + tool schema
+live in `schema.ts`. Validation errors are returned to the model so it self-corrects in the same turn.
 
-- **Agent SDK is externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
-  loaded via dynamic `import()` in `generate.ts`. It must not be inlined: it spawns a bundled
-  native `claude` binary resolved relative to its own module path. **zod** is externalized too so
-  the SDK's `tool()` gets schemas from the same instance. When packaging, the SDK + its
-  platform-native package are asar-unpacked (`forge.config.ts`) so the binary is spawnable.
+The user picks the **active provider** + model in Settings ▸ AI (`shared/ai.ts` = the registry: id,
+label, auth kind, models). Supported backends:
+- **claude-subscription** — the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`): authenticates
+  like the Claude Code CLI, runs on the user's **Pro/Max plan** (no API credits). The SDK manages the
+  conversation/tool dispatch/resume; the driver just registers `emit_structure`.
+- **claude-api** — the raw Anthropic API (`@anthropic-ai/sdk`) with a pasted key; a manual tool loop
+  with prompt caching on the (huge) system prompt.
+- **openai** — OpenAI Chat Completions (`openai`); function calling + vision. `tool` messages are
+  text-only, so the review screenshots come back as a follow-up `user` message.
+- **gemini** — Gemini (`@google/genai`); function declarations can't express the free-form authoring
+  maps, so `emit_structure` takes the structure as a **JSON string** (parsed in the driver); review
+  images ride a follow-up user turn.
+- **codex** — the Codex CLI (`@openai/codex-sdk`) on the **ChatGPT Plus/Pro** plan. No in-process
+  tools: it uses **structured output** for the authoring JSON and takes review screenshots as
+  `local_image` file paths. Best-effort.
+
+Resumable providers (claude-subscription, codex — see `RESUMABLE_PROVIDERS`) continue their own
+server/CLI conversation via a stored session id; the stateless API providers have no server memory,
+so the orchestrator **re-seeds them each turn** with the latest emitted version's authoring JSON
+(`buildSeed`) so follow-up edits stay coherent.
+
+`credentials.ts` resolves auth per provider: env var(s) for that provider win and lock the field
+in-app, else an in-app secret (encrypted via `safeStorage` in one blob), else (for subscription
+providers) the existing CLI keychain login. Secrets never cross the IPC bridge — only a `configured?`
+flag, a masked hint, and the chosen model (`getConfig` → `AiConfig`). `aiAvailable()` reflects the
+active provider (subscription = optimistic, api-key = key present); a real auth failure surfaces as a
+clear error on first send (see `authHint`). Old single-Claude credentials migrate on first read.
+
+- **The AI SDKs are externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
+  loaded via dynamic `import()` inside each `providers/` driver (so a provider's SDK only loads when
+  used). The Claude Agent SDK and Codex SDK each spawn a bundled **native binary** resolved relative
+  to their own module path, so they must not be inlined; the rest (`@anthropic-ai/sdk`, `openai`,
+  `@google/genai`) stay external for the same load path. **zod** is external too so the Agent SDK's
+  `tool()` gets schemas from the same instance. When packaging, those SDKs + their platform-native
+  packages (`@anthropic-ai/claude-agent-sdk-*`, `@openai/codex` + `@openai/codex-*`) are asar-unpacked
+  (`forge.config.ts`) so the binaries are spawnable.
 - **Tool/MCP wiring:** pass the result of `createSdkMcpServer(...)` *directly* as the `mcpServers`
   value (`{ blockwright: server }`) — do **not** re-wrap as `{ type:'sdk', instance: server }`
   (the docs example is misleading; double-wrapping throws "connect is not a function"). Lock the

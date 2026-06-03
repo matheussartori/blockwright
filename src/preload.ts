@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
+import type { AiConfig, AiProviderId } from '@/shared/ai';
 import type {
-  ApiKeyInfo,
   AssembleOptions,
   BlockwrightApi,
   ChatRecord,
@@ -56,9 +56,15 @@ const api: BlockwrightApi = {
   jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.jigsawCandidates, path, connectorIndex),
   aiAvailable: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.aiAvailable),
-  aiKeyInfo: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiKeyInfo),
-  aiSetKey: (key: string): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiSetKey, key),
-  aiClearKey: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiClearKey),
+  aiGetConfig: (): Promise<AiConfig> => ipcRenderer.invoke(IPC_CHANNELS.aiGetConfig),
+  aiSetActiveProvider: (id: AiProviderId): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSetActiveProvider, id),
+  aiSetModel: (id: AiProviderId, model: string): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSetModel, id, model),
+  aiSetCredential: (id: AiProviderId, secret: string): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSetCredential, id, secret),
+  aiClearCredential: (id: AiProviderId): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiClearCredential, id),
   aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string): Promise<GenerateResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, basePath),
   aiCancel: (sessionId: string): Promise<void> =>
