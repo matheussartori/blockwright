@@ -141,8 +141,12 @@ function editPreamble(json: string): string {
     'You are EDITING an existing structure the user already has open in the viewer — NOT building a new ' +
     'one from scratch. Below is its CURRENT Blockwright authoring JSON (air omitted; geometry is given as ' +
     'a flat "blocks" list). Treat it as the starting point: keep everything the user did not ask to change, ' +
-    'apply only the requested change, and then call emit_structure with the COMPLETE modified structure ' +
-    '(same size and overall layout unless asked otherwise). You may re-express unchanged geometry as "ops" ' +
+    'apply only the requested change, and then call emit_structure with the COMPLETE modified structure. ' +
+    'Keep the same size and layout for parts the change does not touch, but if the request needs more room ' +
+    '(e.g. "make the basement bigger", "add rooms/corridors", "expand it"), GROW "size" freely — there is no ' +
+    'width/depth limit — and RE-ANCHOR the kept parts so anything that should stay centred shifts with the ' +
+    'enlarged footprint instead of being left in a corner. Resizing/re-anchoring needs mode "full" (a patch ' +
+    'cannot change size or move existing cells). You may re-express unchanged geometry as "ops" ' +
     'if that is cheaper to emit, as long as the result matches.\n\n' +
     'CURRENT STRUCTURE:\n```json\n' +
     json +

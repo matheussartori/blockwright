@@ -102,6 +102,27 @@ then gets *placed* so those bottom layers sit underground.
 - This is the same reason foundations build *up* from `y=0` ([`02`](02-coordinates-and-layout.md)),
   not down — the file has no negative space.
 
+### Levels can have different footprints (the basement need not match the tower)
+
+**Storeys do not have to share one footprint.** A common, deliberate shape is a **small building
+over a much larger basement** — a 6×6 tower on a 20×20 undercroft of rooms and corridors, a modest
+house over a sprawling cellar complex. This is normal and intended; build it.
+
+- The build's **footprint = the largest level**. `size.x`/`size.z` come from the **basement** (the
+  big level), not the tower. The narrow upper part is **offset inward** so it sits centred over the
+  wide part (`offset = (bigDim − smallDim) / 2` on each axis). All levels still share the single
+  most-negative corner `[0,0,0]` — see [`02`](02-coordinates-and-layout.md) §"mixed footprints".
+- Only the upper part's **footprint** (its column of cells) reaches the surface; the wide basement
+  is entirely below the ground line, so it can extend far past the building above it without
+  poking out. The roof of the over-wide basement (the part **not** under the tower) is just
+  buried ceiling — cap it with a floor course at the ground line.
+- **Size the request, not a default.** "A tower with a big basement: 4 rooms, two corridors" ⇒ work
+  out the basement footprint that fits 4 rooms + corridors (easily 16–28 per axis), set `size` to
+  that, and place the small tower centred on top. Don't shrink the basement to match the tower —
+  grow the box (there's no width/depth limit, [`02`](02-coordinates-and-layout.md)).
+- **Plan the big level top-down first** (rooms, corridors, the stair landing), then drop the tower
+  column onto its centre and align the stairwell so it lands inside the tower footprint.
+
 ### Storey mechanics (every level)
 
 - A storey ≈ `floor course (1) + interior air (≥3) + ceiling course (1)` ≈ 5 blocks. Each added
@@ -131,6 +152,120 @@ then gets *placed* so those bottom layers sit underground.
   surface and put `glass`/bars at the top.
 - Natural fit for storage/utility: `barrel`s, `chest`s, `bookshelf`, `brewing_stand`, `cauldron`,
   damp accents (`mossy_*`, `cobweb`). A great match for a **dark, grey** theme — lean into it.
+
+### Multi-room underground complex (the big connected undercroft)
+
+When the user asks for a **multi-room** basement / underground (a dungeon, undercroft, catacomb,
+crypt, vault, or buried palace — many rooms, corridors, larger halls), build a **connected
+complex**, not one big cellar. This is a deliberate underground *type*: lots of rooms of varying
+size, linked by corridors, with one or more grander halls. It is almost always **much larger than
+anything above ground** — size the box to the complex (tens of blocks per axis) and centre any
+surface build over it (§"Levels can have different footprints", [`02`](02-coordinates-and-layout.md)).
+
+**Lay it out around circulation, on a grid:**
+
+- **A spine.** Pick a **main corridor or central hall** and branch rooms off it — every room opens
+  onto the circulation, never floats isolated in rock. Long builds get a cross/grid of corridors
+  (a main axis + side passages) so it reads as planned, not a random pile of boxes.
+- **Tile rooms sharing walls.** Rooms sit on a grid and **share 1-block partition walls** (like a
+  real dungeon), each entered through a 1×2 (or arched 1×3) doorway off the corridor. Don't bury
+  separate rooms in solid stone with gaps between them.
+- **Vary room size AND ceiling height.** Mix small cells/storerooms (3×3–5×5, low 3-high ceiling)
+  with a **feature hall** that's wide and **tall** (7–11 wide, 6–9 high, sometimes a double-height
+  2-storey volume). The height contrast between tight corridors and a soaring hall is what sells an
+  underground complex — keep corridors low and pop the halls tall.
+
+**Build the big halls properly (they're the centrepiece — refs are pillared stone halls):**
+
+- **Rows of pillars** carry a wide ceiling: 1–2-block columns (`stone_bricks`, `polished_blackstone`,
+  `polished_deepslate`, `*_log`) in two regular rows down the hall, with the floor/ceiling between.
+  A wide flat ceiling with no internal supports reads empty and unreal.
+- **Arches between pillars / over doorways:** spring `*_stairs half:top` from each pillar to a
+  keystone block for an arcade; arch the main doorways the same way.
+- **Galleries / balconies:** in a double-height hall, run an **upper walkway** around the perimeter
+  (a `*_slab`/plank ledge on corbels), railed with `*_fence`/`iron_bars`/`*_wall`, reached by stairs
+  — the galleried-hall look (wooden railings over a stone hall in the references).
+- **A focal axis:** a **carpet/`wool` runner** down the centre of the grand hall leading to a focal
+  feature (a throne, altar, statue niche, big chest, or stair up), flanked by pillars and lights.
+
+**Make every room COMPLETELY DIFFERENT — this is the whole point of a multi-room complex.** Do not
+fill the program with the same room repeated, or with rooms that differ only in size. Each room
+should have its **own function, and read as that function at a glance** — distinct *layout, floor &
+wall material, furniture, lighting, and props*. Walking from one room to the next should feel like
+walking into a different place: a warm timber library, then a cold barred prison, then a steamy
+forge, then a flooded cistern. Give a room **one clear purpose and theme it fully**; never hand off
+generic stone boxes with a chest in the corner. Vary the palette and light colour per room too
+(warm `lantern` library vs. blue `soul_lantern` crypt vs. orange `lava`-glow forge) so they don't
+blur together.
+
+> The list below is the **room grammar**: how each room type should LOOK, block-by-block. Use it
+> both to vary a complex AND when the user asks for **one specific room** ("build a prison",
+> "a library") — that single request gets the full treatment below, sized as its own build.
+
+- **Prison / dungeon cells:** a row of small (3×3–4×4) cells down both sides of a corridor, sharing
+  walls. Each cell is **fronted by `iron_bars`** (full wall of bars) with a 1-wide `iron_door` gate;
+  inside, a bare `*_slab`/`hay_block` cot, a `chain` hanging from the ceiling, a `cauldron` (slop
+  bucket), maybe a `skeleton_skull` or `cobweb`. Cold, grim: `cobblestone`/`stone_bricks` (+`mossy_`/
+  `cracked_`), dim `lantern`/`soul_lantern`, `wall_torch` only in the corridor. Floor in plain
+  `stone`/`cobblestone`. A guard nook with a `barrel`/`chest` of keys at the corridor end.
+- **Library / archive:** warm and tall. Wall-to-wall `bookshelf` + `chiseled_bookshelf`, broken by
+  `*_log`/`dark_oak` pilasters; a **gallery** of upper shelves reached by `ladder`s or a `*_stairs`
+  spiral; reading tables (`*_slab` on `*_fence`/barrel) with `lectern`s, `candle`s, a `carpet`;
+  warm `lantern`/`chandelier` light, a `*_chandelier` of `*_fence`+`lantern`. Cozy wood floor
+  (`*_planks`) and a coffered `*_log` ceiling. The opposite mood to the prison.
+- **Storage / pantry / cellar:** rows of `barrel`s and `chest`s on shelves (`*_slab` ledges),
+  `hay_block` and `composter` stacks, `decorated_pot`s, hanging `*_carpet`/`item_frame` look, sacks
+  (`white_wool`+`barrel`). Crates stacked 2–3 high. Damp stone, a few `cobweb`s, `barrel`-lined
+  walls; functional `lantern` light. Cool/dim, utilitarian.
+- **Armory / forge:** hot and industrial. A `furnace`/`blast_furnace` bank and a **`lava` channel**
+  (framed in `*_slab`, glowing orange) for heat, `anvil`s, `grindstone`, `smithing_table`,
+  `stonecutter`; weapon/tool racks (`fence`/`tripwire_hook`+blocks against the wall), `chain`s,
+  `iron_block`/`copper` accents. `nether_brick`/`blackstone`/`deepslate` palette, orange lava glow +
+  `lantern` — the warmest, busiest, noisiest-looking room.
+- **Throne / great hall / shrine:** the centrepiece pillared hall (above) — a **carpet/`wool` runner**
+  down the axis to a raised dais (`*_stairs` steps) with a throne (`*_stairs` seat flanked by
+  `*_wall`/banners) or an altar (`*_slab`+`candle`s+`enchanting_table`/`lodestone`). Grand palette:
+  `polished_blackstone`+`gold_block` trim, `quartz`, banners, `chain`+`lantern` chandeliers,
+  symmetric and brightly lit. The room the whole complex builds toward.
+- **Treasure vault:** small, sealed behind `iron_bars`/`iron_door` (or a `*_wall` of `obsidian`).
+  `gold_block`/`emerald_block`/`diamond_block`/`netherite_block` pedestals, `chest`/`barrel` rows,
+  `decorated_pot`s, a `lodestone`, `sea_lantern` glow. Reads as the high-security room.
+- **Bath / cistern / pool:** sunken `water` pools framed in `*_slab`/`*_stairs` steps down, columns,
+  `sea_lantern`/`prismarine` accents; **bright clean palette** (`quartz`/`smooth_stone`/`sandstone`,
+  polished tile floor) — a Roman-bath / palace look, the inverse of the grimy dungeon rooms.
+- **Crypt / catacomb:** burial niches (recessed `*_slab` shelves) along the walls, `*_wall`+
+  `skeleton_skull` markers, `soul_lantern`/`soul_fire` (cold blue), `cobweb`, `mossy_`/`cracked_`
+  stone, `chiseled_stone_bricks` tombs, the odd `decorated_pot`. Eerie and blue-lit.
+- **Mess hall / kitchen:** long tables (`*_slab` runs on supports) with `*_stairs` benches, a hearth
+  of `furnace`/`smoker`/`campfire`, `barrel`/`cauldron`/`composter`, hanging `lantern`s, a `bell`.
+  Warm and communal.
+- **Mushroom / grow room / garden cavern:** `podzol`/`moss_block`/`rooted_dirt` floor, `*_mushroom`/
+  `mushroom_block`, `glow_lichen`, `azalea`, `water` runnels, `glowstone`/`shroomlight` grow-lights —
+  a green, organic counterpoint to the stone rooms.
+
+**Connect, light & atmosphere (underground is pitch black — over-light it):**
+
+- **Access:** a stairwell or ladder down from the surface lands in an **entry chamber/landing**;
+  corridors keep a consistent headroom and floor level; cut every ceiling hole for stairs. Every
+  room must be reachable on foot — no sealed pockets.
+- **Lighting everywhere, all VISIBLE:** `lantern`/`soul_lantern` on the walls and **hung on `chain`s**
+  from tall ceilings, `wall_torch`, `glowstone`/`sea_lantern` accents, floor lights set into the
+  paving (the glowstone-in-floor look), `candle`s on tables. Never `minecraft:light`. A dark room
+  reads as a hole.
+- **Atmosphere by theme:** old dungeon/catacomb = `mossy_`/`cracked_stone_bricks`, `cobweb` in
+  corners, `vine`/`glow_lichen` creeping down walls, `gravel`/`tuff` patches, the odd `skeleton_skull`
+  or `decayed_*`; clean palace/vault = `smooth_stone`/`quartz`/`sandstone`, polished floors, banners.
+- **Floor & ceiling detail:** pattern the floor (a 2-tone tile of `stone_bricks`+`polished_*`, a
+  central runner), and break the ceiling with beams (`*_log` lines) or coffers so it isn't one flat
+  slab.
+
+**Audit:** ❌ one giant empty cellar → ✅ many rooms on a grid off corridors. ❌ rooms isolated in
+rock → ✅ shared walls + doorways onto circulation. ❌ uniform ceiling height → ✅ low corridors,
+tall pillared hall. ❌ wide flat hall ceiling unsupported → ✅ pillar rows + arches. ❌ dark → ✅
+lanterns/chains/floor lights in every room. ❌ surface-sized footprint → ✅ a sprawling box much
+larger than the build above. ❌ the same room repeated / rooms that differ only in size → ✅ every
+room a distinct function with its own layout, materials, furniture and light colour (library ≠
+prison ≠ forge ≠ bath).
 
 ### Attic / loft (inside the roof volume)
 

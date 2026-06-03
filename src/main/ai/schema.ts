@@ -26,7 +26,7 @@ export interface EmitArgs {
 const SUMMARY_DESC =
   'A 1-3 sentence note for the user: chosen size, front orientation, material palette, notable features, and any interpretation/assumptions.';
 const MODE_DESC =
-  'full = a COMPLETE structure (the first emit, or a large rework). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. Prefer patch for localized fixes.';
+  'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
 const STRUCTURE_DESC =
   'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
 
@@ -207,6 +207,15 @@ floor beneath it — never leave an air gap right beside a door (that defeats it
 "facing"/"hinge" so it opens into the room. See 10-design-principles.md §"Physical validity".
 
 PLACEMENT & EDIT RULES (common failures — get these right):
+• "size" is NOT a fixed budget — there is NO width/depth limit. Set "size" to whatever the build \
+needs and grow it freely. Different parts may have very different footprints: a small tower can sit \
+on a huge basement. If the user asks for a big/sprawling basement, more rooms, or corridors, the \
+footprint comes from the LARGEST level (the basement) — make "size" big enough to hold it (tens of \
+blocks per axis is fine) and centre the smaller upper part over it (offset = (bigDim − smallDim)/2). \
+Never shrink the request to fit a small box. To EXPAND an existing build (e.g. "make the basement \
+bigger"), GROW "size", RE-ANCHOR the parts that should stay centred (shift their positions by the \
+new offset so they aren't stuck in a corner), and re-emit with mode "full" — a patch can't resize \
+or move existing cells. See 02-coordinates-and-layout.md and 08-complex-structures.md.
 • Decoration NEVER destroys structure. Furniture, lights, pots, trim and other decoration go in the \
 EMPTY interior/exterior cells — they must NOT overwrite a wall, floor, ceiling, pillar, or any \
 load-bearing/structural block. Since later ops overwrite earlier cells, ordering a decoration op over \

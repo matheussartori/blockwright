@@ -88,7 +88,7 @@ const EMPTY_DETAILS: BuildDetails = {
 };
 
 const BUILD_TYPES = ['House', 'Tower', 'Cabin', 'Ruin', 'Bridge', 'Wall', 'Dungeon room', 'Shrine', 'Barn', 'Tree house', 'Other'];
-const BASEMENTS = ['None', 'Small', 'Large'];
+const BASEMENTS = ['None', 'Small', 'Large', 'Multi-room complex'];
 const DECAYS = ['None', 'Light', 'Moderate', 'Heavy'];
 const FURNISHINGS = ['Empty', 'Basic', 'Detailed'];
 const LIGHTINGS = ['Dim', 'Medium', 'Bright'];
@@ -103,7 +103,13 @@ function buildBrief(d: BuildDetails): string {
   }
   if (d.floors) lines.push(`- Floors: ${d.floors}`);
   if (d.rooms) lines.push(`- Rooms: ${d.rooms}`);
-  if (d.basement) lines.push(`- Basement: ${d.basement}`);
+  if (d.basement) {
+    lines.push(
+      d.basement === 'Multi-room complex'
+        ? '- Underground: a large MULTI-ROOM underground complex (dungeon/undercroft/catacomb) — many connected rooms off corridors, with at least one bigger/taller pillared hall, and stairs/landings linking it to the surface. Every room must be COMPLETELY DIFFERENT — its own function, layout, materials, furniture and light colour (e.g. library, prison, forge, bath, vault) — not the same room repeated or rooms that only differ in size. Make the underground footprint MUCH larger than the surface build and centre any surface build over it. Build it per 08-complex-structures.md §"Multi-room underground complex" (room grammar included).'
+        : `- Basement: ${d.basement}`,
+    );
+  }
   if (d.materials) lines.push(`- Preferred materials: ${d.materials}`);
   if (d.decay) lines.push(`- Decay / ruin level: ${d.decay}`);
   if (d.furnished) lines.push(`- Interior: ${d.furnished}`);

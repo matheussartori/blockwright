@@ -49,7 +49,7 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
 | [`05-building-houses.md`](05-building-houses.md) | Foundations, walls, roofs, windows, doors — construction recipes. |
 | [`06-decoration-and-interiors.md`](06-decoration-and-interiors.md) | Faux-furniture, lighting, kitchens, bedrooms, storage, gardens. |
 | [`07-workflow.md`](07-workflow.md) | Generate → preview → validate → iterate; using references & images. |
-| [`08-complex-structures.md`](08-complex-structures.md) | Render-fidelity table, large/modular builds, vertical zoning (basement/floors/attic), deep reference-NBT & image workflow, advanced gotchas. |
+| [`08-complex-structures.md`](08-complex-structures.md) | Render-fidelity table, large/modular builds, vertical zoning (basement/floors/attic), mixed footprints, multi-room underground complexes, deep reference-NBT & image workflow, advanced gotchas. |
 | [`09-worked-example.md`](09-worked-example.md) | One complete annotated cabin in the authoring JSON — copy as a template. |
 | [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |

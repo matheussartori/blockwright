@@ -193,6 +193,13 @@ Tower windows are **tall and narrow**, not domestic:
 
 The shaft is hollow with a way up — don't pack it solid:
 
+> **A tower often sits on a much larger basement / undercroft** — a 6×6 shaft over a 20×20 cellar of
+> rooms and corridors is a classic keep. The build's footprint then comes from the **basement**, with
+> the tower centred over it; see [`02`](02-coordinates-and-layout.md) §"mixed footprints" and
+> [`08`](08-complex-structures.md) §"Levels can have different footprints". Size the box to the
+> basement and don't shrink the request — there's no width/depth limit.
+
+
 - One `hollow`/`walls`+floors per shaft segment leaves the interior open. Carve the windows with an
   air index afterward.
 - **Vertical circulation:** a `ladder` column up one inside wall, or a **spiral stair** of `*_stairs`

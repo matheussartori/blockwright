@@ -77,12 +77,48 @@ Pick a size that fits the request, then build inside it. Rules of thumb:
   `y=1..3`, ceiling at `y=4`). 4–5 for a "grand" room.
 - **Small house**: ~`7×6×7` (incl. walls). **Cottage**: ~`9×7×9`. **Two-story**: add ~5 to `y`.
 - **Wall thickness**: 1 block. **Floor/ceiling**: 1 block.
-- Keep the bounding box **tight** — don't pad with huge empty volumes. The preview and file
-  size both suffer, and the placement footprint should match the visible build.
-- **Size ceiling:** a vanilla **structure block** loads at most **48×48×48**. Larger structure
-  files exist (placed via `/place` or worldgen), and Blockwright will render them, but if the
-  build is meant to be reusable in-game keep each dimension ≤ 48. For bigger scenes, split into
-  multiple structures (see [`08`](08-complex-structures.md) §"Modular builds").
+- Keep the bounding box **snug around the geometry** — don't pad with huge *empty* volumes (a
+  tight box renders faster). But "snug" means *no wasted air*, **not** "small": make `size` exactly
+  as big as the build needs. A request for a big build means a big `size` — never shrink the design
+  to hit some number.
+- **There is no width/depth limit.** `size` is **not a budget you must stay under** — it's just the
+  bounding box, and you set it to whatever the build requires. If the user asks for a huge sprawling
+  basement, an enormous hall, or many rooms, **make `size` large enough to hold all of it** (tens or
+  hundreds of blocks per axis is fine — Blockwright renders it). Do not cram a big request into a
+  small footprint, and do not refuse size for being "too big".
+- **The 48×48×48 thing is a soft in-game note, not a cap.** A vanilla *structure block* only loads
+  48³ at once, but larger `.nbt`s exist (placed via `/place`/worldgen) and Blockwright renders them
+  fully. Only keep each dimension ≤ 48 if the user specifically wants a structure-block-reusable
+  piece; otherwise build at whatever size looks right. For genuinely scene-scale work you can also
+  split into multiple structures ([`08`](08-complex-structures.md) §"Modular builds").
+
+## The bounding box wraps the WHOLE build — mixed footprints & expansion
+
+`size` is the box around **everything**, summed across all parts — so different parts can have very
+different footprints. **A small tower can sit on a giant basement.** If the above-ground tower is
+6×6 but the user wants a 24×24 undercroft with several rooms, the build's footprint is **24×24**
+(the basement), and the tower is a 6×6 column **centred over it**:
+
+- `size` on each axis = the **extent of the largest part** on that axis (here `[24, towerHeight +
+  basementHeight, 24]`).
+- The wide part (basement) spans the full `0..23`; the narrow part (tower) is **offset inward** so
+  it's centred: tower x-range `9..14`, z-range `9..14` (`(24−6)/2 = 9`). The two share the same
+  most-negative corner `[0,0,0]`; you place each part at its own offset within the one box.
+- Plan each level's footprint separately (a top-down grid per level, [`08`](08-complex-structures.md)),
+  then size the box to the **union** of them. Levels are free to differ — a wide basement, a
+  medium ground floor, a slim tower, a flared roof — that's normal, not a problem.
+
+**Expanding an existing build (edits).** Growing a build is a real, expected edit — don't treat the
+current `size` as fixed. To enlarge a part (e.g. "make the basement bigger" / "add more rooms"):
+
+1. **Grow `size`** on the axes that need room (and re-derive it = `maxPos + 1` after).
+2. **Re-anchor** what should stay centred. If you widen the footprint, the parts you kept (the
+   tower, the entrance) usually need to shift by the same offset so they stay centred over/aligned
+   with the enlarged part — recompute their positions; don't leave them stuck in a corner.
+3. **Re-emit the COMPLETE structure (`mode:"full"`)** for any change that resizes or re-anchors.
+   A `patch` can't *move* the cells already placed, so it can't re-centre a tower over a widened
+   basement — use `full` and rebuild from the new, larger box. (Patches are for adding/fixing detail
+   *within* the existing footprint.)
 
 ## Worked layout: footprint → layers
 
