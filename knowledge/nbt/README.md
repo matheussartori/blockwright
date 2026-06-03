@@ -54,6 +54,7 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
 | [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |
 | [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md) | Block-by-block facade grammar & style archetypes: timber framing, dormers, balconies, porches, towers, chimneys, mansion massing & grounds. |
+| [`14-towers.md`](14-towers.md) | Standalone towers: base→shaft→crown massing, vertical emphasis, tier/machicolation rings, crowns (spire/parapet/horns), tower lighting, dark-fantasy palettes & archetypes. |
 
 ## Hard rules (read before generating)
 

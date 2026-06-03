@@ -21,8 +21,12 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 - **Small table (canonical):** `oak_fence` (or any fence) leg at `@ y`, a **carpet** or
   **`*_pressure_plate`** on top at `@ y+1`, standing on solid floor at `@ y-1`. The fence post is the
   full leg height; the carpet/plate is the thin surface. For a wider table, put a fence leg under
-  **each corner** and lay `*_carpet`/`*_pressure_plate` (or, if you must, a single `*_slab type:top`)
-  across the top.
+  **each corner** and lay `*_carpet`/`*_pressure_plate` across the top.
+- **On a fence, the top MUST be `*_carpet` or `*_pressure_plate` — never a `*_slab type:top`.** A
+  carpet/pressure_plate sits at the *bottom* of its cell, so it rests flush on the fence post below.
+  A `slab type:top` sits in the *top* half of its cell, leaving a visible gap above the fence — the
+  tabletop **floats**. (A `*_slab type:top` top is only acceptable when it rests on a **full-block**
+  leg/base that fills the cell beneath it, not on a fence/post.)
 - **Keep the top thin, and every leg on the floor.** The tabletop is a *single* thin layer —
   `*_carpet`, `*_pressure_plate`, or a *single* `*_slab type:top` — **never a full block, a `double`
   slab, or stacked slabs** (that reads as a thick, clumsy block, not a table). The leg(s) must run

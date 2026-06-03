@@ -10,6 +10,7 @@
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
 import type { GenerateImage, FloorDef } from '@/shared/types';
+import { basename, dirname } from '../ui/path';
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
  *  it's the active tab. Provided by App, which owns the viewers.
@@ -30,6 +31,20 @@ export function setDocLoader(fn: DocLoader): void {
 /** Persistent chat key: the file path for a saved `.nbt`, else the session id. */
 function chatKey(doc: Document): string {
   return doc.filePath ?? doc.sessionId;
+}
+
+/** AI-generated versions live on disk at `<generatedRoot>/<sessionId>/vN.nbt`, so
+ *  the parent directory name IS the session id. If the user reopens such a temp
+ *  version file directly (e.g. dragging it in), recover that session id from the
+ *  path so its chat/version history can be restored. Returns null for any path
+ *  that doesn't look like a generated version file. The recovered id is only
+ *  trusted once a stored chat record is found for it (in hydrateDoc). */
+function recoverGeneratedSession(filePath: string): string | null {
+  if (!/^v\d+\.nbt$/i.test(basename(filePath))) return null;
+  const sessionDir = dirname(filePath);
+  const root = basename(dirname(sessionDir));
+  if (root !== 'generated' && root !== '.generated') return null;
+  return basename(sessionDir) || null;
 }
 
 /** Persist a document's current chat + session info so it survives restarts. */
@@ -125,13 +140,28 @@ export async function hydrateDoc(docId: string): Promise<void> {
   const docs = documentsStore.getState();
   const doc = docs.documents.find((d) => d.id === docId);
   if (!doc || doc.hydrated) return;
-  const rec = await api.chatHistoryGet(chatKey(doc));
+  let rec = await api.chatHistoryGet(chatKey(doc));
+  // The doc was opened as a file but its history is keyed by the original session
+  // id. Reopening a generated temp version directly (its parent dir = the session
+  // id) lands here with `filePath` set and no record under that path; recover the
+  // session and adopt it so chat/versions come back. Drop the temp `filePath` so
+  // the doc behaves as the original Untitled session (chat keyed by session id,
+  // edits continue the same conversation, no on-disk "v0" baseline).
+  let dropFilePath = false;
+  if ((!rec || rec.messages.length === 0) && doc.filePath) {
+    const sid = recoverGeneratedSession(doc.filePath);
+    const recovered = sid ? await api.chatHistoryGet(sid) : null;
+    if (recovered && recovered.messages.length > 0) {
+      rec = recovered;
+      dropFilePath = true;
+    }
+  }
   if (rec && rec.messages.length > 0) {
     // Adopt the persisted session so a follow-up resumes the same conversation,
     // and surface its compiled versions (read from disk) in the Versions panel.
     // For a file-backed doc, prepend the untouched original as the "v0" baseline.
     const versions = await api.aiListVersions(rec.sessionId);
-    const baseline = rec.baselinePath ?? doc.filePath;
+    const baseline = rec.baselinePath ?? (dropFilePath ? null : doc.filePath);
     if (baseline && versions.length > 0 && !versions.some((v) => v.version === 0)) {
       versions.unshift({ version: 0, path: baseline });
     }
@@ -145,6 +175,7 @@ export async function hydrateDoc(docId: string): Promise<void> {
       baselinePath: rec.baselinePath ?? null,
       floors: (rec.floors ?? []).map(normalizeFloor),
       hydrated: true,
+      ...(dropFilePath ? { filePath: null } : {}),
     });
     await api.aiPrimeSession(rec.sessionId, rec.sdkSessionId, rec.version);
   } else {

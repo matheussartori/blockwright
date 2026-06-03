@@ -167,6 +167,11 @@ The entrance is the focal point — scale it to the build:
 
 ## Towers & vertical focal points
 
+> For a **standalone tower** as the whole build (watchtower, wizard spire, dark-fantasy keep,
+> Barad-dûr / Eye-of-Sauron horned tower, lighthouse), see [`14`](14-towers.md) — base→shaft→crown
+> massing, vertical emphasis, tier rings, crowns, and tower lighting. This section is just the
+> tower *attached to a house*.
+
 - A square `stone_brick` **tower** rising a storey above the rest, capped with a steep pyramidal
   roof (stairs to a point) or a crenellated parapet, marks a grand house (the medieval town-house
   reference). Put a feature window or balcony near its top.

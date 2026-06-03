@@ -142,6 +142,13 @@ one of these before handing off:
   `campfire`, pot, or any prop dropped in the middle of a corridor, doorway, or stair run blocks the
   path the player walks. Keep lights and props against walls or hang them from the ceiling so the
   1–2-block walking lane through every space stays open end to end.
+- **Every door, opening, and balcony has a real means of approach — entry/exit must flow.** Wherever
+  a player enters or steps out (a ground door, an upper-storey door, a balcony/terrace/varanda, a
+  raised threshold), there must be a walkable path *to and through* it: steps/stairs up to a raised
+  doorway, a stair or ladder up to a balcony, a landing on both sides of a door. A door opening onto
+  a 3-block drop, or a balcony with no stair/ladder reaching it, is a dead access — the player can't
+  get in or out smoothly. Build the approach (a short stair run, a stoop, a ramp) so movement in and
+  out is fluid, never a jump or a fall.
 - **Rooms are enclosed and reachable.** Every interior space a player is meant to use needs a way
   in (a door or opening) and complete walls/floor/ceiling around it — no one-block holes leaking to
   the outside, no sealed rooms with no entrance. This applies to **basements and lower floors**: a
@@ -320,8 +327,11 @@ Catch these in the preview ([`07`](07-workflow.md)):
   gable filled, with a window/dormer if you want an opening.
 - ❌ Wall-face torch floating off the wall / floor `torch` against a wall → ✅ `wall_torch[facing]`
   leaning on a backing block.
-- ❌ Long chain trailed to the floor for a lantern, or a chain/hanging lantern with air above it →
-  ✅ short `chain`→`lantern[hanging=true]` near the ceiling, or a floor lantern on a block.
+- ❌ Hanging lantern with air above it, or a `chain` that doesn't reach the ceiling (floats), or a
+  long chain trailed to the floor → ✅ a suspended `lantern[hanging=true]` hangs from a `chain` that
+  runs **continuously from the ceiling/beam down to the lantern** (no gap above the chain), kept
+  short; otherwise set a floor `lantern` on a solid block. A lantern with nothing under it and
+  nothing solidly above it breaks on spawn.
 - ❌ Candle stacked on another candle (floating) → ✅ candle on a full solid block; raise the
   `candles` count for more.
 - ❌ Lantern embedded mid-pillar → ✅ lights against wall faces, on the floor, or hung from above.
@@ -339,10 +349,15 @@ Catch these in the preview ([`07`](07-workflow.md)):
   reachable.
 - ❌ Carpet/candle/pressure plate floating over air → ✅ laid directly on a solid block (they break
   on spawn otherwise).
-- ❌ Table with a full-block/double-slab top or a leg hovering over air → ✅ thin top (single
-  `slab type:top`/carpet/plate) on a post that reaches the floor.
+- ❌ Table with a full-block/double-slab top, a `slab type:top` floating over a fence, or a leg
+  hovering over air → ✅ thin top on a leg that reaches the floor; on a **fence** use `carpet`/
+  `pressure_plate` (flush), never a `slab type:top` (it floats above the post).
 - ❌ Staircase with a floating, open underside → ✅ fill under each step with a full block or
   mirrored `half:top` stair.
+- ❌ Stair run with an extra step/full block above the top, or stopping a block short of the floor →
+  ✅ bottom step at floor level, top step flush with the upper floor — step straight off, no stub/lip.
+- ❌ Door/balcony/raised threshold with no way to reach it (opens onto a drop) → ✅ a stair, ladder,
+  stoop, or steps so the player enters and exits fluidly, never jumping or falling.
 - ❌ Bed stranded mid-floor or at an odd angle → ✅ head against a wall, foot to the room.
 - ❌ Cobweb used as a staircase/ladder/path → ✅ real stairs or a wall-backed ladder; cobweb only as
   a stray corner strand for an abandoned mood.

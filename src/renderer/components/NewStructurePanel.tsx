@@ -624,7 +624,13 @@ export function GenerateContent() {
             title="Optional build details (type, size, materials…)"
             aria-pressed={showDetails}
             disabled={busy || available === false}
-            onClick={() => setShowDetails((v) => !v)}
+            onClick={() =>
+              setShowDetails((v) => {
+                const next = !v;
+                if (next) setShowFloors(false);
+                return next;
+              })
+            }
           >
             ⚙ Details{hasDetails(details) ? ' •' : ''}
           </button>
@@ -633,7 +639,13 @@ export function GenerateContent() {
             title="Define the build's vertical levels (floors) as context for the AI"
             aria-pressed={showFloors}
             disabled={busy}
-            onClick={() => setShowFloors((v) => !v)}
+            onClick={() =>
+              setShowFloors((v) => {
+                const next = !v;
+                if (next) setShowDetails(false);
+                return next;
+              })
+            }
           >
             ▦ Floors{floors.length > 0 ? ` (${floors.length})` : ''}
           </button>

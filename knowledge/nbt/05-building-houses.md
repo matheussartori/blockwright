@@ -92,6 +92,13 @@ stacked full blocks (that reads as rubble, not a staircase). A run climbs much b
   the stair run** — a player should *walk down the stairs*, not drop through an oversized hole beside
   them. No open shaft to fall down: the hole is the width of the stairs and the run fills it step by
   step, meeting solid floor at the bottom.
+- **The run lands flush with each floor — no extra step.** The **bottom** step sits *at* the lower
+  floor level (its base on the floor, walkable straight off the floor), and the **top** step rises so
+  its walkable surface is **level with the upper floor** — you step off the last stair directly onto
+  the upper floor. Don't add a full block or an extra stair above the top step (that makes a stub you
+  bump into / climb over), and don't stop the run a block short so there's a lip to jump. Count it:
+  for a 3-block rise the run is 3 steps at `y, y+1, y+2`, and the upper floor is at `y+3` — the top
+  step's top face meets it flush.
 - Keep the steps clear: don't park a chest, barrel, cauldron, or carpet on or directly above the
   staircase — it blocks the passage.
 
