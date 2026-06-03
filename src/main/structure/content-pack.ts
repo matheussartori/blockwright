@@ -73,6 +73,39 @@ export function hasContent(): boolean {
   return fs.existsSync(path.join(assetsDir('minecraft'), 'blockstates'));
 }
 
+// A block ID is valid iff the content pack has a blockstate JSON for it (every
+// placeable block has one). Namespace-aware like assets: `minecraft:` resolves in
+// the vanilla pack, a mod namespace in the active workspace. Cached so repeated
+// validation of the same palette is cheap.
+const knownBlockCache = new Map<string, boolean>();
+
+/** Whether `name` (`[namespace:]id`) is a real block in the resolvable content. */
+export function isKnownBlock(name: string): boolean {
+  const colon = name.indexOf(':');
+  const namespace = colon >= 0 ? name.slice(0, colon) : 'minecraft';
+  const id = colon >= 0 ? name.slice(colon + 1) : name;
+  const key = `${namespace}:${id}`;
+  const hit = knownBlockCache.get(key);
+  if (hit !== undefined) return hit;
+  const ok = fs.existsSync(path.join(assetsDir(namespace), 'blockstates', `${id}.json`));
+  knownBlockCache.set(key, ok);
+  return ok;
+}
+
+/** The subset of `names` that aren't real blocks (typos / wrong variant), deduped
+ *  in input order — so the generator can reject them with actionable feedback
+ *  instead of shipping a flat fallback-coloured block that's missing in-game. */
+export function unknownBlockIds(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of names) {
+    if (seen.has(name) || isKnownBlock(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
 // --- JSON loading with a small cache -----------------------------------------
 
 const jsonCache = new Map<string, unknown>();
@@ -91,4 +124,5 @@ export function loadJson(file: string): unknown {
 
 export function clearJsonCache(): void {
   jsonCache.clear();
+  knownBlockCache.clear(); // a workspace change adds/removes valid block IDs
 }

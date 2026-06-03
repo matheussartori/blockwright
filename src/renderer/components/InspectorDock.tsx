@@ -8,23 +8,30 @@ import { useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
 import { JigsawContent } from '../windows/JigsawWindow';
+import { GenerateContent } from './NewStructurePanel';
 
 type Availability = Record<PanelId, boolean>;
 
 const PANELS: Record<PanelId, { title: string; Content: FC }> = {
   inspector: { title: 'Info', Content: InspectorContent },
   jigsaw: { title: 'Jigsaw', Content: JigsawContent },
+  generate: { title: 'Generate ✨', Content: GenerateContent },
 };
 
-const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw'];
+const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'generate'];
+
+/** The chat panel manages its own layout (pinned composer), so its container
+ *  drops the default padding/scroll the static panels rely on. */
+const FLUSH: Record<PanelId, boolean> = { inspector: false, jigsaw: false, generate: true };
 
 export function InspectorDock({ availability }: { availability: Availability }) {
   const inspector = useWindows((s) => s.inspector);
   const jigsaw = useWindows((s) => s.jigsaw);
+  const generate = useWindows((s) => s.generate);
   const activeTab = useWindows((s) => s.activeTab);
   const collapsed = useWindows((s) => s.sidebarCollapsed);
 
-  const state: Record<PanelId, typeof inspector> = { inspector, jigsaw };
+  const state: Record<PanelId, typeof inspector> = { inspector, jigsaw, generate };
   // Tabs are the panels that are shown, docked (not floating), and available.
   const tabs = PANEL_IDS.filter(
     (id) => availability[id] && state[id].visible && !state[id].floating,
@@ -52,7 +59,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
   const { Content } = PANELS[active];
 
   return (
-    <aside className="inspector-dock">
+    <aside className={`inspector-dock${active === 'generate' ? ' wide' : ''}`}>
       <div className="dock-head">
         <div className="dock-tabs" role="tablist">
           {tabs.map((id) => (
@@ -89,7 +96,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
           </button>
         </div>
       </div>
-      <div className="dock-body">
+      <div className={`dock-body${FLUSH[active] ? ' flush' : ''}`}>
         <Content />
       </div>
     </aside>
@@ -102,7 +109,13 @@ function FloatingPanel({ id, available }: { id: PanelId; available: boolean }) {
   if (!floating) return null;
   const { title, Content } = PANELS[id];
   return (
-    <FloatingWindow id={id} title={title} available={available}>
+    <FloatingWindow
+      id={id}
+      title={title}
+      available={available}
+      flush={FLUSH[id]}
+      className={id === 'generate' ? 'gen-window' : undefined}
+    >
       <Content />
     </FloatingWindow>
   );

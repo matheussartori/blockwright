@@ -20,9 +20,16 @@ material, no depth.
    pillars that jut, recessed windows/doors — anything that creates a *shadow line*. A wall on a
    single plane looks like cardboard; the same wall with a 1-block offset here and there looks
    built.
-3. **Proportion: avoid the perfect cube.** Real buildings are rarely as tall as they are wide.
-   Make the footprint a non-square rectangle, give rooms believable height (see below), and let
-   the roof be a real fraction of the silhouette (~⅓ to ½ of the total height for pitched roofs).
+3. **Proportion & asymmetry: avoid the perfect cube.** Real buildings are rarely as tall as they
+   are wide, and almost never a single symmetric box. Make the footprint a non-square rectangle,
+   give rooms believable height (see below), and let the roof be a real fraction of the silhouette
+   (~⅓ to ½ of the total height for pitched roofs). **Break the symmetry of the massing itself**,
+   not just the surface detail: an L- or T-shaped footprint, a wing or lean-to off one side, a
+   porch/bay/chimney projecting from one face, a tower or dormer on one corner, an off-centre
+   entrance, one section a storey taller than the rest. A building whose four sides are
+   interchangeable reads as a placeholder cube. Use `mirror` for *local* symmetry (a balanced
+   facade) — but the overall silhouette should be irregular, with a clear front that differs from
+   the back and sides.
 4. **Detail hierarchy: big shape → medium breakup → small trim.** Get the massing and roof
    right first; then break up large faces (framing, string courses, pillars); then add small
    detailing (trapdoors, buttons, fences, lanterns). Don't sprinkle tiny details on a wrong
@@ -31,6 +38,50 @@ material, no depth.
    plinth, steps up to the door, plants and a path at the base — so it looks rooted, not dropped.
 6. **Theme consistency.** Materials, lighting color, roof style, and decoration should all tell
    one story (cozy cottage / grand stone hall / modern glass). Echo the exterior palette inside.
+
+## Physical validity — it must survive being placed in the world (non-negotiable)
+
+A structure that looks fine in the preview but **breaks, floats, or makes no sense when placed
+in a real world** is a failure, no matter how pretty. The preview renders blocks in isolation; it
+does **not** simulate Minecraft's placement/support rules, so *you* must enforce them. Check every
+one of these before handing off:
+
+- **Nothing floats.** Every block must trace down to the ground through solid blocks, or be
+  genuinely attached to something (a wall, a ceiling). A lone block, slab, stair, or fixture
+  hanging in mid-air with air on all sides is the #1 "this is fake" tell. If you want a block up
+  high, it needs a visible support: a pillar under it, a wall behind it, a chain/beam to a ceiling.
+- **Ladders must be against a solid wall.** A `ladder[facing=X]` needs a **full solid block behind
+  it** (on the side opposite `facing` — a `ladder[facing=south]` rests on the block to its north).
+  A ladder with air behind it **pops off and breaks the instant the structure is placed in-game.**
+  Never place a freestanding ladder column in open air to climb floors — run it flush against an
+  interior wall, or build a 1-wide shaft and line one side of it with full blocks for the ladder to
+  cling to. Same support rule for `wall_torch`, `wall_sign`, `wall_banner`, `lever`, `button`,
+  `painting`, `item_frame`, `vine`, `tripwire_hook` — all need their backing block.
+- **Lanterns and hanging fixtures attach, they don't hold things up.** A `lantern` either **sits on
+  a solid block below it** (floor lantern) or **hangs with `hanging:"true"` from a solid block
+  above it** (ceiling/chain/fence). A lantern is **not a structural support** — never put a lantern
+  under a pillar, beam, or block and pretend it's holding it up. That's backwards: the heavy block
+  supports the light, never the reverse. Hang a chandelier as `chain` → `lantern[hanging=true]`
+  *descending from the ceiling*, not as a lantern propping up a post.
+- **Gravity blocks need a floor.** `sand`, `red_sand`, `gravel`, `*_concrete_powder`, and anvils
+  fall if the cell under them is air — keep a solid block beneath them.
+- **Doors actually block a doorway — no gap beside them.** A door fills a **1-wide opening in an
+  otherwise solid wall**, both the lower and upper block of the opening, framed by solid blocks on
+  *both* sides. If there's an empty (air) cell right next to the door, the door is pointless — you
+  can just walk around it. Always seal the wall flush to the door's jambs. A door also needs a
+  solid block beneath its lower half. Get `facing` (which way it opens) and `hinge` right so it
+  swings into the room, not into a wall (catch this in the preview).
+- **Stairs/ladders must lead somewhere.** A staircase or ladder exists to connect two reachable
+  places — a lower floor to an upper floor through a hole in the ceiling, the ground to a door.
+  **Never** build a flight of stairs that climbs into a solid ceiling, ends at a blank wall, or
+  stops in mid-air. Verify the top of every stair run opens onto a real walkable space (cut the
+  floor/ceiling hole it climbs through) and the bottom meets a floor.
+- **Rooms are enclosed and reachable.** Every interior space a player is meant to use needs a way
+  in (a door or opening) and complete walls/floor/ceiling around it — no one-block holes leaking to
+  the outside, no sealed rooms with no entrance.
+
+> Quick mental test for any block: *"If a player loaded this build in a fresh world, would this
+> block still be here, attached to something, and serve its purpose?"* If no, fix it.
 
 ## Walls & facades — kill the flat plane
 
@@ -116,9 +167,10 @@ The entrance should be the **focal point**, not just a hole.
   always leave **circulation** — 1–2 blocks of walking space; never fill the floor.
 - **One anchor per room** (bed / dining table / counter run / fireplace) placed against a sensible
   wall first, then supporting props around it.
-- **Light every room** — a dark interior reads as unfinished. A source roughly every ~6 blocks,
-  plus one feature light. Use `minecraft:light` ([`03`](03-blocks-and-blockstates.md)) only when
-  the theme can't justify a visible fixture.
+- **Light every room** — a dark interior reads as unfinished. A *visible* source roughly every ~6
+  blocks, plus one feature light (lantern, candle, glowstone, sea lantern, redstone torch…). Never
+  use `minecraft:light` ([`03`](03-blocks-and-blockstates.md)) — it's invisible, command-only, and
+  often fails to light a placed structure.
 - **Echo the exterior theme** inside (oak build → oak furniture, warm lanterns).
 - **Restraint:** 2–4 detail props per room. Negative space is part of the design; clutter reads
   as messy.
@@ -160,7 +212,11 @@ Catch these in the preview ([`07`](07-workflow.md)):
 - ❌ Every wall flat → ✅ framing, insets/projections, base + corner trim.
 - ❌ Flat or no overhang roof → ✅ pitched roof, 1-block eaves, contrasting material, ridge.
 - ❌ Door is a bare hole → ✅ framed/recessed entrance with steps and lights.
-- ❌ Perfect cube proportions → ✅ rectangular footprint, roof = real fraction of height.
+- ❌ Air gap beside a door → ✅ wall sealed flush to both jambs so the door actually blocks the way.
+- ❌ Perfect symmetric cube → ✅ rectangular/L-shaped footprint, wing/bay/tower, distinct front.
 - ❌ Build sits on flat grass → ✅ foundation course, path, planting, terrain tie-in.
 - ❌ Random/misaligned windows → ✅ regular rhythm, vertically aligned, framed/inset.
-- ❌ Dark or empty/cluttered rooms → ✅ lit, zoned, one anchor + restrained props each.
+- ❌ Dark or empty/cluttered rooms → ✅ lit, zoned, anchor + supporting props, no bare floors.
+- ❌ Floating block / freestanding ladder / lantern "holding up" a pillar → ✅ everything supported,
+  ladders flush to a wall, lights hung from above or set on a block.
+- ❌ Stairs into a ceiling or to nowhere → ✅ every stair/ladder connects two reachable floors.

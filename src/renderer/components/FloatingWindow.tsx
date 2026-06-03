@@ -13,6 +13,10 @@ interface FloatingWindowProps {
   headerExtra?: ReactNode;
   /** When false the window is hidden regardless of its stored visibility. */
   available?: boolean;
+  /** Extra class on the window root (e.g. for a fixed-height panel). */
+  className?: string;
+  /** Drop the body's default padding/scroll so the child manages its own layout. */
+  flush?: boolean;
   children: ReactNode;
 }
 
@@ -25,6 +29,8 @@ export function FloatingWindow({
   title,
   headerExtra,
   available = true,
+  className,
+  flush,
   children,
 }: FloatingWindowProps) {
   const state = useWindows((s) => s[id]);
@@ -62,7 +68,7 @@ export function FloatingWindow({
   return (
     <section
       ref={ref}
-      className={`bw-window${state.minimized ? ' minimized' : ''}`}
+      className={`bw-window${state.minimized ? ' minimized' : ''}${className ? ` ${className}` : ''}`}
       style={{ left: state.x, top: state.y, width: WINDOW_WIDTHS[id] }}
     >
       <div className="bw-window-head" onPointerDown={onHeaderPointerDown}>
@@ -89,7 +95,9 @@ export function FloatingWindow({
           ⌄
         </button>
       </div>
-      {!state.minimized && <div className="bw-window-body">{children}</div>}
+      {!state.minimized && (
+        <div className={`bw-window-body${flush ? ' flush' : ''}`}>{children}</div>
+      )}
     </section>
   );
 }

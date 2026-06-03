@@ -102,6 +102,11 @@ export class Viewer {
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    // Release all held movement keys when the window loses focus. Without this,
+    // a key down at blur time (e.g. Shift in a screenshot shortcut) never gets
+    // its keyup, so the camera would keep drifting — notoriously "flying down"
+    // forever when a screenshot grab steals focus mid-Shift.
+    window.addEventListener('blur', this.onBlur);
     this.renderer.domElement.addEventListener('wheel', this.onWheel, { passive: false });
 
     new ResizeObserver(() => this.onResize()).observe(container);
@@ -198,6 +203,9 @@ export class Viewer {
   private onKeyUp = (e: KeyboardEvent) => {
     if (MOVE_CODES.has(e.code)) this.keys.delete(e.code);
   };
+
+  /** Drop every held key when focus leaves the window, so no movement sticks. */
+  private onBlur = () => this.keys.clear();
 
   /** While flying, the wheel tunes movement speed instead of zooming. */
   private onWheel = (e: WheelEvent) => {
@@ -400,6 +408,22 @@ export class Viewer {
    *  output. Each render→read happens synchronously (no rAF interleaves), so the
    *  WebGL buffer is valid even without `preserveDrawingBuffer`; we copy it into a
    *  downscaled 2D canvas (capped at `maxSize`) to keep the payload reasonable. */
+  /** Downscale the current framebuffer to a PNG data URL (max edge `maxSize`).
+   *  Assumes the caller already rendered the frame; shared by the capture paths. */
+  private snapshot(maxSize: number): string {
+    const src = this.renderer.domElement;
+    const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
+    const w = Math.max(1, Math.round(src.width * scale));
+    const h = Math.max(1, Math.round(src.height * scale));
+    const off = document.createElement('canvas');
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext('2d');
+    if (!ctx) return src.toDataURL('image/png');
+    ctx.drawImage(src, 0, 0, w, h);
+    return off.toDataURL('image/png');
+  }
+
   capture(angles = 2, maxSize = 900): string[] {
     if (!this.current) return [];
     const wasFly = this.mode === 'fly';
@@ -413,15 +437,6 @@ export class Viewer {
     const elevation = offset.y;
     const baseAngle = Math.atan2(offset.z, offset.x);
 
-    const src = this.renderer.domElement;
-    const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
-    const w = Math.max(1, Math.round(src.width * scale));
-    const h = Math.max(1, Math.round(src.height * scale));
-    const off = document.createElement('canvas');
-    off.width = w;
-    off.height = h;
-    const ctx = off.getContext('2d');
-
     const shots: string[] = [];
     for (let i = 0; i < angles; i++) {
       const a = baseAngle + (i * 2 * Math.PI) / angles;
@@ -432,13 +447,7 @@ export class Viewer {
       );
       this.camera.lookAt(target);
       this.renderer.render(this.scene, this.camera);
-      if (ctx) {
-        ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(src, 0, 0, w, h);
-        shots.push(off.toDataURL('image/png'));
-      } else {
-        shots.push(src.toDataURL('image/png'));
-      }
+      shots.push(this.snapshot(maxSize));
     }
 
     // Restore the user's viewpoint.
@@ -446,5 +455,115 @@ export class Viewer {
     this.camera.lookAt(target);
     this.controls.update();
     return shots;
+  }
+
+  /** Top-down "floor plan" screenshots: slice the build into a few horizontal
+   *  bands, clip away everything above each cut, and shoot straight down. This
+   *  gives the AI self-review loop a view of the INTERIOR (room layout, faux
+   *  furniture, circulation) — which the exterior orbits in capture() never
+   *  reveal, leaving the model building interiors blind. One cut per ~storey,
+   *  capped so capture time and token cost stay bounded. */
+  captureCutaways(maxSize = 900): string[] {
+    if (!this.current) return [];
+    if (this.mode === 'fly') this.setMode('orbit');
+    this.removeHighlight();
+
+    const box = new THREE.Box3().setFromObject(this.current);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const height = Math.max(size.y, 1);
+    // ~5 blocks ≈ one storey; cap at 3 so a tall build doesn't flood the result.
+    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 3);
+
+    // Save everything we mutate so the user's live view is untouched afterward.
+    const savedPos = this.camera.position.clone();
+    const savedUp = this.camera.up.clone();
+    const savedNear = this.camera.near;
+    const savedFar = this.camera.far;
+    const savedTarget = this.controls.target.clone();
+    const savedClip = this.renderer.clippingPlanes;
+
+    // Fit the footprint from straight above; +Z points "down" in the image so
+    // every floor plan shares one orientation.
+    const footprint = Math.max(size.x, size.z, 1);
+    const dist = footprint * 1.15 + 2;
+    this.camera.up.set(0, 0, -1);
+    this.camera.near = 0.05;
+    this.camera.far = (height + dist) * 4;
+    this.camera.updateProjectionMatrix();
+
+    const shots: string[] = [];
+    for (let i = 0; i < floors; i++) {
+      // Cut near the top of each band (above that floor's furniture, below its
+      // ceiling) so looking down reveals the floor's interior. Plane normal
+      // (0,-1,0) keeps everything with y ≤ cutY.
+      const cutY = box.min.y + ((i + 0.85) * height) / floors;
+      this.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), cutY)];
+      this.camera.position.set(center.x, cutY + dist, center.z);
+      this.camera.lookAt(center.x, box.min.y, center.z);
+      this.renderer.render(this.scene, this.camera);
+      shots.push(this.snapshot(maxSize));
+    }
+
+    // Restore the user's viewpoint and clear the clip.
+    this.renderer.clippingPlanes = savedClip;
+    this.camera.up.copy(savedUp);
+    this.camera.position.copy(savedPos);
+    this.camera.near = savedNear;
+    this.camera.far = savedFar;
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(savedTarget);
+    this.controls.update();
+    return shots;
+  }
+
+  /** Vertical "cross-section" screenshot: clip the front half away and look at the
+   *  exposed interior straight on from the front. Mirrors a reference's vertical-
+   *  section panel — lets the AI self-review loop verify storey heights, vertical
+   *  alignment between floors, and hanging detail (chains/lanterns/basement), which
+   *  the top-down cutaways flatten away. One cut through the middle along z. */
+  captureSection(maxSize = 900): string[] {
+    if (!this.current) return [];
+    if (this.mode === 'fly') this.setMode('orbit');
+    this.removeHighlight();
+
+    const box = new THREE.Box3().setFromObject(this.current);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+
+    const savedPos = this.camera.position.clone();
+    const savedUp = this.camera.up.clone();
+    const savedTarget = this.controls.target.clone();
+    const savedNear = this.camera.near;
+    const savedFar = this.camera.far;
+    const savedClip = this.renderer.clippingPlanes;
+
+    // Keep the back half (z ≤ midZ): plane normal (0,0,1), constant -midZ clips
+    // everything in front of the cut so the camera sees the exposed interior.
+    const midZ = center.z;
+    this.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 0, 1), -midZ)];
+
+    // Look straight on from in front of the build (-Z), framing its width × height.
+    const span = Math.max(size.x, size.y, 1);
+    const dist = span * 1.4 + 4;
+    this.camera.up.set(0, 1, 0);
+    this.camera.near = 0.05;
+    this.camera.far = (dist + size.z) * 4;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.set(center.x, center.y, box.min.z - dist);
+    this.camera.lookAt(center.x, center.y, center.z);
+    this.renderer.render(this.scene, this.camera);
+    const shot = this.snapshot(maxSize);
+
+    // Restore the user's viewpoint and clear the clip.
+    this.renderer.clippingPlanes = savedClip;
+    this.camera.up.copy(savedUp);
+    this.camera.position.copy(savedPos);
+    this.camera.near = savedNear;
+    this.camera.far = savedFar;
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(savedTarget);
+    this.controls.update();
+    return [shot];
   }
 }

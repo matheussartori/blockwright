@@ -23,7 +23,7 @@ The preview is your validation loop, so you must know what it shows. Generate to
 | `entities` (item frames, paintings, mobs, armor stands) | ❌ | Entirely absent from preview. Use only when the request needs them. |
 | Unknown / misspelled block ID | ⚠️ flat fallback color | A **visible failure** — catch it and fix the ID. |
 | Grass/foliage tint | ✅ approximate | Biome tint is a fixed approximation, not per-biome. |
-| `minecraft:light` (invisible light) | ✅ as empty space | Correct: it *is* invisible. Don't mistake it for a hole. |
+| `minecraft:light` (invisible light) | ❌ shows as empty space | **Don't use it** — invisible, command-only, and often fails to light a placed structure. Light with visible fixtures ([`03`](03-blocks-and-blockstates.md)). |
 
 Implication: build interiors out of **block geometry** (faux-furniture), not out of items or
 sign text, because that's what previews accurately. See [`06`](06-decoration-and-interiors.md).
@@ -53,6 +53,13 @@ A 20×20 build is thousands of cells. Discipline that prevents the common failur
 Big builds are usually **one module repeated** (a wall bay, a tower, a wing). Design the module
 once, then place copies — but **every copy must rotate/mirror its `facing`/`axis`/`shape`**, or
 stairs and doors point the wrong way.
+
+> **Prefer the transform ops** (`mirror`/`rotate`/`repeat`, see
+> [`00-volumetric-ops.md`](00-volumetric-ops.md)) over doing this by hand: they copy the cells AND
+> rewrite the orientation blockstates for you, so the copy is correct automatically. Build the
+> module/half once with fill/hollow ops, then `mirror` it across the centre, `rotate` it about the
+> building's pivot, or `repeat` it along a facade. Hand-rotation (below) is only needed when you
+> can't express the copy as one of those ops. The conventions are identical either way:
 
 Use the conventions from [`02`](02-coordinates-and-layout.md). For a clockwise quarter-turn
 (viewed from above):
@@ -114,9 +121,11 @@ then gets *placed* so those bottom layers sit underground.
 
 - Occupies `y=0 .. groundLine−1`. Walls are **solid foundation** (`stone_bricks`, `deepslate`,
   `cobblestone`, `tuff`) — no normal windows, since it's buried.
-- **It will be dark** — there's no daylight. Light it deliberately: `lantern`s, `glowstone`/
-  `sea_lantern` behind trapdoors, or invisible `minecraft:light`
-  ([`03`](03-blocks-and-blockstates.md)). A black, unlit basement reads as a hole.
+- **It will be dark** — there's no daylight. Light it deliberately with **visible** sources:
+  `lantern`s/`soul_lantern`s (hung from the ceiling), `glowstone`/`sea_lantern` behind trapdoors,
+  `candle`s, `redstone_torch`. **Do not use `minecraft:light`** — it's invisible, command-only, and
+  often fails to light a placed structure ([`03`](03-blocks-and-blockstates.md)). A black, unlit
+  basement reads as a hole.
 - **Access:** a stairwell down from the ground floor (headroom hole cut in the ground-floor floor).
 - **Window wells** (optional): if you want a sliver of light, recess a small light shaft up to the
   surface and put `glass`/bars at the top.
@@ -195,6 +204,33 @@ JSON (palette + indexed blocks). Treat it as data, not just a picture:
 - **Coordinate joins:** to attach along +X, the new piece starts at `x = oldSizeX` (no overlap)
   or `x = oldSizeX−1` if they share a wall. Keep a shared wall single-thickness, not doubled.
 
+## Working from a spec sheet / blueprint
+
+Some references aren't photos — they're **design documents**: a labelled block palette, an
+explicit footprint (e.g. "19×15"), a storey count, per-floor plan diagrams, and a vertical
+section. When the reference gives you data like this, **don't interpret — transcribe.** This is a
+precision copy, and it's the *easiest* kind of reference to nail because the decisions are already
+made.
+
+1. **Read the palette list → build your `palette`.** Each named block ("Deepslate Bricks", "Soul
+   Lantern", "Blood Red Carpet" → `red_carpet`, "Spruce Trapdoor") becomes one entry. Map every
+   listed material to its 1.21.1 ID up front, before placing anything.
+2. **Read the dimensions → fix `size`.** "Pegada 19×15" + "3 níveis (porão + térreo + andar)" fixes
+   `size.x`/`size.z` exactly and constrains `size.y` (≈ basement + Σ storeys + roof, ~5 each — see
+   §Vertical zoning). Don't round the footprint to a square.
+3. **Read each floor plan → lay out that storey.** The per-floor diagrams ARE the top-down grids
+   §Vertical zoning tells you to draw. Place interior walls, doorways, the stairwell (stacked in
+   the same footprint across floors), and faux-furniture where the plan shows them.
+4. **Read the section → fix vertical placement.** The cross-section shows pé-direito (storey
+   heights), where chains/lanterns hang, and the basement layout. Match it — the preview's vertical
+   cross-section screenshot is exactly this view, so you can compare 1:1.
+5. **Honour the "details/tips" notes.** A spec usually lists atmosphere rules ("pouca luz; lanternas
+   de alma, tochas de redstone, velas"; "correntes penduradas"; "interior irregular"). Treat them
+   as constraints, not suggestions.
+
+Build it floor-by-floor with `mode:"full"` for the first complete pass, then `mode:"patch"` to fix
+whatever the screenshots reveal against the plans.
+
 ## Working from reference images
 
 Images give **style, silhouette, color, proportion, mood** — not exact blocks. Translate, don't
@@ -250,8 +286,9 @@ These appear in worldgen/reference files; you usually don't generate them, but r
 - **Re-derive `size`** after any dimensional edit; it must be `maxPos+1` on every axis.
 - **Rotate/mirror also rewrites `facing`/`axis`/`shape`/`hinge`** — not just positions.
 - **Waterlog partial blocks** for submerged builds instead of stacking separate water cells.
-- **Light with `minecraft:light`** when the theme can't justify a visible fixture; it previews
-  as empty space (not a hole).
+- **Never light with `minecraft:light`** — it's invisible, command-only, doesn't render in the
+  preview, and often fails to light a placed structure. Use visible fixtures (lanterns, candles,
+  glowstone, sea lanterns, redstone torches…).
 - **Multi-floor stairwells need headroom holes** cut in the floor above.
 - **A basement is the lowest layers, not negative `y`** — pick a "ground line", build up from
   `y=0`, and report the ground line so the build is placed buried.

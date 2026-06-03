@@ -234,8 +234,8 @@ export interface ApiKeyInfo {
   fromEnv: boolean;
 }
 
-/** The three standardized floating windows the View menu can show/hide. */
-export type WindowId = 'controls' | 'inspector' | 'jigsaw';
+/** The standardized panels/windows the View menu can show/hide. */
+export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate';
 
 /** Per-window state the renderer reports to main so the View menu reflects it.
  *  `available` gates the menu item's enabled state (its content can exist);
@@ -288,8 +288,10 @@ export interface BlockwrightApi {
   /** Remove the stored Anthropic API key; returns its new status. */
   aiClearKey: () => Promise<ApiKeyInfo>;
   /** Generate or edit a structure for a session; returns the written `.nbt` or an error.
-   *  Optional reference images are sent to the model as visual guidance. */
-  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[]) => Promise<GenerateResult>;
+   *  Optional reference images are sent to the model as visual guidance. `basePath` is
+   *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model with
+   *  that structure so the first prompt edits it instead of building from scratch. */
+  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string) => Promise<GenerateResult>;
   /** Cancel the in-flight generation for a session (resolves the pending aiGenerate as canceled). */
   aiCancel: (sessionId: string) => Promise<void>;
   /** Forget a generation session's conversation so the next prompt starts fresh. */

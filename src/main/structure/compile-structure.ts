@@ -25,11 +25,22 @@ export interface AuthoringStructure {
 /** A volumetric build op. `fill` = solid box; `hollow` = 6-face shell; `walls` =
  *  the 4 vertical sides only (no floor/ceiling); `line` = a 3D line between two
  *  cells; `block` = a single cell (the only op that may carry block-entity nbt).
- *  Write an air palette index to carve. */
+ *  Write an air palette index to carve.
+ *
+ *  Transform ops operate on cells ALREADY placed by earlier ops (apply order
+ *  matters) and rewrite orientation blockstates as they copy — so a symmetric
+ *  build can be authored once and reflected/rotated/tiled with stairs, doors and
+ *  logs pointing the right way (the #1 manual-symmetry bug). `mirror` reflects a
+ *  region onto itself across its centre plane; `rotate` turns it about a pivot;
+ *  `repeat` tiles it along an axis. `roof` synthesises a pitched stair roof. */
 export type AuthoringOp =
   | { op: 'fill' | 'hollow' | 'walls'; from: [number, number, number]; to: [number, number, number]; state: number }
   | { op: 'line'; from: [number, number, number]; to: [number, number, number]; state: number }
-  | { op: 'block'; pos: [number, number, number]; state: number; nbt?: Record<string, unknown> };
+  | { op: 'block'; pos: [number, number, number]; state: number; nbt?: Record<string, unknown> }
+  | { op: 'mirror'; from: [number, number, number]; to: [number, number, number]; axis: 'x' | 'z' }
+  | { op: 'rotate'; from: [number, number, number]; to: [number, number, number]; turns: number; pivot?: [number, number] }
+  | { op: 'repeat'; from: [number, number, number]; to: [number, number, number]; axis: 'x' | 'y' | 'z'; step: number; count: number }
+  | { op: 'roof'; from: [number, number, number]; to: [number, number, number]; state: number; style?: 'gable' | 'hip'; ridge?: 'x' | 'z'; fill?: number };
 
 interface AuthoringPaletteEntry {
   Name: string;
@@ -172,14 +183,214 @@ function lineCells(a: [number, number, number], b: [number, number, number]): [n
   return cells;
 }
 
-/** Apply one op into the cell map (keyed position → block). */
-function applyOp(op: AuthoringOp, cells: Map<string, AuthoringBlock>): void {
+// ── Orientation blockstate transforms (mirror / rotate ops) ──────────────────
+// Copying a region symmetrically must rewrite directional blockstates, or stairs/
+// doors/logs point the wrong way after the copy. These rewrite one property; the
+// transform ops apply them per copied cell and intern a palette entry for the
+// result. Convention matches shared/jigsaw.ts: CW = clockwise viewed from above.
+
+const FACING_CW = { north: 'east', east: 'south', south: 'west', west: 'north' } as const;
+type Horiz = keyof typeof FACING_CW;
+const isHoriz = (v: unknown): v is Horiz => v === 'north' || v === 'south' || v === 'east' || v === 'west';
+const SHAPE_MIRROR: Record<string, string> = {
+  inner_left: 'inner_right', inner_right: 'inner_left',
+  outer_left: 'outer_right', outer_right: 'outer_left',
+};
+
+type PropXform = { kind: 'mirror'; axis: 'x' | 'z' } | { kind: 'rotate'; turns: number };
+
+function rotFacing(f: Horiz, q: number): Horiz {
+  let out: Horiz = f;
+  const n = (((q % 4) + 4) % 4);
+  for (let i = 0; i < n; i++) out = FACING_CW[out];
+  return out;
+}
+function mirrorFacing(f: Horiz, axis: 'x' | 'z'): Horiz {
+  if (axis === 'x') return f === 'east' ? 'west' : f === 'west' ? 'east' : f;
+  return f === 'north' ? 'south' : f === 'south' ? 'north' : f;
+}
+
+/** Rewrite a block's orientation properties under a mirror/rotate, so the copied
+ *  geometry stays physically consistent (facing/axis/shape/hinge/rotation). */
+function transformProps(
+  props: Record<string, unknown> | undefined,
+  t: PropXform,
+): Record<string, unknown> | undefined {
+  if (!props) return props;
+  const out: Record<string, unknown> = { ...props };
+  if (isHoriz(out.facing)) {
+    out.facing = t.kind === 'rotate' ? rotFacing(out.facing, t.turns) : mirrorFacing(out.facing, t.axis);
+  }
+  if ((out.axis === 'x' || out.axis === 'z') && t.kind === 'rotate' && (((t.turns % 2) + 2) % 2) === 1) {
+    out.axis = out.axis === 'x' ? 'z' : 'x';
+  }
+  if (typeof out.shape === 'string' && t.kind === 'mirror' && SHAPE_MIRROR[out.shape]) {
+    out.shape = SHAPE_MIRROR[out.shape];
+  }
+  if ((out.hinge === 'left' || out.hinge === 'right') && t.kind === 'mirror') {
+    out.hinge = out.hinge === 'left' ? 'right' : 'left';
+  }
+  if (out.rotation !== undefined) {
+    const r = Number(out.rotation);
+    if (Number.isFinite(r)) {
+      const nr = t.kind === 'rotate' ? (((r + 4 * t.turns) % 16) + 16) % 16 : (((16 - r) % 16) + 16) % 16;
+      out.rotation = String(nr);
+    }
+  }
+  return out;
+}
+
+const inBounds = (p: [number, number, number], s: [number, number, number]): boolean =>
+  p[0] >= 0 && p[0] < s[0] && p[1] >= 0 && p[1] < s[1] && p[2] >= 0 && p[2] < s[2];
+
+/** Snapshot the non-air cells currently inside an inclusive box (source for the
+ *  transform ops, taken before we start writing copies). */
+function cellsInBox(
+  cells: Map<string, AuthoringBlock>,
+  a: [number, number, number],
+  b: [number, number, number],
+): AuthoringBlock[] {
+  const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]);
+  const y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+  const z0 = Math.min(a[2], b[2]), z1 = Math.max(a[2], b[2]);
+  const out: AuthoringBlock[] = [];
+  for (const c of cells.values()) {
+    const [x, y, z] = c.pos;
+    if (x >= x0 && x <= x1 && y >= y0 && y <= y1 && z >= z0 && z <= z1) out.push(c);
+  }
+  return out;
+}
+
+/** One clockwise quarter-turn of (x,z) about pivot (px,pz), viewed from above. */
+function rotXZ(x: number, z: number, px: number, pz: number): [number, number] {
+  return [px - (z - pz), pz + (x - px)];
+}
+
+interface OpCtx {
+  cells: Map<string, AuthoringBlock>;
+  palette: AuthoringPaletteEntry[];
+  intern: (entry: AuthoringPaletteEntry) => number;
+  size: [number, number, number];
+}
+
+/** Lay a pitched stair roof over the eave rectangle. `state` must be a `*_stairs`
+ *  block; the op derives the per-side facings (and corner shapes for hip), and an
+ *  optional `fill` plugs the gap under each step so the roof reads solid. */
+function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx): void {
+  const { cells, palette, intern, size } = ctx;
+  const x0 = Math.min(op.from[0], op.to[0]), x1 = Math.max(op.from[0], op.to[0]);
+  const z0 = Math.min(op.from[2], op.to[2]), z1 = Math.max(op.from[2], op.to[2]);
+  const y0 = Math.min(op.from[1], op.to[1]);
+  const baseName = palette[op.state]?.Name ?? 'minecraft:oak_stairs';
+  const slabName = baseName.endsWith('_stairs') ? baseName.replace(/_stairs$/, '_slab') : null;
+  const ridge = op.ridge ?? (x1 - x0 >= z1 - z0 ? 'z' : 'x'); // ridge runs along the longer axis
+  const hip = op.style === 'hip';
+
+  const stair = (facing: Horiz, shape?: string): number =>
+    intern({ Name: baseName, Properties: { facing, half: 'bottom', shape: shape ?? 'straight', waterlogged: 'false' } });
+  const set = (x: number, y: number, z: number, st: number): void => {
+    if (inBounds([x, y, z], size)) cells.set(posKey(x, y, z), { state: st, pos: [x, y, z] });
+  };
+  const plug = (x: number, y: number, z: number): void => {
+    if (op.fill !== undefined) set(x, y, z, op.fill);
+  };
+
+  if (ridge === 'z' || hip) {
+    // Slopes across x (eaves on the west/east long sides), climbing inward.
+    for (let i = 0; x0 + i <= x1 - i; i++) {
+      const y = y0 + i;
+      const xl = x0 + i, xr = x1 - i;
+      for (let z = z0; z <= z1; z++) {
+        const endCap = hip && (z === z0 || z === z1);
+        set(xl, y, z, stair(endCap ? (z === z0 ? 'north' : 'south') : 'east', endCap ? (z === z0 ? 'outer_left' : 'outer_right') : 'straight'));
+        if (xr !== xl) set(xr, y, z, stair(endCap ? (z === z0 ? 'north' : 'south') : 'west', endCap ? (z === z0 ? 'outer_right' : 'outer_left') : 'straight'));
+        plug(xl, y - 1, z);
+        if (xr !== xl) plug(xr, y - 1, z);
+      }
+    }
+  }
+  if (ridge === 'x' || hip) {
+    // Slopes across z (eaves on the north/south sides), climbing inward.
+    for (let i = 0; z0 + i <= z1 - i; i++) {
+      const y = y0 + i;
+      const zl = z0 + i, zr = z1 - i;
+      const xa = hip ? x0 + i + 1 : x0, xb = hip ? x1 - i - 1 : x1; // hip: leave corners to the x-slopes
+      for (let x = xa; x <= xb; x++) {
+        set(x, y, zl, stair('south'));
+        if (zr !== zl) set(x, y, zr, stair('north'));
+        plug(x, y - 1, zl);
+        if (zr !== zl) plug(x, y - 1, zr);
+      }
+    }
+  }
+  // Cap the ridge line with a top slab (or leave stairs meeting) for a clean seam.
+  if (slabName && !hip) {
+    if (ridge === 'z') {
+      const i = Math.floor((x1 - x0) / 2);
+      if ((x1 - x0) % 2 === 0) {
+        const st = intern({ Name: slabName, Properties: { type: 'top', waterlogged: 'false' } });
+        for (let z = z0; z <= z1; z++) set(x0 + i, y0 + i, z, st);
+      }
+    } else {
+      const i = Math.floor((z1 - z0) / 2);
+      if ((z1 - z0) % 2 === 0) {
+        const st = intern({ Name: slabName, Properties: { type: 'top', waterlogged: 'false' } });
+        for (let x = x0; x <= x1; x++) set(x, y0 + i, z0 + i, st);
+      }
+    }
+  }
+}
+
+/** Apply one op into the cell map (keyed position → block). Transform/roof ops
+ *  read cells placed by earlier ops and may intern new palette entries. */
+function applyOp(op: AuthoringOp, ctx: OpCtx): void {
+  const { cells, palette, intern, size } = ctx;
   if (op.op === 'block') {
     cells.set(posKey(...op.pos), { state: op.state, pos: op.pos, ...(op.nbt ? { nbt: op.nbt } : {}) });
     return;
   }
   if (op.op === 'line') {
     for (const pos of lineCells(op.from, op.to)) cells.set(posKey(...pos), { state: op.state, pos });
+    return;
+  }
+  if (op.op === 'mirror' || op.op === 'rotate') {
+    const a = op.from, b = op.to;
+    const xform: PropXform = op.op === 'mirror' ? { kind: 'mirror', axis: op.axis } : { kind: 'rotate', turns: op.turns };
+    const px = op.op === 'rotate' ? (op.pivot?.[0] ?? Math.floor((Math.min(a[0], b[0]) + Math.max(a[0], b[0])) / 2)) : 0;
+    const pz = op.op === 'rotate' ? (op.pivot?.[1] ?? Math.floor((Math.min(a[2], b[2]) + Math.max(a[2], b[2])) / 2)) : 0;
+    const turns = op.op === 'rotate' ? (((op.turns % 4) + 4) % 4) : 0;
+    for (const c of cellsInBox(cells, a, b)) {
+      let x = c.pos[0], z = c.pos[2];
+      const y = c.pos[1];
+      if (op.op === 'mirror') {
+        if (op.axis === 'x') x = Math.min(a[0], b[0]) + Math.max(a[0], b[0]) - x;
+        else z = Math.min(a[2], b[2]) + Math.max(a[2], b[2]) - z;
+      } else {
+        for (let q = 0; q < turns; q++) [x, z] = rotXZ(x, z, px, pz);
+      }
+      const entry = palette[c.state];
+      if (!entry) continue;
+      const ns = intern({ Name: entry.Name, Properties: transformProps(entry.Properties, xform) });
+      const np: [number, number, number] = [x, y, z];
+      if (inBounds(np, size)) cells.set(posKey(...np), { state: ns, pos: np, ...(c.nbt ? { nbt: c.nbt } : {}) });
+    }
+    return;
+  }
+  if (op.op === 'repeat') {
+    const ai = op.axis === 'x' ? 0 : op.axis === 'y' ? 1 : 2;
+    const src = cellsInBox(cells, op.from, op.to);
+    for (let k = 1; k < op.count; k++) {
+      const d = op.step * k;
+      for (const c of src) {
+        const np: [number, number, number] = [...c.pos];
+        np[ai] += d;
+        if (inBounds(np, size)) cells.set(posKey(...np), { state: c.state, pos: np, ...(c.nbt ? { nbt: c.nbt } : {}) });
+      }
+    }
+    return;
+  }
+  if (op.op === 'roof') {
+    applyRoof(op, ctx);
     return;
   }
   const [ax, ay, az] = op.from, [bx, by, bz] = op.to;
@@ -200,18 +411,31 @@ function applyOp(op: AuthoringOp, cells: Map<string, AuthoringBlock>): void {
 }
 
 /** Expand `ops` (in order) then overlay explicit `blocks`, dropping air cells.
- *  This is the final block list compiled to NBT; `validateAuthoring` must pass
- *  first (it bounds-checks the inputs). */
-export function resolveBlocks(s: AuthoringStructure): AuthoringBlock[] {
-  const palette = s.palette ?? [];
+ *  Transform/roof ops can intern new palette entries (rotated stairs, slab ridge,
+ *  …), so this returns the possibly-extended palette alongside the blocks.
+ *  `validateAuthoring` must pass first (it bounds-checks the inputs). */
+export function resolveBlocks(s: AuthoringStructure): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] } {
+  const palette = (s.palette ?? []).slice();
+  const index = new Map<string, number>();
+  palette.forEach((p, i) => index.set(paletteKey(p), i));
+  const intern = (entry: AuthoringPaletteEntry): number => {
+    const key = paletteKey(entry);
+    const hit = index.get(key);
+    if (hit !== undefined) return hit;
+    const i = palette.push(entry) - 1;
+    index.set(key, i);
+    return i;
+  };
+  const size = (s.size ?? [0, 0, 0]) as [number, number, number];
   const cells = new Map<string, AuthoringBlock>();
-  for (const op of s.ops ?? []) applyOp(op, cells);
+  const ctx: OpCtx = { cells, palette, intern, size };
+  for (const op of s.ops ?? []) applyOp(op, ctx);
   for (const b of s.blocks ?? []) cells.set(posKey(...b.pos), b);
   const out: AuthoringBlock[] = [];
   for (const b of cells.values()) {
     if (!isAir(palette[b.state]?.Name ?? '')) out.push(b);
   }
-  return out;
+  return { blocks: out, palette };
 }
 
 // ── Neighbour-aware connections ───────────────────────────────────────────
@@ -382,14 +606,41 @@ export function validateAuthoring(s: AuthoringStructure): void {
 
   const ops = s.ops ?? [];
   if (!Array.isArray(ops)) throw new Error('ops must be an array');
-  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block'];
+  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof'];
   ops.forEach((o, i) => {
-    if (!o || !OP_KINDS.includes((o as AuthoringOp).op)) {
+    const op = o as AuthoringOp;
+    if (!o || !OP_KINDS.includes(op.op)) {
       throw new Error(`ops[${i}].op must be one of ${OP_KINDS.join(', ')}`);
     }
-    checkState((o as { state: unknown }).state, `ops[${i}].state`);
-    if (o.op === 'block') checkPos(o.pos, `ops[${i}].pos`);
-    else { checkPos(o.from, `ops[${i}].from`); checkPos(o.to, `ops[${i}].to`); }
+    if (op.op === 'block') {
+      checkState(op.state, `ops[${i}].state`);
+      checkPos(op.pos, `ops[${i}].pos`);
+      return;
+    }
+    // All remaining ops take a from/to box.
+    checkPos(op.from, `ops[${i}].from`);
+    checkPos(op.to, `ops[${i}].to`);
+    if (op.op === 'fill' || op.op === 'hollow' || op.op === 'walls' || op.op === 'line' || op.op === 'roof') {
+      checkState(op.state, `ops[${i}].state`);
+    }
+    if (op.op === 'roof' && op.fill !== undefined) checkState(op.fill, `ops[${i}].fill`);
+    if (op.op === 'mirror' && op.axis !== 'x' && op.axis !== 'z') {
+      throw new Error(`ops[${i}].axis must be "x" or "z"`);
+    }
+    if (op.op === 'rotate') {
+      if (!Number.isInteger(op.turns)) throw new Error(`ops[${i}].turns must be an integer (1, 2 or 3 quarter-turns)`);
+      if (op.pivot !== undefined) {
+        if (!Array.isArray(op.pivot) || op.pivot.length !== 2) throw new Error(`ops[${i}].pivot must be [x, z]`);
+        if (op.pivot[0] < 0 || op.pivot[0] >= size[0] || op.pivot[1] < 0 || op.pivot[1] >= size[2]) {
+          throw new Error(`ops[${i}].pivot is out of bounds`);
+        }
+      }
+    }
+    if (op.op === 'repeat') {
+      if (op.axis !== 'x' && op.axis !== 'y' && op.axis !== 'z') throw new Error(`ops[${i}].axis must be "x", "y" or "z"`);
+      if (!Number.isInteger(op.step) || op.step === 0) throw new Error(`ops[${i}].step must be a non-zero integer`);
+      if (!Number.isInteger(op.count) || op.count < 1) throw new Error(`ops[${i}].count must be a positive integer`);
+    }
   });
 
   const blocks = s.blocks ?? [];
@@ -404,12 +655,64 @@ export function validateAuthoring(s: AuthoringStructure): void {
   }
 }
 
+/** Clear a build's interior with explicit `minecraft:air` — but only inside its
+ *  own footprint, so placement doesn't gouge the surrounding terrain.
+ *
+ *  On placement a Minecraft structure leaves OMITTED positions unchanged (the
+ *  world's existing block stays), and writes whatever IS in the file. The old
+ *  approach air-filled the WHOLE bounding box, which carves a rectangular hole in
+ *  the terrain around any non-rectangular build (a cross/L footprint loses its
+ *  concave corners; a manor deletes a 40×40 block of world). Instead we fill air
+ *  only **per occupied (x,z) column, between that column's lowest and highest
+ *  block** — so enclosed room interiors get cleared, but cells outside the build
+ *  (empty columns, and the space above/below each column) stay OMITTED and the
+ *  terrain is preserved, exactly like a vanilla worldgen piece. */
+function fillBoxWithAir(
+  blocks: AuthoringBlock[],
+  palette: AuthoringPaletteEntry[],
+): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] } {
+  let airIdx = palette.findIndex((p) => isAir(p.Name));
+  let outPalette = palette;
+  if (airIdx < 0) {
+    airIdx = palette.length;
+    outPalette = [...palette, { Name: 'minecraft:air' }];
+  }
+  // `blocks` here is already air-free (resolveBlocks drops air). Find each
+  // column's vertical extent, then air-fill the gaps within it.
+  const occupied = new Set(blocks.map((b) => posKey(...b.pos)));
+  const colMin = new Map<string, number>();
+  const colMax = new Map<string, number>();
+  for (const b of blocks) {
+    const col = `${b.pos[0]},${b.pos[2]}`;
+    const y = b.pos[1];
+    const lo = colMin.get(col);
+    const hi = colMax.get(col);
+    if (lo === undefined || y < lo) colMin.set(col, y);
+    if (hi === undefined || y > hi) colMax.set(col, y);
+  }
+  const out = blocks.slice();
+  for (const [col, y0] of colMin) {
+    const y1 = colMax.get(col) as number;
+    const [xs, zs] = col.split(',');
+    const x = Number(xs), z = Number(zs);
+    for (let y = y0 + 1; y < y1; y++) {
+      if (!occupied.has(posKey(x, y, z))) out.push({ state: airIdx, pos: [x, y, z] });
+    }
+  }
+  return { blocks: out, palette: outPalette };
+}
+
 /** Compile authoring JSON to a gzip-compressed `.nbt` buffer (Java big-endian). */
 export function compileStructure(s: AuthoringStructure): Buffer {
   validateAuthoring(s);
-  // Expand ops → blocks, then derive connecting-block sides from neighbours
-  // (panes/bars/fences/walls), which may append palette entries.
-  const { blocks, palette } = connectBlocks(resolveBlocks(s), s.palette ?? []);
+  // Expand ops → blocks (transform/roof ops may extend the palette), then derive
+  // connecting-block sides from neighbours (panes/bars/fences/walls), which may
+  // append palette entries too.
+  const resolved = resolveBlocks(s);
+  const connected = connectBlocks(resolved.blocks, resolved.palette);
+  // Then air-fill each column's interior so placing the structure clears its own
+  // rooms without gouging the surrounding terrain (non-rectangular footprints).
+  const { blocks, palette } = fillBoxWithAir(connected.blocks, connected.palette);
   const root = {
     type: 'compound' as const,
     name: '',
@@ -430,4 +733,44 @@ export function compileStructure(s: AuthoringStructure): Buffer {
 /** Compile and write the authoring JSON to `filePath` as a gzipped `.nbt`. */
 export async function writeStructureFile(s: AuthoringStructure, filePath: string): Promise<void> {
   await fs.writeFile(filePath, compileStructure(s));
+}
+
+/** Read an existing `.nbt` back into authoring JSON — the inverse of compile, so
+ *  the AI generator can be seeded with the file the user already has open and
+ *  EDIT it rather than building from scratch. Air cells are dropped (the
+ *  authoring format omits air by convention; compile re-materialises it), which
+ *  also keeps the seed small. Blockstate property values are normalised to
+ *  strings. The result is a flat `blocks` list (no `ops`) since the geometry is
+ *  already baked. */
+export async function readAuthoring(filePath: string): Promise<AuthoringStructure> {
+  const buffer = await fs.readFile(filePath);
+  const { parsed } = await nbt.parse(buffer);
+  const root = nbt.simplify(parsed) as {
+    DataVersion?: number;
+    size?: number[];
+    palette?: { Name: string; Properties?: Record<string, string | number> }[];
+    blocks?: { state: number; pos: number[]; nbt?: Record<string, unknown> }[];
+  };
+  const palette: AuthoringPaletteEntry[] = (root.palette ?? []).map((p) => {
+    const out: AuthoringPaletteEntry = { Name: p.Name };
+    if (p.Properties && Object.keys(p.Properties).length > 0) {
+      const props: Record<string, string> = {};
+      for (const [k, v] of Object.entries(p.Properties)) props[k] = String(v);
+      out.Properties = props;
+    }
+    return out;
+  });
+  const blocks: AuthoringBlock[] = (root.blocks ?? [])
+    .filter((b) => Array.isArray(b.pos) && typeof b.state === 'number' && !isAir(palette[b.state]?.Name ?? ''))
+    .map((b) => ({
+      state: b.state,
+      pos: b.pos as [number, number, number],
+      ...(b.nbt && Object.keys(b.nbt).length > 0 ? { nbt: b.nbt } : {}),
+    }));
+  return {
+    DataVersion: root.DataVersion ?? 3955,
+    size: (root.size ?? [0, 0, 0]) as [number, number, number],
+    palette,
+    blocks,
+  };
 }

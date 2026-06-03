@@ -73,12 +73,30 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 
 ## Composing a furnished room
 
+> **An empty room is the most common interior failure — and a worse one than a slightly busy
+> room.** A few sticks of furniture lost in a big bare floor reads as unfinished. Every room a
+> player can enter must look *lived-in and used*: furnished against the walls, decorated, lit,
+> with only the middle left as walking space. Aim to dress **all four walls**, not just one.
+
+Build each room up in layers until it feels inhabited:
+
 1. Decide the room's **function** (kitchen, bedroom, living room) from the prompt.
 2. Place the **big anchor** first (bed / counter run / dining table) against a sensible wall.
-3. Add **circulation** — leave 1–2 cells of walking space; don't fill the whole floor.
-4. Add **lighting** (every ~6 blocks, plus a feature light).
-5. Add **2–4 detail props** (plants, art, rug) — restraint reads as tasteful; clutter reads as messy.
-6. Echo the build's **material theme** (oak build → oak furniture, warm lights).
+3. **Furnish the perimeter.** Line the walls with function pieces and storage so no wall is bare:
+   a kitchen gets counters + cabinets + pantry along two walls; a bedroom gets bed + nightstand +
+   wardrobe + a chest or bookshelf; a living room gets a sofa + fireplace + shelves + a side table.
+   Push furniture **against walls and into corners**, keeping the centre open.
+4. Add **circulation** — leave a 1–2 cell walking path through the middle; don't block doorways.
+5. Add **lighting** (a visible source every ~6 blocks, plus one feature light per room).
+6. Add **decoration on the walls and surfaces**, not just the floor: paintings/item-frames,
+   banners, wall trapdoors/shelves, potted plants on sills and tables, a rug/carpet, books, a
+   clock/compass in a frame. Bare walls and bare floors are what make a room look empty.
+7. Echo the build's **material theme** (oak build → oak furniture, warm lights).
+
+**Density target:** a furnished room should fill roughly **a third to half of its floor and wall
+area** with furniture, storage, and decoration, with the rest as deliberate open space. Restraint
+means *avoiding random clutter in the walking path* — it does **not** mean leaving rooms nearly
+empty. When in doubt for these builds, add one more piece against a wall rather than leaving it bare.
 
 ## Style presets (quick starting points)
 
@@ -90,8 +108,14 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 
 ## Common decoration mistakes to avoid
 
+- **Leaving rooms empty.** A near-bare room with one item in the corner is the #1 interior failure —
+  furnish the perimeter of every room (see "Composing a furnished room" above).
 - Leaving rooms dark. Always light them.
-- Furniture floating or blocking the door. Keep paths clear.
-- Over-cluttering. Negative space is part of the design.
+- Bare walls. Hang art/banners/shelves/plants; don't decorate only the floor.
+- Furniture floating or blocking the door. Keep furniture against walls and the door/path clear.
+- A lantern or candle "floating" with nothing under or above it — set lights on a block or hang
+  them with `hanging:true` (see [`10`](10-design-principles.md) §Physical validity).
+- Over-cluttering the *walking path*. Keep the centre open — but that's not a license to leave
+  rooms empty; the clutter to avoid is in circulation space, not against the walls.
 - Mixing too many wood/stone types — pick 2–3 and stick to them.
 - Forgetting `facing` on stairs/chairs so they point the wrong way (catch this in preview).

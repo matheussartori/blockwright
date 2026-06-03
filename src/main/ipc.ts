@@ -126,7 +126,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.aiRenderResult, async (_e, result: RenderResult) => {
     pendingRenders.get(result.requestId)?.(result);
   });
-  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[]) => {
+  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string) => {
     const capture: CapturePreview = (path, version) =>
       new Promise((resolve) => {
         const requestId = randomUUID();
@@ -141,7 +141,7 @@ export function registerIpc(): void {
         });
         e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, path, version });
       });
-    return generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture);
+    return generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath);
   });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));

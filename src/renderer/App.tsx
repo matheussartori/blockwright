@@ -19,7 +19,7 @@ import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { SettingsModal } from './components/SettingsModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
-import { NewStructurePanel } from './components/NewStructurePanel';
+import { GenerateLoadProvider } from './components/NewStructurePanel';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 
@@ -32,6 +32,9 @@ function Shell() {
   const availability = {
     inspector: fileOpen,
     jigsaw: structure !== null && structure.jigsaws.length > 0,
+    // Generate is always available — you can author from scratch or iterate on
+    // whatever .nbt is currently open.
+    generate: true,
   };
   // Handlers read the latest viewer from a ref so they can stay stable; a load
   // requested before the viewer is ready is queued and run once it exists.
@@ -130,27 +133,35 @@ function Shell() {
     api.onFileDrop((p) => void load(p));
     api.onCloseStructure(() => close());
     api.onOpenSettings(() => st.setSettingsOpen(true));
-    api.onNewStructure(() => st.setGenOpen(true));
+    api.onNewStructure(() => windowsStore.getState().openPanel('generate'));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
     api.onToggleWindow((id) => {
       const w = windowsStore.getState();
-      w.setVisible(id, !w[id].visible);
+      // Showing a panel surfaces it (active tab / un-minimized); hiding just hides.
+      if (!w[id].visible && id !== 'controls') w.openPanel(id);
+      else w.setVisible(id, !w[id].visible);
     });
     api.onResetWindows(() => windowsStore.getState().resetAll());
     // The AI generator (main) asks us to render each version it emits and hand
     // back screenshot(s), so it can see its own build and refine it against the
     // reference. We load it into the live viewer (so the user watches it evolve),
-    // then capture a couple of orbited angles.
+    // then capture a couple of orbited exterior angles PLUS top-down floor-plan
+    // cutaways so the model can also review the interior (which the orbits hide).
     api.onAiRenderRequest(async ({ requestId, path, version }) => {
       try {
         await load(path, version > 1, false);
-        const shots = viewerRef.current?.capture() ?? [];
-        const images = shots.map((url) => {
+        const toImg = (url: string) => {
           const [head, data] = url.split(',');
           return { mediaType: head.slice(5, head.indexOf(';')), data };
-        });
+        };
+        const shots = viewerRef.current?.capture() ?? [];
+        const section = viewerRef.current?.captureSection() ?? [];
+        const cutaways = viewerRef.current?.captureCutaways() ?? [];
+        // Exterior orbits, then a vertical cross-section, then top-down floor-plan
+        // cutaways — generate.ts labels them in this order for the review.
+        const images = [...shots.map(toImg), ...section.map(toImg), ...cutaways.map(toImg)];
         api.sendRenderResult({ requestId, images });
       } catch (err) {
         api.sendRenderResult({ requestId, error: String(err) });
@@ -205,6 +216,7 @@ function Shell() {
         controls: { visible: w.controls.visible, available: open },
         inspector: { visible: w.inspector.visible, available: open },
         jigsaw: { visible: w.jigsaw.visible, available: hasJigsaw },
+        generate: { visible: w.generate.visible, available: true },
       };
       const key = JSON.stringify({ open, report });
       if (key === lastKey.current) return;
@@ -222,17 +234,16 @@ function Shell() {
   }, []);
 
   return (
-    <>
+    <GenerateLoadProvider load={load}>
       <Titlebar fileOpen={fileOpen} onClose={close} />
       <main className="stage">
-        <NewStructurePanel load={load} />
         <div className="stage-main">
           <Viewport />
           <Welcome
             onOpen={() => void open()}
             onLoad={(p) => void load(p)}
             onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
-            onGenerate={() => store.getState().setGenOpen(true)}
+            onGenerate={() => windowsStore.getState().openPanel('generate')}
           />
           <FloatingPanels availability={availability} />
           <WorkspaceBadge />
@@ -248,7 +259,7 @@ function Shell() {
       <Statusbar />
       <SettingsModal />
       <VersionSelectModal />
-    </>
+    </GenerateLoadProvider>
   );
 }
 

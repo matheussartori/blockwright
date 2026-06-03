@@ -4,9 +4,11 @@
 // Follow-up messages edit the current structure (the generate→preview→iterate
 // loop from knowledge/nbt/07-workflow.md). Chat state is local; the conversation
 // the model sees lives in main, keyed by this panel's session id.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
+import { windowsStore } from '../state/windows';
 import { useApp } from '../hooks/useStores';
 import type { GenerateProgress, GenerateImage } from '@/shared/types';
 
@@ -56,6 +58,14 @@ function readImages(files: Iterable<File>): Promise<Attachment[]> {
  *  `recent: false` so they never enter the recent-files list. */
 type LoadFn = (path: string, preserveCamera?: boolean, recent?: boolean) => Promise<void>;
 
+// The generate panel is rendered inside the generic dock/floating chrome, which
+// can't thread App's `load` down through its panel map — so it flows via context.
+const LoadContext = createContext<LoadFn | null>(null);
+
+export function GenerateLoadProvider({ load, children }: { load: LoadFn; children: ReactNode }) {
+  return <LoadContext.Provider value={load}>{children}</LoadContext.Provider>;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
@@ -71,8 +81,12 @@ const EXAMPLES = [
   'A cozy cabin with a pitched spruce roof and a porch',
 ];
 
-export function NewStructurePanel({ load }: { load: LoadFn }) {
-  const open = useApp((s) => s.genOpen);
+/** The generate chat body. Rendered inside the dock/floating chrome (which
+ *  provides the title bar, detach/redock and minimize), so it only owns its own
+ *  toolbar (New / Close), the warning, the transcript and the composer. */
+export function GenerateContent() {
+  const load = useContext(LoadContext);
+  if (!load) throw new Error('GenerateContent must be rendered within GenerateLoadProvider');
   const settingsOpen = useApp((s) => s.settingsOpen);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -93,12 +107,12 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
     });
   }, []);
 
-  // Probe whether an API key is configured when the panel opens, and re-probe
+  // Probe whether an API key is configured when the panel mounts, and re-probe
   // whenever the Settings panel closes (the key may have just been added there).
   useEffect(() => {
-    if (!open || settingsOpen) return;
+    if (settingsOpen) return;
     void api.aiAvailable().then(setAvailable);
-  }, [open, settingsOpen]);
+  }, [settingsOpen]);
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -114,7 +128,7 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
     return () => clearInterval(id);
   }, [busy]);
 
-  const close = () => store.getState().setGenOpen(false);
+  const close = () => windowsStore.getState().setVisible('generate', false);
 
   const addFiles = useCallback(async (files: Iterable<File>) => {
     const added = await readImages(files);
@@ -156,8 +170,12 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
     setProgress(null);
     setBusy(true);
     const startedAt = Date.now();
+    // Seed the model with the structure currently open in the viewer so a first
+    // prompt like "change the blocks" edits it rather than building anew. Main
+    // only uses this on a fresh session and ignores files it generated itself.
+    const basePath = store.getState().structure?.path;
     try {
-      const result = await api.aiGenerate(sessionId.current, promptText, images);
+      const result = await api.aiGenerate(sessionId.current, promptText, images, basePath);
       if (result.ok) {
         setMessages((m) => [
           ...m,
@@ -200,21 +218,16 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
     setAttachments([]);
   }, []);
 
-  if (!open) return null;
-
   return (
-    <aside className="gen-panel" role="dialog" aria-label="Generate structure">
-      <header className="gen-head">
-        <span className="gen-title">Generate structure ✨</span>
-        <div className="gen-head-actions">
-          <button className="btn sm" onClick={reset} disabled={busy || messages.length === 0}>
-            New
-          </button>
-          <button className="settings-close" title="Close" aria-label="Close" onClick={close}>
-            ✕
-          </button>
-        </div>
-      </header>
+    <div className="gen-content" role="dialog" aria-label="Generate structure">
+      <div className="gen-bar">
+        <button className="btn sm" onClick={reset} disabled={busy || messages.length === 0}>
+          New
+        </button>
+        <button className="settings-close" title="Close" aria-label="Close" onClick={close}>
+          ✕
+        </button>
+      </div>
 
       {available === false && (
         <div className="gen-warn">
@@ -388,6 +401,6 @@ export function NewStructurePanel({ load }: { load: LoadFn }) {
           )}
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

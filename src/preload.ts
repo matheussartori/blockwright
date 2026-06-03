@@ -52,8 +52,8 @@ const api: BlockwrightApi = {
   aiKeyInfo: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiKeyInfo),
   aiSetKey: (key: string): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiSetKey, key),
   aiClearKey: (): Promise<ApiKeyInfo> => ipcRenderer.invoke(IPC_CHANNELS.aiClearKey),
-  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[]): Promise<GenerateResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images),
+  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string): Promise<GenerateResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, basePath),
   aiCancel: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiCancel, sessionId),
   aiResetSession: (sessionId: string): Promise<void> =>

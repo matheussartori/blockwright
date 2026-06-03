@@ -19,9 +19,35 @@ use **reference NBTs** and **reference images**.
    - Does the silhouette match the intent (right size, roof shape, openings)?
    - Any **flat untextured blocks**? → a wrong/unknown block ID fell back to a solid color. Fix the ID.
    - Any **floating** blocks, holes in walls/roof, doors/stairs facing wrong?
+   - **Physical validity** ([`10`](10-design-principles.md) §Physical validity): ladders flush to a
+     wall (not freestanding), no lantern "holding up" a pillar, every staircase leads to a real
+     floor (not into a ceiling), no air gap beside a door, nothing floating.
    - Block count / dimensions sane for the request?
-6. **Iterate.** Make targeted edits (the JSON is diffable) and re-preview. Repeat until it
-   matches. Don't regenerate from scratch for small fixes — patch the cells involved.
+6. **Iterate.** Make targeted edits and re-preview. Repeat until it matches. Don't regenerate
+   from scratch for small fixes — **patch** the cells involved (see "Emit modes" below).
+
+## Emit modes: full vs patch
+
+`emit_structure` takes a `mode`:
+
+- **`full`** — a COMPLETE structure. Use it for the first emit and for a large massing rework
+  (changing the footprint, storey count, or roof shape).
+- **`patch`** — ONLY the new geometry to append onto the **previous version**. Use it for a
+  localized fix: a roof, one facade, one room, lighting. The app reuses your last version as the
+  base, appends your new `palette` entries **after** the existing ones (so existing indices stay
+  valid — never renumber), and appends your `ops`/`blocks` **after** the base's (so, since later
+  ops overwrite earlier cells, a `fill` of an air index *carves*, and a `fill` of a block *repaints*
+  what was there). Omit `size`/`DataVersion` unless you are resizing.
+
+Why it matters: **output tokens are the dominant cost**, and a full re-emit re-serializes the
+whole build every round. A patch fixes a roof with a handful of ops, so you can afford more
+refine passes within the round budget. The tool result tells you the current palette length, so
+you know the index your first new palette entry will get.
+
+After each emit the tool result returns screenshots: orbited **exterior** angles, a **vertical
+cross-section** (front half clipped — read storey heights and floor stacking here), then top-down
+**floor-plan cutaways** (roof clipped — read each room's layout/furniture/lighting). Review the
+build against the target using all three before deciding to patch, full-rework, or stop.
 
 ## Validating from the preview (what to look for)
 
@@ -30,6 +56,10 @@ use **reference NBTs** and **reference images**.
 | Flat solid-color block | Unknown block ID (fallback color) | Correct the ID ([`03`](03-blocks-and-blockstates.md)) |
 | Stair/door points wrong way | Wrong `facing` | Flip `facing` to intended direction |
 | Block in mid-air | Missing support / wrong `pos` | Add support or fix coordinates |
+| Ladder floating / breaks in-game | No solid block behind it | Run it flush against a solid wall ([`10`](10-design-principles.md)) |
+| Lantern under a pillar/beam | Treating a light as structure | Support the block from below; hang lights from above instead |
+| Staircase ends at a ceiling/wall | Stairs lead nowhere | Cut the floor hole it climbs to, or remove the stair |
+| Door has air beside it | Wall not sealed to the jamb | Fill the gap so the door blocks the only way through |
 | Gap in wall/roof | Missed cell in the layer loop | Fill the cell |
 | Build off-center / oversized box | `size` padded or origin wrong | Tighten `size` ([`02`](02-coordinates-and-layout.md)) |
 | Door/window misaligned by 1 | Off-by-one in the perimeter test | Recheck `x==0||x==W-1||…` bounds |

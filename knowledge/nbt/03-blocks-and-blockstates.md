@@ -82,7 +82,10 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 ### Torches & lights
 - `torch` (on floor) vs `wall_torch` (`facing`). Same for `soul_torch`/`soul_wall_torch`,
   `redstone_torch`/`redstone_wall_torch`.
-- `lantern`: `hanging` (`true`/`false`). `soul_lantern` likewise.
+- `lantern`: `hanging` (`true`/`false`). `soul_lantern` likewise. A floor lantern sits on a solid
+  block **below** it; `hanging:"true"` hangs from a solid block (or `chain`/fence) **above** it. A
+  lantern is a light, **not a support** — never place one under a pillar/beam as if it holds the
+  block up. For a chandelier, hang `chain` → `lantern[hanging=true]` from the ceiling.
 - `glowstone`, `sea_lantern`, `shroomlight`, `froglight`s — full-block lights.
 - `candle` (1–4, `candles` count + `lit`).
 
@@ -100,6 +103,12 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 `lever`, `*_button`, `*_pressure_plate`, `grindstone` (`face`,`facing`), `lectern`
 (`facing`,`has_book`,`powered`), `campfire` (`facing`,`lit`).
 
+> **`ladder` needs a solid wall behind it** (the block on the side opposite `facing`). A
+> freestanding ladder in open air **breaks the moment the structure is placed in-game** — always
+> run it flush against a full block, and make sure it actually climbs to a reachable floor (cut the
+> ceiling hole). Same backing-block requirement for `wall_torch`/`wall_sign`/wall banners/`lever`/
+> `*_button`/`painting`/`item_frame`. See [`10`](10-design-principles.md) §Physical validity.
+
 ### Block-entity blocks (carry `nbt`) — see [`04`](04-block-entities.md)
 `chest` (`facing`,`type`), `trapped_chest`, `barrel` (`facing`,`open`), `furnace`/`blast_furnace`/`smoker`
 (`facing`,`lit`), `*_sign` & `*_hanging_sign`/`*_wall_sign`, `*_shulker_box`, `brewing_stand`,
@@ -109,11 +118,19 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 > Note: `flower_pot` is **not** a block entity in 1.21.1 — an empty pot is just `flower_pot`, and
 > a planted pot is its own block state (`potted_poppy`, `potted_oak_sapling`, …). No `nbt`.
 
-### Invisible light source — `minecraft:light`
-`{ "Name": "minecraft:light", "Properties": { "level": "15", "waterlogged": "false" } }`. A
-fully transparent, collision-less block that emits light `level` 0–15. **The right tool to light a
-build without a visible fixture** (it renders as empty space in the preview, by design). Use it
-sparingly to brighten interiors that the decorative theme can't light naturally.
+### Do NOT use `minecraft:light` — light with visible fixtures instead
+`minecraft:light` is a **command-only, map-making technical block**: it is not obtainable in
+survival, it is **invisible** (a player finds a lit room with no source, which breaks immersion),
+and its light often **fails to propagate when a structure is placed** programmatically (the room
+ends up dark in-game). It also **does not render in Blockwright's preview** (it shows as empty
+space), so the self-review loop can't even confirm the room is lit. **Never use it to light a
+build.** Always light with a *visible* source that both renders in the preview and works in
+survival: `lantern`/`soul_lantern` (hung from a ceiling, or `hanging:"true"`), `sea_lantern`,
+`glowstone`, `shroomlight`, `ochre_/verdant_/pearlescent_froglight`, `candle`s (1–4, `lit:"true"`),
+`campfire`/`soul_campfire`, `torch`/`soul_torch`/`redstone_torch`, a lit `redstone_lamp`,
+`jack_o_lantern`, `end_rod`, or `glow_lichen`. Aim for one source roughly every ~6 blocks. For a
+dark/gothic theme, lean on `soul_lantern`, `candle`s, and `redstone_torch` — they light *and* set
+the mood.
 
 ### 1.21 / "Tricky Trials" blocks (valid in 1.21.1)
 - **Copper family:** `copper_bulb` (+`exposed_/weathered_/oxidized_/waxed_*`; props `lit`,`powered`),

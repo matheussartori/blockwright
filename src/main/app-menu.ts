@@ -33,6 +33,7 @@ let windowsState: WindowsReport = {
   controls: { visible: true, available: false },
   inspector: { visible: true, available: false },
   jigsaw: { visible: true, available: false },
+  generate: { visible: false, available: true },
 };
 
 /** Update the open-file flag and rebuild the menu if it changed. */
@@ -120,6 +121,8 @@ export function buildAppMenu(): void {
   const viewMenu: MenuItemConstructorOptions = {
     label: 'View',
     submenu: [
+      windowItem('generate', 'Generate', 'CmdOrCtrl+G'),
+      { type: 'separator' },
       windowItem('inspector', 'Inspector', 'CmdOrCtrl+1'),
       windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+2'),
       { type: 'separator' },
