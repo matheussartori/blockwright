@@ -65,20 +65,44 @@ one of these before handing off:
   *descending from the ceiling*, not as a lantern propping up a post.
 - **Gravity blocks need a floor.** `sand`, `red_sand`, `gravel`, `*_concrete_powder`, and anvils
   fall if the cell under them is air — keep a solid block beneath them.
+- **Floor fixtures rest ON the floor — they are never on the ceiling or stuck to a wall.** A
+  `cauldron`, `anvil`, `furnace`/`smoker`/`blast_furnace`, `flower_pot`/`potted_*`, `composter`,
+  `decorated_pot`, `brewing_stand`, `cake`, `chest`/`barrel`, `campfire`, and floor `lantern`/`torch`
+  all sit on top of a solid block, the right way up. **Never** hang a cauldron, furnace, or pot from a
+  ceiling or float it high on a wall — it reads as a glitch (a cauldron stuck to the ceiling is
+  nonsense). If you want something *hanging* from above, use the blocks made for it: `chain` →
+  `lantern[hanging=true]`, a `*_hanging_sign`, or `vine`/`glow_lichen` — not a floor fixture.
+- **Cobweb is sparse decoration, not a building material.** `cobweb` is **not** a stair, ladder,
+  scaffold, floor, or path — you cannot climb it or walk up it, and a diagonal run of cobwebs is not
+  a staircase, it's just floating junk. Use it only as the occasional *single* strand tucked into a
+  corner or ceiling angle for an "abandoned/cave" mood (and only when the prompt wants that), always
+  touching a solid block. To actually move between heights, build real `*_stairs` against structure
+  or a `ladder` flush to a wall (see below) — never a cobweb climb.
 - **Doors actually block a doorway — no gap beside them.** A door fills a **1-wide opening in an
   otherwise solid wall**, both the lower and upper block of the opening, framed by solid blocks on
   *both* sides. If there's an empty (air) cell right next to the door, the door is pointless — you
   can just walk around it. Always seal the wall flush to the door's jambs. A door also needs a
   solid block beneath its lower half. Get `facing` (which way it opens) and `hinge` right so it
   swings into the room, not into a wall (catch this in the preview).
-- **Stairs/ladders must lead somewhere.** A staircase or ladder exists to connect two reachable
-  places — a lower floor to an upper floor through a hole in the ceiling, the ground to a door.
-  **Never** build a flight of stairs that climbs into a solid ceiling, ends at a blank wall, or
-  stops in mid-air. Verify the top of every stair run opens onto a real walkable space (cut the
-  floor/ceiling hole it climbs through) and the bottom meets a floor.
+- **Stairs/ladders must lead somewhere — and they are not filler.** A staircase or ladder exists to
+  connect two reachable places — a lower floor to an upper floor through a hole in the ceiling, the
+  ground to a door. **Never** build a flight of stairs that climbs into a solid ceiling, ends at a
+  blank wall, or stops in mid-air. Verify the top of every stair run opens onto a real walkable space
+  (cut the floor/ceiling hole it climbs through) and the bottom meets a floor. A `*_stairs` block is a
+  *shaped solid block*, not a decorative space-filler: **do not stack or scatter loose stairs in the
+  middle of a room or in open air to "fill" it.** A pile of free-floating stairs sitting in a room is
+  the clearest "fake build" tell of all — every stair must be part of a supported staircase, roof,
+  or furniture piece, resting on or attached to something solid.
+- **Walkways and rooms stay clear — don't block your own circulation.** A floor `lantern`, `torch`,
+  `campfire`, pot, or any prop dropped in the middle of a corridor, doorway, or stair run blocks the
+  path the player walks. Keep lights and props against walls or hang them from the ceiling so the
+  1–2-block walking lane through every space stays open end to end.
 - **Rooms are enclosed and reachable.** Every interior space a player is meant to use needs a way
   in (a door or opening) and complete walls/floor/ceiling around it — no one-block holes leaking to
-  the outside, no sealed rooms with no entrance.
+  the outside, no sealed rooms with no entrance. This applies to **basements and lower floors**: a
+  cellar must have an actual way down into it (a staircase or ladder through a hole in the floor
+  above), not be a sealed box buried under the build. If you can't trace a walkable route from the
+  entrance to a room, either connect it or don't build it.
 
 > Quick mental test for any block: *"If a player loaded this build in a fresh world, would this
 > block still be here, attached to something, and serve its purpose?"* If no, fix it.
@@ -219,4 +243,12 @@ Catch these in the preview ([`07`](07-workflow.md)):
 - ❌ Dark or empty/cluttered rooms → ✅ lit, zoned, anchor + supporting props, no bare floors.
 - ❌ Floating block / freestanding ladder / lantern "holding up" a pillar → ✅ everything supported,
   ladders flush to a wall, lights hung from above or set on a block.
-- ❌ Stairs into a ceiling or to nowhere → ✅ every stair/ladder connects two reachable floors.
+- ❌ Stairs into a ceiling or to nowhere / a pile of loose stairs floating in a room → ✅ every
+  stair/ladder is a supported run that connects two reachable floors.
+- ❌ Cauldron/furnace/pot stuck to a ceiling or wall → ✅ floor fixtures rest the right way up on a
+  solid block; hang things with `chain`+`lantern` or hanging signs instead.
+- ❌ Cobweb used as a staircase/ladder/path → ✅ real stairs or a wall-backed ladder; cobweb only as
+  a stray corner strand for an abandoned mood.
+- ❌ Lantern/prop blocking a corridor, doorway, or stair → ✅ walking lane kept clear; props against
+  walls or hung from above.
+- ❌ Sealed basement with no way in → ✅ a real staircase/ladder down into every lower room.

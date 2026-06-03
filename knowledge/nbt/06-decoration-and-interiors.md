@@ -26,8 +26,9 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 
 ### Kitchen / counters
 - **Counter**: row of `*_stairs half:top` or full blocks topped with `*_slab`.
-- **Sink**: a `cauldron` (optionally `water_cauldron level:3`) set into the counter, with a
-  `*_trapdoor` or lever as a faucet on the wall behind.
+- **Sink**: a `cauldron` (optionally `water_cauldron level:3`) set into the counter at *floor/counter
+  level* — a cauldron always rests on a solid block the right way up, never hung from a ceiling or
+  floated on a wall — with a `*_trapdoor` or lever as a faucet on the wall behind.
 - **Stove/oven**: `furnace`/`smoker facing:out` in the counter line; `lit:true` if "cooking".
 - **Hood/cabinets**: `*_trapdoor`s on the wall above; `barrel`s = base cabinets.
 - **Pantry**: `barrel`s, `decorated_pot`s, `composter`, hanging `lantern`.
@@ -69,7 +70,9 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
 - `chain` + `lantern` hanging fixtures.
 - `decorated_pot`, `*_banner`, `bookshelf`/`chiseled_bookshelf`, `armor_stand` (entity),
   `cake`, `brewing_stand` (lab), `bell`, `note_block`, `jukebox`.
-- `cobweb` in corners for "abandoned"; `candle` clusters for "ritual/cozy".
+- `cobweb` as a *single stray strand* tucked in a corner or ceiling angle for "abandoned" — never a
+  run of them, and never as a stair/ladder/path (you can't climb cobweb; see
+  [`10`](10-design-principles.md) §Physical validity). `candle` clusters for "ritual/cozy".
 
 ## Composing a furnished room
 
@@ -115,6 +118,12 @@ empty. When in doubt for these builds, add one more piece against a wall rather 
 - Furniture floating or blocking the door. Keep furniture against walls and the door/path clear.
 - A lantern or candle "floating" with nothing under or above it — set lights on a block or hang
   them with `hanging:true` (see [`10`](10-design-principles.md) §Physical validity).
+- A floor lantern/torch/prop dropped in the middle of a corridor, doorway, or stair, blocking the
+  walking path — keep lights against walls or hung from the ceiling, never in the lane the player walks.
+- A cauldron/furnace/pot stuck to a ceiling or wall — these are floor fixtures; they rest upright on
+  a solid block. Use `chain`+`lantern` or a hanging sign for anything that should hang from above.
+- Cobwebs used as a staircase, ladder, or path — cobweb can't be climbed or walked on; build real
+  stairs or a wall-backed ladder instead, and keep cobweb to a stray corner strand.
 - Over-cluttering the *walking path*. Keep the centre open — but that's not a license to leave
   rooms empty; the clutter to avoid is in circulation space, not against the walls.
 - Mixing too many wood/stone types — pick 2–3 and stick to them.
