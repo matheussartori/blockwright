@@ -9,6 +9,8 @@ import { detectMcVersion } from '../../mc-version-detect';
 
 let activeWorkspace: Workspace | null = null;
 
+/** Set the active mod workspace (the asset source for its own namespace). Callers
+ *  clear the model/JSON caches separately so stale resolutions don't linger. */
 export function setActiveWorkspace(ws: Workspace | null): void {
   activeWorkspace = ws;
 }
@@ -45,6 +47,8 @@ function rootFor(namespace: string): string {
   return contentDir();
 }
 
+/** The `assets/<namespace>` dir owning a namespace (workspace for its own, else
+ *  the bundled pack) — where models, textures and blockstates live. */
 export function assetsDir(namespace = 'minecraft'): string {
   return path.join(rootFor(namespace), 'assets', namespace);
 }
@@ -55,6 +59,7 @@ export function dataDir(namespace = 'minecraft'): string {
   return path.join(rootFor(namespace), 'data', namespace);
 }
 
+/** The `textures` dir for a namespace (under its assetsDir). */
 export function texturesDir(namespace = 'minecraft'): string {
   return path.join(assetsDir(namespace), 'textures');
 }
@@ -69,6 +74,8 @@ export function resolveTextureFile(key: string): { file: string; root: string } 
   return { file: path.join(root, `${rest}.png`), root };
 }
 
+/** Whether a usable vanilla content pack is present (probes for its blockstates dir);
+ *  resolution falls back to flat colors when false. */
 export function hasContent(): boolean {
   return fs.existsSync(path.join(assetsDir('minecraft'), 'blockstates'));
 }
@@ -125,6 +132,8 @@ export function loadJson(file: string): unknown {
   return data;
 }
 
+/** Drop the cached JSON + known-block results — call after a workspace change so
+ *  resolutions and block-ID validation pick up the new asset source. */
 export function clearJsonCache(): void {
   jsonCache.clear();
   knownBlockCache.clear(); // a workspace change adds/removes valid block IDs

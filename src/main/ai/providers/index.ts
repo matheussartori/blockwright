@@ -8,6 +8,7 @@ import type { Critic, Driver } from './types';
  *  the orchestrator re-seeds them with the latest build so edits stay coherent. */
 export const RESUMABLE_PROVIDERS = new Set<AiProviderId>(['claude-subscription', 'codex']);
 
+/** The driver for a provider id, dynamically importing its module (and SDK) on first use. */
 export async function getDriver(id: AiProviderId): Promise<Driver> {
   switch (id) {
     case 'claude-subscription':

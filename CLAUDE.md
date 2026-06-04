@@ -1,8 +1,8 @@
 # Blockwright
 
-Electron desktop app that renders Minecraft `.nbt` structure files in 3D. Long-term
-goal: also AI-generate structures. Built with Electron Forge + Vite + TypeScript +
-Three.js. Block models/textures come from an extracted Minecraft "content pack" on disk.
+Electron desktop app that renders Minecraft `.nbt` structure files in 3D and AI-generates
+new ones. Built with Electron Forge + Vite + TypeScript + React + Three.js. Block
+models/textures come from an extracted Minecraft "content pack" on disk.
 
 ## Commands
 
@@ -40,7 +40,8 @@ src/
         fallback-color.ts    Deterministic per-block color when textures are missing
         block-entity/        Blocks vanilla draws with an entity renderer (particle-only model),
                              synthesized from a 64×64 atlas: box-uv.ts (shared box/UV helper),
-                             chest.ts, bed.ts, banner.ts (wall), index.ts (dispatcher)
+                             chest.ts, bed.ts, banner.ts (wall), skull.ts, decorated-pot.ts,
+                             index.ts (dispatcher)
       catalog/
         block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
                              namespace-aware) + a representative texture per block → the Block Catalog.
@@ -102,11 +103,16 @@ src/
                           returns a CompileReport ({fixes,warnings}) for the generator to surface.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: initTheme() then createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
-    App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
+    App.tsx               Orchestration: layout (TabBar/stage/Statusbar) + composition of the app/ hooks
+    app/                  The Shell's concerns, one hook per responsibility: useDocumentFlow (open/load/
+                          close + workspace-suggest handlers), useAppIpc (native-menu/file IPC wiring +
+                          file/window-state report to main), useAiRenderBridge (the self-review render→
+                          screenshot bridge), useViewerSync (store→viewer effects), capture.ts (helpers)
     api.ts                Typed accessor for window.blockwright (the preload bridge)
     components/           FloatingWindow (shared window chrome), Statusbar, Welcome (themed Logo + action
                           cards), TabBar (the single slim top bar — no separate titlebar), WorkspaceBadge/
-                          Suggest, Loading, SettingsModal (tabbed), VersionSelectModal, CatalogModal
+                          Suggest, Loading, SettingsModal (tabbed shell; each tab is a component in
+                          components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen)
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
                           (themed <picture>), BlockPreview (standalone Three.js single-block render).
@@ -116,14 +122,17 @@ src/
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
                           windows.ts (floating-window layout, persisted), theme.ts (apply light/dark)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
-    viewer/               Three.js Viewer (scene/camera/navigation/loading) + ViewerProvider (React
+    viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
                           bridge) + mesh/geometry/texture building. Focused concerns split out of the
-                          Viewer class: capture.ts (the AI-review screenshot paths: orbit/cutaway/
-                          section), floor-regions.ts (FloorRegionsOverlay — the floor-plan bands),
-                          highlight.ts (FocusHighlight — the inspector focus box).
+                          Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
+                          navigation + framing), capture.ts (the AI-review screenshot paths: orbit/
+                          cutaway/section), floor-regions.ts (FloorRegionsOverlay — the floor-plan
+                          bands), highlight.ts (FocusHighlight — the inspector focus box).
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
-    types.ts              Type-only contracts shared by both bundles (incl. BlockwrightApi)
+    types/                Type-only contracts shared by both bundles, grouped by domain
+                          (structure, workspace, jigsaw, generation, app, api = BlockwrightApi) +
+                          an index.ts barrel — so `@/shared/types` stays the one import path
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
 content/                  Extracted Minecraft content pack (assets/minecraft/...). Shipped as extraResource.
@@ -135,7 +144,7 @@ content/                  Extracted Minecraft content pack (assets/minecraft/...
 `IPC_CHANNELS` = request/response (`ipcRenderer.invoke` ↔ `ipcMain.handle`);
 `IPC_EVENTS` = fire-and-forget pushes from main → renderer (e.g. `open-path`).
 When adding a feature that crosses the boundary: add the channel in `shared/ipc.ts`,
-the handler in `main/ipc.ts`, the method on `BlockwrightApi` in `shared/types.ts`, and
+the handler in `main/ipc.ts`, the method on `BlockwrightApi` in `shared/types/api.ts`, and
 the binding in `preload.ts`.
 
 ### Content pack & namespaces
@@ -347,7 +356,7 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
 - **Synthesized blocks (entities + fluids):** some blocks have a particle-only blockstate
   model because vanilla draws them with a dedicated renderer. `resolveBlock` intercepts them
   before the normal model path: `fluid.ts` (water/lava) and the `block-entity/` dispatcher
-  (chest/bed/banner). Each builds `ResolvedModel`s directly. **Add a new kind as its own file**
+  (chest/bed/banner/skull/decorated-pot). Each builds `ResolvedModel`s directly. **Add a new kind as its own file**
   in `block-entity/` and wire it into `block-entity/index.ts` — don't lump them together.
   - Entity geometry uses `box-uv.ts`: `boxFaces` is the standard Minecraft box-UV unwrap
     (front lands on +z/south) into a 64×64 atlas; `FACING_Y` maps `facing` to a y-rotation

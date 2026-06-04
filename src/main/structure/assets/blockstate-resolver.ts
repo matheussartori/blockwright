@@ -15,6 +15,8 @@ const AIR = new Set([
   'minecraft:structure_void',
 ]);
 
+/** Whether a block id is an air variant (air / cave_air / void_air / structure_void) —
+ *  these are skipped entirely when rendering. */
 export function isAir(name: string): boolean {
   return AIR.has(name);
 }

@@ -81,6 +81,8 @@ export interface Placement {
 
 const ROOT_PLACEMENT: Placement = { offset: [0, 0, 0], quarterTurns: 0 };
 
+/** A fresh root placement — the identity transform (origin, no rotation) the first
+ *  assembly piece sits at. Returns a copy so callers can mutate it safely. */
 export function rootPlacement(): Placement {
   return { ...ROOT_PLACEMENT, offset: [...ROOT_PLACEMENT.offset] };
 }

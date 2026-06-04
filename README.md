@@ -5,7 +5,7 @@
 <h1 align="center">Blockwright</h1>
 
 <p align="center">
-  A desktop app that renders Minecraft <code>.nbt</code> structure files in 3D.
+  A desktop app for viewing, browsing, and AI-generating Minecraft <code>.nbt</code> structures in 3D.
 </p>
 
 <p align="center">
@@ -33,16 +33,29 @@ them as interactive 3D scenes. Block models and textures are read from an extrac
 "content pack" on disk, so structures appear with their real in-game look — including support for
 modded blocks via [mod workspaces](#mod-workspaces).
 
-The long-term goal is to also **AI-generate** structures from prompts, with the viewer as the
-foundation for inspecting the results.
+Blockwright can also **AI-generate** structures: describe a build in a prompt (optionally with a
+reference image) and the model emits a structure, which the app compiles to `.nbt`, renders, and
+refines through an emit → render → review loop — previewed live in the viewer as it evolves.
 
 ## Features
 
 - Real-time 3D rendering of `.nbt` structures with [Three.js](https://threejs.org)
+- AI structure generation from a prompt or reference image, through an emit → render → review loop
+  that refines the build live — with multiple provider backends to choose from (Claude
+  subscription / API, OpenAI, Gemini, Codex), configured in Settings
+- Composable generation domain — structure types × decoration themes crossed at compile time, so
+  the model describes a build with a single high-level op
+- Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
+  along as context on every generation prompt
 - Namespace-aware asset resolution from an extracted Minecraft content pack
-- Mod workspace support — render modded structures with their own textures and models
-- Block-entity rendering (chests: normal / trapped / ender, plus modded variants)
+- Mod workspace support — render modded structures with their own textures and models, with the
+  workspace's target Minecraft version auto-detected
+- Jigsaw assembly preview for worldgen template pools
+- Block Catalog browser with live 3D block previews
+- Block-entity rendering (chests, beds, banners, skulls, decorated pots) and animated fluids
+  (water / lava)
 - Deterministic color fallback for blocks with missing textures
+- Floating, dockable tool windows (Controls / Inspector / Jigsaw) and a light/dark themed UI
 - Recently opened files and workspaces, surfaced in the welcome screen and native menu
 - Headless self-screenshot for visual testing (no screen-recording permission needed)
 - Full TypeScript source across all three Electron contexts
@@ -60,6 +73,12 @@ foundation for inspecting the results.
 
 Recently opened files are remembered and listed under **File ▸ Open Recent** and on the welcome
 screen.
+
+### Generating a structure
+
+**File ▸ New Structure** opens a chat where you describe a build (optionally attaching a reference
+image). Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer,
+iterating through a visual review loop. Pick an AI provider and model in **Settings ▸ AI** first.
 
 ## Mod Workspaces
 
@@ -117,10 +136,11 @@ screen-recording permission. Set these env vars when launching:
 
 | Variable       | Description                                            |
 | -------------- | ------------------------------------------------------ |
-| `BW_OPEN`      | Path to a `.nbt` file to open on startup               |
-| `BW_CAPTURE`   | Path to write a PNG to, then quit (~2.5s after render) |
-| `BW_CONTENT`   | Override the content-pack location                     |
-| `BW_WORKSPACE` | Activate a mod workspace on startup                    |
+| `BW_OPEN`         | Path to a `.nbt` file to open on startup                  |
+| `BW_CAPTURE`      | Path to write a PNG to, then quit (~2.5s after render)    |
+| `BW_CAPTURE_DELAY`| Override the capture delay in ms (raise it on cold starts) |
+| `BW_CONTENT`      | Override the content-pack location                        |
+| `BW_WORKSPACE`    | Activate a mod workspace on startup                       |
 
 ## Architecture
 
@@ -131,25 +151,26 @@ Blockwright builds three Vite bundles, one per Electron context, with a strict p
 src/
   main.ts        Main entry: app lifecycle, open-file, scheme/protocol/IPC wiring
   preload.ts     Exposes window.blockwright (contextBridge) — the only renderer→main bridge
-  main/          Window, IPC handlers, native menu, recents, workspaces, structure loading
-  renderer/      Renderer entry, UI shell, and the Three.js viewer
+  main/          Window, IPC handlers, native menu, recents, workspaces, structure loading,
+                 the authoring/NBT compiler, the composable generation domain, and AI generation
+  renderer/      React UI shell (Vite + React) and the imperative Three.js viewer
   shared/        IPC channel names and type-only contracts shared by both bundles
 content/         Extracted Minecraft content pack, shipped as an extraResource
 ```
 
 - **IPC** — `shared/ipc.ts` is the single source of truth for channel/event names; handlers live
-  in `main/ipc.ts` and methods are exposed on `BlockwrightApi` (`shared/types.ts`).
+  in `main/ipc.ts` and methods are exposed on `BlockwrightApi` (`shared/types/`).
 - **Content pack** — asset resolution is namespace-aware (`namespace:path`); the vanilla pack
   serves `minecraft`, the active mod workspace serves its own namespace.
 - **Textures** — served only through the privileged `bw-texture://` scheme (never `file://`).
 - **Renderer state** — held in a vanilla [Zustand](https://github.com/pmndrs/zustand) store.
 
-Built with **Electron Forge + Vite + TypeScript + Three.js**.
+Built with **Electron Forge + Vite + TypeScript + React + Three.js**.
 
 ## Support
 
 Blockwright is a solo, open-source project. If it's useful to you and you'd like to help fund
-its development (and the long-term goal of AI-generated structures), consider buying me a coffee —
+its continued development (including the AI structure generation), consider buying me a coffee —
 every bit is genuinely appreciated. ☕
 
 <p align="center">

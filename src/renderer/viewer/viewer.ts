@@ -1,13 +1,11 @@
-// The 3D viewport: scene setup, camera, navigation, and structure loading/framing.
-// Two navigation modes share one camera: OrbitControls (default — drag/pan/zoom
-// around the structure) and a pointer-locked "fly" mode (WASD + mouse look, like
-// Minecraft noclip). The focused concerns are delegated to siblings: mesh building
+// The 3D viewport: scene setup, lights, structure loading + framing, and the render
+// loop. The camera and its navigation modes (orbit / pointer-locked fly) live in a
+// CameraController; the other focused concerns are siblings too: mesh building
 // (mesh-builder) + texture loading (texture-loader), screenshot paths (capture), the
 // floor-plan overlay (floor-regions), and the inspector focus box (highlight).
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import type { StructureData } from '@/shared/types';
+import { CameraController, type NavMode } from './camera-controller';
 import { type CaptureContext, captureCutaways, captureOrbit, captureSection } from './capture';
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
@@ -15,8 +13,7 @@ import { buildStructure } from './mesh-builder';
 import { TextureLoader } from './texture-loader';
 
 export type { FloorRegion } from './floor-regions';
-
-export type NavMode = 'orbit' | 'fly';
+export type { NavMode } from './camera-controller';
 
 /** One structure placed in the scene: its data plus a rigid transform. Rotation
  *  is quarter-turns about +Y, offset is the position of its local origin — the
@@ -27,17 +24,10 @@ export interface AssemblyPiece {
   quarterTurns: number;
 }
 
-/** Keys that drive fly movement — captured (preventDefault) only while flying. */
-const MOVE_CODES = new Set([
-  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight',
-]);
-
 export class Viewer {
   private scene = new THREE.Scene();
-  private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
-  private controls: OrbitControls;
-  private fly: PointerLockControls;
+  private nav: CameraController;
   private current: THREE.Group | null = null;
   private grid: THREE.GridHelper | null = null;
   private textures = new TextureLoader();
@@ -46,15 +36,7 @@ export class Viewer {
   /** Floor-plan bands (one per named level), persisted across builds. */
   private floors = new FloorRegionsOverlay(this.scene);
 
-  private mode: NavMode = 'orbit';
-  private keys = new Set<string>();
   private timer = new THREE.Timer();
-  /** Fly movement speed in world units/second; scaled to the structure on load. */
-  private flySpeed = 8;
-  /** Mouse-look multiplier in fly mode (Settings). */
-  private lookSensitivity = 1;
-  /** Invert the vertical look axis in fly mode (Settings). */
-  private invertY = false;
   /** Whether the ground grid is shown (Settings). */
   private showGrid = true;
   /** Whether jigsaw blocks are rendered (Settings; off by default). */
@@ -63,8 +45,6 @@ export class Viewer {
   private hideShell = false;
   /** Last rendered pieces, kept so a settings toggle can rebuild without a reload. */
   private lastPieces: AssemblyPiece[] | null = null;
-  private readonly dir = new THREE.Vector3();
-  private readonly euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
   /** Notified whenever the navigation mode changes (for the UI to reflect it). */
   onModeChange: ((mode: NavMode) => void) | null = null;
@@ -80,23 +60,12 @@ export class Viewer {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(this.renderer.domElement);
 
-    this.camera = new THREE.PerspectiveCamera(
-      50,
+    this.nav = new CameraController(
+      this.renderer.domElement,
       container.clientWidth / container.clientHeight,
-      0.05,
-      2000,
+      { offscreen, canToggle: () => this.current !== null },
     );
-    this.camera.position.set(8, 8, 14);
-
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.08;
-
-    this.fly = new PointerLockControls(this.camera, this.renderer.domElement);
-    // We drive mouse-look ourselves (to support sensitivity + invert-Y from
-    // Settings), so neutralize PointerLockControls' own rotation while keeping
-    // its lock plumbing (isLocked, lock/unlock, moveRight, the unlock event).
-    this.fly.pointerSpeed = 0;
+    this.nav.onModeChange = (mode) => this.onModeChange?.(mode);
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.05));
     const sun = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -107,18 +76,6 @@ export class Viewer {
     this.scene.add(fill);
 
     if (!offscreen) {
-      this.renderer.domElement.ownerDocument.addEventListener('mousemove', this.onMouseLook);
-      // Losing the pointer lock (Esc, or the browser dropping it) is the canonical
-      // signal to leave fly mode and hand the camera back to OrbitControls.
-      this.fly.addEventListener('unlock', () => this.setMode('orbit'));
-      window.addEventListener('keydown', this.onKeyDown);
-      window.addEventListener('keyup', this.onKeyUp);
-      // Release all held movement keys when the window loses focus. Without this,
-      // a key down at blur time (e.g. Shift in a screenshot shortcut) never gets
-      // its keyup, so the camera would keep drifting — notoriously "flying down"
-      // forever when a screenshot grab steals focus mid-Shift.
-      window.addEventListener('blur', this.onBlur);
-      this.renderer.domElement.addEventListener('wheel', this.onWheel, { passive: false });
       new ResizeObserver(() => this.onResize()).observe(container);
       this.animate();
     }
@@ -127,106 +84,19 @@ export class Viewer {
   private animate = () => {
     requestAnimationFrame(this.animate);
     this.timer.update();
-    const dt = this.timer.getDelta();
-    if (this.mode === 'fly') this.updateFly(dt);
-    else this.controls.update();
+    this.nav.update(this.timer.getDelta());
     this.highlight.update();
-    this.renderer.render(this.scene, this.camera);
-  };
-
-  /** Integrate one frame of WASD/Space/Shift movement while flying. */
-  private updateFly(dt: number) {
-    if (!this.fly.isLocked) return;
-    const step = this.flySpeed * dt;
-    let forward = 0;
-    let right = 0;
-    let up = 0;
-    if (this.keys.has('KeyW')) forward += 1;
-    if (this.keys.has('KeyS')) forward -= 1;
-    if (this.keys.has('KeyD')) right += 1;
-    if (this.keys.has('KeyA')) right -= 1;
-    if (this.keys.has('Space')) up += 1;
-    if (this.keys.has('ShiftLeft') || this.keys.has('ShiftRight')) up -= 1;
-
-    if (forward !== 0) {
-      // Fly along the look direction (full 3D), so looking down + W descends.
-      this.camera.getWorldDirection(this.dir);
-      this.camera.position.addScaledVector(this.dir, forward * step);
-    }
-    if (right !== 0) this.fly.moveRight(right * step);
-    if (up !== 0) this.camera.position.y += up * step;
-  }
-
-  /** Switch navigation mode, syncing the inactive controller so the swap is seamless. */
-  private setMode(mode: NavMode) {
-    if (mode === this.mode) return;
-    this.mode = mode;
-    if (mode === 'fly') {
-      this.controls.enabled = false;
-      this.fly.lock();
-    } else {
-      if (this.fly.isLocked) this.fly.unlock();
-      this.keys.clear();
-      // Re-anchor the orbit target in front of the camera so rotation pivots
-      // around where you were looking, not back at the old target.
-      const dist = this.controls.target.distanceTo(this.camera.position) || 10;
-      this.camera.getWorldDirection(this.dir);
-      this.controls.target.copy(this.camera.position).addScaledVector(this.dir, dist);
-      this.controls.enabled = true;
-      this.controls.update();
-    }
-    this.onModeChange?.(mode);
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    if ((e.key === 'f' || e.key === 'F') && !e.repeat) {
-      if (!this.current) return; // nothing loaded — no navigation to do
-      this.setMode(this.mode === 'fly' ? 'orbit' : 'fly');
-      return;
-    }
-    if (this.mode !== 'fly') return;
-    if (MOVE_CODES.has(e.code)) {
-      this.keys.add(e.code);
-      e.preventDefault(); // stop Space from scrolling, etc.
-    }
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    if (MOVE_CODES.has(e.code)) this.keys.delete(e.code);
-  };
-
-  /** Drop every held key when focus leaves the window, so no movement sticks. */
-  private onBlur = () => this.keys.clear();
-
-  /** While flying, the wheel tunes movement speed instead of zooming. */
-  private onWheel = (e: WheelEvent) => {
-    if (this.mode !== 'fly') return;
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    this.flySpeed = THREE.MathUtils.clamp(this.flySpeed * factor, 1, 500);
-  };
-
-  /** Pointer-lock mouse-look (mirrors PointerLockControls' math, but with the
-   *  user's sensitivity and optional Y inversion). */
-  private onMouseLook = (e: MouseEvent) => {
-    if (this.mode !== 'fly' || !this.fly.isLocked) return;
-    const factor = 0.002 * this.lookSensitivity;
-    this.euler.setFromQuaternion(this.camera.quaternion);
-    this.euler.y -= e.movementX * factor;
-    this.euler.x -= e.movementY * factor * (this.invertY ? -1 : 1);
-    // Clamp pitch so you can't flip over the poles.
-    this.euler.x = THREE.MathUtils.clamp(this.euler.x, -Math.PI / 2, Math.PI / 2);
-    this.camera.quaternion.setFromEuler(this.euler);
+    this.renderer.render(this.scene, this.nav.camera);
   };
 
   /** Mouse-look multiplier in fly mode (Settings). */
   setLookSensitivity(value: number) {
-    this.lookSensitivity = value;
+    this.nav.setLookSensitivity(value);
   }
 
   /** Invert the vertical look axis in fly mode (Settings). */
   setInvertY(value: boolean) {
-    this.invertY = value;
+    this.nav.setInvertY(value);
   }
 
   /** Show or hide the ground grid (Settings). */
@@ -257,8 +127,7 @@ export class Viewer {
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
     if (w === 0 || h === 0) return;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.nav.resize(w / h);
     this.renderer.setSize(w, h);
   }
 
@@ -297,28 +166,16 @@ export class Viewer {
     // Re-apply the floor-plan bands against the new footprint (clear() dropped the
     // meshes but kept the desired regions).
     this.floors.reapply(this.current);
-    if (preserveCamera) this.controls.update();
-    else this.frame(box);
+    if (preserveCamera) this.nav.controls.update();
+    else this.nav.frame(box);
   }
 
   /** Center the camera on a single block (local coords of the loaded structure)
    *  and flash a translucent box over it for ~1s so it's easy to spot among
    *  neighbours. */
   focusBlock(pos: [number, number, number]) {
-    if (this.mode === 'fly') this.setMode('orbit');
     const center = new THREE.Vector3(pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5);
-
-    // Keep the current view direction; pull in to a comfortable distance so the
-    // block fills the frame even when we were zoomed out over a big structure.
-    const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
-    const curDist = dir.length();
-    if (curDist < 1e-3) dir.set(0.8, 0.7, 0.9);
-    dir.normalize();
-    const dist = THREE.MathUtils.clamp(curDist, 3, 8);
-    this.controls.target.copy(center);
-    this.camera.position.copy(center).addScaledVector(dir, dist);
-    this.controls.update();
-
+    this.nav.focusOn(center);
     this.highlight.flash(center);
   }
 
@@ -335,7 +192,7 @@ export class Viewer {
     // Drop the live band meshes but keep the desired regions so the next build
     // re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();
-    this.setMode('orbit'); // never leave a stale pointer lock when unloading
+    this.nav.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);
       this.disposeGroup(this.current);
@@ -373,31 +230,12 @@ export class Viewer {
     this.grid = grid;
   }
 
-  private frame(box: THREE.Box3) {
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const radius = Math.max(size.x, size.y, size.z, 1);
-    const dist = radius * 1.8 + 2;
-    // Fly speed proportional to the structure so big builds aren't a slow crawl.
-    this.flySpeed = Math.max(6, radius * 0.8);
-    this.controls.target.copy(center);
-    this.camera.position.set(
-      center.x + dist * 0.8,
-      center.y + dist * 0.7,
-      center.z + dist * 0.9,
-    );
-    this.camera.near = Math.max(0.05, dist / 100);
-    this.camera.far = dist * 20;
-    this.camera.updateProjectionMatrix();
-    this.controls.update();
-  }
-
   /** The live bits the capture paths read/mutate. Callers guard `current` first. */
   private captureContext(): CaptureContext {
     return {
       renderer: this.renderer,
-      camera: this.camera,
-      controls: this.controls,
+      camera: this.nav.camera,
+      controls: this.nav.controls,
       scene: this.scene,
       current: this.current!,
     };
@@ -406,7 +244,7 @@ export class Viewer {
   /** Orbited exterior screenshots (angle 0 = the current camera) for the AI review. */
   capture(angles = 2, maxSize = 720): string[] {
     if (!this.current) return [];
-    if (this.mode === 'fly') this.setMode('orbit');
+    if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
     return captureOrbit(this.captureContext(), angles, maxSize);
   }
@@ -414,7 +252,7 @@ export class Viewer {
   /** Top-down floor-plan cutaways (interior layout) for the AI review. */
   captureCutaways(maxSize = 720): string[] {
     if (!this.current) return [];
-    if (this.mode === 'fly') this.setMode('orbit');
+    if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
     return captureCutaways(this.captureContext(), maxSize);
   }
@@ -422,7 +260,7 @@ export class Viewer {
   /** A vertical cross-section screenshot (storey heights / hanging detail) for review. */
   captureSection(maxSize = 720): string[] {
     if (!this.current) return [];
-    if (this.mode === 'fly') this.setMode('orbit');
+    if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
     return captureSection(this.captureContext(), maxSize);
   }

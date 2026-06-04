@@ -25,6 +25,7 @@ export function paletteKey(entry: AuthoringPaletteEntry): string {
  *  matching (name, props) combo, appending it (mutating `palette`) if new. */
 export type Intern = (entry: AuthoringPaletteEntry) => number;
 
+/** Build an Intern bound to `palette` (which it mutates as new entries are appended). */
 export function makeIntern(palette: AuthoringPaletteEntry[]): Intern {
   const index = new Map<string, number>();
   palette.forEach((p, i) => index.set(paletteKey(p), i));

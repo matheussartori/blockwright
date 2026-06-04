@@ -10,6 +10,9 @@ export { connectBlocks, connFamily } from './connect-blocks';
 export { fillInteriorAir } from './fill-air';
 export { fixPlacement } from './placement';
 
+/** Run `passes` in order over the resolved blocks, threading each pass's output
+ *  (blocks + possibly-grown palette) into the next and accumulating their
+ *  fixes/warnings into the final result. */
 export function runPasses(
   blocks: AuthoringBlock[],
   palette: AuthoringPaletteEntry[],

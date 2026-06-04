@@ -276,10 +276,13 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
   return a;
 }
 
+/** Plan a full (seeded, bounded) jigsaw assembly starting from `rootPath`, returning
+ *  the placed pieces + any validation warnings. */
 export function assembleJigsaw(rootPath: string, rootId: string, options: AssembleOptions): Promise<JigsawPlan> {
   return new Assembler().assemble(rootPath, rootId, options);
 }
 
+/** The candidate pieces that could attach to one connector of `rootPath` (manual mode). */
 export function jigsawCandidates(rootPath: string, connectorIndex: number): Promise<JigsawCandidate[]> {
   return new Assembler().candidates(rootPath, connectorIndex);
 }

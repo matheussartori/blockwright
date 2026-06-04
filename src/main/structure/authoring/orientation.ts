@@ -16,6 +16,7 @@ const SHAPE_MIRROR: Record<string, string> = {
 
 export type PropXform = { kind: 'mirror'; axis: 'x' | 'z' } | { kind: 'rotate'; turns: number };
 
+/** Rotate a horizontal facing by `q` clockwise quarter-turns (about +Y). */
 export function rotFacing(f: Horiz, q: number): Horiz {
   let out: Horiz = f;
   const n = (((q % 4) + 4) % 4);
@@ -23,6 +24,7 @@ export function rotFacing(f: Horiz, q: number): Horiz {
   return out;
 }
 
+/** Reflect a horizontal facing across the given axis (x flips east/west, z north/south). */
 export function mirrorFacing(f: Horiz, axis: 'x' | 'z'): Horiz {
   if (axis === 'x') return f === 'east' ? 'west' : f === 'west' ? 'east' : f;
   return f === 'north' ? 'south' : f === 'south' ? 'north' : f;
