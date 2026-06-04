@@ -11,8 +11,9 @@ import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { GenerateImage } from '@/shared/types';
 import { EMIT_TOOL_NAME, EMIT_TOOL_DESCRIPTION, normalizeMode } from '../schema';
 import type { EmitArgs } from '../schema';
+import { criticSystemPrompt, criticUserText, parseCritique } from '../critic';
 import { authEnv, claudeExecutablePath } from '../credentials';
-import type { Driver, DriverParams, NeutralBlock } from './types';
+import type { Critic, Driver, DriverParams, NeutralBlock } from './types';
 
 type AgentSdk = typeof import('@anthropic-ai/claude-agent-sdk');
 type Zod = typeof import('zod');
@@ -61,6 +62,16 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
           'PREVIOUS version (later ops overwrite earlier cells); size/DataVersion inherited, palette lists ONLY new ' +
           'entries (appended after existing ones), ops/blocks reference existing indices. Prefer patch for localized fixes.',
       ),
+      phase: z.enum(['massing', 'roof', 'facade', 'interior', 'circulation', 'audit']).optional().describe(
+        'The design pass you just completed (see "Design passes"). Optional — informational.',
+      ),
+      audit: z
+        .array(z.object({ check: z.string(), ok: z.boolean(), note: z.string().optional() }))
+        .optional()
+        .describe(
+          'On the final Audit pass: your verdict per checklist item — { check (item id), ok, note }. Patch every ' +
+            'item you mark not ok and re-report; you are only done when all are ok.',
+        ),
       structure: z
         .object({
           DataVersion: z.number().int().optional().describe('Always 3955 for 1.21.1. Omit in a patch.'),
@@ -72,7 +83,7 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
           ops: z
             .array(
               z.object({
-                op: z.enum(['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'template']),
+                op: z.enum(['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'stairs', 'template']),
                 from: z.array(z.number().int()).optional(),
                 to: z.array(z.number().int()).optional(),
                 pos: z.array(z.number().int()).optional(),
@@ -87,13 +98,16 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
                 style: z.enum(['gable', 'hip']).optional(),
                 ridge: z.enum(['x', 'z']).optional(),
                 fill: z.number().int().optional(),
+                clear: z.number().int().optional(),
                 nbt: z.record(z.string(), z.unknown()).optional(),
               }),
             )
             .optional()
             .describe(
               'PREFERRED bulk geometry, applied in order (later overwrites earlier): fill/hollow/walls/line/block, ' +
-                'transforms mirror/rotate/repeat, roof (pitched *_stairs), template (named preset). One fill = a whole wall.',
+                'transforms mirror/rotate/repeat, roof (pitched *_stairs), stairs (a climbable flight — from=bottom ' +
+                'step, to=top step; fill=tread support, clear=AIR index for headroom + stairwell hole), template ' +
+                '(named preset). One fill = a whole wall.',
             ),
           blocks: z
             .array(z.object({ state: z.number().int(), pos: z.array(z.number().int()), nbt: z.record(z.string(), z.unknown()).optional() }))
@@ -103,8 +117,8 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
         })
         .describe('The authoring JSON: { DataVersion, size, palette, ops (preferred), blocks (detail), entities }.'),
     },
-    async ({ summary, mode, structure }) => {
-      const args: EmitArgs = { summary: summary ?? '', mode: normalizeMode(mode), structure: structure as EmitArgs['structure'] };
+    async ({ summary, mode, structure, phase, audit }) => {
+      const args: EmitArgs = { summary: summary ?? '', mode: normalizeMode(mode), structure: structure as EmitArgs['structure'], phase, audit };
       const result = await p.onEmit(args);
       if (result.stop) forceStop = true;
       return result.isError
@@ -170,4 +184,40 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
       p.progress.endTurn();
     }
   }
+};
+
+/** Independent critic via the Agent SDK: a fresh one-shot query (no `resume`, no
+ *  tools) so the model judges the screenshots with no memory of having built them. */
+export const claudeSdkCritique: Critic = async (input) => {
+  const { sdk } = await loadMods();
+  const model = process.env.BW_AI_CRITIC_MODEL || input.credential.model;
+  let text = '';
+  let tokensIn = 0;
+  let tokensOut = 0;
+  for await (const msg of sdk.query({
+    prompt: imagePrompt(criticUserText(input.buildPrompt, input.checklist), input.images),
+    options: {
+      model,
+      systemPrompt: criticSystemPrompt(),
+      tools: [],
+      allowedTools: [],
+      settingSources: [],
+      thinking: { type: 'disabled' },
+      abortController: input.abort,
+      env: authEnv(input.credential.id),
+      cwd: input.dir,
+      pathToClaudeCodeExecutable: claudeExecutablePath(),
+    },
+  })) {
+    if (msg.type === 'assistant') {
+      for (const block of msg.message.content) {
+        if (block.type === 'text') text += block.text;
+      }
+    } else if (msg.type === 'result') {
+      const u = (msg as { usage?: { input_tokens?: number; cache_read_input_tokens?: number; output_tokens?: number } }).usage;
+      tokensIn += (u?.input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0);
+      tokensOut += u?.output_tokens ?? 0;
+    }
+  }
+  return { ...parseCritique(text), tokensIn, tokensOut };
 };

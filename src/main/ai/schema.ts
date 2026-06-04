@@ -11,6 +11,7 @@
 // Both resolve to the same EmitArgs the orchestrator's handler consumes.
 import type { AuthoringStructure } from '../structure/authoring';
 import { loadKnowledge } from './knowledge';
+import { phaseOverview } from './phases';
 
 export const EMIT_TOOL_NAME = 'emit_structure';
 export const EMIT_TOOL_DESCRIPTION =
@@ -21,6 +22,12 @@ export interface EmitArgs {
   summary: string;
   mode: 'full' | 'patch';
   structure: AuthoringStructure;
+  /** The design pass the model says it just worked on (massing/roof/…). Optional —
+   *  informational only; the orchestrator drives the pass sequence itself. */
+  phase?: string;
+  /** On the final Audit pass, the model's verdict per checklist item. The
+   *  orchestrator gates the stop on every item being ok. */
+  audit?: { check: string; ok: boolean; note?: string }[];
 }
 
 const SUMMARY_DESC =
@@ -29,6 +36,25 @@ const MODE_DESC =
   'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
 const STRUCTURE_DESC =
   'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
+// Kept in sync with PHASES in ./phases.ts (the orchestrator owns the actual sequence).
+const PHASE_DESC =
+  'The design pass you just completed: "massing", "roof", "facade", "interior", "circulation" or "audit" (see "Design passes"). Optional — informational only.';
+const PHASE_IDS = ['massing', 'roof', 'facade', 'interior', 'circulation', 'audit'] as const;
+const AUDIT_DESC =
+  'On the final Audit pass, your verdict for EACH checklist item (see "Design passes"): an array of { check (the item id), ok (true/false), note (what you see) }. Patch every item you mark not ok and re-report; you are only done when all are ok.';
+const auditSchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      check: { type: 'string', enum: PHASE_IDS },
+      ok: { type: 'boolean' },
+      note: { type: 'string' },
+    },
+    required: ['check', 'ok'],
+    additionalProperties: false,
+  },
+} as const;
 
 /** A single op entry, shared by both schema dialects (rich JSON Schema form). */
 const opSchema = {
@@ -99,6 +125,8 @@ export const emitJsonSchema = {
   properties: {
     summary: { type: 'string', description: SUMMARY_DESC },
     mode: { type: 'string', enum: ['full', 'patch'], description: MODE_DESC },
+    phase: { type: 'string', enum: PHASE_IDS, description: PHASE_DESC },
+    audit: { ...auditSchema, description: AUDIT_DESC },
     structure: { ...structureJsonSchema, description: STRUCTURE_DESC },
   },
   required: ['structure'],
@@ -112,6 +140,8 @@ export const emitStringSchema = {
   properties: {
     summary: { type: 'string', description: SUMMARY_DESC },
     mode: { type: 'string', enum: ['full', 'patch'], description: MODE_DESC },
+    phase: { type: 'string', enum: PHASE_IDS, description: PHASE_DESC },
+    audit: { ...auditSchema, description: AUDIT_DESC },
     structure: { type: 'string', description: `${STRUCTURE_DESC} Provide it as a JSON string.` },
   },
   required: ['structure'],
@@ -124,7 +154,9 @@ export function normalizeMode(mode: unknown): 'full' | 'patch' {
 
 /** Parse the EmitArgs out of a string-schema provider's call, where `structure`
  *  arrived as a JSON string. Throws if the JSON is unparseable. */
-export function parseStringArgs(raw: { summary?: unknown; mode?: unknown; structure?: unknown }): EmitArgs {
+export function parseStringArgs(
+  raw: { summary?: unknown; mode?: unknown; structure?: unknown; phase?: unknown; audit?: unknown },
+): EmitArgs {
   const structure =
     typeof raw.structure === 'string'
       ? (JSON.parse(raw.structure) as AuthoringStructure)
@@ -133,6 +165,8 @@ export function parseStringArgs(raw: { summary?: unknown; mode?: unknown; struct
     summary: typeof raw.summary === 'string' ? raw.summary : '',
     mode: normalizeMode(raw.mode),
     structure,
+    phase: typeof raw.phase === 'string' ? raw.phase : undefined,
+    audit: Array.isArray(raw.audit) ? (raw.audit as EmitArgs['audit']) : undefined,
   };
 }
 
@@ -289,7 +323,9 @@ screenshots to check how close you got. If a reference is a SPEC SHEET / bluepri
 it before building: map each listed block to a palette entry, fix "size" from the stated footprint/height, \
 and lay out each floor from its plan — this is a precision copy, not a free interpretation.`;
 
-/** The full system prompt: instructions followed by the NBT knowledge base. */
-export function systemPrompt(): string {
-  return `${INSTRUCTIONS}\n\n# NBT generation knowledge base\n\n${loadKnowledge()}`;
+/** The full system prompt: instructions, the phased design workflow, then the NBT
+ *  knowledge base (only the guides relevant to `prompt` — situational ones like the
+ *  tower playbook are dropped when the build doesn't call for them). */
+export function systemPrompt(prompt = ''): string {
+  return `${INSTRUCTIONS}\n\n# Design passes\n\n${phaseOverview()}\n\n# NBT generation knowledge base\n\n${loadKnowledge(prompt)}`;
 }

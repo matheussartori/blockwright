@@ -6,7 +6,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { EMIT_TOOL_NAME, EMIT_TOOL_DESCRIPTION, emitJsonSchema, normalizeMode } from '../schema';
 import type { EmitArgs } from '../schema';
-import type { Driver, DriverParams, NeutralBlock } from './types';
+import { criticSystemPrompt, criticUserText, parseCritique } from '../critic';
+import type { Critic, Driver, DriverParams, NeutralBlock } from './types';
 
 /** Map neutral blocks to the text/image blocks a tool_result accepts. */
 function toBlocks(blocks: NeutralBlock[]): Array<Anthropic.TextBlockParam | Anthropic.ImageBlockParam> {
@@ -86,8 +87,14 @@ export const anthropicDriver: Driver = async (p: DriverParams) => {
     const results: Anthropic.ContentBlockParam[] = [];
     let stop = false;
     for (const tu of toolUses) {
-      const raw = tu.input as { summary?: string; mode?: unknown; structure?: EmitArgs['structure'] };
-      const args: EmitArgs = { summary: raw.summary ?? '', mode: normalizeMode(raw.mode), structure: raw.structure as EmitArgs['structure'] };
+      const raw = tu.input as { summary?: string; mode?: unknown; structure?: EmitArgs['structure']; phase?: unknown; audit?: unknown };
+      const args: EmitArgs = {
+        summary: raw.summary ?? '',
+        mode: normalizeMode(raw.mode),
+        structure: raw.structure as EmitArgs['structure'],
+        phase: typeof raw.phase === 'string' ? raw.phase : undefined,
+        audit: Array.isArray(raw.audit) ? (raw.audit as EmitArgs['audit']) : undefined,
+      };
       const out = await p.onEmit(args);
       results.push({ type: 'tool_result', tool_use_id: tu.id, content: toBlocks(out.content), is_error: out.isError || undefined });
       if (out.stop) stop = true;
@@ -96,4 +103,33 @@ export const anthropicDriver: Driver = async (p: DriverParams) => {
     if (stop) break;
   }
   return { resultSubtype };
+};
+
+/** Independent critic via the Messages API: a one-shot vision call with a fresh
+ *  context (no build history) that judges the screenshots against the checklist. */
+export const anthropicCritique: Critic = async (input) => {
+  if (!input.credential.value) throw new Error('No Anthropic API key configured.');
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: input.credential.value });
+  const model = process.env.BW_AI_CRITIC_MODEL || input.credential.model;
+  const content: Anthropic.ContentBlockParam[] = [
+    ...input.images.map(
+      (img): Anthropic.ContentBlockParam => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType as Anthropic.Base64ImageSource['media_type'], data: img.data },
+      }),
+    ),
+    { type: 'text', text: criticUserText(input.buildPrompt, input.checklist) },
+  ];
+  const res = await client.messages.create(
+    { model, max_tokens: 1500, system: criticSystemPrompt(), messages: [{ role: 'user', content }] },
+    { signal: input.abort.signal },
+  );
+  const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
+  const u = res.usage;
+  return {
+    ...parseCritique(text),
+    tokensIn: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+    tokensOut: u.output_tokens ?? 0,
+  };
 };

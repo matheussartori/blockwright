@@ -14,8 +14,9 @@ import path from 'node:path';
 import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, VersionInfo } from '@/shared/types';
 import { systemPrompt } from './schema';
 import type { EmitArgs } from './schema';
+import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, phaseBriefing, PHASES, summarizeAudit } from './phases';
 import { activeCredential, aiAvailable } from './credentials';
-import { getDriver, RESUMABLE_PROVIDERS } from './providers';
+import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
 import { writeStructureFile, validateAuthoring, resolveBlocks, readAuthoring, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 import { unknownBlockIds } from '../structure/content-pack';
@@ -34,7 +35,7 @@ export type CapturePreview = (
  *  Set BW_AI_THINKING_BUDGET=0 to disable, or a token count to tune the budget. */
 const THINKING_BUDGET = process.env.BW_AI_THINKING_BUDGET !== undefined
   ? Number(process.env.BW_AI_THINKING_BUDGET)
-  : 8000;
+  : 5000;
 
 /** Max emit→render→review rounds before we force the model to stop, so the
  *  self-correction loop can't run forever. When BW_AI_MAX_ROUNDS is unset we pick
@@ -212,6 +213,9 @@ export async function generateStructure(
   const session = getSession(sessionId);
   const cred = activeCredential();
   const resumable = RESUMABLE_PROVIDERS.has(cred.id);
+  // Independent critic for the audit gate (null on providers without one → the gate
+  // falls back to the model's self-reported audit).
+  const critic = await getCritic(cred.id);
 
   const seed = await buildSeed(resumable, session, basePath);
   const effectivePrompt = seed + prompt;
@@ -219,8 +223,15 @@ export async function generateStructure(
   // Captured by the emit handler as the model emits the structure.
   let captured: Extract<GenerateResult, { ok: true }> | null = null;
   let captureError: string | null = null;
+  const startedAt = Date.now();
   let rounds = 0;
-  let maxRounds = ENV_MAX_ROUNDS ?? 4;
+  // Enough rounds to walk the whole design-pass sequence, plus headroom for the
+  // audit gate to iterate (fix → re-audit) before the hard cap.
+  let maxRounds = Math.max(ENV_MAX_ROUNDS ?? 4, PHASES.length + 2);
+  // The design pass the model should be working on this emit (massing → … → audit).
+  // The orchestrator owns this pointer; it advances one pass per emit (clamped at
+  // the terminal audit pass) regardless of provider.
+  let phaseIndex = 0;
 
   // Live progress accounting (see emitProgress). Input tokens accumulate across
   // turns (including cached context). Output is the committed total from finished
@@ -237,12 +248,16 @@ export async function generateStructure(
   const displayedOutput = (): number => committedOutput + Math.max(currentOutput, currentThinking);
   const emitProgress = (force = false): void => {
     if (!onProgress) return;
-    const snapshot = `${phase}:${inputTokens}:${displayedOutput()}:${turns}`;
+    const snapshot = `${phase}:${phaseIndex}:${inputTokens}:${displayedOutput()}:${turns}`;
     const now = Date.now();
     if (!force && (snapshot === lastSnapshot || now - lastEmit < 150)) return;
     lastSnapshot = snapshot;
     lastEmit = now;
-    onProgress({ sessionId, phase, inputTokens, outputTokens: displayedOutput(), turns });
+    const dp = phaseAt(phaseIndex);
+    onProgress({
+      sessionId, phase, inputTokens, outputTokens: displayedOutput(), turns,
+      designPhase: dp.label, designStep: phaseIndex + 1, designSteps: PHASES.length,
+    });
   };
   emitProgress(true); // flip the UI to a live status immediately
 
@@ -379,8 +394,16 @@ export async function generateStructure(
     captureError = null;
     rounds += 1;
     if (ENV_MAX_ROUNDS == null && rounds === 1) {
-      maxRounds = roundsForVolume(size[0] * size[1] * size[2]);
+      // Floor to the design passes + audit-gate headroom so the volume cap can't
+      // truncate the sequence or starve the audit loop.
+      maxRounds = Math.max(roundsForVolume(size[0] * size[1] * size[2]), PHASES.length + 2);
     }
+    // Per-round telemetry (dev terminal) to profile time/token cost across rounds.
+    console.log(
+      `[gen] round ${rounds}/${maxRounds} pass=${phaseAt(phaseIndex).label} ` +
+        `t=${((Date.now() - startedAt) / 1000).toFixed(1)}s in=${inputTokens} out=${displayedOutput()} ` +
+        `v${version} ${size.join('×')} ${blockCount} blocks`,
+    );
 
     // Render this version and feed screenshots back so the model can review.
     phase = 'rendering';
@@ -441,10 +464,8 @@ export async function generateStructure(
           `YOUR build v${version} follows: first the orbited EXTERIOR angles, then a VERTICAL ` +
           'CROSS-SECTION (front half clipped away, viewed straight on) showing storey heights and how floors ' +
           'stack, then top-down FLOOR-PLAN cutaways (the roof clipped away) so you can review each INTERIOR — ' +
-          'room layout, faux furniture, lighting, and circulation. Compare critically against the target/request: ' +
-          'silhouette and massing (not a plain cube), roofline (a real pitched/edged roof with an overhang, no ' +
-          'holes), facade depth and a framed entrance, proportions, materials/palette, and whether each room reads ' +
-          'as laid-out and furnished rather than empty. Run the audit in 10-design-principles.md.',
+          'room layout, faux furniture, lighting, and circulation. Review them against the focused goal for ' +
+          'this design pass below.',
       });
       for (const img of shot.images!) content.push({ type: 'image', data: img.data, mediaType: img.mediaType });
     } else {
@@ -454,17 +475,90 @@ export async function generateStructure(
       });
     }
 
-    content.push({
-      type: 'text',
-      text: atCap
-        ? `This is the final allowed revision (round ${rounds}/${maxRounds}). Do NOT call emit_structure again — finish now.`
-        : 'If the build clearly falls short, call emit_structure again. For a localized fix (a roof, a facade, ' +
-          'one room) prefer mode "patch" (append only the correcting ops — far cheaper); for a big massing rework ' +
-          'use mode "full". Fix the biggest problems first. If it already matches the intent well, stop and do not ' +
-          'call the tool again.',
-    });
+    // Drive the model through the design passes (massing → roof → facade → interior
+    // → circulation → audit), one per emit. The final Audit pass is GATED by the
+    // critic: the model must report a clean checklist before it's allowed to stop.
+    const nextIdx = advancePhase(phaseIndex);
+    const onAudit = isLastPhase(phaseIndex); // the pass just emitted was the audit pass
+    const labelFor = (id: string): string => AUDIT_CHECKS.find((c) => c.id === id)?.label ?? id;
 
-    return { content, isError: false, stop: atCap };
+    // On the audit pass, get the verdict that gates the stop: an INDEPENDENT critic
+    // (fresh context, judges the screenshots) when the provider has one, else the
+    // model's self-reported audit. The critic is what defeats the self-audit's
+    // rubber-stamping; it runs only here (the final pass) to bound its cost.
+    let auditReported = false; // do we have a usable verdict (clean or failed)?
+    let auditFailed: { label: string; note: string }[] = [];
+    let bySelf = true;
+    if (onAudit && !atCap) {
+      if (critic && shot.images && shot.images.length > 0) {
+        phase = 'reviewing';
+        emitProgress(true);
+        try {
+          const c = await critic({
+            credential: cred, images: shot.images, buildPrompt: prompt,
+            checklist: auditChecklistText(), dir: session.dir, abort: ac,
+          });
+          inputTokens += c.tokensIn ?? 0;
+          committedOutput += c.tokensOut ?? 0;
+          auditReported = true;
+          bySelf = false;
+          auditFailed = c.failed.map((f) => ({ label: labelFor(f.check), note: f.note }));
+        } catch {
+          /* critic unavailable this round — fall back to the self-report below */
+        }
+      }
+      if (!auditReported) {
+        const a = summarizeAudit(args.audit);
+        auditReported = a.reported;
+        auditFailed = a.failed.map((f) => ({ label: f.label, note: f.note }));
+      }
+    }
+
+    let stop = atCap;
+    if (atCap) {
+      content.push({
+        type: 'text',
+        text: `This is the final allowed revision (round ${rounds}/${maxRounds}). Do NOT call emit_structure again — finish now.`,
+      });
+    } else if (onAudit && !auditReported) {
+      // Self-audit path with no checklist yet — require it before stopping.
+      content.push({
+        type: 'text',
+        text:
+          'AUDIT pass. Evaluate the build against EACH checklist item below and report your verdict in the ' +
+          '"audit" field (one { check, ok, note } per item, judged against the screenshots). Patch anything you ' +
+          `mark not ok, then re-emit and re-report.\n${auditChecklistText()}`,
+      });
+    } else if (onAudit && auditFailed.length) {
+      // Open issues — keep the model on the audit pass until the verdict is clean.
+      const lines = auditFailed.map((f) => `• ${f.label}${f.note ? `: ${f.note}` : ''}`).join('\n');
+      const who = bySelf ? 'Your audit lists' : 'An INDEPENDENT reviewer flagged';
+      content.push({
+        type: 'text',
+        text:
+          `${who} ${auditFailed.length} open issue(s). Fix EACH with a "patch", then re-emit — do not stop while ` +
+          `any item is open:\n${lines}`,
+      });
+    } else if (onAudit) {
+      content.push({
+        type: 'text',
+        text: bySelf
+          ? 'Audit clean — every check passes. Finalize the build; do not call emit_structure again.'
+          : 'An independent reviewer approved the build — every check passes. Finalize; do not call emit_structure again.',
+      });
+      stop = true;
+    } else {
+      content.push({
+        type: 'text',
+        text:
+          `Good — now the next pass. ${phaseBriefing(nextIdx)} Apply ONLY this pass (keep everything else that ` +
+          `already works), then call emit_structure with phase="${phaseAt(nextIdx).id}". Fix any glaring problem ` +
+          'from an earlier pass at the same time if you spot one.',
+      });
+    }
+    phaseIndex = nextIdx; // advance the pointer for the next emit (clamped at audit)
+
+    return { content, isError: false, stop };
   };
 
   // Snapshot the running token totals — attached to EVERY result branch
@@ -483,7 +577,7 @@ export async function generateStructure(
     const driver = await getDriver(cred.id);
     driverResult = await driver({
       credential: cred,
-      systemPrompt: systemPrompt(),
+      systemPrompt: systemPrompt(prompt),
       userText: effectivePrompt,
       images: images ?? [],
       thinkingBudget: THINKING_BUDGET,
@@ -503,6 +597,12 @@ export async function generateStructure(
   } finally {
     activeRuns.delete(sessionId);
   }
+
+  // Run summary (dev terminal): the before/after baseline for efficiency work.
+  console.log(
+    `[gen] done in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${rounds} rounds · ${turns} turns · ` +
+      `in=${inputTokens} out=${displayedOutput()} tokens`,
+  );
 
   // `captured` is only ever assigned inside the onEmit/setSessionId closures, so
   // TS's main-body flow analysis treats it as still null here (the truthy branch

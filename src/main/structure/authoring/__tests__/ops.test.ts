@@ -83,6 +83,26 @@ describe('resolveBlocks — volumetric ops', () => {
     for (const b of r.blocks) expect(r.palette[b.state].Name).toMatch(/_stairs$|_slab$/);
   });
 
+  it('closes the gable-end triangles when given a fill block', () => {
+    const r = resolveBlocks({
+      size: [7, 7, 7],
+      palette: [{ Name: 'minecraft:oak_stairs' }, { Name: 'minecraft:oak_planks' }],
+      ops: [{ op: 'roof', from: [0, 0, 0], to: [6, 6, 6], state: 0, ridge: 'z', fill: 1 }],
+    });
+    // ridge along z → gable ends at z=0 and z=6; the fill block walls them in.
+    const ends = r.blocks.filter((b) => r.palette[b.state].Name === 'minecraft:oak_planks' && (b.pos[2] === 0 || b.pos[2] === 6));
+    expect(ends.length).toBeGreaterThan(0);
+  });
+
+  it('leaves gable ends open when no fill is given (only stairs/slabs)', () => {
+    const r = resolveBlocks({
+      size: [7, 7, 7],
+      palette: [{ Name: 'minecraft:oak_stairs' }],
+      ops: [{ op: 'roof', from: [0, 0, 0], to: [6, 6, 6], state: 0, ridge: 'z' }],
+    });
+    for (const b of r.blocks) expect(r.palette[b.state].Name).toMatch(/_stairs$|_slab$/);
+  });
+
   it('dedupes identical palette interns', () => {
     const r = resolveBlocks({
       size: [2, 1, 1],

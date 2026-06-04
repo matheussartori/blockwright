@@ -570,7 +570,7 @@ export class Viewer {
     return off.toDataURL('image/png');
   }
 
-  capture(angles = 2, maxSize = 900): string[] {
+  capture(angles = 2, maxSize = 720): string[] {
     if (!this.current) return [];
     const wasFly = this.mode === 'fly';
     if (wasFly) this.setMode('orbit');
@@ -609,7 +609,7 @@ export class Viewer {
    *  furniture, circulation) — which the exterior orbits in capture() never
    *  reveal, leaving the model building interiors blind. One cut per ~storey,
    *  capped so capture time and token cost stay bounded. */
-  captureCutaways(maxSize = 900): string[] {
+  captureCutaways(maxSize = 720): string[] {
     if (!this.current) return [];
     if (this.mode === 'fly') this.setMode('orbit');
     this.removeHighlight();
@@ -618,8 +618,9 @@ export class Viewer {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const height = Math.max(size.y, 1);
-    // ~5 blocks ≈ one storey; cap at 3 so a tall build doesn't flood the result.
-    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 3);
+    // ~5 blocks ≈ one storey; cap at 2 so a tall build doesn't flood the result
+    // (and to keep the per-round screenshot token cost down).
+    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 2);
 
     // Save everything we mutate so the user's live view is untouched afterward.
     const savedPos = this.camera.position.clone();
@@ -668,7 +669,7 @@ export class Viewer {
    *  section panel — lets the AI self-review loop verify storey heights, vertical
    *  alignment between floors, and hanging detail (chains/lanterns/basement), which
    *  the top-down cutaways flatten away. One cut through the middle along z. */
-  captureSection(maxSize = 900): string[] {
+  captureSection(maxSize = 720): string[] {
     if (!this.current) return [];
     if (this.mode === 'fly') this.setMode('orbit');
     this.removeHighlight();

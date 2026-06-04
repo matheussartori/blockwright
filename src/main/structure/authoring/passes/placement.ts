@@ -42,6 +42,10 @@ export const fixPlacement: Pass = (blocks, palette) => {
   let loweredLanterns = 0, raisedLanterns = 0, removedLanterns = 0;
   let removedTorches = 0, removedCandles = 0, removedGround = 0;
   let reanchoredTorches = 0, removedWall = 0;
+  let clearedChestTops = 0, openedDoorways = 0, seatedSlabs = 0;
+  // Cells to delete after the per-block pass: decoration sitting on a chest lid, and
+  // wall blocks plugging a doorway. Collected by position so order doesn't matter.
+  const carve = new Set<string>();
 
   const out: AuthoringBlock[] = [];
   for (const b of blocks) {
@@ -91,17 +95,36 @@ export const fixPlacement: Pass = (blocks, palette) => {
       continue;
     }
 
+    // A `type:top` slab sits in the UPPER half of its cell — so a top slab resting on
+    // a block below it floats a half-block above that block (the classic "floating
+    // slab"). Seat it: flip to `bottom` when there's something to sit on below and
+    // open air above. Skip when below is a stair/slab (the roof op's ridge cap sits
+    // on stairs and is meant to be top), or when a block above makes it a ceiling lip.
+    if (id.endsWith('_slab') && props.type === 'top') {
+      const belowName = at(x, y - 1, z);
+      const belowId = belowName ? bareId(belowName) : '';
+      const seatable = belowName !== undefined && !isAir(belowName) && !belowId.endsWith('_stairs') && !belowId.endsWith('_slab');
+      if (seatable && !above) {
+        out.push({ ...b, state: intern({ Name: name, Properties: { ...props, type: 'bottom' } }) });
+        seatedSlabs++;
+        continue;
+      }
+      out.push(b);
+      continue;
+    }
+
     const kind = wallFixtureKind(name);
     if (kind) {
-      // A wall fixture leans on the cell opposite its facing — that cell must be a
-      // solid (non-glass) block.
-      const facing = typeof props.facing === 'string' ? props.facing : undefined;
-      const dir = FACINGS.find((d) => d.facing === facing);
-      const supported = dir ? isSolidSupport(at(x - dir.dx, y, z - dir.dz)) : false;
-      if (supported) { out.push(b); continue; }
+      // A wall fixture must have a SOLID block behind it (opposite its facing) AND
+      // face into OPEN space. Facing into a wall (front also solid) means it replaced
+      // a structural block, punching a hole — so that is NOT well placed.
+      const wellPlaced = (d: { dx: number; dz: number }): boolean =>
+        isSolidSupport(at(x - d.dx, y, z - d.dz)) && !isSolidSupport(at(x + d.dx, y, z + d.dz));
+      const dir = FACINGS.find((d) => d.facing === props.facing);
+      if (dir && wellPlaced(dir)) { out.push(b); continue; }
       if (kind === 'torch') {
-        // Re-anchor: face away from any adjacent solid wall (keeps the light).
-        const anchor = FACINGS.find((d) => isSolidSupport(at(x - d.dx, y, z - d.dz)));
+        // Re-anchor: face into open space with a solid wall behind (keeps the light).
+        const anchor = FACINGS.find((d) => wellPlaced(d));
         if (anchor) {
           out.push({ ...b, state: intern({ Name: name, Properties: { ...props, facing: anchor.facing } }) });
           reanchoredTorches++;
@@ -110,6 +133,34 @@ export const fixPlacement: Pass = (blocks, palette) => {
       }
       removedWall++;
       continue;
+    }
+
+    // Top-opening container: keep its lid cell clear. Drop a decoration sitting on a
+    // chest (a candle/lantern/pot on the lid); leave a solid block above alone (that's
+    // a framing question, not ours to gut).
+    if (id === 'chest' || id === 'trapped_chest') {
+      const aboveName = at(x, y + 1, z);
+      if (aboveName !== undefined && !isAir(aboveName) && !isSolidSupport(aboveName)) {
+        carve.add(posKey(x, y + 1, z));
+        clearedChestTops++;
+      }
+    }
+
+    // A door must be walkable: the cells in line with its facing (front and back, both
+    // door halves) must be passable. If a solid wall plugs one, carve it so the door
+    // actually leads somewhere instead of opening into a wall.
+    if (id.endsWith('_door') && props.half === 'lower') {
+      const dir = FACINGS.find((d) => d.facing === props.facing);
+      if (dir) {
+        let opened = false;
+        for (const s of [1, -1]) {        // front (+facing), back (−facing)
+          for (const dy of [0, 1]) {       // both door halves
+            const cx = x + s * dir.dx, cy = y + dy, cz = z + s * dir.dz;
+            if (isSolidSupport(at(cx, cy, cz))) { carve.add(posKey(cx, cy, cz)); opened = true; }
+          }
+        }
+        if (opened) openedDoorways++;
+      }
     }
 
     out.push(b);
@@ -124,6 +175,10 @@ export const fixPlacement: Pass = (blocks, palette) => {
   if (removedGround) fixes.push(`removed ${plural(removedGround, 'unsupported carpet/plant/rail/plate')}`);
   if (reanchoredTorches) fixes.push(`re-anchored ${plural(reanchoredTorches, 'wall torch')} onto a solid wall`);
   if (removedWall) fixes.push(`removed ${plural(removedWall, 'wall fixture')} with no solid backing (e.g. stuck to glass or floating)`);
+  if (clearedChestTops) fixes.push(`cleared ${plural(clearedChestTops, 'block')} sitting on a chest lid (kept it openable)`);
+  if (openedDoorways) fixes.push(`opened ${plural(openedDoorways, 'doorway')} that was blocked by a wall`);
+  if (seatedSlabs) fixes.push(`seated ${plural(seatedSlabs, 'floating top-slab')} onto the block below (flipped to bottom)`);
 
-  return { blocks: out, palette: outPalette, fixes };
+  const kept = carve.size ? out.filter((b) => !carve.has(posKey(...b.pos))) : out;
+  return { blocks: kept, palette: outPalette, fixes };
 };

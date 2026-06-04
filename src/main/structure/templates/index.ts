@@ -179,9 +179,10 @@ function abandonedHouse(from: Vec3, to: Vec3, params: Record<string, unknown>): 
 }
 
 /** A sunken cellar carved to a varied footprint (rect/L/T/U/plus, seeded — so it
- *  isn't always a square box): a stone shell with a distinct floor/ceiling, a grid
- *  of support pillars (lit on top), and a ladder up through a hole in the ceiling.
- *  Params (all optional): wall, floor, ceiling, pillar, light, decay, shape, seed.
+ *  isn't always a square box): a SEALED stone shell with a distinct floor/ceiling
+ *  and a grid of support pillars (lit on top). No built-in access — the ceiling is
+ *  solid so terrain can't reveal the interior; the caller carves the connection to
+ *  the house above. Params (all optional): wall, floor, ceiling, pillar, light, decay, shape, seed.
  *  The box should already sit at the depth you want (y grows up, so place it low). */
 function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (intern: Intern) => AuthoringOp[] {
   return (intern) => {
@@ -198,7 +199,6 @@ function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (
     const shape = isFootprintShape(shapeParam) ? shapeParam : 'auto';
     const seed = asInt(params.seed, seed3(x0, y0, z0), 0, 0x7fffffff);
 
-    const air = intern('minecraft:air');
     const wall = intern(wallName);
     const floorIdx = intern(floorName);
     const ceil = intern(ceilName);
@@ -226,20 +226,10 @@ function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (
       }
     }
 
-    // Vertical access: a ladder on an interior cell backed by a (solid) north wall
-    // column, climbing to a carved ceiling hole (ladder faces away from its wall).
-    if (y1 - y0 >= 2) {
-      let spot: [number, number] | undefined;
-      for (const [x, z] of fp.columns()) {
-        if (!fp.isEdge(x, z) && fp.has(x, z - 1) && fp.isEdge(x, z - 1)) { spot = [x, z]; break; }
-      }
-      if (spot) {
-        const [lx, lz] = spot;
-        ops.push({ op: 'block', pos: [lx, y1, lz], state: air }); // ceiling hole
-        const rung = intern('minecraft:ladder', { facing: 'south' });
-        for (let y = y0 + 1; y <= y1; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: rung });
-      }
-    }
+    // No vertical access here on purpose: the cellar is a SEALED box (solid ceiling,
+    // no hole, no ladder) so terrain can never reveal its interior when the structure
+    // is placed on uneven ground. The model connects it to the house above
+    // deliberately in the circulation pass, carving the stairwell where they meet.
 
     // Decay: weather some perimeter wall cells with moss.
     if (decay > 0) {

@@ -76,3 +76,32 @@ export interface DriverResult {
 }
 
 export type Driver = (p: DriverParams) => Promise<DriverResult>;
+
+// ── Independent critic ───────────────────────────────────────────────────────
+// A SEPARATE, fresh-context model call (no build history) that judges a finished
+// build's screenshots against the audit checklist — so it catches what the builder
+// rubber-stamps in its own self-audit. Implemented only for the Claude paths; other
+// providers return no critic and fall back to the self-reported audit.
+
+export interface CritiqueInput {
+  credential: ResolvedCredential;
+  /** Screenshots of the build to judge (the same shots fed to the review loop). */
+  images: GenerateImage[];
+  /** The user's original build request, for context. */
+  buildPrompt: string;
+  /** The audit checklist text (see phases.ts auditChecklistText). */
+  checklist: string;
+  /** Per-session scratch dir (cwd for providers that spawn a binary). */
+  dir: string;
+  abort: AbortController;
+}
+
+export interface CritiqueResult {
+  /** The checklist items the critic judged as failing (validated check ids). */
+  failed: { check: string; note: string }[];
+  /** Token usage of the critic call, folded into the run's totals. */
+  tokensIn?: number;
+  tokensOut?: number;
+}
+
+export type Critic = (input: CritiqueInput) => Promise<CritiqueResult>;

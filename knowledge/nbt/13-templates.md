@@ -55,12 +55,15 @@ and `5` tall (so the roof fits); taller/wider reads better.
 | `decay` | `0.2` | 0 = pristine, 1 = heavy ruin (holes + moss) |
 
 ### `large_basement`
-A sunken cellar: a stone shell with a distinct floor and ceiling, a grid of
-support pillars (each lit on top), and a ladder up through a hole in the ceiling.
-Its **footprint is carved to a varied shape** (L / T / U / plus / rect) so cellars
-aren't always a plain square box — leave `shape` as the default `auto` to get a
-seeded plan, or pin one. Place the box **low** (small/zero `y`) and put the
-above-ground build on top of it within the same `size`.
+A sunken cellar: a **sealed** stone shell with a distinct floor and ceiling and a
+grid of support pillars (each lit on top). Its **footprint is carved to a varied
+shape** (L / T / U / plus / rect) so cellars aren't always a plain square box —
+leave `shape` as the default `auto` to get a seeded plan, or pin one. Place the box
+**low** (small/zero `y`) and put the above-ground build on top of it within the same
+`size`. The cellar has **no built-in access on purpose** — the ceiling is solid so
+uneven terrain can never expose its interior; YOU connect it to the house by carving
+a stairwell (a `stairs` op + an air-index hole) down from the ground floor where they
+meet, placed in a back corner or side room (never the entrance).
 
 | param | default | meaning |
 |-------|---------|---------|

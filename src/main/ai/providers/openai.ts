@@ -102,8 +102,14 @@ export const openaiDriver: Driver = async (p: DriverParams) => {
     for (const c of toolCalls) {
       let args: EmitArgs;
       try {
-        const raw = JSON.parse(c.args || '{}') as { summary?: string; mode?: unknown; structure?: EmitArgs['structure'] };
-        args = { summary: raw.summary ?? '', mode: normalizeMode(raw.mode), structure: raw.structure as EmitArgs['structure'] };
+        const raw = JSON.parse(c.args || '{}') as { summary?: string; mode?: unknown; structure?: EmitArgs['structure']; phase?: unknown; audit?: unknown };
+        args = {
+          summary: raw.summary ?? '',
+          mode: normalizeMode(raw.mode),
+          structure: raw.structure as EmitArgs['structure'],
+          phase: typeof raw.phase === 'string' ? raw.phase : undefined,
+          audit: Array.isArray(raw.audit) ? (raw.audit as EmitArgs['audit']) : undefined,
+        };
       } catch (err) {
         messages.push({ role: 'tool', tool_call_id: c.id, content: `Could not parse tool arguments as JSON: ${String(err)}. Re-emit valid JSON.` });
         continue;

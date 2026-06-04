@@ -53,6 +53,27 @@ export function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx):
       }
     }
   }
+  // Close the gable-end triangles (the vertical wall under each slope at the two
+  // ends) so you can't see into the attic. Only for a gabled (non-hip) roof, and
+  // only when `fill` is given — the op can't know the wall material otherwise.
+  if (!hip && op.fill !== undefined) {
+    if (ridge === 'z') {
+      for (const z of z0 === z1 ? [z0] : [z0, z1]) {
+        for (let x = x0; x <= x1; x++) {
+          const top = y0 + Math.min(x - x0, x1 - x); // slope height at this column
+          for (let y = y0; y < top; y++) set(x, y, z, op.fill);
+        }
+      }
+    } else {
+      for (const x of x0 === x1 ? [x0] : [x0, x1]) {
+        for (let z = z0; z <= z1; z++) {
+          const top = y0 + Math.min(z - z0, z1 - z);
+          for (let y = y0; y < top; y++) set(x, y, z, op.fill);
+        }
+      }
+    }
+  }
+
   // Cap the ridge line with a top slab (or leave stairs meeting) for a clean seam.
   if (slabName && !hip) {
     if (ridge === 'z') {

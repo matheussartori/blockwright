@@ -132,6 +132,32 @@ describe('fixPlacement — wall fixtures (auto-fix)', () => {
     expect((r.fixes ?? []).join(' ')).toMatch(/re-anchored/);
   });
 
+  it('removes a wall torch buried in a wall (solid on front and back, no open side)', () => {
+    // facing east into stone, stone behind too, and stone on both perpendicular sides
+    // → it replaced a wall block (a hole); no open face to re-anchor to → removed.
+    const r = run(
+      [{ Name: 'minecraft:wall_torch', Properties: { facing: 'east' } }, { Name: 'minecraft:stone' }],
+      [
+        { state: 0, pos: [5, 5, 5] },
+        { state: 1, pos: [6, 5, 5] }, { state: 1, pos: [4, 5, 5] },
+        { state: 1, pos: [5, 5, 6] }, { state: 1, pos: [5, 5, 4] },
+      ],
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:wall_torch')).toHaveLength(0);
+  });
+
+  it('re-anchors a torch facing into a wall toward an open side', () => {
+    // facing east is blocked (stone in front); but south is open with a solid north
+    // wall behind → re-anchor to face south.
+    const r = run(
+      [{ Name: 'minecraft:wall_torch', Properties: { facing: 'east' } }, { Name: 'minecraft:stone' }],
+      [{ state: 0, pos: [5, 5, 5] }, { state: 1, pos: [6, 5, 5] }, { state: 1, pos: [5, 5, 4] }],
+    );
+    const torch = r.blocks.find((b) => nameOf(r, b) === 'minecraft:wall_torch');
+    expect(torch).toBeDefined();
+    expect(r.palette[torch!.state].Properties?.facing).toBe('south');
+  });
+
   it('removes a wall sign with no backing (signs are not re-anchored)', () => {
     // facing south needs a block to the north; the only solid is to the side.
     const r = run(
@@ -139,5 +165,83 @@ describe('fixPlacement — wall fixtures (auto-fix)', () => {
       [{ state: 0, pos: [5, 5, 5] }, { state: 1, pos: [4, 5, 5] }],
     );
     expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:oak_wall_sign')).toHaveLength(0);
+  });
+});
+
+describe('fixPlacement — chest lids', () => {
+  it('clears a candle sitting on a chest (keeps the lid openable)', () => {
+    const r = run(
+      [{ Name: 'minecraft:chest' }, { Name: 'minecraft:candle' }],
+      [{ state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }],
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:candle')).toHaveLength(0);
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:chest')).toHaveLength(1);
+    expect((r.fixes ?? []).join(' ')).toMatch(/chest lid/);
+  });
+
+  it('leaves a solid block above a chest alone (framing, not ours to gut)', () => {
+    const r = run(
+      [{ Name: 'minecraft:chest' }, { Name: 'minecraft:oak_planks' }],
+      [{ state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }],
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:oak_planks')).toHaveLength(1);
+  });
+});
+
+describe('fixPlacement — floating top-slabs', () => {
+  it('seats a top-slab resting on a full block (flips to bottom)', () => {
+    const r = run(
+      [{ Name: 'minecraft:dark_oak_planks' }, { Name: 'minecraft:dark_oak_slab', Properties: { type: 'top' } }],
+      [{ state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }],
+    );
+    const slab = r.blocks.find((b) => nameOf(r, b) === 'minecraft:dark_oak_slab')!;
+    expect(r.palette[slab.state].Properties?.type).toBe('bottom');
+    expect((r.fixes ?? []).join(' ')).toMatch(/top-slab/);
+  });
+
+  it('leaves a top-slab sitting on stairs (roof ridge cap) alone', () => {
+    const r = run(
+      [{ Name: 'minecraft:oak_stairs' }, { Name: 'minecraft:oak_slab', Properties: { type: 'top' } }],
+      [{ state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }],
+    );
+    const slab = r.blocks.find((b) => nameOf(r, b) === 'minecraft:oak_slab')!;
+    expect(r.palette[slab.state].Properties?.type).toBe('top');
+  });
+
+  it('leaves a top-slab with a block above (ceiling lip) and one floating in air alone', () => {
+    const lip = run(
+      [{ Name: 'minecraft:stone' }, { Name: 'minecraft:stone_slab', Properties: { type: 'top' } }],
+      [{ state: 0, pos: [0, 2, 0] }, { state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }], // block below AND above
+    );
+    expect(lip.palette[lip.blocks.find((b) => nameOf(lip, b) === 'minecraft:stone_slab')!.state].Properties?.type).toBe('top');
+
+    const floating = run(
+      [{ Name: 'minecraft:stone_slab', Properties: { type: 'top' } }],
+      [{ state: 0, pos: [5, 5, 5] }], // nothing below to seat on
+    );
+    expect(floating.palette[floating.blocks[0].state].Properties?.type).toBe('top');
+  });
+});
+
+describe('fixPlacement — door passage', () => {
+  it('opens a doorway blocked by a wall behind it', () => {
+    // facing south → back is north (z-1); a stone wall plugs both door halves there.
+    const r = run(
+      [{ Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } }, { Name: 'minecraft:stone_bricks' }],
+      [{ state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 1, 4] }, { state: 1, pos: [5, 2, 4] }],
+    );
+    const walls = r.blocks.filter((b) => nameOf(r, b) === 'minecraft:stone_bricks');
+    expect(walls).toHaveLength(0); // the plug was carved out
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:spruce_door')).toHaveLength(1);
+    expect((r.fixes ?? []).join(' ')).toMatch(/doorway/);
+  });
+
+  it('leaves a door with clear passage on both sides untouched', () => {
+    const r = run(
+      [{ Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } }],
+      [{ state: 0, pos: [5, 1, 5] }],
+    );
+    expect(r.blocks).toHaveLength(1);
+    expect(r.fixes ?? []).toHaveLength(0);
   });
 });

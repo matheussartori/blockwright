@@ -61,6 +61,8 @@ src/
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
+                            (conditionally — `knowledge-select.ts` drops situational guides like
+                            the tower playbook unless the prompt calls for them, to cut tokens)
     structure/authoring/    Validate + compile authoring JSON → gzipped .nbt (the JSON↔NBT
                           pipeline). Decomposed by responsibility, with a unit-test suite in
                           __tests__/ (run `npm run test`). Public API via the barrel `index.ts`.
@@ -224,7 +226,23 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   `emit_structure` the handler asks the renderer to load + screenshot the compiled `.nbt` and
   returns those images as **image content blocks in the tool result**; the model critiques them
   against the prompt/reference and re-emits a complete improved structure, stopping when it matches
-  (capped at `BW_AI_MAX_ROUNDS`, default 4). **Extended thinking is on by default** (`BW_AI_THINKING_BUDGET`,
+  (capped at `BW_AI_MAX_ROUNDS`, default 4 — but floored to the number of design passes). The loop is
+  **phase-driven** (`ai/phases.ts`): instead of one vague "make it better", the orchestrator walks the
+  model through ordered design passes — massing → roof → facade → interior → circulation → audit — and
+  the `onEmit` feedback briefs the NEXT pass's focused rubric each round (`phaseBriefing`). The
+  orchestrator owns the pass pointer (`phaseIndex`, advances one pass/emit, clamped at audit) so it
+  works on every provider; `emit_structure` takes an optional `phase` the model reports (reinforces the
+  workflow + drives the "Facade (3/6)" progress label). Detail passes use mode `patch` (cheaper).
+  The final **Audit pass is a gated critic**: the model must report an `audit` checklist (per-item
+  ok+note for massing/roof/facade/interior/circulation/physical, judged against the screenshots) and
+  the orchestrator refuses to signal stop until every item passes (or the round cap) — `summarizeAudit`
+  in `phases.ts`. This is the lever for the aesthetic/layout defects that can't be enforced in code.
+  Because the *builder* rubber-stamps its own audit, the gate is driven by an **independent critic**
+  when available (`ai/critic.ts` + `providers/getCritic`): a SEPARATE, fresh-context model call
+  (claude-sdk `query` with no resume/tools, or the anthropic Messages API) that judges only the
+  screenshots + checklist and returns the failing items — it has no stake in the build, so it catches
+  what the builder rationalizes. Claude paths only; other providers fall back to the self-report.
+  `BW_AI_CRITIC_MODEL` can point the critic at a cheaper model. **Extended thinking is on by default** (`BW_AI_THINKING_BUDGET`,
   default 8000 tokens, `0` disables) so it can plan geometry, and the system prompt tells it to plan
   → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
   callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +

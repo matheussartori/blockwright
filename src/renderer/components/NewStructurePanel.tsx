@@ -412,6 +412,12 @@ export function GenerateContent() {
               <span className="gen-spinner" aria-hidden />
               <span className="gen-phase">
                 {progress ? PHASE_LABEL[progress.phase] : 'Generating…'}
+                {progress?.designPhase && (
+                  <span className="gen-design-phase">
+                    {' · '}{progress.designPhase}
+                    {progress.designStep ? ` (${progress.designStep}/${progress.designSteps})` : ''}
+                  </span>
+                )}
               </span>
             </div>
             <div className="gen-stats">
