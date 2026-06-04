@@ -1,0 +1,41 @@
+// Single-declaration parameter specs for structure types. A type declares each of
+// its SHAPE/BEHAVIOUR params once (kind + default + range); `resolveParams` coerces
+// the loose `template` op params to typed values against that spec. Block-id params
+// are NOT declared here — any op param whose key is a Role (see roles.ts) is treated
+// as a per-role block override and resolved by the palette instead.
+
+/** One parameter's shape, default, and bounds. */
+export type ParamDef =
+  | { kind: 'int'; default: number; min: number; max: number }
+  | { kind: 'unit'; default: number } // a 0..1 fraction (e.g. decay)
+  | { kind: 'enum'; default: string; values: readonly string[] };
+
+/** A type's full parameter spec, keyed by param name. */
+export type ParamSpec = Record<string, ParamDef>;
+
+/** A param value after coercion: a clamped number (int/unit) or a valid enum string. */
+export type ParamValues = Record<string, number | string>;
+
+function asInt(v: unknown, def: number, min: number, max: number): number {
+  const n = typeof v === 'number' ? Math.trunc(v) : def;
+  return Math.max(min, Math.min(max, Number.isFinite(n) ? n : def));
+}
+
+function asUnit(v: unknown, def: number): number {
+  const n = typeof v === 'number' ? v : def;
+  return Math.max(0, Math.min(1, Number.isFinite(n) ? n : def));
+}
+
+/** Coerce the raw `template` op params to typed values per `spec`, applying each
+ *  param's default + bounds. Params not in the spec (the theme id, role overrides)
+ *  are ignored here and handled elsewhere. */
+export function resolveParams(spec: ParamSpec, raw: Record<string, unknown>): ParamValues {
+  const out: ParamValues = {};
+  for (const [key, def] of Object.entries(spec)) {
+    const v = raw[key];
+    if (def.kind === 'int') out[key] = asInt(v, def.default, def.min, def.max);
+    else if (def.kind === 'unit') out[key] = asUnit(v, def.default);
+    else out[key] = typeof v === 'string' && def.values.includes(v) ? v : def.default;
+  }
+  return out;
+}

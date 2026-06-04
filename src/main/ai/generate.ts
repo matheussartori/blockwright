@@ -22,7 +22,7 @@ import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
 import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 import { unknownBlockIds } from '../structure/assets/content-pack';
-import { templateBlockNames } from '../structure/templates';
+import { composeBlockNames } from '../structure/domain';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),
  *  so the model can see its own build and refine it. Supplied by the IPC layer,
@@ -201,9 +201,9 @@ export async function generateStructure(
       );
     }
 
-    // Reject unknown/misspelled block IDs (incl. template-param block names).
+    // Reject unknown/misspelled block IDs (incl. template per-role override blocks).
     const templateNames = (authoring.ops ?? []).flatMap((op) =>
-      op.op === 'template' ? templateBlockNames(op.name, op.params ?? {}) : [],
+      op.op === 'template' ? composeBlockNames(op.params ?? {}) : [],
     );
     const unknown = unknownBlockIds([...(authoring.palette ?? []).map((p) => p.Name), ...templateNames]);
     if (unknown.length > 0) {

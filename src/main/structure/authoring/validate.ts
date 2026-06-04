@@ -1,7 +1,7 @@
 // Validate the authoring JSON against the hard rules, throwing a human-readable
 // message on the first violation so the AI loop gets actionable feedback.
-import { isTemplateName, TEMPLATE_NAMES } from '../templates';
-import type { AuthoringOp, AuthoringStructure } from './types';
+import { isKnownStructure, knownStructureNames } from '../domain';
+import { type AuthoringOp, type AuthoringStructure, OP_NAMES } from './types';
 
 export function validateAuthoring(s: AuthoringStructure): void {
   if (!s || typeof s !== 'object') throw new Error('structure is not an object');
@@ -32,11 +32,10 @@ export function validateAuthoring(s: AuthoringStructure): void {
 
   const ops = s.ops ?? [];
   if (!Array.isArray(ops)) throw new Error('ops must be an array');
-  const OP_KINDS = ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'stairs', 'template'];
   ops.forEach((o, i) => {
     const op = o as AuthoringOp;
-    if (!o || !OP_KINDS.includes(op.op)) {
-      throw new Error(`ops[${i}].op must be one of ${OP_KINDS.join(', ')}`);
+    if (!o || !(OP_NAMES as readonly string[]).includes(op.op)) {
+      throw new Error(`ops[${i}].op must be one of ${OP_NAMES.join(', ')}`);
     }
     if (op.op === 'block') {
       checkState(op.state, `ops[${i}].state`);
@@ -44,10 +43,10 @@ export function validateAuthoring(s: AuthoringStructure): void {
       return;
     }
     if (op.op === 'template') {
-      // Template ops carry a name + bounding box (no palette index — the template
-      // interns its own entries on expand). The box must sit inside `size`.
-      if (!isTemplateName(op.name)) {
-        throw new Error(`ops[${i}].name "${op.name}" is not a known template (${TEMPLATE_NAMES.join(', ')})`);
+      // Template ops carry a structure-type name + bounding box (no palette index —
+      // the type interns its own entries on expand). The box must sit inside `size`.
+      if (!isKnownStructure(op.name)) {
+        throw new Error(`ops[${i}].name "${op.name}" is not a known structure type (${knownStructureNames().join(', ')})`);
       }
       checkPos(op.from, `ops[${i}].from`);
       checkPos(op.to, `ops[${i}].to`);

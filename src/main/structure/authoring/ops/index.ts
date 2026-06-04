@@ -2,7 +2,7 @@
 // a flat, air-free block list. Ops are applied in order (later ops overwrite
 // earlier cells); transform/roof/stairs ops read cells placed by earlier ops and
 // may intern new palette entries.
-import { expandTemplate } from '../../templates';
+import { composeStructure } from '../../domain';
 import { cellsInBox, inBounds, lineCells, posKey, rotXZ } from '../geometry';
 import { isAir, makeIntern } from '../palette';
 import { transformProps, type PropXform } from '../orientation';
@@ -18,11 +18,11 @@ export type { OpCtx } from './context';
 export function applyOp(op: AuthoringOp, ctx: OpCtx): void {
   const { cells, palette, intern, size } = ctx;
   if (op.op === 'template') {
-    // Expand the template into ordinary ops (interning palette entries by block
-    // name) and apply them in order, exactly as if the model had authored them.
+    // Expand the structure type into ordinary ops (interning palette entries by
+    // block name) and apply them in order, exactly as if the model had authored them.
     const internByName = (name: string, props?: Record<string, string>): number =>
       intern({ Name: name, Properties: props });
-    for (const inner of expandTemplate(op.name, op.from, op.to, op.params ?? {}, internByName)) {
+    for (const inner of composeStructure(op.name, op.from, op.to, op.params ?? {}, internByName)) {
       applyOp(inner, ctx);
     }
     return;

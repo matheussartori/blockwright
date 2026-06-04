@@ -50,15 +50,20 @@ src/
         jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
         template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
         jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
-      templates/           Parameterized building presets (abandoned_house, large_basement),
-                           expanded by the `template` op in the authoring compiler: the model emits one
-                           op, the code produces the geometry. Pure (box+params)→ops; interns its
-                           own palette by block name. Register a new one in templates/index.ts.
-                           rng.ts = shared seeded PRNG (mulberry32/seed3); footprint.ts = seeded
-                           non-rectangular footprints (rect/L/T/U/plus) so large_basement isn't always
-                           a square box (param `shape`, default `auto`). Tests in templates/__tests__/.
-                           (NOTE: slated to be refactored into a composable structure-type ×
-                           decoration-theme domain model under `structure/domain/`.)
+      domain/              Composable generation: STRUCTURE TYPES × DECORATION THEMES, expanded by
+                           the `template` op in the authoring compiler (the model emits one op, the
+                           code produces the geometry). See "Composable generation domain" below.
+        roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
+        params.ts          ParamSpec/ParamDef + resolveParams (single per-type param declaration)
+        compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure +
+                           name aliases (abandoned_house→house+abandoned, large_basement→basement+abandoned)
+        structure-types/   One file per archetype (house, basement) + types.ts (contract + Box/logProps)
+                           + index.ts (registry). A type emits ops in terms of roles; never names blocks.
+        themes/            One file per look (abandoned, plain) + types.ts (contract) + index.ts (registry,
+                           DEFAULT_THEME='abandoned'). A theme maps roles→blocks + decay + weathering.
+        rng.ts             shared seeded PRNG (mulberry32/seed3)
+        footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
+                           a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     ai/                     AI structure generation (File ▸ New Structure)
       generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→
@@ -176,6 +181,36 @@ convention: `quarterTurns` maps to `group.rotation.y = q·π/2` and `offset` to 
 plan's coordinates land exactly where the meshes go. Jigsaw features are gated to validated versions
 via `isJigsawSupported`; unsupported versions show a notice instead. Pieces only resolve when the
 relevant data is reachable (an active workspace, or the vanilla pack for `minecraft:` pools).
+
+### Composable generation domain
+
+`structure/domain/` is the data-driven model behind the authoring `template` op, built so
+the two growth axes — **structure types** and **decoration themes** — combine without N×M
+code. A **StructureType** (`house`, `basement`) owns only the *massing* (shell, openings,
+structural detail) and emits ops in terms of **semantic roles** (`wall`, `floor`, `roof`…),
+never concrete blocks. A **DecorationTheme** (`abandoned`, `plain`) owns the *look*: it maps
+roles→blocks (sparsely), sets a decay level, and weathers blocks. `composeStructure` crosses
+them: it resolves a role's block by **per-op override > theme.blocks > type.defaults >
+BASE_BLOCKS**, resolves the type's params (`params.ts`, the single param declaration), and
+calls `type.build(...)` against a theme-backed `RolePalette`. So any type works with any
+theme, and a new type or theme is one small file.
+
+- **The `template` op is unchanged** in the authoring schema: `op.name` is a structure-type
+  id, `op.params.theme` picks the theme, and any param keyed by a role name is a block
+  override. Compiled in `authoring/ops/index.ts` via `composeStructure`.
+- **Behaviour preserved:** each type ships its own material `defaults` (a "kit"), so the
+  `abandoned` theme is transparent (no block overrides — just decay + weathering) and
+  `house`/`basement` + `abandoned` reproduce the old `abandoned_house`/`large_basement`
+  output. The old names still resolve via aliases in `compose.ts`.
+- **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
+  **Add a theme:** new file in `themes/`, register in its `index.ts`. **Add a role:** extend
+  `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`).
+- **Three consumers** (all via the `domain/` barrel): `authoring/ops/index.ts`
+  (`composeStructure`), `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`),
+  `ai/generate.ts` (`composeBlockNames` — the per-role override block ids it validates against
+  the content pack). The model-facing guide is `knowledge/nbt/13-templates.md`.
+- **Future:** `DecorationTheme.furnish()` is a defined-but-unused extension point for
+  furniture/decoration ops (interiors still come from the AI + authoring passes today).
 
 ### AI structure generation
 
