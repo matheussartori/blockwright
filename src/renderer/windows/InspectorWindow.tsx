@@ -85,8 +85,16 @@ export function InspectorContent() {
     [structure],
   );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
 
   if (!structure) return null;
+
+  const copyPath = () => {
+    if (!structure.path) return;
+    void navigator.clipboard?.writeText(structure.path);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
 
   const toggle = (name: string) =>
     setExpanded((prev) => {
@@ -100,6 +108,16 @@ export function InspectorContent() {
     <>
       <div className="inspector-meta">
         <h2 title={structure.name}>{structure.name}</h2>
+        {structure.path && (
+          <button
+            type="button"
+            className="inspector-path"
+            title={copied ? 'Copied!' : `Click to copy\n${structure.path}`}
+            onClick={copyPath}
+          >
+            {copied ? 'Copied to clipboard' : structure.path}
+          </button>
+        )}
         <dl className="meta">
           <div>
             <dt>Size</dt>

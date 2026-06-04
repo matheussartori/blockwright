@@ -501,6 +501,65 @@ export function resolveBlocks(s: AuthoringStructure): { blocks: AuthoringBlock[]
   return { blocks: out, palette };
 }
 
+// ── Stairwell headroom ────────────────────────────────────────────────────
+// A real staircase needs an open shaft above it: 2 blocks of headroom over every
+// tread, and a hole through whatever floor/ceiling sits at the top. The `stairs`
+// op carves that automatically (its `clear` arg), but models routinely *hand*-
+// place a flight of `*_stairs` and then cap it with a solid floor resting on the
+// top tread — so the stairs "lead nowhere", with no room to climb. This pass
+// repairs that for any flight regardless of how it was authored: it finds treads
+// that belong to an actual climbing run (a same-facing stair one step up or down
+// along the ascent diagonal) and removes whatever solid block occupies the 2
+// cells of headroom directly above each tread. It only fires on real flights and
+// never deletes another stair, so decorative single stairs (chairs, desks) and
+// open roof slopes are left untouched.
+
+const STAIR_DIR: Record<string, [number, number]> = {
+  north: [0, -1], south: [0, 1], west: [-1, 0], east: [1, 0],
+};
+
+function carveStairwells(
+  blocks: AuthoringBlock[],
+  palette: AuthoringPaletteEntry[],
+): AuthoringBlock[] {
+  const isBottomStair = (state: number): boolean => {
+    const p = palette[state];
+    if (!p || !bareId(p.Name).endsWith('_stairs')) return false;
+    const half = p.Properties?.half;
+    return half === undefined || half === 'bottom';
+  };
+  const facingOf = (state: number): string | undefined => {
+    const f = palette[state]?.Properties?.facing;
+    return typeof f === 'string' ? f : undefined;
+  };
+  const at = new Map<string, AuthoringBlock>();
+  for (const b of blocks) at.set(posKey(...b.pos), b);
+  const stairAt = (x: number, y: number, z: number, facing: string): boolean => {
+    const b = at.get(posKey(x, y, z));
+    return !!b && isBottomStair(b.state) && facingOf(b.state) === facing;
+  };
+  const remove = new Set<string>();
+  for (const b of blocks) {
+    if (!isBottomStair(b.state)) continue;
+    const facing = facingOf(b.state);
+    const dir = facing ? STAIR_DIR[facing] : undefined;
+    if (!dir) continue;
+    const [fx, fz] = dir;
+    const [x, y, z] = b.pos;
+    // Part of a climbing flight if a same-facing tread sits one step up the
+    // ascent diagonal (toward `facing`) or one step down behind it.
+    const inFlight = stairAt(x + fx, y + 1, z + fz, facing) || stairAt(x - fx, y - 1, z - fz, facing);
+    if (!inFlight) continue;
+    for (const dy of [1, 2]) {
+      const key = posKey(x, y + dy, z);
+      const above = at.get(key);
+      if (above && !isBottomStair(above.state)) remove.add(key); // clear the headroom; keep stairs
+    }
+  }
+  if (remove.size === 0) return blocks;
+  return blocks.filter((b) => !remove.has(posKey(...b.pos)));
+}
+
 // ── Neighbour-aware connections ───────────────────────────────────────────
 // Glass panes, iron bars, fences and walls are *connecting* blocks: their visual
 // shape comes from the north/south/east/west (and, for walls, up) blockstate
@@ -790,7 +849,10 @@ export function compileStructure(s: AuthoringStructure): Buffer {
   // connecting-block sides from neighbours (panes/bars/fences/walls), which may
   // append palette entries too.
   const resolved = resolveBlocks(s);
-  const connected = connectBlocks(resolved.blocks, resolved.palette);
+  // Open the shaft above any climbing staircase (hand-placed flights often get a
+  // solid floor dropped on the top tread, leaving no room to climb).
+  const carved = carveStairwells(resolved.blocks, resolved.palette);
+  const connected = connectBlocks(carved, resolved.palette);
   // Then air-fill each column's interior so placing the structure clears its own
   // rooms without gouging the surrounding terrain (non-rectangular footprints).
   const { blocks, palette } = fillBoxWithAir(connected.blocks, connected.palette);
