@@ -57,6 +57,9 @@ async function openWorkspaceFromMenu(): Promise<void> {
   buildAppMenu(); // reflect the active workspace (Close item, etc.)
 }
 
+/** Build + install the native application menu (File ▸ Open / Open Recent /
+ *  Workspace, View ▸ windows, etc.). Re-called whenever the recents or the
+ *  per-window visibility change, so the menu's items + checkmarks stay in sync. */
 export function buildAppMenu(): void {
   const recents = getRecents();
   const openRecent: MenuItemConstructorOptions[] = recents.length

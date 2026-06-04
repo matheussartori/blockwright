@@ -129,6 +129,9 @@ function windowIcon(): string | undefined {
   return fs.existsSync(icon) ? icon : undefined;
 }
 
+/** Create the single main `BrowserWindow` (hiddenInset titlebar, opaque themed
+ *  background, preload bridge), wire its lifecycle, load the renderer, and flush any
+ *  pending file the OS asked to open before the window existed. Returns the window. */
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
     width: 1180,

@@ -110,6 +110,9 @@ export function unknownBlockIds(names: string[]): string[] {
 
 const jsonCache = new Map<string, unknown>();
 
+/** Read + parse a JSON asset (blockstate/model), memoised by absolute path; returns
+ *  `null` (also cached) on a missing/invalid file. Cleared by `clearJsonCache` when
+ *  the active workspace changes. */
 export function loadJson(file: string): unknown {
   if (jsonCache.has(file)) return jsonCache.get(file);
   let data: unknown;

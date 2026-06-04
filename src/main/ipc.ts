@@ -33,6 +33,9 @@ const pendingRenders = new Map<string, (result: RenderResult) => void>();
  *  giving up so generation can continue without the visual feedback. */
 const RENDER_TIMEOUT_MS = 20000;
 
+/** Register every `ipcMain.handle`/`.on` for the app's IPC channels + events (the
+ *  renderer↔main bridge). Call once at startup. Channel names come from
+ *  `shared/ipc.ts` — never inline them here. */
 export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
 
