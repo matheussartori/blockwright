@@ -2,12 +2,18 @@
 // It runs its own lightweight Three.js scene (separate from the main Viewer) and
 // reuses the normal mesh pipeline: `previewBlock` (main) resolves the block into a
 // 1×1×1 StructureData, then `buildStructure` + `TextureLoader` turn it into the
-// same meshes the viewer would draw. The block slowly auto-rotates.
+// same meshes the viewer would draw. The block gently auto-rotates (delta-timed,
+// so the pace is the same regardless of display refresh rate).
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { api } from '../../api';
 import { buildStructure } from '../../viewer/mesh-builder';
 import { TextureLoader } from '../../viewer/texture-loader';
+
+/** Auto-rotation speed in radians/second — calm, not spinning. */
+const SPIN_RATE = 0.5;
+/** Starting yaw so a block opens on a pleasing 3/4 view, not flat-on. */
+const START_YAW = -Math.PI / 5;
 
 export function BlockPreview({ blockId }: { blockId: string | null }) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -32,7 +38,7 @@ export function BlockPreview({ blockId }: { blockId: string | null }) {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-    camera.position.set(2.4, 1.9, 2.4);
+    camera.position.set(3, 2.35, 3); // pulled back so the block sits comfortably inside the frame
     camera.lookAt(0, 0, 0);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.78));
@@ -59,9 +65,11 @@ export function BlockPreview({ blockId }: { blockId: string | null }) {
     ro.observe(mount);
 
     let raf = 0;
+    const clock = new THREE.Clock();
     const animate = () => {
       raf = requestAnimationFrame(animate);
-      if (contentRef.current) contentRef.current.rotation.y += 0.012;
+      const dt = Math.min(clock.getDelta(), 0.1); // clamp to avoid a jump after a stall
+      if (contentRef.current) contentRef.current.rotation.y += SPIN_RATE * dt;
       renderer.render(scene, camera);
     };
     animate();
@@ -100,6 +108,7 @@ export function BlockPreview({ blockId }: { blockId: string | null }) {
         const center = box.getCenter(new THREE.Vector3());
         group.position.sub(center);
         const wrap = new THREE.Group();
+        wrap.rotation.y = START_YAW;
         wrap.add(group);
         scene.add(wrap);
         contentRef.current = wrap;

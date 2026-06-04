@@ -38,6 +38,19 @@ const VIEW_ICONS = {
   ),
 } as const;
 
+const CopyIcon = (
+  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+    <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
+    <path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />
+  </svg>
+);
+
+const CheckIcon = (
+  <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+    <path d="M3 8.5l3.2 3.2L13 5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 function Thumb({ block }: { block: CatalogBlock }) {
   return block.texture ? (
     <img src={api.textureUrl(block.texture)} alt="" loading="lazy" draggable={false} />
@@ -174,13 +187,24 @@ export function CatalogModal() {
 
         <aside className="catalog-side">
           <div className="catalog-preview">
+            {selected && <span className="chip catalog-ns-badge">{selected.namespace}</span>}
             <BlockPreview blockId={selected?.id ?? null} />
           </div>
           {selected ? (
             <div className="catalog-detail">
-              <div className="catalog-detail-id">{selected.id}</div>
-              <button className="btn sm catalog-copy" onClick={() => copyId(selected.id)}>
-                {copied ? 'Copied!' : 'Copy id'}
+              <div className="catalog-detail-head">
+                <span className="catalog-detail-name" title={selected.block}>
+                  {selected.block}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="catalog-id-copy"
+                title="Copy block id"
+                onClick={() => copyId(selected.id)}
+              >
+                <code className="catalog-detail-id">{selected.id}</code>
+                <span className="catalog-id-copy-icon">{copied ? CheckIcon : CopyIcon}</span>
               </button>
             </div>
           ) : (
