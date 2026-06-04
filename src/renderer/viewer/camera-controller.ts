@@ -68,6 +68,12 @@ export class CameraController {
       // keyup, so the camera keeps drifting — notoriously "flying down" forever when
       // a screenshot grab steals focus mid-Shift.
       window.addEventListener('blur', this.onBlur);
+      // A screenshot grab (system overlay, Print Screen, etc.) can take the page
+      // out of focus/visibility or drop the pointer lock without delivering the
+      // keyup for a held key — leaving e.g. Shift "stuck" so the camera sinks
+      // forever. Treat any of these as "release everything".
+      domElement.ownerDocument.addEventListener('visibilitychange', this.onBlur);
+      domElement.ownerDocument.addEventListener('pointerlockchange', this.onPointerLockChange);
       domElement.addEventListener('wheel', this.onWheel, { passive: false });
     }
   }
@@ -156,7 +162,13 @@ export class CameraController {
 
   /** Integrate one frame of WASD/Space/Shift movement while flying. */
   private updateFly(dt: number): void {
-    if (!this.fly.isLocked) return;
+    // Only move while the pointer is locked AND the page actually has focus. If a
+    // screenshot tool grabbed focus (so a keyup got swallowed), bail and drop the
+    // held keys so a stuck Shift can't keep sinking the camera.
+    if (!this.fly.isLocked || !this.domElement.ownerDocument.hasFocus()) {
+      if (this.keys.size) this.keys.clear();
+      return;
+    }
     const step = this.flySpeed * dt;
     let forward = 0;
     let right = 0;
@@ -187,15 +199,38 @@ export class CameraController {
     if (MOVE_CODES.has(e.code)) {
       this.keys.add(e.code);
       e.preventDefault(); // stop Space from scrolling, etc.
+      return;
     }
+    // Anything else pressed while flying (Print Screen, an OS/app shortcut, …) is
+    // not navigation. Release any held movement keys so the press that triggers a
+    // screenshot can't leave Shift stuck and sink the camera. Recognized screenshot
+    // triggers also exit fly mode entirely.
+    this.keys.clear();
+    if (this.isScreenshotKey(e)) this.setMode('orbit');
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
     if (MOVE_CODES.has(e.code)) this.keys.delete(e.code);
   };
 
+  /** A Print Screen press (reported as PrintScreen, or F13 for a PC keyboard's PrtSc
+   *  on macOS) or a macOS screenshot chord (Cmd+Shift+3/4/5/6). */
+  private isScreenshotKey(e: KeyboardEvent): boolean {
+    return (
+      e.code === 'PrintScreen' ||
+      e.code === 'F13' ||
+      (e.metaKey && e.shiftKey && /^Digit[3-6]$/.test(e.code))
+    );
+  }
+
   /** Drop every held key when focus leaves the window, so no movement sticks. */
   private onBlur = () => this.keys.clear();
+
+  /** Losing the pointer lock (screenshot overlay, OS taking over) must release any
+   *  held keys so movement can't stick. */
+  private onPointerLockChange = () => {
+    if (!this.fly.isLocked) this.keys.clear();
+  };
 
   /** While flying, the wheel tunes movement speed instead of zooming. */
   private onWheel = (e: WheelEvent) => {
