@@ -15,7 +15,7 @@ import { documentsStore } from '../state/documents';
 import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc } from '../hooks/useStores';
 import { api } from '../api';
-import type { GenerateProgress, FloorDef } from '@/shared/types';
+import type { GenerateProgress, FloorDef, GenerationCatalog } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
@@ -80,11 +80,16 @@ interface BuildDetails {
   decay: string;
   furnished: string;
   lighting: string;
+  /** A ready-made shell to start from (a structure-type id from the registry), and
+   *  the decoration theme to build it with — both expanded by a `template` op. */
+  presetType: string;
+  theme: string;
 }
 
 const EMPTY_DETAILS: BuildDetails = {
   buildType: '', style: '', width: '', depth: '', height: '', floors: '',
   rooms: '', basement: '', materials: '', decay: '', furnished: '', lighting: '',
+  presetType: '', theme: '',
 };
 
 const BUILD_TYPES = ['House', 'Tower', 'Cabin', 'Ruin', 'Bridge', 'Wall', 'Dungeon room', 'Shrine', 'Barn', 'Tree house', 'Other'];
@@ -96,6 +101,14 @@ const LIGHTINGS = ['Dim', 'Medium', 'Bright'];
 /** Build the structured-hints block appended to the prompt, or '' if nothing set. */
 function buildBrief(d: BuildDetails): string {
   const lines: string[] = [];
+  if (d.presetType) {
+    const theme = d.theme ? ` with the "${d.theme}" decoration theme` : '';
+    const themeParam = d.theme ? `, params.theme "${d.theme}"` : '';
+    lines.push(
+      `- Start from the "${d.presetType}" preset shell${theme}: emit a \`template\` op ` +
+      `(name "${d.presetType}"${themeParam}) as the base massing, then layer your own ops on top.`,
+    );
+  }
   if (d.buildType) lines.push(`- Type: ${d.buildType}`);
   if (d.style) lines.push(`- Style/theme: ${d.style}`);
   if (d.width || d.depth || d.height) {
@@ -140,6 +153,7 @@ export function GenerateContent() {
   const [showDetails, setShowDetails] = useState(false);
   const [showFloors, setShowFloors] = useState(false);
   const [details, setDetails] = useState<BuildDetails>(EMPTY_DETAILS);
+  const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevDocId = useRef<string | undefined>(undefined);
@@ -152,6 +166,12 @@ export function GenerateContent() {
     if (settingsOpen) return;
     void api.aiAvailable().then(setAvailable);
   }, [settingsOpen]);
+
+  // Load the composable generation registry once (structure types + themes) for
+  // the preset picker. It's static for the session, so fetch it a single time.
+  useEffect(() => {
+    void api.generationCatalog().then(setCatalog);
+  }, []);
 
   // Keep the newest message in view. Jump instantly when switching tabs (so the
   // transcript just appears at the bottom — no scroll-down animation on open),
@@ -473,6 +493,20 @@ export function GenerateContent() {
         {showDetails && (
           <div className="gen-details">
             <div className="gen-details-grid">
+              <label className="gen-field">
+                <span>Preset shell</span>
+                <select value={details.presetType} onChange={(e) => setField('presetType', e.target.value)} disabled={busy}>
+                  <option value="">None</option>
+                  {(catalog?.structureTypes ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </label>
+              <label className="gen-field">
+                <span>Theme</span>
+                <select value={details.theme} onChange={(e) => setField('theme', e.target.value)} disabled={busy || !details.presetType}>
+                  <option value="">Default</option>
+                  {(catalog?.themes ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </label>
               <label className="gen-field">
                 <span>Type</span>
                 <select value={details.buildType} onChange={(e) => setField('buildType', e.target.value)} disabled={busy}>

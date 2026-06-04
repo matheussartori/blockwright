@@ -323,6 +323,18 @@ export type WindowsReport = Record<WindowId, WindowMenuState>;
 /** One block in the content catalog: a placeable block discovered in the active
  *  content (vanilla pack + the mod workspace's namespace), with a representative
  *  texture key for a thumbnail (null when none could be resolved). */
+/** A selectable id+label pair (a structure type or a decoration theme). */
+export interface GenerationCatalogItem {
+  id: string;
+  label: string;
+}
+
+/** The composable generation registry, surfaced to the composer's preset picker. */
+export interface GenerationCatalog {
+  structureTypes: GenerationCatalogItem[];
+  themes: GenerationCatalogItem[];
+}
+
 export interface CatalogBlock {
   /** Full `namespace:id` (e.g. `minecraft:stone`, `theplacebeyond:ashen_block`). */
   id: string;
@@ -421,6 +433,9 @@ export interface BlockwrightApi {
   listCatalog: () => Promise<CatalogBlock[]>;
   /** Resolve a single block into a 1×1×1 StructureData (for the catalog's 3D preview). */
   previewBlock: (id: string) => Promise<StructureData>;
+  /** The composable generation registry (structure types × decoration themes) for
+   *  the composer's preset picker. */
+  generationCatalog: () => Promise<GenerationCatalog>;
   /** Drive the native appearance (macOS vibrancy + traffic lights + the renderer's
    *  prefers-color-scheme) so a forced theme isn't fighting a vibrancy stuck on the OS. */
   setThemeSource: (pref: 'system' | 'light' | 'dark') => Promise<void>;

@@ -70,6 +70,8 @@ export const IPC_CHANNELS = {
   catalogList: 'catalog:list',
   /** Resolve a single block (name[+props]) into a 1×1×1 StructureData for the catalog 3D preview. */
   previewBlock: 'catalog:preview-block',
+  /** The composable generation registry (structure types + decoration themes) → GenerationCatalog. */
+  generationCatalog: 'generation:catalog',
   /** Drive the native theme (vibrancy + traffic lights + prefers-color-scheme): 'system'|'light'|'dark'. */
   themeSet: 'theme:set',
   /** Load persisted per-NBT chat history for a key (payload: key). */

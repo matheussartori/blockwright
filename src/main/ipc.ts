@@ -8,6 +8,7 @@ import { loadStructure } from './structure/io/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
+import { listStructureTypes, listThemes } from './structure/domain';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { getConfig, setActiveProvider, setModel, setCredential, clearCredential } from './ai/credentials';
 import type { AiProviderId } from '@/shared/ai';
@@ -167,6 +168,10 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
   ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));
+  ipcMain.handle(IPC_CHANNELS.generationCatalog, async () => ({
+    structureTypes: listStructureTypes(),
+    themes: listThemes(),
+  }));
 
   // Drive the native appearance so a forced light/dark theme also flips the macOS
   // vibrancy material (otherwise dark text lands on a dark vibrancy backdrop) and

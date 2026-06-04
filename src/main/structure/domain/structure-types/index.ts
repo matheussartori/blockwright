@@ -27,3 +27,8 @@ export function isStructureType(id: string): boolean {
 export function structureTypeIds(): string[] {
   return Object.keys(STRUCTURE_TYPES);
 }
+
+/** Every structure type as `{ id, label }` (for the composer's preset picker). */
+export function listStructureTypes(): { id: string; label: string }[] {
+  return Object.values(STRUCTURE_TYPES).map((t) => ({ id: t.id, label: t.label }));
+}

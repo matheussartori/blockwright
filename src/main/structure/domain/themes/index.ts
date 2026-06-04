@@ -24,3 +24,8 @@ export function getTheme(id: string): DecorationTheme | undefined {
 export function themeIds(): string[] {
   return Object.keys(THEMES);
 }
+
+/** Every theme as `{ id, label }` (for the composer's decoration picker). */
+export function listThemes(): { id: string; label: string }[] {
+  return Object.values(THEMES).map((t) => ({ id: t.id, label: t.label }));
+}

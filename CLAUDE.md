@@ -311,10 +311,16 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   for the model in `knowledge/nbt/13-templates.md`; block-name params are validated against the real
   content pack in `generate.ts` (templates intern their own palette, so those names never reach
   `palette`). Add a preset in `templates/index.ts` + its block-name params in `BLOCK_PARAM_KEYS`.
-- **Optional build details:** `NewStructurePanel`'s composer has a "⚙ Details" section (type, style,
-  size, floors, rooms, basement, materials, decay, interior, lighting). All optional; they're folded
-  into the prompt as a structured "[Build details]" brief (renderer-side, no IPC change) and cleared
-  after sending, so follow-up edits don't re-send stale hints.
+- **Optional build details:** `NewStructurePanel`'s composer has a "⚙ Details" section (preset shell +
+  theme, type, style, size, floors, rooms, basement, materials, decay, interior, lighting). All
+  optional; they're folded into the prompt as a structured "[Build details]" brief (renderer-side) and
+  cleared after sending, so follow-up edits don't re-send stale hints.
+  - **Preset shell × Theme** are registry-backed: the composer fetches the composable generation
+    catalog (structure types × decoration themes) once via the `generationCatalog` IPC channel
+    (`listStructureTypes`/`listThemes` from `structure/domain`), and the picker grows automatically as
+    the registry does. Choosing them appends a directive to use a `template` op with that name +
+    `params.theme`. The free-text "Type"/"Style" creative hints stay alongside (a different layer — a
+    nudge to build from scratch, vs. a ready-made shell).
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

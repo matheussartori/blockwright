@@ -33,6 +33,7 @@ const api: BlockwrightApi = {
   pathExists: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.pathExists, path),
   listCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.catalogList),
   previewBlock: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.previewBlock, id),
+  generationCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.generationCatalog),
   setThemeSource: (pref: 'system' | 'light' | 'dark') => ipcRenderer.invoke(IPC_CHANNELS.themeSet, pref),
   openWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceOpen),
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),

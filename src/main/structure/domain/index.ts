@@ -7,6 +7,6 @@ export {
   knownStructureNames,
   type Intern,
 } from './compose';
-export { getStructureType, isStructureType, structureTypeIds, type StructureType } from './structure-types';
-export { getTheme, themeIds, DEFAULT_THEME, type DecorationTheme } from './themes';
+export { getStructureType, isStructureType, structureTypeIds, listStructureTypes, type StructureType } from './structure-types';
+export { getTheme, themeIds, listThemes, DEFAULT_THEME, type DecorationTheme } from './themes';
 export { ROLES, isRole, type Role } from './roles';
