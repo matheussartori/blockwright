@@ -4,7 +4,7 @@
 // the bundled pack for "minecraft"). Pool JSON is cached via content-pack.
 import fs from 'node:fs';
 import path from 'node:path';
-import { dataDir, loadJson } from './content-pack';
+import { dataDir, loadJson } from '../assets/content-pack';
 
 const EMPTY_ID = 'minecraft:empty';
 

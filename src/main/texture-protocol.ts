@@ -2,7 +2,7 @@
 // to the renderer under a strict CSP (bw-texture://block/stone.png).
 import { protocol } from 'electron';
 import fs from 'node:fs';
-import { resolveTextureFile } from './structure/content-pack';
+import { resolveTextureFile } from './structure/assets/content-pack';
 
 export const TEXTURE_SCHEME = 'bw-texture';
 

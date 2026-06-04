@@ -26,7 +26,7 @@ import {
   rootPlacement,
   solveAttachment,
 } from '@/shared/jigsaw';
-import { loadStructureMeta, type StructureMeta } from './load-structure';
+import { loadStructureMeta, type StructureMeta } from '../io/load-structure';
 import { resolvePool, type ResolvedPool, type ResolvedPoolElement } from './template-pool';
 
 const EMPTY_POOL = 'minecraft:empty';

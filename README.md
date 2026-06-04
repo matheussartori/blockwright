@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/logo.png" alt="Blockwright" width="600" />
+  <img src=".github/assets/logo.png" alt="Blockwright" width="800" />
 </p>
 
 <h1 align="center">Blockwright</h1>
@@ -102,23 +102,25 @@ This launches the Vite dev server and Electron together, with hot-module reloadi
 
 **Other useful commands**
 
-| Command           | Description                                            |
-| ----------------- | ------------------------------------------------------ |
-| `npm run lint`    | Run ESLint (typescript-eslint)                         |
-| `npm run package` | Package the app via Electron Forge                     |
-| `npm run make`    | Build distributable installers via Electron Forge      |
+| Command             | Description                                       |
+| ------------------- | ------------------------------------------------- |
+| `npm run lint`      | Run ESLint (typescript-eslint)                    |
+| `npm run typecheck` | Type-check with `tsc --noEmit`                    |
+| `npm run test`      | Run the Vitest unit suites                        |
+| `npm run package`   | Package the app via Electron Forge                |
+| `npm run make`      | Build distributable installers via Electron Forge |
 
 ### Visual testing
 
 Blockwright can screenshot itself headlessly — useful for verifying renders without granting
 screen-recording permission. Set these env vars when launching:
 
-| Variable      | Description                                              |
-| ------------- | -------------------------------------------------------- |
-| `BW_OPEN`     | Path to a `.nbt` file to open on startup                 |
-| `BW_CAPTURE`  | Path to write a PNG to, then quit (~2.5s after render)   |
-| `BW_CONTENT`  | Override the content-pack location                       |
-| `BW_WORKSPACE`| Activate a mod workspace on startup                      |
+| Variable       | Description                                            |
+| -------------- | ------------------------------------------------------ |
+| `BW_OPEN`      | Path to a `.nbt` file to open on startup               |
+| `BW_CAPTURE`   | Path to write a PNG to, then quit (~2.5s after render) |
+| `BW_CONTENT`   | Override the content-pack location                     |
+| `BW_WORKSPACE` | Activate a mod workspace on startup                    |
 
 ## Architecture
 

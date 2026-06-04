@@ -6,7 +6,7 @@ import path from 'node:path';
 import type { WindowId, WindowsReport } from '@/shared/types';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
-import { getActiveWorkspace } from './structure/content-pack';
+import { getActiveWorkspace } from './structure/assets/content-pack';
 import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './workspace';
 import {
   notifyClose,

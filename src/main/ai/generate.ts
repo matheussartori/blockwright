@@ -21,7 +21,7 @@ import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
 import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
-import { unknownBlockIds } from '../structure/content-pack';
+import { unknownBlockIds } from '../structure/assets/content-pack';
 import { templateBlockNames } from '../structure/templates';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),

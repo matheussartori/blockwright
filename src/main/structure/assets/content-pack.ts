@@ -5,7 +5,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Workspace } from '@/shared/types';
-import { detectMcVersion } from '../mc-version-detect';
+import { detectMcVersion } from '../../mc-version-detect';
 
 let activeWorkspace: Workspace | null = null;
 

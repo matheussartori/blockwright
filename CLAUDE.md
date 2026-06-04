@@ -7,7 +7,9 @@ Three.js. Block models/textures come from an extracted Minecraft "content pack" 
 ## Commands
 
 - `npm start` — run the app in dev (Vite dev server + Electron, with HMR).
-- `npm run lint` — ESLint (typescript-eslint). There is no separate typecheck script.
+- `npm run lint` — ESLint (typescript-eslint).
+- `npm run typecheck` — `tsc --noEmit` (no emit, type-only check).
+- `npm run test` — Vitest (the unit suites under `__tests__/` dirs); `npm run test:watch` to watch.
 - `npm run package` / `npm run make` — build/package via Electron Forge.
 
 ## Architecture
@@ -27,15 +29,27 @@ src/
     recent-workspaces.ts  Persisted "recently opened" mod workspaces (last 10) in userData
     workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one)
     texture-protocol.ts   Custom bw-texture:// privileged scheme serving namespaced PNGs
-    structure/
-      load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
-      content-pack.ts      Namespace-aware asset roots (vanilla pack + workspace) + JSON cache
-      blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
-      block-entity/        Blocks vanilla draws with an entity renderer (particle-only model),
-                           synthesized from a 64×64 atlas: box-uv.ts (shared box/UV helper),
-                           chest.ts, bed.ts, banner.ts (wall), index.ts (dispatcher)
-      fluid.ts             Water/lava: full-cube from the animated "still" strip (water blue-tinted)
-      fallback-color.ts    Deterministic per-block color when textures are missing
+    structure/              Grouped by responsibility (one subdir per concern):
+      io/
+        load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
+      assets/               The resource/model layer (block name+props → resolved models + textures):
+        content-pack.ts      Namespace-aware asset roots (vanilla pack + workspace) + JSON cache
+        blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
+        variant-match.ts     Pick the best blockstate variant for a block's props
+        fluid.ts             Water/lava: full-cube from the animated "still" strip (water blue-tinted)
+        fallback-color.ts    Deterministic per-block color when textures are missing
+        block-entity/        Blocks vanilla draws with an entity renderer (particle-only model),
+                             synthesized from a 64×64 atlas: box-uv.ts (shared box/UV helper),
+                             chest.ts, bed.ts, banner.ts (wall), index.ts (dispatcher)
+      catalog/
+        block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
+                             namespace-aware) + a representative texture per block → the Block Catalog.
+                             `previewBlock(id)` resolves one block into a 1×1×1 StructureData for the
+                             catalog's live 3D preview (renderer reuses buildStructure on it).
+      jigsaw/
+        jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
+        template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
+        jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
       templates/           Parameterized building presets (abandoned_house, large_basement),
                            expanded by the `template` op in the authoring compiler: the model emits one
                            op, the code produces the geometry. Pure (box+params)→ops; interns its
@@ -43,13 +57,8 @@ src/
                            rng.ts = shared seeded PRNG (mulberry32/seed3); footprint.ts = seeded
                            non-rectangular footprints (rect/L/T/U/plus) so large_basement isn't always
                            a square box (param `shape`, default `auto`). Tests in templates/__tests__/.
-      block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
-                           namespace-aware) + a representative texture per block → the Block Catalog.
-                           `previewBlock(id)` resolves one block into a 1×1×1 StructureData for the
-                           catalog's live 3D preview (renderer reuses buildStructure on it).
-      jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
-      template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
-      jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
+                           (NOTE: slated to be refactored into a composable structure-type ×
+                           decoration-theme domain model under `structure/domain/`.)
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     ai/                     AI structure generation (File ▸ New Structure)
       generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→

@@ -3,11 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as nbt from 'prismarine-nbt';
 import type { JigsawConnector, PaletteEntry, StructureData } from '@/shared/types';
-import { getActiveWorkspace, hasContent } from './content-pack';
-import { collectTextures } from './model-loader';
-import { isAir, resolveBlock } from './blockstate-resolver';
-import { fallbackColor } from './fallback-color';
-import { extractJigsaws } from './jigsaw';
+import { getActiveWorkspace, hasContent } from '../assets/content-pack';
+import { collectTextures } from '../assets/model-loader';
+import { isAir, resolveBlock } from '../assets/blockstate-resolver';
+import { fallbackColor } from '../assets/fallback-color';
+import { extractJigsaws } from '../jigsaw/jigsaw';
 
 interface RawPaletteEntry {
   Name: string;

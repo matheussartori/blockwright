@@ -7,8 +7,8 @@ import {
   clearJsonCache,
   getActiveWorkspace,
   setActiveWorkspace,
-} from './structure/content-pack';
-import { clearModelCache } from './structure/model-loader';
+} from './structure/assets/content-pack';
+import { clearModelCache } from './structure/assets/model-loader';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
 import { detectMcVersion } from './mc-version-detect';

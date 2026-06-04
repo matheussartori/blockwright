@@ -7,10 +7,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CatalogBlock, PaletteEntry, StructureData } from '@/shared/types';
-import { assetsDir, getActiveWorkspace, hasContent, loadJson } from './content-pack';
-import { parseRef, buildResolvedModel, collectTextures } from './model-loader';
-import { isAir, resolveBlock } from './blockstate-resolver';
-import { fallbackColor } from './fallback-color';
+import { assetsDir, getActiveWorkspace, hasContent, loadJson } from '../assets/content-pack';
+import { parseRef, buildResolvedModel, collectTextures } from '../assets/model-loader';
+import { isAir, resolveBlock } from '../assets/blockstate-resolver';
+import { fallbackColor } from '../assets/fallback-color';
 
 interface VariantModel {
   model: string;

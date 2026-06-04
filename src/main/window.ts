@@ -7,7 +7,7 @@ import type { ExportResult } from '@/shared/types';
 import { IPC_EVENTS } from '@/shared/ipc';
 import { getRecents } from './recents';
 import { getRecentWorkspaces } from './recent-workspaces';
-import { getActiveWorkspace } from './structure/content-pack';
+import { getActiveWorkspace } from './structure/assets/content-pack';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
