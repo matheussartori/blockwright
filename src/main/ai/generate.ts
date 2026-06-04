@@ -7,18 +7,20 @@
 // Generation can run on a subscription (Claude Code / Codex — no API credits) or
 // a paid API key (Anthropic / OpenAI / Gemini); the user picks the active
 // provider + model in Settings (see credentials.ts).
-import { app } from 'electron';
-import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, VersionInfo } from '@/shared/types';
+import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage } from '@/shared/types';
 import { systemPrompt } from './schema';
 import type { EmitArgs } from './schema';
-import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, phaseBriefing, PHASES, summarizeAudit } from './phases';
+import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, PHASES, summarizeAudit } from './phases';
+import { auditGateFeedback } from './audit-gate';
+import { maxRoundsFor } from './rounds';
+import { beginRun, endRun, getSession } from './session';
+import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
-import { writeStructureFile, validateAuthoring, resolveBlocks, readAuthoring, type AuthoringStructure, type CompileReport } from '../structure/authoring';
+import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 import { unknownBlockIds } from '../structure/content-pack';
 import { templateBlockNames } from '../structure/templates';
 
@@ -42,159 +44,10 @@ const THINKING_BUDGET = process.env.BW_AI_THINKING_BUDGET !== undefined
  *  the cap per-build from its volume; the env override, when present, wins. */
 const ENV_MAX_ROUNDS = process.env.BW_AI_MAX_ROUNDS ? Number(process.env.BW_AI_MAX_ROUNDS) : null;
 
-/** Revision cap from a build's bounding-box volume (blocks³). Larger builds get
- *  more emit→review passes since one round can't fix both massing and interiors. */
-function roundsForVolume(volume: number): number {
-  if (volume > 20000) return 7;
-  if (volume > 6000) return 6;
-  if (volume > 1500) return 5;
-  return 4;
-}
-
 export { aiAvailable };
-
-interface Session {
-  /** The provider conversation id to resume (Claude SDK / Codex thread); null
-   *  until the first turn establishes it, or always null for stateless providers. */
-  sdkSessionId: string | null;
-  version: number;
-  dir: string;
-}
-const sessions = new Map<string, Session>();
-
-// AbortControllers for in-flight generations, keyed by session id, so the
-// renderer can cancel a running prompt.
-const activeRuns = new Map<string, AbortController>();
-
-/** Cancel the in-flight generation for `sessionId`, if any. */
-export function cancelGeneration(sessionId: string): void {
-  activeRuns.get(sessionId)?.abort();
-}
-
-/** Temp root for generated structures: repo-local `.generated` in dev (gitignored),
- *  userData when packaged. Override with BW_GENERATED. */
-function generatedRoot(): string {
-  if (process.env.BW_GENERATED) return process.env.BW_GENERATED;
-  return app.isPackaged
-    ? path.join(app.getPath('userData'), 'generated')
-    : path.join(app.getAppPath(), '.generated');
-}
-
-function sessionDir(sessionId: string): string {
-  const safe = sessionId.replace(/[^a-zA-Z0-9_-]/g, '');
-  return path.join(generatedRoot(), safe || 'session');
-}
-
-function getSession(sessionId: string): Session {
-  let s = sessions.get(sessionId);
-  if (!s) {
-    const dir = sessionDir(sessionId);
-    fs.mkdirSync(dir, { recursive: true });
-    s = { sdkSessionId: null, version: 0, dir };
-    sessions.set(sessionId, s);
-  }
-  return s;
-}
-
-/** Forget a session's conversation and version counter (its files stay on disk).
- *  The next prompt starts a fresh provider session. */
-export function resetSession(sessionId: string): void {
-  sessions.delete(sessionId);
-}
-
-/** List the compiled `vN.nbt` versions on disk for a session, ascending. */
-export function listVersions(sessionId: string): VersionInfo[] {
-  const dir = sessionDir(sessionId);
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir);
-  } catch {
-    return []; // no session dir yet
-  }
-  const out: VersionInfo[] = [];
-  for (const name of names) {
-    const m = /^v(\d+)\.nbt$/.exec(name);
-    if (m) out.push({ version: Number(m[1]), path: path.join(dir, name) });
-  }
-  return out.sort((a, b) => a.version - b.version);
-}
-
-/** Restore a session's conversation id + version from persisted chat history so a
- *  follow-up prompt after an app restart resumes the same conversation. No-op
- *  once the session is live in memory (don't clobber a running one). */
-export function primeSession(
-  sessionId: string,
-  sdkSessionId: string | null,
-  version: number,
-): void {
-  if (sessions.has(sessionId)) return;
-  const dir = sessionDir(sessionId);
-  fs.mkdirSync(dir, { recursive: true });
-  sessions.set(sessionId, { sdkSessionId, version, dir });
-}
-
-/** Build the "you are editing this structure" preamble from an authoring JSON
- *  the model should start from (the open file, or a stateless provider's latest
- *  build), so a follow-up like "change the blocks" edits THAT rather than
- *  generating anew. */
-function editPreamble(json: string): string {
-  return (
-    'You are EDITING an existing structure the user already has open in the viewer — NOT building a new ' +
-    'one from scratch. Below is its CURRENT Blockwright authoring JSON (air omitted; geometry is given as ' +
-    'a flat "blocks" list). Treat it as the starting point: keep everything the user did not ask to change, ' +
-    'apply only the requested change, and then call emit_structure with the COMPLETE modified structure. ' +
-    'Keep the same size and layout for parts the change does not touch, but if the request needs more room ' +
-    '(e.g. "make the basement bigger", "add rooms/corridors", "expand it"), GROW "size" freely — there is no ' +
-    'width/depth limit — and RE-ANCHOR the kept parts so anything that should stay centred shifts with the ' +
-    'enlarged footprint instead of being left in a corner. Resizing/re-anchoring needs mode "full" (a patch ' +
-    'cannot change size or move existing cells). You may re-express unchanged geometry as "ops" ' +
-    'if that is cheaper to emit, as long as the result matches.\n\n' +
-    'CURRENT STRUCTURE:\n```json\n' +
-    json +
-    '\n```\n\nUSER REQUEST:\n'
-  );
-}
-
-/** Read an authoring JSON from disk and wrap it as an edit preamble, or '' if it
- *  can't be read. */
-async function seedFromFile(basePath: string): Promise<string> {
-  try {
-    const authoring = await readAuthoring(basePath);
-    return editPreamble(JSON.stringify(authoring));
-  } catch {
-    return '';
-  }
-}
-
-/** Decide the edit preamble for this turn. Resumable providers carry their own
- *  conversation, so they only seed from the open file on the very first turn.
- *  Stateless providers have no server-side memory, so they re-seed every turn
- *  from the latest emitted version (or the open file on turn one). */
-async function buildSeed(
-  resumable: boolean,
-  session: Session,
-  basePath: string | undefined,
-): Promise<string> {
-  const fromOpenFile = async (): Promise<string> => {
-    if (!basePath) return '';
-    const isOwnOutput = path.resolve(basePath).startsWith(path.resolve(session.dir) + path.sep);
-    return isOwnOutput ? '' : seedFromFile(basePath);
-  };
-  if (resumable) {
-    return session.sdkSessionId === null && session.version === 0 ? fromOpenFile() : '';
-  }
-  // Stateless: rebuild context from the latest build, else the open file.
-  if (session.version >= 1) {
-    const latest = path.join(session.dir, `v${session.version}.json`);
-    try {
-      const json = await fsp.readFile(latest, 'utf8');
-      return editPreamble(json);
-    } catch {
-      return '';
-    }
-  }
-  return fromOpenFile();
-}
+// Session lifecycle + the edit-seed live in their own modules; re-export the
+// IPC-facing pieces so importers (ipc.ts) stay stable.
+export { cancelGeneration, listVersions, primeSession, resetSession } from './session';
 
 /** Generate (or edit) the structure for `sessionId` from `prompt`. Returns the
  *  written file path + metadata, or an error message for the UI to surface.
@@ -225,9 +78,9 @@ export async function generateStructure(
   let captureError: string | null = null;
   const startedAt = Date.now();
   let rounds = 0;
-  // Enough rounds to walk the whole design-pass sequence, plus headroom for the
-  // audit gate to iterate (fix → re-audit) before the hard cap.
-  let maxRounds = Math.max(ENV_MAX_ROUNDS ?? 4, PHASES.length + 2);
+  // Volume is unknown until the first emit, so start at the floor; re-derived from
+  // the build's size on round 1 below.
+  let maxRounds = maxRoundsFor(0, ENV_MAX_ROUNDS);
   // The design pass the model should be working on this emit (massing → … → audit).
   // The orchestrator owns this pointer; it advances one pass per emit (clamped at
   // the terminal audit pass) regardless of provider.
@@ -394,9 +247,7 @@ export async function generateStructure(
     captureError = null;
     rounds += 1;
     if (ENV_MAX_ROUNDS == null && rounds === 1) {
-      // Floor to the design passes + audit-gate headroom so the volume cap can't
-      // truncate the sequence or starve the audit loop.
-      maxRounds = Math.max(roundsForVolume(size[0] * size[1] * size[2]), PHASES.length + 2);
+      maxRounds = maxRoundsFor(size[0] * size[1] * size[2], null);
     }
     // Per-round telemetry (dev terminal) to profile time/token cost across rounds.
     console.log(
@@ -514,51 +365,18 @@ export async function generateStructure(
       }
     }
 
-    let stop = atCap;
-    if (atCap) {
-      content.push({
-        type: 'text',
-        text: `This is the final allowed revision (round ${rounds}/${maxRounds}). Do NOT call emit_structure again — finish now.`,
-      });
-    } else if (onAudit && !auditReported) {
-      // Self-audit path with no checklist yet — require it before stopping.
-      content.push({
-        type: 'text',
-        text:
-          'AUDIT pass. Evaluate the build against EACH checklist item below and report your verdict in the ' +
-          '"audit" field (one { check, ok, note } per item, judged against the screenshots). Patch anything you ' +
-          `mark not ok, then re-emit and re-report.\n${auditChecklistText()}`,
-      });
-    } else if (onAudit && auditFailed.length) {
-      // Open issues — keep the model on the audit pass until the verdict is clean.
-      const lines = auditFailed.map((f) => `• ${f.label}${f.note ? `: ${f.note}` : ''}`).join('\n');
-      const who = bySelf ? 'Your audit lists' : 'An INDEPENDENT reviewer flagged';
-      content.push({
-        type: 'text',
-        text:
-          `${who} ${auditFailed.length} open issue(s). Fix EACH with a "patch", then re-emit — do not stop while ` +
-          `any item is open:\n${lines}`,
-      });
-    } else if (onAudit) {
-      content.push({
-        type: 'text',
-        text: bySelf
-          ? 'Audit clean — every check passes. Finalize the build; do not call emit_structure again.'
-          : 'An independent reviewer approved the build — every check passes. Finalize; do not call emit_structure again.',
-      });
-      stop = true;
-    } else {
-      content.push({
-        type: 'text',
-        text:
-          `Good — now the next pass. ${phaseBriefing(nextIdx)} Apply ONLY this pass (keep everything else that ` +
-          `already works), then call emit_structure with phase="${phaseAt(nextIdx).id}". Fix any glaring problem ` +
-          'from an earlier pass at the same time if you spot one.',
-      });
-    }
+    const gate = auditGateFeedback({
+      onAudit,
+      atCap,
+      rounds,
+      maxRounds,
+      nextPhaseIndex: nextIdx,
+      verdict: { reported: auditReported, failed: auditFailed, bySelf },
+    });
+    content.push({ type: 'text', text: gate.text });
     phaseIndex = nextIdx; // advance the pointer for the next emit (clamped at audit)
 
-    return { content, isError: false, stop };
+    return { content, isError: false, stop: gate.stop };
   };
 
   // Snapshot the running token totals — attached to EVERY result branch
@@ -568,9 +386,7 @@ export async function generateStructure(
     tokensOut: displayedOutput(),
   });
 
-  const ac = new AbortController();
-  activeRuns.get(sessionId)?.abort();
-  activeRuns.set(sessionId, ac);
+  const ac = beginRun(sessionId);
 
   let driverResult: { resultSubtype?: string | null };
   try {
@@ -595,7 +411,7 @@ export async function generateStructure(
     if (ac.signal.aborted) return { ok: false, error: 'Canceled.', canceled: true, ...tokens() };
     return { ok: false, error: authHint(errMessage(err)), ...tokens() };
   } finally {
-    activeRuns.delete(sessionId);
+    endRun(sessionId, ac);
   }
 
   // Run summary (dev terminal): the before/after baseline for efficiency work.

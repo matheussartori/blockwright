@@ -27,11 +27,18 @@ export interface AiModelOption {
   label: string;
 }
 
+/** Maturity of a backend in Blockwright: `stable` is the supported path we test and
+ *  tune the self-review/critic loop against; `beta` works but is less exercised.
+ *  Drives the Stable/Beta badge + grouping in Settings ▸ AI. */
+export type AiStability = 'stable' | 'beta';
+
 /** Static, non-secret description of a provider (safe to read in the renderer). */
 export interface AiProviderMeta {
   id: AiProviderId;
   label: string;
   authKind: AiAuthKind;
+  /** Maturity tier — `stable` (Claude subscription) vs `beta` (everything else). */
+  stability: AiStability;
   /** One-line description for the settings UI. */
   blurb: string;
   /** Env var(s) that pin this provider's credential (and lock it in-app). */
@@ -50,6 +57,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'claude-subscription',
     label: 'Claude (subscription)',
     authKind: 'subscription',
+    stability: 'stable',
     blurb:
       'Runs on your Claude Pro/Max plan via Claude Code — no API credits. Uses your existing Claude Code login, or a token from `claude setup-token`.',
     envVars: ['CLAUDE_CODE_OAUTH_TOKEN'],
@@ -65,6 +73,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'claude-api',
     label: 'Claude API',
     authKind: 'api-key',
+    stability: 'beta',
     blurb: 'Anthropic API key (pay-as-you-go credits). Same models, billed per token.',
     envVars: ['ANTHROPIC_API_KEY'],
     keyPlaceholder: 'sk-ant-api…',
@@ -79,6 +88,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'openai',
     label: 'OpenAI (ChatGPT)',
     authKind: 'api-key',
+    stability: 'beta',
     blurb: 'OpenAI API key (pay-as-you-go). GPT models with vision for the self-review loop.',
     envVars: ['OPENAI_API_KEY'],
     keyPlaceholder: 'sk-…',
@@ -94,6 +104,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'gemini',
     label: 'Google Gemini',
     authKind: 'api-key',
+    stability: 'beta',
     blurb: 'Google AI API key (generous free tier). Strong vision; great value.',
     envVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     keyPlaceholder: 'AIza…',
@@ -108,6 +119,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'codex',
     label: 'Codex (ChatGPT)',
     authKind: 'subscription',
+    stability: 'beta',
     blurb:
       'Runs on your ChatGPT Plus/Pro plan via the Codex CLI — no API credits. Sign in first with `codex login`. Vision review is best-effort.',
     envVars: ['CODEX_API_KEY'],

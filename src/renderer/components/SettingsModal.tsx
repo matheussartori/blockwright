@@ -8,7 +8,10 @@ import { api } from '../api';
 import { settingsStore } from '../state/settings';
 import { store } from '../state/store';
 import { useApp, useSettings } from '../hooks/useStores';
-import { AI_PROVIDERS, type AiConfig, type AiProviderId, type AiProviderState } from '@/shared/ai';
+import {
+  AI_PROVIDERS, providerMeta,
+  type AiConfig, type AiProviderId, type AiProviderMeta, type AiProviderState, type AiStability,
+} from '@/shared/ai';
 import type { ThemePref } from '../state/settings';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
@@ -199,8 +202,21 @@ function AboutTab() {
  *  manage per-provider credentials. Secrets are stored (encrypted) in the main
  *  process; only a "configured?" flag, a masked hint, and the chosen model ever
  *  cross the bridge. */
+/** A "Stable"/"Beta" maturity badge (reuses the `.ai-pill` chrome). */
+function StabilityPill({ stability }: { stability: AiStability }) {
+  return (
+    <span className={`ai-pill ai-pill-${stability}`}>{stability === 'stable' ? 'Stable' : 'Beta'}</span>
+  );
+}
+
+/** Human label for a provider's currently-selected model id. */
+function modelLabel(meta: AiProviderMeta | undefined, modelId: string): string {
+  return meta?.models.find((m) => m.id === modelId)?.label ?? modelId;
+}
+
 function AiTab() {
   const [config, setConfig] = useState<AiConfig | null>(null);
+  const [showBeta, setShowBeta] = useState(false);
 
   useEffect(() => {
     void api.aiGetConfig().then(setConfig);
@@ -210,40 +226,52 @@ function AiTab() {
 
   const stateOf = (id: AiProviderId): AiProviderState =>
     config.providers.find((p) => p.id === id) ?? { id, configured: false, fromEnv: false, hint: null, model: '' };
+  const activate = (id: AiProviderId): void => void api.aiSetActiveProvider(id).then(setConfig);
+
+  const stable = AI_PROVIDERS.filter((m) => m.stability === 'stable');
+  const beta = AI_PROVIDERS.filter((m) => m.stability === 'beta');
+  const activeMeta = providerMeta(config.activeProvider);
+
+  const card = (meta: AiProviderMeta) => (
+    <ProviderCard
+      key={meta.id}
+      meta={meta}
+      state={stateOf(meta.id)}
+      active={config.activeProvider === meta.id}
+      onChange={setConfig}
+      onActivate={activate}
+    />
+  );
 
   return (
     <>
-      <section className="settings-group">
-        <div className="settings-group-name">Active provider</div>
-        <label className="setting-row">
-          <span className="setting-label">Generate with</span>
-          <select
-            className="input setting-select"
-            value={config.activeProvider}
-            onChange={(e) => void api.aiSetActiveProvider(e.target.value as AiProviderId).then(setConfig)}
-          >
-            {AI_PROVIDERS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-                {stateOf(m.id).configured ? '' : m.authKind === 'api-key' ? ' — needs a key' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="setting-note">
-          Choose which backend builds your structures. You can configure several below and switch any time.
-        </p>
+      <section className="settings-group ai-active-banner">
+        <span className="ai-active-label">Generating with</span>
+        <span className="ai-active-name">{activeMeta?.label ?? config.activeProvider}</span>
+        {activeMeta && <StabilityPill stability={activeMeta.stability} />}
+        <span className="ai-active-model">{modelLabel(activeMeta, stateOf(config.activeProvider).model)}</span>
       </section>
 
-      {AI_PROVIDERS.map((meta) => (
-        <ProviderCard
-          key={meta.id}
-          meta={meta}
-          state={stateOf(meta.id)}
-          active={config.activeProvider === meta.id}
-          onChange={setConfig}
-        />
-      ))}
+      {stable.map(card)}
+
+      <section className="settings-group ai-beta-section">
+        <button
+          type="button"
+          className="ai-beta-toggle no-drag"
+          aria-expanded={showBeta}
+          onClick={() => setShowBeta((v) => !v)}
+        >
+          <span className={`ai-beta-chevron${showBeta ? ' open' : ''}`} aria-hidden>›</span>
+          <span className="settings-group-name">Beta providers</span>
+          <span className="ai-pill ai-pill-beta">Beta</span>
+          <span className="ai-beta-sub">{beta.map((b) => b.label).join(' · ')}</span>
+        </button>
+        <p className="setting-note">
+          They work, but are less exercised — the self-review/critic loop is tuned for Claude. Expand to configure or
+          switch to one.
+        </p>
+      </section>
+      {showBeta && beta.map(card)}
     </>
   );
 }
@@ -253,11 +281,13 @@ function ProviderCard({
   state,
   active,
   onChange,
+  onActivate,
 }: {
-  meta: (typeof AI_PROVIDERS)[number];
+  meta: AiProviderMeta;
   state: AiProviderState;
   active: boolean;
   onChange: (c: AiConfig) => void;
+  onActivate: (id: AiProviderId) => void;
 }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -295,8 +325,15 @@ function ProviderCard({
     <section className="settings-group ai-provider">
       <div className="ai-provider-head">
         <span className="settings-group-name">{meta.label}</span>
-        {active && <span className="ai-pill ai-pill-active">Active</span>}
+        <StabilityPill stability={meta.stability} />
         <span className={`ai-pill${state.configured || state.fromEnv ? ' ai-pill-ok' : ''}`}>{status}</span>
+        {active ? (
+          <span className="ai-pill ai-pill-active ai-provider-active">Active</span>
+        ) : (
+          <button className="btn sm no-drag ai-provider-active" onClick={() => onActivate(meta.id)}>
+            Use
+          </button>
+        )}
       </div>
       <p className="setting-note">{meta.blurb}</p>
 

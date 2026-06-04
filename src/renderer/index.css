@@ -1992,6 +1992,78 @@ body {
   background: var(--accent);
   border-color: var(--accent);
 }
+/* Maturity badges: stable reads "supported" (accent tint); beta is quiet/muted. */
+.ai-pill-stable {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.ai-pill-beta {
+  color: var(--text-muted);
+  background: var(--panel);
+  border-style: dashed;
+}
+/* Pushes the Active pill / Use button to the right edge of a provider head. */
+.ai-provider-active {
+  margin-left: auto;
+}
+
+/* Active-provider banner: a compact, accent-led summary of what runs. */
+.ai-active-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid var(--accent);
+}
+.ai-active-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ai-active-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.ai-active-model {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Collapsible "Beta providers" header. */
+.ai-beta-section {
+  padding-bottom: 4px;
+}
+.ai-beta-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+.ai-beta-toggle .settings-group-name {
+  margin-bottom: 0;
+}
+.ai-beta-chevron {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.ai-beta-chevron.open {
+  transform: rotate(90deg);
+}
+.ai-beta-sub {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 
 /* --- Jigsaw content -------------------------------------------------------- */
 

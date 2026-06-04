@@ -258,13 +258,23 @@ export function authEnv(id: AiProviderId): Record<string, string | undefined> {
   return env;
 }
 
-/** Path to the Agent SDK's bundled `claude` binary. In dev the SDK resolves it
- *  from node_modules itself; when packaged it's unpacked from the asar (see
- *  forge.config.ts) so the subprocess is spawnable. */
+/** Path to the Agent SDK's bundled `claude` native binary, or `undefined` to let the
+ *  SDK resolve it itself. In dev the SDK finds it in node_modules; when packaged it's
+ *  the platform package unpacked from the asar (see forge.config.ts). Checks the
+ *  candidate locations and returns the one that exists, warning (with the paths tried)
+ *  if none do — so a packaging regression is diagnosable instead of a cryptic spawn
+ *  failure. Override with `BW_CLAUDE_BIN`. */
 export function claudeExecutablePath(): string | undefined {
   if (process.env.BW_CLAUDE_BIN) return process.env.BW_CLAUDE_BIN;
   if (!app.isPackaged) return undefined;
   const pkg = `@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}`;
   const bin = process.platform === 'win32' ? 'claude.exe' : 'claude';
-  return path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', pkg, bin);
+  const candidates = [
+    path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', pkg, bin),
+    path.join(process.resourcesPath, 'app', 'node_modules', pkg, bin),
+  ];
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (found) return found;
+  console.warn(`[ai] Claude Agent SDK binary not found; tried:\n  ${candidates.join('\n  ')}`);
+  return undefined;
 }

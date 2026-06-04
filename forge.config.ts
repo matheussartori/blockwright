@@ -6,8 +6,66 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// The AI SDKs are externalized from the Vite main bundle (see vite.main.config.ts)
+// and loaded via dynamic import() at runtime, so they must exist in the packaged
+// app's node_modules. But the Vite plugin's prune strips node_modules entirely,
+// dropping them — and the native binaries the Agent/Codex SDKs spawn. This list +
+// the `packageAfterPrune` hook below re-copy just those packages (plus their full
+// runtime dependency closure) back into the package, so the dynamic imports resolve
+// and the `asar.unpack` glob can extract the native binaries.
+const RUNTIME_PACKAGES = [
+  '@anthropic-ai/claude-agent-sdk',
+  '@anthropic-ai/sdk',
+  '@openai/codex-sdk',
+  'openai',
+  '@google/genai',
+  'zod',
+];
+
+/** A package's runtime dependency names (deps + optionalDeps) from its manifest. */
+function dependencyNames(pkgDir: string): string[] {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+    return [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.optionalDependencies ?? {})];
+  } catch {
+    return [];
+  }
+}
+
+/** Copy `packages` and their transitive runtime dependency closure from `fromRoot`'s
+ *  node_modules into `appRoot`'s node_modules, skipping anything already present or
+ *  not installed for this platform (optional native deps). */
+function copyDependencyClosure(packages: string[], fromRoot: string, appRoot: string): void {
+  const queue = [...packages];
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const name = queue.shift();
+    if (name === undefined || seen.has(name)) continue;
+    seen.add(name);
+    const src = path.join(fromRoot, 'node_modules', name);
+    if (!fs.existsSync(src)) continue; // optional/platform dep not installed here
+    const dest = path.join(appRoot, 'node_modules', name);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(src, dest, { recursive: true, dereference: true });
+    queue.push(...dependencyNames(src));
+  }
+}
 
 const config: ForgeConfig = {
+  hooks: {
+    // Re-instate the externalized runtime SDKs that prune removed (see the note above
+    // RUNTIME_PACKAGES). Runs after prune, before the asar is built, so the copied
+    // packages land in the asar and the `asar.unpack` glob extracts their binaries.
+    packageAfterPrune: async (_config, buildPath) => {
+      copyDependencyClosure(RUNTIME_PACKAGES, process.cwd(), buildPath);
+    },
+  },
   packagerConfig: {
     // App icon (logo-dark). Forge/packager appends the platform extension:
     // build/icon.icns on macOS, build/icon.ico on Windows.
