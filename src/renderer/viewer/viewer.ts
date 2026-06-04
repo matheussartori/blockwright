@@ -1,23 +1,22 @@
-// The 3D viewport: scene setup, camera, and framing. Two navigation modes share
-// one camera: OrbitControls (default — drag/pan/zoom around the structure) and a
-// pointer-locked "fly" mode (WASD + mouse look, like Minecraft noclip). Mesh
-// construction and texture loading are delegated to mesh-builder / texture-loader.
+// The 3D viewport: scene setup, camera, navigation, and structure loading/framing.
+// Two navigation modes share one camera: OrbitControls (default — drag/pan/zoom
+// around the structure) and a pointer-locked "fly" mode (WASD + mouse look, like
+// Minecraft noclip). The focused concerns are delegated to siblings: mesh building
+// (mesh-builder) + texture loading (texture-loader), screenshot paths (capture), the
+// floor-plan overlay (floor-regions), and the inspector focus box (highlight).
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import type { StructureData } from '@/shared/types';
+import { type CaptureContext, captureCutaways, captureOrbit, captureSection } from './capture';
+import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
+import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
 import { TextureLoader } from './texture-loader';
 
-export type NavMode = 'orbit' | 'fly';
+export type { FloorRegion } from './floor-regions';
 
-/** A named vertical band highlighted in the viewer (one per floor-plan level),
- *  spanning the inclusive y range `from`..`to`. */
-export interface FloorRegion {
-  name: string;
-  from: number;
-  to: number;
-}
+export type NavMode = 'orbit' | 'fly';
 
 /** One structure placed in the scene: its data plus a rigid transform. Rotation
  *  is quarter-turns about +Y, offset is the position of its local origin — the
@@ -33,9 +32,6 @@ const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight',
 ]);
 
-/** How long the focus-a-block highlight stays on screen (ms). */
-const HIGHLIGHT_MS = 1000;
-
 export class Viewer {
   private scene = new THREE.Scene();
   private camera: THREE.PerspectiveCamera;
@@ -45,13 +41,10 @@ export class Viewer {
   private current: THREE.Group | null = null;
   private grid: THREE.GridHelper | null = null;
   private textures = new TextureLoader();
-  /** Transient box drawn over a block the user clicked in the inspector. */
-  private highlight: THREE.Mesh | null = null;
-  private highlightUntil = 0;
-  /** Floor-plan highlight: one translucent band per named level, persisted across
-   *  builds. `floorRegions` is the desired state; `floorGroup` the live meshes. */
-  private floorRegions: FloorRegion[] = [];
-  private floorGroup: THREE.Group | null = null;
+  /** Transient box over a block the user clicked in the inspector. */
+  private highlight = new FocusHighlight(this.scene);
+  /** Floor-plan bands (one per named level), persisted across builds. */
+  private floors = new FloorRegionsOverlay(this.scene);
 
   private mode: NavMode = 'orbit';
   private keys = new Set<string>();
@@ -137,29 +130,9 @@ export class Viewer {
     const dt = this.timer.getDelta();
     if (this.mode === 'fly') this.updateFly(dt);
     else this.controls.update();
-    this.updateHighlight();
+    this.highlight.update();
     this.renderer.render(this.scene, this.camera);
   };
-
-  /** Fade out and eventually drop the focus highlight. */
-  private updateHighlight() {
-    if (!this.highlight) return;
-    const remaining = this.highlightUntil - performance.now();
-    if (remaining <= 0) {
-      this.removeHighlight();
-      return;
-    }
-    const t = remaining / HIGHLIGHT_MS; // 1 → 0
-    (this.highlight.material as THREE.MeshBasicMaterial).opacity = 0.2 + 0.55 * t;
-  }
-
-  private removeHighlight() {
-    if (!this.highlight) return;
-    this.scene.remove(this.highlight);
-    this.highlight.geometry.dispose();
-    (this.highlight.material as THREE.Material).dispose();
-    this.highlight = null;
-  }
 
   /** Integrate one frame of WASD/Space/Shift movement while flying. */
   private updateFly(dt: number) {
@@ -321,16 +294,16 @@ export class Viewer {
 
     const box = new THREE.Box3().setFromObject(parent);
     this.addGrid(box);
-    // Re-apply the floor-plan bands against the new footprint (clear() dropped
-    // the meshes but kept the desired regions).
-    this.renderFloorRegions();
+    // Re-apply the floor-plan bands against the new footprint (clear() dropped the
+    // meshes but kept the desired regions).
+    this.floors.reapply(this.current);
     if (preserveCamera) this.controls.update();
     else this.frame(box);
   }
 
   /** Center the camera on a single block (local coords of the loaded structure)
    *  and flash a translucent box over it for ~1s so it's easy to spot among
-   *  neighbours. Drawn without depth-testing so it shows through other blocks. */
+   *  neighbours. */
   focusBlock(pos: [number, number, number]) {
     if (this.mode === 'fly') this.setMode('orbit');
     const center = new THREE.Vector3(pos[0] + 0.5, pos[1] + 0.5, pos[2] + 0.5);
@@ -346,151 +319,22 @@ export class Viewer {
     this.camera.position.copy(center).addScaledVector(dir, dist);
     this.controls.update();
 
-    this.removeHighlight();
-    const geo = new THREE.BoxGeometry(1.06, 1.06, 1.06);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffd54a,
-      transparent: true,
-      opacity: 0.75,
-      depthTest: false,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.copy(center);
-    mesh.renderOrder = 999;
-    this.scene.add(mesh);
-    this.highlight = mesh;
-    this.highlightUntil = performance.now() + HIGHLIGHT_MS;
+    this.highlight.flash(center);
   }
 
-  /** Set (or clear) the floor-plan highlight: one translucent band per named
-   *  level, spanning the build's footprint over the level's inclusive y range.
-   *  The bands persist across orbit and re-render with each build (the App drives
-   *  this from the active doc's floor plan + the user's settings). */
+  /** Set (or clear) the floor-plan highlight: one translucent band per named level,
+   *  spanning the build's footprint over the level's inclusive y range. */
   setFloorRegions(regions: FloorRegion[]) {
-    this.floorRegions = regions;
-    this.renderFloorRegions();
-  }
-
-  /** (Re)build the floor-band meshes from `this.floorRegions` against the current
-   *  footprint. Called by setFloorRegions and after each structure load (which
-   *  clears the scene). */
-  private renderFloorRegions() {
-    this.removeFloorRegions();
-    if (this.floorRegions.length === 0) return;
-
-    // Footprint from the current build, padded out a little; fall back to a
-    // comfortable pad centred on the origin for a fresh (empty) tab.
-    let minX = -1;
-    let maxX = 15;
-    let minZ = -1;
-    let maxZ = 15;
-    if (this.current) {
-      const box = new THREE.Box3().setFromObject(this.current);
-      minX = box.min.x - 1;
-      maxX = box.max.x + 1;
-      minZ = box.min.z - 1;
-      maxZ = box.max.z + 1;
-    }
-    const w = Math.max(maxX - minX, 2);
-    const d = Math.max(maxZ - minZ, 2);
-    const cx = (minX + maxX) / 2;
-    const cz = (minZ + maxZ) / 2;
-
-    const group = new THREE.Group();
-    this.floorRegions.forEach((r, i) => {
-      const from = Math.min(r.from, r.to);
-      const to = Math.max(r.from, r.to);
-      // Layer `to` occupies y=to..to+1, so the band's top is at to+1.
-      const h = to + 1 - from;
-      const cy = from + h / 2;
-      // A distinct hue per level so stacked bands read apart.
-      const color = new THREE.Color().setHSL((i * 0.13 + 0.58) % 1, 0.6, 0.6);
-
-      const box = new THREE.Mesh(
-        new THREE.BoxGeometry(w, h, d),
-        new THREE.MeshBasicMaterial({
-          color,
-          transparent: true,
-          opacity: 0.1,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      box.position.set(cx, cy, cz);
-      group.add(box);
-
-      const edges = new THREE.LineSegments(
-        new THREE.EdgesGeometry(box.geometry),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }),
-      );
-      edges.position.copy(box.position);
-      group.add(edges);
-
-      const text = r.name.trim()
-        ? `${r.name.trim()} · y ${from}${to > from ? `–${to}` : ''}`
-        : `y ${from}${to > from ? `–${to}` : ''}`;
-      const sprite = this.makeLabel(text);
-      sprite.position.set(cx, to + 1 + 0.6, cz);
-      group.add(sprite);
-    });
-
-    group.renderOrder = 998;
-    this.scene.add(group);
-    this.floorGroup = group;
-  }
-
-  private removeFloorRegions() {
-    if (!this.floorGroup) return;
-    this.scene.remove(this.floorGroup);
-    this.floorGroup.traverse((o) => {
-      const obj = o as Partial<THREE.Mesh> & { material?: THREE.Material | THREE.Material[] };
-      obj.geometry?.dispose();
-      const mat = obj.material as (THREE.Material & { map?: THREE.Texture }) | undefined;
-      if (mat) {
-        mat.map?.dispose();
-        mat.dispose();
-      }
-    });
-    this.floorGroup = null;
-  }
-
-  /** A small canvas-textured sprite used to caption the level plane. */
-  private makeLabel(text: string): THREE.Sprite {
-    const canvas = document.createElement('canvas');
-    const pad = 12;
-    const font = 'bold 40px -apple-system, sans-serif';
-    const ctx = canvas.getContext('2d')!;
-    ctx.font = font;
-    const w = Math.ceil(ctx.measureText(text).width) + pad * 2;
-    const h = 56 + pad;
-    canvas.width = w;
-    canvas.height = h;
-    ctx.font = font;
-    ctx.fillStyle = 'rgba(20,24,32,0.78)';
-    ctx.beginPath();
-    ctx.roundRect(0, 0, w, h, 12);
-    ctx.fill();
-    ctx.fillStyle = '#dce6ff';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, pad, h / 2);
-
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }),
-    );
-    // Scale to world units (~1 unit tall), preserving the canvas aspect.
-    sprite.scale.set((w / h) * 1.1, 1.1, 1);
-    return sprite;
+    this.floors.setRegions(regions, this.current);
   }
 
   /** Remove the current structure and grid from the scene (back to empty). */
   clear() {
     this.lastPieces = null;
-    this.removeHighlight();
-    // Drop the live band meshes but keep `floorRegions` so the next build
+    this.highlight.clear();
+    // Drop the live band meshes but keep the desired regions so the next build
     // re-renders the same plan (re-applied at the end of showAssembly).
-    this.removeFloorRegions();
+    this.floors.clearMeshes();
     this.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);
@@ -548,170 +392,38 @@ export class Viewer {
     this.controls.update();
   }
 
-  /** Screenshot the current build from `angles` viewpoints orbited evenly around
-   *  the framed target (angle 0 = the current camera), returning PNG data URLs.
-   *  Used by the AI generator's self-review loop so the model can see its own
-   *  output. Each render→read happens synchronously (no rAF interleaves), so the
-   *  WebGL buffer is valid even without `preserveDrawingBuffer`; we copy it into a
-   *  downscaled 2D canvas (capped at `maxSize`) to keep the payload reasonable. */
-  /** Downscale the current framebuffer to a PNG data URL (max edge `maxSize`).
-   *  Assumes the caller already rendered the frame; shared by the capture paths. */
-  private snapshot(maxSize: number): string {
-    const src = this.renderer.domElement;
-    const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
-    const w = Math.max(1, Math.round(src.width * scale));
-    const h = Math.max(1, Math.round(src.height * scale));
-    const off = document.createElement('canvas');
-    off.width = w;
-    off.height = h;
-    const ctx = off.getContext('2d');
-    if (!ctx) return src.toDataURL('image/png');
-    ctx.drawImage(src, 0, 0, w, h);
-    return off.toDataURL('image/png');
+  /** The live bits the capture paths read/mutate. Callers guard `current` first. */
+  private captureContext(): CaptureContext {
+    return {
+      renderer: this.renderer,
+      camera: this.camera,
+      controls: this.controls,
+      scene: this.scene,
+      current: this.current!,
+    };
   }
 
+  /** Orbited exterior screenshots (angle 0 = the current camera) for the AI review. */
   capture(angles = 2, maxSize = 720): string[] {
     if (!this.current) return [];
-    const wasFly = this.mode === 'fly';
-    if (wasFly) this.setMode('orbit');
-    this.removeHighlight();
-
-    const target = this.controls.target.clone();
-    const saved = this.camera.position.clone();
-    const offset = saved.clone().sub(target);
-    const radius = Math.hypot(offset.x, offset.z) || 1;
-    const elevation = offset.y;
-    const baseAngle = Math.atan2(offset.z, offset.x);
-
-    const shots: string[] = [];
-    for (let i = 0; i < angles; i++) {
-      const a = baseAngle + (i * 2 * Math.PI) / angles;
-      this.camera.position.set(
-        target.x + radius * Math.cos(a),
-        target.y + elevation,
-        target.z + radius * Math.sin(a),
-      );
-      this.camera.lookAt(target);
-      this.renderer.render(this.scene, this.camera);
-      shots.push(this.snapshot(maxSize));
-    }
-
-    // Restore the user's viewpoint.
-    this.camera.position.copy(saved);
-    this.camera.lookAt(target);
-    this.controls.update();
-    return shots;
+    if (this.mode === 'fly') this.setMode('orbit');
+    this.highlight.clear();
+    return captureOrbit(this.captureContext(), angles, maxSize);
   }
 
-  /** Top-down "floor plan" screenshots: slice the build into a few horizontal
-   *  bands, clip away everything above each cut, and shoot straight down. This
-   *  gives the AI self-review loop a view of the INTERIOR (room layout, faux
-   *  furniture, circulation) — which the exterior orbits in capture() never
-   *  reveal, leaving the model building interiors blind. One cut per ~storey,
-   *  capped so capture time and token cost stay bounded. */
+  /** Top-down floor-plan cutaways (interior layout) for the AI review. */
   captureCutaways(maxSize = 720): string[] {
     if (!this.current) return [];
     if (this.mode === 'fly') this.setMode('orbit');
-    this.removeHighlight();
-
-    const box = new THREE.Box3().setFromObject(this.current);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const height = Math.max(size.y, 1);
-    // ~5 blocks ≈ one storey; cap at 3 so the cutaways cover a deep build (cellar +
-    // storeys + attic) — the critic/review can't judge a level it never sees — without
-    // flooding the result on a very tall build.
-    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 3);
-
-    // Save everything we mutate so the user's live view is untouched afterward.
-    const savedPos = this.camera.position.clone();
-    const savedUp = this.camera.up.clone();
-    const savedNear = this.camera.near;
-    const savedFar = this.camera.far;
-    const savedTarget = this.controls.target.clone();
-    const savedClip = this.renderer.clippingPlanes;
-
-    // Fit the footprint from straight above; +Z points "down" in the image so
-    // every floor plan shares one orientation.
-    const footprint = Math.max(size.x, size.z, 1);
-    const dist = footprint * 1.15 + 2;
-    this.camera.up.set(0, 0, -1);
-    this.camera.near = 0.05;
-    this.camera.far = (height + dist) * 4;
-    this.camera.updateProjectionMatrix();
-
-    const shots: string[] = [];
-    for (let i = 0; i < floors; i++) {
-      // Cut near the top of each band (above that floor's furniture, below its
-      // ceiling) so looking down reveals the floor's interior. Plane normal
-      // (0,-1,0) keeps everything with y ≤ cutY.
-      const cutY = box.min.y + ((i + 0.85) * height) / floors;
-      this.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), cutY)];
-      this.camera.position.set(center.x, cutY + dist, center.z);
-      this.camera.lookAt(center.x, box.min.y, center.z);
-      this.renderer.render(this.scene, this.camera);
-      shots.push(this.snapshot(maxSize));
-    }
-
-    // Restore the user's viewpoint and clear the clip.
-    this.renderer.clippingPlanes = savedClip;
-    this.camera.up.copy(savedUp);
-    this.camera.position.copy(savedPos);
-    this.camera.near = savedNear;
-    this.camera.far = savedFar;
-    this.camera.updateProjectionMatrix();
-    this.camera.lookAt(savedTarget);
-    this.controls.update();
-    return shots;
+    this.highlight.clear();
+    return captureCutaways(this.captureContext(), maxSize);
   }
 
-  /** Vertical "cross-section" screenshot: clip the front half away and look at the
-   *  exposed interior straight on from the front. Mirrors a reference's vertical-
-   *  section panel — lets the AI self-review loop verify storey heights, vertical
-   *  alignment between floors, and hanging detail (chains/lanterns/basement), which
-   *  the top-down cutaways flatten away. One cut through the middle along z. */
+  /** A vertical cross-section screenshot (storey heights / hanging detail) for review. */
   captureSection(maxSize = 720): string[] {
     if (!this.current) return [];
     if (this.mode === 'fly') this.setMode('orbit');
-    this.removeHighlight();
-
-    const box = new THREE.Box3().setFromObject(this.current);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    const savedPos = this.camera.position.clone();
-    const savedUp = this.camera.up.clone();
-    const savedTarget = this.controls.target.clone();
-    const savedNear = this.camera.near;
-    const savedFar = this.camera.far;
-    const savedClip = this.renderer.clippingPlanes;
-
-    // Keep the back half (z ≤ midZ): plane normal (0,0,1), constant -midZ clips
-    // everything in front of the cut so the camera sees the exposed interior.
-    const midZ = center.z;
-    this.renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 0, 1), -midZ)];
-
-    // Look straight on from in front of the build (-Z), framing its width × height.
-    const span = Math.max(size.x, size.y, 1);
-    const dist = span * 1.4 + 4;
-    this.camera.up.set(0, 1, 0);
-    this.camera.near = 0.05;
-    this.camera.far = (dist + size.z) * 4;
-    this.camera.updateProjectionMatrix();
-    this.camera.position.set(center.x, center.y, box.min.z - dist);
-    this.camera.lookAt(center.x, center.y, center.z);
-    this.renderer.render(this.scene, this.camera);
-    const shot = this.snapshot(maxSize);
-
-    // Restore the user's viewpoint and clear the clip.
-    this.renderer.clippingPlanes = savedClip;
-    this.camera.up.copy(savedUp);
-    this.camera.position.copy(savedPos);
-    this.camera.near = savedNear;
-    this.camera.far = savedFar;
-    this.camera.updateProjectionMatrix();
-    this.camera.lookAt(savedTarget);
-    this.controls.update();
-    return [shot];
+    this.highlight.clear();
+    return captureSection(this.captureContext(), maxSize);
   }
 }

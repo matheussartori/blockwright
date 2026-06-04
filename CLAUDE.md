@@ -116,7 +116,11 @@ src/
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
                           windows.ts (floating-window layout, persisted), theme.ts (apply light/dark)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
-    viewer/               Three.js Viewer + ViewerProvider (React bridge) + mesh/geometry/texture building
+    viewer/               Three.js Viewer (scene/camera/navigation/loading) + ViewerProvider (React
+                          bridge) + mesh/geometry/texture building. Focused concerns split out of the
+                          Viewer class: capture.ts (the AI-review screenshot paths: orbit/cutaway/
+                          section), floor-regions.ts (FloorRegionsOverlay — the floor-plan bands),
+                          highlight.ts (FocusHighlight — the inspector focus box).
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types.ts              Type-only contracts shared by both bundles (incl. BlockwrightApi)
