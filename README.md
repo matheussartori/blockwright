@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/assets/logo.png" alt="Blockwright" width="600" />
+</p>
+
 <h1 align="center">Blockwright</h1>
 
 <p align="center">
