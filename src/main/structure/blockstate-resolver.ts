@@ -6,6 +6,7 @@ import { assetsDir, loadJson } from './content-pack';
 import { buildResolvedModel, parseRef } from './model-loader';
 import { resolveBlockEntity } from './block-entity';
 import { resolveFluid } from './fluid';
+import { bestVariant } from './variant-match';
 
 const AIR = new Set([
   'minecraft:air',
@@ -27,15 +28,6 @@ interface VariantModel {
 
 function pickVariant(value: VariantModel | VariantModel[]): VariantModel {
   return Array.isArray(value) ? value[0] : value;
-}
-
-/** Does a variant key like "facing=east,half=bottom" match the block properties? */
-function variantMatches(key: string, props: Record<string, string>): boolean {
-  if (key === '') return true;
-  return key.split(',').every((pair) => {
-    const [k, v] = pair.split('=');
-    return props[k] === v;
-  });
 }
 
 type MultipartWhen = Record<string, string> & {
@@ -75,9 +67,9 @@ export function resolveBlock(
   const out: ResolvedModel[] = [];
 
   if (state.variants) {
-    const entry = Object.entries(state.variants).find(([k]) => variantMatches(k, properties));
+    const entry = bestVariant(state.variants, properties);
     if (entry) {
-      const v = pickVariant(entry[1]);
+      const v = pickVariant(entry);
       const m = buildResolvedModel(v.model, v);
       if (m) out.push(m);
     }

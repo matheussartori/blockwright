@@ -57,8 +57,10 @@ and `5` tall (so the roof fits); taller/wider reads better.
 ### `large_basement`
 A sunken cellar: a stone shell with a distinct floor and ceiling, a grid of
 support pillars (each lit on top), and a ladder up through a hole in the ceiling.
-Place the box **low** (small/zero `y`) and put the above-ground build on top of
-it within the same `size`.
+Its **footprint is carved to a varied shape** (L / T / U / plus / rect) so cellars
+aren't always a plain square box — leave `shape` as the default `auto` to get a
+seeded plan, or pin one. Place the box **low** (small/zero `y`) and put the
+above-ground build on top of it within the same `size`.
 
 | param | default | meaning |
 |-------|---------|---------|
@@ -68,6 +70,11 @@ it within the same `size`.
 | `pillar` | `minecraft:stone_bricks` | support pillars |
 | `light` | `minecraft:lantern` | pillar-top light fixture |
 | `decay` | `0.25` | moss weathering, 0–1 |
+| `shape` | `auto` | footprint: `auto` (seeded pick of `rect`/`l`/`t`/`u`) · or pin `rect`/`l`/`t`/`u`/`plus` (`plus` only when explicit) |
+| `seed` | from position | integer; change it to get a different `auto`/carved layout |
+
+> The footprint only varies when the box is at least `5×5`; smaller boxes stay
+> rectangular. Pillars, the ladder and decay all follow the carved shape.
 
 ## Worked example — house over a cellar
 

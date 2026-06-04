@@ -37,9 +37,12 @@ src/
       fluid.ts             Water/lava: full-cube from the animated "still" strip (water blue-tinted)
       fallback-color.ts    Deterministic per-block color when textures are missing
       templates/           Parameterized building presets (abandoned_house, large_basement),
-                           expanded by the `template` op in compile-structure: the model emits one
+                           expanded by the `template` op in the authoring compiler: the model emits one
                            op, the code produces the geometry. Pure (box+params)→ops; interns its
                            own palette by block name. Register a new one in templates/index.ts.
+                           rng.ts = shared seeded PRNG (mulberry32/seed3); footprint.ts = seeded
+                           non-rectangular footprints (rect/L/T/U/plus) so large_basement isn't always
+                           a square box (param `shape`, default `auto`). Tests in templates/__tests__/.
       block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
                            namespace-aware) + a representative texture per block → the Block Catalog.
                            `previewBlock(id)` resolves one block into a 1×1×1 StructureData for the
@@ -58,13 +61,29 @@ src/
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
-    structure/compile-structure.ts  Validate + compile authoring JSON → gzipped .nbt.
+    structure/authoring/    Validate + compile authoring JSON → gzipped .nbt (the JSON↔NBT
+                          pipeline). Decomposed by responsibility, with a unit-test suite in
+                          __tests__/ (run `npm run test`). Public API via the barrel `index.ts`.
+      types.ts            AuthoringStructure/Op/PaletteEntry/Block/Entity (shared contracts)
+      geometry.ts         pure integer geometry (posKey, inBounds, lineCells, cellsInBox, rotXZ)
+      orientation.ts      directional-blockstate transforms for mirror/rotate (facing/axis/…)
+      palette.ts          paletteKey, makeIntern (get-or-create dedup), isAir, bareId
+      nbt-encode.ts/-decode.ts  tag-typed encode → gzipped .nbt; readAuthoring (.nbt → JSON)
+      ops/                applyOp dispatcher + resolveBlocks; roof.ts/stairs.ts builders.
                           Expands volumetric `ops` (fill/hollow/walls/line/block) → block list
-                          before NBT (resolveBlocks), so the model emits ~ops not ~1000s of blocks.
-                          Then connectBlocks derives connecting-block sides (panes/iron
-                          bars/fences/walls) from neighbours — the AI omits north/south/
-                          east/west, so without this an isolated pane renders as the bare
-                          `_post` column; it splits palette entries per side combination.
+                          before NBT, so the model emits ~ops not ~1000s of blocks.
+      passes/             Post-processing pipeline: each Pass is (blocks,palette,ctx)→
+                          {blocks,palette,fixes?,warnings?}; runPasses chains them, accumulating
+                          fixes/warnings. carveStairwells (open the shaft over a flight +
+                          clear a standing landing in front of the bottom step),
+                          connectBlocks (derive pane/bar/fence/wall sides from neighbours — the AI
+                          omits north/south/east/west, so an isolated pane would render as the bare
+                          `_post` column; splits palette per side combo), fillInteriorAir (clear
+                          each column's interior without gouging terrain). NEW quality checks plug
+                          in as a Pass here (e.g. the placement validator).
+      compile.ts          compileStructure / compileStructureReport / writeStructureFile
+                          (validate → resolveBlocks → runPasses → encode). writeStructureFile
+                          returns a CompileReport ({fixes,warnings}) for the generator to surface.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: initTheme() then createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
     App.tsx               Orchestration: layout, open/load/close flow, IPC wiring, window→menu reporting
@@ -151,7 +170,7 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 
 File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation is
 **provider-agnostic** (`src/main/ai/`): `generate.ts` owns everything backend-neutral — sessions, the
-`emit_structure` handler that validates + compiles the authoring JSON (`compile-structure.ts`) to a
+`emit_structure` handler that validates + compiles the authoring JSON (`structure/authoring/`) to a
 versioned temp `.nbt`, the emit→render→**review** loop (screenshots fed back so the model refines
 against the prompt/reference, not blind), the round budget, and the live token/phase progress — then
 dispatches the LLM transport to a **provider driver** (`providers/`). The shared contract lives in
@@ -216,7 +235,7 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
 - **Output-token cost / volumetric `ops`:** the dominant cost for any non-trivial build is **output
   tokens** — the model must serialize every block, so a flat per-block list is `O(blocks)` to emit
   and a big build can blow past the single-response output cap. The fix is the **volumetric `ops`**
-  authoring primitive (fill/hollow/walls/line/block, expanded in `compile-structure.ts`); the prompt
+  authoring primitive (fill/hollow/walls/line/block, expanded in `structure/authoring/ops/`); the prompt
   + knowledge (`knowledge/nbt/00-volumetric-ops.md`) steer the model to describe geometry as ops
   (one `fill` = a whole wall) instead of thousands of blocks. (There is no time cap — generation runs
   until the model is satisfied, hits `BW_AI_MAX_ROUNDS`, errors, or the user cancels.)

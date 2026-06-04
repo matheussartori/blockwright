@@ -12,7 +12,9 @@
 //
 // Add a new template: write its builder, register it in TEMPLATES, and list its
 // block-name params in BLOCK_PARAM_KEYS so unknown-block validation can see them.
-import type { AuthoringOp } from '../compile-structure';
+import type { AuthoringOp } from '../authoring/types';
+import { isFootprintShape, makeFootprint } from './footprint';
+import { mulberry32, seed3 } from './rng';
 
 type Vec3 = [number, number, number];
 type Props = Record<string, string>;
@@ -76,19 +78,6 @@ function mossyVariant(name: string): string {
   if (id === 'cobblestone_wall') return 'minecraft:mossy_cobblestone_wall';
   return name;
 }
-
-/** Deterministic RNG so decay (and any randomness) is stable across re-renders. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const seed3 = (x: number, y: number, z: number): number =>
-  ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0;
 
 interface Box {
   x0: number; y0: number; z0: number;
@@ -189,10 +178,11 @@ function abandonedHouse(from: Vec3, to: Vec3, params: Record<string, unknown>): 
   };
 }
 
-/** A sunken cellar: a stone shell with a distinct floor/ceiling, a grid of
- *  support pillars (lit on top), and a ladder up through a hole in the ceiling.
- *  Params (all optional): wall, floor, ceiling, pillar, light, decay. The box
- *  should already sit at the depth you want (y grows up, so place it low). */
+/** A sunken cellar carved to a varied footprint (rect/L/T/U/plus, seeded — so it
+ *  isn't always a square box): a stone shell with a distinct floor/ceiling, a grid
+ *  of support pillars (lit on top), and a ladder up through a hole in the ceiling.
+ *  Params (all optional): wall, floor, ceiling, pillar, light, decay, shape, seed.
+ *  The box should already sit at the depth you want (y grows up, so place it low). */
 function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (intern: Intern) => AuthoringOp[] {
   return (intern) => {
     const { x0, y0, z0, x1, y1, z1 } = box(from, to);
@@ -204,6 +194,9 @@ function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (
     const pillarName = asStr(params.pillar, 'minecraft:stone_bricks');
     const lightName = asStr(params.light, 'minecraft:lantern');
     const decay = as01(params.decay, 0.25);
+    const shapeParam = asStr(params.shape, 'auto');
+    const shape = isFootprintShape(shapeParam) ? shapeParam : 'auto';
+    const seed = asInt(params.seed, seed3(x0, y0, z0), 0, 0x7fffffff);
 
     const air = intern('minecraft:air');
     const wall = intern(wallName);
@@ -213,38 +206,48 @@ function largeBasement(from: Vec3, to: Vec3, params: Record<string, unknown>): (
     const light = intern(lightName);
     const mossy = intern(mossyVariant(wallName));
 
-    ops.push({ op: 'hollow', from: [x0, y0, z0], to: [x1, y1, z1], state: wall }); // 6-face shell, interior empty
-    ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, z1], state: floorIdx });
-    ops.push({ op: 'fill', from: [x0, y1, z0], to: [x1, y1, z1], state: ceil });
+    const fp = makeFootprint({ x0, z0, x1, z1 }, shape, seed);
 
-    // Support pillars on a 4-block grid, each capped with a light just under the
-    // ceiling so the cellar reads as lit.
+    // Floor + ceiling on every footprint column; perimeter columns also get a
+    // full-height wall (interior columns stay hollow → cleared to air on compile).
+    for (const [x, z] of fp.columns()) {
+      ops.push({ op: 'block', pos: [x, y0, z], state: floorIdx });
+      ops.push({ op: 'block', pos: [x, y1, z], state: ceil });
+      if (fp.isEdge(x, z)) ops.push({ op: 'fill', from: [x, y0 + 1, z], to: [x, y1 - 1, z], state: wall });
+    }
+
+    // Support pillars on a 4-block grid, but only on interior footprint cells; each
+    // capped with a light just under the ceiling so the cellar reads as lit.
     for (let x = x0 + 3; x <= x1 - 3; x += 4) {
       for (let z = z0 + 3; z <= z1 - 3; z += 4) {
+        if (!fp.has(x, z) || fp.isEdge(x, z)) continue;
         ops.push({ op: 'fill', from: [x, y0 + 1, z], to: [x, y1 - 1, z], state: pillar });
         ops.push({ op: 'block', pos: [x, y1 - 1, z], state: light });
       }
     }
 
-    // Vertical access: a ladder in a corner against the north wall, climbing to a
-    // carved hole in the ceiling (ladder faces away from the wall it hangs on).
-    if (y1 - y0 >= 2 && x1 - x0 >= 2 && z1 - z0 >= 2) {
-      const lx = x0 + 1, lz = z0 + 1;
-      ops.push({ op: 'block', pos: [lx, y1, lz], state: air }); // ceiling hole
-      for (let y = y0 + 1; y <= y1; y++) {
-        ops.push({ op: 'block', pos: [lx, y, lz], state: intern('minecraft:ladder', { facing: 'south' }) });
+    // Vertical access: a ladder on an interior cell backed by a (solid) north wall
+    // column, climbing to a carved ceiling hole (ladder faces away from its wall).
+    if (y1 - y0 >= 2) {
+      let spot: [number, number] | undefined;
+      for (const [x, z] of fp.columns()) {
+        if (!fp.isEdge(x, z) && fp.has(x, z - 1) && fp.isEdge(x, z - 1)) { spot = [x, z]; break; }
+      }
+      if (spot) {
+        const [lx, lz] = spot;
+        ops.push({ op: 'block', pos: [lx, y1, lz], state: air }); // ceiling hole
+        const rung = intern('minecraft:ladder', { facing: 'south' });
+        for (let y = y0 + 1; y <= y1; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: rung });
       }
     }
 
-    // Light decay: weather some wall cells with moss.
+    // Decay: weather some perimeter wall cells with moss.
     if (decay > 0) {
-      const rnd = mulberry32(seed3(x0, y0, z0));
-      for (let y = y0 + 1; y < y1; y++) {
-        for (let x = x0; x <= x1; x++) {
-          for (let z = z0; z <= z1; z++) {
-            if (x !== x0 && x !== x1 && z !== z0 && z !== z1) continue;
-            if (rnd() < decay * 0.3) ops.push({ op: 'block', pos: [x, y, z], state: mossy });
-          }
+      const rnd = mulberry32(seed ^ 0x9e3779b9);
+      for (const [x, z] of fp.columns()) {
+        if (!fp.isEdge(x, z)) continue;
+        for (let y = y0 + 1; y < y1; y++) {
+          if (rnd() < decay * 0.3) ops.push({ op: 'block', pos: [x, y, z], state: mossy });
         }
       }
     }

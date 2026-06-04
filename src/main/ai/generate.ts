@@ -17,7 +17,7 @@ import type { EmitArgs } from './schema';
 import { activeCredential, aiAvailable } from './credentials';
 import { getDriver, RESUMABLE_PROVIDERS } from './providers';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
-import { writeStructureFile, validateAuthoring, resolveBlocks, readAuthoring, type AuthoringStructure } from '../structure/compile-structure';
+import { writeStructureFile, validateAuthoring, resolveBlocks, readAuthoring, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 import { unknownBlockIds } from '../structure/content-pack';
 import { templateBlockNames } from '../structure/templates';
 
@@ -350,8 +350,9 @@ export async function generateStructure(
 
     const version = session.version + 1;
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
+    let report: CompileReport;
     try {
-      await writeStructureFile(authoring, nbtPath);
+      report = await writeStructureFile(authoring, nbtPath);
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     } catch (err) {
       captureError = `Failed to compile the structure: ${errMessage(err)}`;
@@ -365,7 +366,9 @@ export async function generateStructure(
       ok: true,
       path: nbtPath,
       version,
-      summary: (args.summary ?? '').trim(),
+      summary: [(args.summary ?? '').trim(), report.fixes.length ? `(auto-fixed placement: ${report.fixes.join('; ')})` : '']
+        .filter(Boolean)
+        .join(' '),
       size,
       blockCount,
       sdkSessionId: session.sdkSessionId,
@@ -407,6 +410,21 @@ export async function generateStructure(
           `in a patch, new palette entries you add start at index ${paletteLen}.`,
       },
     ];
+
+    if (report.fixes.length) {
+      content.push({
+        type: 'text',
+        text:
+          `The compiler auto-corrected unsupported block placements: ${report.fixes.join('; ')}. ` +
+          'Place these blocks on a valid support in future emits so they no longer need fixing.',
+      });
+    }
+    if (report.warnings.length) {
+      content.push({
+        type: 'text',
+        text: `PLACEMENT WARNINGS (not auto-fixed — you must correct these): ${report.warnings.join(' ')}`,
+      });
+    }
 
     if (haveRef && haveShots) {
       content.push({

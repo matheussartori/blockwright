@@ -29,10 +29,11 @@ function headMattress(texture: string): Partial<Record<FaceDir, ModelFace>> {
     // Top: flip V so the pillow (atlas rows 6-13) lands on the +z outer end.
     up: face(texture, rect(6, 22, 22, 6)),
     down: face(texture, rect(28, 6, 44, 22)),
-    south: face(texture, rect(6, 0, 22, 6)), // outer headboard cap (pillow end + frame)
-    north: face(texture, rect(22, 0, 38, 6)), // inner end (hidden against the foot)
-    west: face(texture, rect(0, 6, 6, 22), 90),
-    east: face(texture, rect(28, 6, 22, 22), 90),
+    south: face(texture, rect(6, 6, 22, 0)), // outer headboard cap (frame strip at the bottom)
+    north: face(texture, rect(22, 6, 38, 0)), // inner end (hidden against the foot)
+    // Long sides: frame strip along the bottom edge, pillow-white at the +z (head) end.
+    west: face(texture, rect(6, 6, 0, 22), 90),
+    east: face(texture, rect(22, 22, 28, 6), 90),
   };
 }
 
@@ -41,10 +42,11 @@ function footMattress(texture: string): Partial<Record<FaceDir, ModelFace>> {
   return {
     up: face(texture, rect(6, 28, 22, 44)),
     down: face(texture, rect(28, 28, 44, 44)),
-    north: face(texture, rect(6, 22, 22, 28)), // outer footboard cap
-    south: face(texture, rect(22, 22, 38, 28)), // inner end (hidden against the head)
-    west: face(texture, rect(0, 28, 6, 44), 90),
-    east: face(texture, rect(28, 28, 22, 44), 90),
+    north: face(texture, rect(22, 28, 38, 22)), // outer footboard cap (frame strip at the bottom)
+    south: face(texture, rect(6, 28, 22, 22)), // inner end (hidden against the head)
+    // Long sides: frame strip along the bottom edge (foot half is uniform red).
+    west: face(texture, rect(6, 28, 0, 44), 90),
+    east: face(texture, rect(22, 28, 28, 44), 90),
   };
 }
 

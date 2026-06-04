@@ -9,7 +9,7 @@
 //    maps, so those drivers take the authoring JSON as a string and we parse it.
 //
 // Both resolve to the same EmitArgs the orchestrator's handler consumes.
-import type { AuthoringStructure } from '../structure/compile-structure';
+import type { AuthoringStructure } from '../structure/authoring';
 import { loadKnowledge } from './knowledge';
 
 export const EMIT_TOOL_NAME = 'emit_structure';
