@@ -74,10 +74,12 @@ export const PHASES: Phase[] = [
     label: 'Circulation',
     mode: 'patch',
     rubric:
-      'Make the build WALKABLE. Every staircase needs a clear LANDING at its bottom, 2 blocks of headroom, ' +
-      'and a stairwell hole through the floor above — and must NOT block a doorway or a container\'s front. ' +
-      'Every flight must REACH the floor it serves: its top tread level with that floor so you walk straight ' +
-      'off it, never one step short (which forces a jump). ' +
+      'Make the build WALKABLE. Build every floor-to-floor staircase with the "stairs" OP (from = bottom ' +
+      'step, to = top step), NEVER hand-placed individual steps — the op guarantees a full, same-direction ' +
+      'flight that REACHES the upper floor with headroom and a stairwell hole, instead of a couple of stray ' +
+      'steps that dead-end half a level short. Every staircase needs a clear LANDING at its bottom, 2 blocks ' +
+      'of headroom, and a stairwell hole through the floor above — and must NOT block a doorway or a ' +
+      "container's front. Its top tread must be level with the floor it serves so you walk straight off it. " +
       'Put basement/upper access in a BACK CORNER or side room — NEVER in the entrance bay or the high-traffic ' +
       'path right inside the front door (a stair descending in front of the door is a bad layout). The stair ' +
       'DOWN to the cellar must LAND in open cellar floor (a usable area) — it must not pierce the cellar shell ' +

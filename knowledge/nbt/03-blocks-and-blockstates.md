@@ -41,7 +41,9 @@ All `*_slab`.
 ```jsonc
 { "Name": "minecraft:oak_slab", "Properties": { "type": "bottom" } }   // bottom | top | double
 ```
-`double` = a full block (visually two slabs).
+`double` = a full block (visually two slabs). A `top` slab sits in the UPPER half of its cell, so a
+top slab resting on a block floats a half-block above it — use `bottom` to seat a slab on what's below
+it. *(Backstop: the compiler seats a floating `top` slab — block below, air above — down to `bottom`.)*
 
 ### Doors — `facing`, `half`, `hinge`, `open`, `powered`
 A door is **two blocks** stacked: the `lower` half at `y` and `upper` at `y+1`. Both palette
@@ -69,8 +71,9 @@ Great for shutters, shelves, table-edge details.
 
 ### Fences, fence gates, walls — connection auto-resolves visually
 `oak_fence`, `*_wall`: have `north/south/east/west` (+`up` for walls) connection booleans and
-`waterlogged`. **You usually don't need to set the connection props** — the renderer/game
-connects to neighbors. Fence gates: `oak_fence_gate` has `facing`, `open`, `in_wall`.
+`waterlogged`. **OMIT the connection props** — the compiler derives them from neighbours at compile
+time *(backstop: `connectBlocks`)*, so you don't set north/south/east/west yourself. Fence gates:
+`oak_fence_gate` has `facing`, `open`, `in_wall`.
 
 ### Stairs/slabs/walls "material" list (1.21.1, common)
 Wood: `oak spruce birch jungle acacia dark_oak mangrove cherry bamboo crimson warped`.
@@ -88,6 +91,10 @@ A bed is **two blocks**: `foot` then `head` in the `facing` direction.
 The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 
 ### Torches & lights
+*(Backstop: the compiler `fixPlacement` auto-corrects the support cases below — it removes a floor
+torch/candle with nothing solid under it, re-seats or removes a floating lantern, and re-anchors or
+removes a wall torch with no solid backing or one facing into a wall. Still place them right: a build
+that needs no fixes renders correctly the first time and costs fewer revision rounds.)*
 - `torch` (on floor) vs `wall_torch` (`facing`). Same for `soul_torch`/`soul_wall_torch`,
   `redstone_torch`/`redstone_wall_torch`. **To mount a torch on a wall, use the `wall_*` variant**
   with `facing` = the direction **away from the wall** (a torch on a north wall = `facing:south`) so
@@ -107,7 +114,8 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 
 ### Glass & panes
 `glass`, `*_stained_glass` (16 colors), `tinted_glass`. Panes: `glass_pane`,
-`*_stained_glass_pane` — connection props auto-resolve like fences.
+`*_stained_glass_pane` — OMIT the connection props; the compiler derives them *(backstop:
+`connectBlocks`)*. Note glass/panes are NOT valid support for a torch or wall fixture.
 
 ### Plants & farm
 `oak_sapling`, `*_sapling`; `wheat` (`age` 0–7); `carrots`/`potatoes` (`age` 0–7);
@@ -124,6 +132,8 @@ The `head` sits one block in the `facing` direction from the `foot`. 16 colors.
 > run it flush against a full block, and make sure it actually climbs to a reachable floor (cut the
 > ceiling hole). Same backing-block requirement for `wall_torch`/`wall_sign`/wall banners/`lever`/
 > `*_button`/`painting`/`item_frame`. See [`10`](10-design-principles.md) §Physical validity.
+> *(Backstop: `fixPlacement` removes a ladder/wall fixture with no solid backing, and re-anchors or
+> removes a wall torch that has no backing or faces into a wall — but place them right to avoid rework.)*
 
 ### Block-entity blocks (carry `nbt`) — see [`04`](04-block-entities.md)
 `chest` (`facing`,`type`), `trapped_chest`, `barrel` (`facing`,`open`), `furnace`/`blast_furnace`/`smoker`

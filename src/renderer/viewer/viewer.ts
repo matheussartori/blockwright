@@ -618,9 +618,10 @@ export class Viewer {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const height = Math.max(size.y, 1);
-    // ~5 blocks ≈ one storey; cap at 2 so a tall build doesn't flood the result
-    // (and to keep the per-round screenshot token cost down).
-    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 2);
+    // ~5 blocks ≈ one storey; cap at 3 so the cutaways cover a deep build (cellar +
+    // storeys + attic) — the critic/review can't judge a level it never sees — without
+    // flooding the result on a very tall build.
+    const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 3);
 
     // Save everything we mutate so the user's live view is untouched afterward.
     const savedPos = this.camera.position.clone();

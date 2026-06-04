@@ -46,6 +46,16 @@ in a real world** is a failure, no matter how pretty. The preview renders blocks
 does **not** simulate Minecraft's placement/support rules, so *you* must enforce them. Check every
 one of these before handing off:
 
+> **Compiler backstop (safety net, not a license to be sloppy).** Blockwright's compiler now
+> auto-corrects the most common violations on its own: it re-seats or removes floating lanterns,
+> drops floor torches/candles/carpets/plates with nothing solid under them, re-anchors or removes
+> wall fixtures with no solid backing (or ones facing into a wall), seats floating `top` slabs onto
+> the block below, clears anything sitting on a chest lid, opens doorways plugged by a wall, and carves
+> stairwell headroom + a bottom landing. Treat this as a net for slips — NOT permission to relax.
+> A build that needs no fixes renders right the first time and spends fewer revision rounds, so still
+> place everything correctly per the rules below; the rules and the compiler agree, the compiler just
+> catches misses.
+
 - **Nothing floats.** Every block must trace down to the ground through solid blocks, or be
   genuinely attached to something (a wall, a ceiling). A lone block, slab, stair, or fixture
   hanging in mid-air with air on all sides is the #1 "this is fake" tell. If you want a block up
@@ -76,16 +86,9 @@ one of these before handing off:
   not run a long chain all the way down to the floor** to hold a lantern (it looks wrong and the
   point of a chain is to suspend a light *near the ceiling*). If a light needs to be low, set a floor
   `lantern` on a block instead of trailing a chain down to it.
-- **Wall-mounted torches use `wall_torch`, not `torch`.** To put a torch *on a wall*, use
-  `wall_torch`/`soul_wall_torch`/`redstone_wall_torch` with `facing` = the direction **away from the
-  wall** (a torch on a north wall is `facing:south`) so it leans on the wall behind it. The wall_torch
-  occupies the **empty (air) cell in front of the wall — never the wall cell itself** (writing it into
-  the wall cell deletes that wall block and leaves a hole, with the torch embedded flush). A plain
-  `torch`/`redstone_torch` is the **floor** variant — it needs a solid block **directly beneath** it
-  and pops off on spawn if floated against a wall face. Never leave a torch hanging in the air off a
-  wall (a torch in mid-air, or facing the wrong way, is a glaring tell); pick the `wall_*` variant,
-  put it in the air cell against the wall, set `facing` away from the wall, and keep the wall solid
-  behind it.
+- **Wall-mounted torches use `wall_torch`, not `torch`** — in the air cell against the wall, `facing`
+  away from it, wall solid behind, never in the wall cell itself (that punches a hole). Full rules in
+  [`03`](03-blocks-and-blockstates.md) §Torches & lights.
 - **Gravity blocks need a floor.** `sand`, `red_sand`, `gravel`, `*_concrete_powder`, and anvils
   fall if the cell under them is air — keep a solid block beneath them.
 - **Floor fixtures rest ON the floor — they are never on the ceiling or stuck to a wall.** A
