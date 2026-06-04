@@ -98,6 +98,10 @@ export const PHASES: Phase[] = [
   },
 ];
 
+/** Phase ids in workflow order. The single source for the AI tool schema's
+ *  `phase` enum (don't restate the list elsewhere). */
+export const PHASE_IDS = PHASES.map((p) => p.id);
+
 const clamp = (i: number): number => Math.max(0, Math.min(i, PHASES.length - 1));
 
 /** The phase at `index` (clamped to the valid range). */
@@ -146,6 +150,11 @@ export const AUDIT_CHECKS: AuditCheck[] = [
   { id: 'circulation', label: 'Circulation', ask: 'Stairs have a bottom landing + headroom, REACH the floor they serve (no jump), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
   { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor?' },
 ];
+
+/** Audit check ids. The single source for the AI tool schema's audit `check`
+ *  enum (note these differ from PHASE_IDS — there's a `physical` check but no
+ *  `audit` check). */
+export const AUDIT_CHECK_IDS = AUDIT_CHECKS.map((c) => c.id);
 
 /** The checklist rendered for the audit briefing. */
 export function auditChecklistText(): string {

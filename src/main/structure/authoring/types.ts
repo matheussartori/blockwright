@@ -39,6 +39,22 @@ export type AuthoringOp =
   | { op: 'stairs'; from: [number, number, number]; to: [number, number, number]; state: number; fill?: number; clear?: number }
   | { op: 'template'; name: string; from: [number, number, number]; to: [number, number, number]; params?: Record<string, unknown> };
 
+/** Every op discriminant, in one place — the AI tool schema's op enum derives from
+ *  this instead of restating the list. The assertion below makes the build fail if
+ *  this and the AuthoringOp union ever drift apart. */
+export const OP_NAMES = ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'stairs', 'template'] as const;
+export type OpName = (typeof OP_NAMES)[number];
+
+// Compile-time guard: OP_NAMES ≡ AuthoringOp['op'] (both directions). If a new op is
+// added to the union but not here (or vice-versa), this alias resolves to a type that
+// can't be `true`, and the line below fails to compile.
+type AssertTrue<T extends true> = T;
+// Exported only so the alias counts as "used"; intentionally NOT re-exported by the
+// authoring barrel, so it stays internal to this module.
+export type _OpNamesInSync = AssertTrue<
+  OpName extends AuthoringOp['op'] ? (AuthoringOp['op'] extends OpName ? true : false) : false
+>;
+
 export interface AuthoringPaletteEntry {
   Name: string;
   Properties?: Record<string, unknown>;

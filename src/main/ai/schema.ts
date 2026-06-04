@@ -9,9 +9,9 @@
 //    maps, so those drivers take the authoring JSON as a string and we parse it.
 //
 // Both resolve to the same EmitArgs the orchestrator's handler consumes.
-import type { AuthoringStructure } from '../structure/authoring';
+import { type AuthoringStructure, OP_NAMES } from '../structure/authoring';
 import { loadKnowledge } from './knowledge';
-import { phaseOverview } from './phases';
+import { AUDIT_CHECK_IDS, PHASE_IDS, phaseOverview } from './phases';
 
 export const EMIT_TOOL_NAME = 'emit_structure';
 export const EMIT_TOOL_DESCRIPTION =
@@ -36,10 +36,8 @@ const MODE_DESC =
   'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
 const STRUCTURE_DESC =
   'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
-// Kept in sync with PHASES in ./phases.ts (the orchestrator owns the actual sequence).
 const PHASE_DESC =
   'The design pass you just completed: "massing", "roof", "facade", "interior", "circulation" or "audit" (see "Design passes"). Optional — informational only.';
-const PHASE_IDS = ['massing', 'roof', 'facade', 'interior', 'circulation', 'audit'] as const;
 const AUDIT_DESC =
   'On the final Audit pass, your verdict for EACH checklist item (see "Design passes"): an array of { check (the item id), ok (true/false), note (what you see) }. Patch every item you mark not ok and re-report; you are only done when all are ok.';
 const auditSchema = {
@@ -47,7 +45,7 @@ const auditSchema = {
   items: {
     type: 'object',
     properties: {
-      check: { type: 'string', enum: PHASE_IDS },
+      check: { type: 'string', enum: AUDIT_CHECK_IDS },
       ok: { type: 'boolean' },
       note: { type: 'string' },
     },
@@ -60,7 +58,7 @@ const auditSchema = {
 const opSchema = {
   type: 'object',
   properties: {
-    op: { type: 'string', enum: ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'stairs', 'template'] },
+    op: { type: 'string', enum: OP_NAMES },
     from: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] corner.' },
     to: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] opposite corner.' },
     pos: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] — for the "block" op only.' },
