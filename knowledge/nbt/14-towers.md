@@ -11,6 +11,27 @@ emphasis broken into tiers, and a dramatic crown** — plus lighting that define
 night. A constant-width extruded column with a flat top is the failure mode; almost everything
 below fights that.
 
+> **The two basic-tower failures to refuse outright** (these are what a lazy emit produces — do NOT
+> ship either):
+> 1. **A stack of identical boxes.** Plain rectangular storeys piled up, each a flat stone-brick box
+>    with a wood frame and a square window, abrupt equal setbacks, and a broken/jagged top. This is
+>    NOT a tower — it's stacked crates. A real tower TAPERS and has continuous vertical detail running
+>    *through* the storey divisions (ribs, buttresses), not a hard seam between boxes.
+> 2. **A featureless monolith.** A single uniform-width column, same cross-section top to bottom, a
+>    flat top, tiny scattered windows, no base, no crown. A "tower" with no base flare and no crown is
+>    half-built.
+>
+> **Be ambitious and varied — towers are the build where creativity matters most.** Don't default to a
+> grey square keep every time. Pick a distinct ARCHETYPE (see the table) and lean into it: a slender
+> fairy-tale mage spire with projecting balconies, bay windows, hanging bracket-lanterns, cascading
+> ivy and a tall candy-coloured conical roof; a round medieval watchtower with a timber hoarding and a
+> flag; a gothic needle-spire; a verdigris-copper-roofed wizard tower with satellite turrets; a
+> warm brick clock-tower with a gabled spire and cottages clustered at its foot; a buttressed
+> deepslate fortress with machicolations. **Break the outline** — a tower whose silhouette is pure
+> rectangle is the boring one. Vary the SHAPE (round/octagon/tapered, not just square), the CROWN
+> (spire/horns/battlement/belfry — never a flat lid), the BASE (flared/buttressed/on rock, never a
+> pole on grass), and the DECORATION (balconies, vines, banners, bracket lanterns, glowing windows).
+
 > **Cost note ([`00`](00-volumetric-ops.md)):** a tower is mostly one tall shell. Build it with
 > `walls`/`hollow` for the shaft, `repeat` to stamp tier rings and window bays up the height, and
 > `rotate` ×3 to turn one corner buttress/horn into four. Never `fill` the shaft solid — it has an
@@ -100,6 +121,36 @@ Breaking the shaft into tiers is what separates a tower from a chimney. At each 
 
 ---
 
+## Break the outline — projecting & organic detail (what makes towers *interesting*)
+
+A boxy tower stays boxy until things **stick out of it**. The reference towers are covered in
+projections; add several, at different heights and faces (asymmetry is good — don't mirror everything):
+
+- **Balconies & galleries:** cantilever a `*_slab` floor on `*_stairs half:top` corbels off a face,
+  railed with `*_fence`/`iron_bars`/`*_wall`, reached by a door from the shaft. A wrap-around gallery
+  just under the crown (the lighthouse/observation deck) is a strong move.
+- **Bay / oriel windows:** push a 1-block bump-out with a tall window on one or two storeys (the mage
+  spire) — a small `walls` box projecting from the shaft, glazed and lit, capped with a `*_slab` or a
+  tiny pitched roof.
+- **Bracket-arm hanging lanterns:** a `*_fence`/`*_wall`/`*_trapdoor` arm sticking out from the wall
+  with a `chain`→`lantern[hanging:true]` (or a `*_hanging_sign`) dangling from it — the wrought-iron
+  lamp bracket seen on the fairy-tale towers. Far better than a lantern stuck flat to the wall.
+- **Bartizans / corner turrets:** small roofed turret boxes corbelled off the corners (see Tiers),
+  each with its own little spire — a cluster of satellite turrets around a central trunk (the
+  copper-roof and aurora towers) reads as fantastical.
+- **Timber hoarding / overhanging top floor:** a wider wooden top storey oversailing the stone shaft
+  on visible beam corbels (`*_log`/`*_stairs`), often open-sided — the medieval watchtower cap.
+- **Vines & moss:** drape `vine`/`glow_lichen`/`cave_vines` down the stone and over the eaves, and
+  noise the field with `mossy_`/`cracked_` — the references are softened by greenery, never bare clean
+  stone. (Vines attach to a block face; hang them off overhangs and walls, in air, not in the wall.)
+- **A real entrance:** the base gets an **arched doorway** (step `*_stairs half:top` to a keystone)
+  framed by pillars/quoins, often reached by a **wide flight of steps with railings** (use the
+  `stairs` op) — see the keep and clock-tower refs. Not a 1×2 hole in a flat wall.
+- **Attached annexes / twin towers:** cluster small outbuildings (a cottage, a guardhouse, a well) at
+  the foot, or pair two towers joined by an arch/bridge — turns a lone pole into a *place*.
+- **A flag / banner** on the crown (a `*_banner` on a `*_fence` mast) gives instant life and a focal
+  colour, as on the watchtower.
+
 ## Crowns — how the tower ends
 
 The top is the most-seen part against the sky. Pick one and commit:
@@ -150,10 +201,23 @@ for the lighting palette.) Per the reference images, lighting is half the build:
 
 ---
 
-## Surface & material grammar (dark-fantasy default)
+## Surface & material grammar
 
-The reference set is overwhelmingly **dark stone**. Build the strongest read with a tight, dark
-palette and contrast in *texture*, not hue:
+Towers come in **both** dark-fantasy and bright/warm flavours — don't default to a grey keep every
+time; match the palette to the archetype and the prompt. Whichever you pick, build the read with a
+tight palette and contrast in *texture*, then a clear accent.
+
+**Bright / warm palettes (fairy-tale, clock tower, copper, cosy):**
+- **Fairy-tale spire:** `quartz_block`/`calcite`/`diorite` field with `oak`/`spruce` log framing and
+  `*_stairs` trim, a steep conical roof in `red_/brown_*_terracotta`/`nether_bricks`/`*_copper`,
+  `purple`/`magenta` `*_stained_glass`, lots of `vine`/`flowering_azalea` greenery, warm `lantern`s.
+- **Brick clock tower:** `bricks` + `stone_bricks` + `*_log` half-timber, `dark_oak`/`spruce` gabled
+  spire, a glowing clock dial, warm `lantern`s, cottages at the foot.
+- **Verdigris/copper:** `oxidized_/weathered_copper` (+ `cut_copper`) roofs and bands over a
+  `dark_oak`/`mangrove` trunk, `sea_lantern`/`amethyst` glow.
+
+**Dark-fantasy palettes** (much of the keep/spire reference set is dark stone) — contrast in *texture*,
+not hue:
 
 - **Deepslate keep (images 1–2):** `polished_deepslate` + `deepslate_bricks` + `deepslate_tiles`
   field, `chiseled_deepslate` in the recessed bays, `cobbled_deepslate` for the rugged base, ribs in
@@ -189,9 +253,13 @@ Tower windows are **tall and narrow**, not domestic:
 
 ---
 
-## The interior core (keep it a shell)
+## The interior — a stack of distinct furnished floors (NOT an empty shaft)
 
-The shaft is hollow with a way up — don't pack it solid:
+The shaft is hollow with a way up — but "hollow" means *roomed and furnished*, not *empty*. The
+preview's top-down floor-plan cutaways show every storey, so an empty tube is as much a failure as an
+empty house. Build the shell, floor it into storeys, run a stair core, then **dress each floor as its
+own themed room** — the great tower interiors (library, study, alchemy lab, great hall, observatory)
+are a *vertical sequence of distinct, fully-furnished rooms*, each different from the last.
 
 > **A tower often sits on a much larger basement / undercroft** — a 6×6 shaft over a 20×20 cellar of
 > rooms and corridors is a classic keep. The build's footprint then comes from the **basement**, with
@@ -199,15 +267,37 @@ The shaft is hollow with a way up — don't pack it solid:
 > [`08`](08-complex-structures.md) §"Levels can have different footprints". Size the box to the
 > basement and don't shrink the request — there's no width/depth limit.
 
+**Structure of the interior:**
+- One `hollow`/`walls`+floors per shaft segment leaves the interior open; carve windows with an air
+  index afterward. **Floor each storey** with a `*_slab`/`fill` platform (leave the stair hole).
+- **Vertical circulation:** a `ladder` column up one inside wall, or a **spiral stair** hugging the
+  inner wall winding up — build each straight quarter-run with a short **`stairs` op** (turning 90° at
+  each landing) so every run climbs correctly and cuts its own hole. Keep the stair against the wall so
+  the centre of each floor stays usable.
+- Give the shaft enough internal diameter to be a *room* — a 3×3 interior is a closet. Aim for ≥5×5
+  clear inside (often more) so each floor can hold furniture around a central walking space.
 
-- One `hollow`/`walls`+floors per shaft segment leaves the interior open. Carve the windows with an
-  air index afterward.
-- **Vertical circulation:** a `ladder` column up one inside wall, or a **spiral stair** of `*_stairs`
-  hugging the inner wall winding up (offset +1 facing each course as it turns the corner — or build
-  one quarter-run and `rotate` it up the levels). Floor each tier with a `*_slab`/`fill` platform and
-  a hatch/opening to the next.
-- Most of the interior won't be seen in the preview from outside; spend detail on the **rooms behind
-  the feature openings** (a lit chamber behind the rose window, the platform behind the parapet).
+**Furnish each floor as a different themed room** (pick a sequence that fits the archetype, e.g. mage
+tower = entry hall → library → study/bedroom → alchemy lab → observatory deck):
+- **Library / study:** walls lined with `bookshelf`/`chiseled_bookshelf`, a `lectern`, desks
+  (`*_stairs`+`*_slab`), a reading chair (stair+signs), a `chain`→`lantern`/`sea_lantern` **chandelier**
+  hung over the middle, rugs (`*_carpet`), potted plants and `vine` in the corners (the wizard-library
+  refs).
+- **Cozy chamber / bedroom:** `bed`, nightstand (`barrel`+lantern), wardrobe (`*_trapdoor` doors on a
+  shelf), a fireplace (`campfire`/`furnace` in a brick recess with a `chain` flue), a window seat with
+  carpet, plants, a banner.
+- **Alchemy / ritual room:** symmetric layout, `brewing_stand`/`cauldron`s, `chiseled_bookshelf` walls,
+  `candle`s, an altar focal point at the far end (an `enchanting_table`/`lodestone`/`*_anvil` framed by
+  `amethyst`/crimson accents and `lantern`s) — the crimson ritual ref.
+- **Great hall:** a taller double-height floor with a **patterned tile floor** (2-tone
+  `*_bricks`+`polished_*` diamond/runner), pillars or arches, banners, a long table, a big chandelier.
+- **Observatory / top room:** behind the feature window — a telescope (`*_fence`+`spyglass`-feel via
+  end_rod/`lightning_rod`), star charts (`item_frame`+`map`), `amethyst` crystals, the brightest light.
+- **Lighting & atmosphere every floor:** a chandelier or wall sconces (see [`06`](06-decoration-and-interiors.md)),
+  no dark floors; coffer the ceilings with `*_log` beams so they aren't flat slabs.
+
+Spend the most detail on the **rooms behind the feature openings** (the lit chamber behind the rose
+window, the platform behind the parapet) since those read from outside too.
 
 ---
 
@@ -219,14 +309,61 @@ The shaft is hollow with a way up — don't pack it solid:
 | **Barad-dûr horned tower** (img 2–3) | smooth `blackstone`/`obsidian`, sparse seams, buttress fins | 2–4 sweeping **horns** framing a glowing eye | strong taper, splayed buttress base, fiery eye (`lava`/`magma`/`glowstone`), base ring of light |
 | **Medieval watchtower** (img 4) | round `stone_bricks` (+mossy/cracked), `*_log` quoins | steep **conical spire** + lantern/beacon finial | machicolation ring, arrow slits, warm lanterns, cantilevered wooden bartizan |
 | **Wizard / mage spire** | `stone_bricks`/`deepslate` + `*_copper`/`purpur` accents | tall slim spire + `beacon`/`end_rod`, crystal | leaning/tapering shaft, glowing arcane windows (`amethyst`/`sea_lantern`), floating rings |
+| **Fairy-tale / Rapunzel spire** | bright `quartz`/`calcite`/`diorite` + `oak`/`spruce` framing | tall steep **conical roof** in `*_terracotta`/`nether_brick`/copper, finial | slender, **projecting balconies & bay windows**, bracket-arm hanging lanterns, cascading `vine`s, coloured `*_stained_glass`, arched door |
+| **Clock tower** | warm `bricks`/`stone_bricks` + `*_log` framing | steep **gabled/hip spire** with dormers, weathervane | a **clock face** feature (target/note-block/`item_frame` dial under the gable), attached cottages/annexes at the foot, gardens |
+| **Verdigris / copper fantasy** | `*_copper` (oxidized/weathered) + dark `*_log` trunk | **patina copper / prismarine cones** | **satellite turrets** cantilevered at varied heights off a central trunk, glowing (`amethyst`/`sea_lantern`) windows, very organic |
 | **Lighthouse** | `*_concrete`/`smooth_stone` banded, `bricks` base | open lantern cage, big `sea_lantern`/beacon | bold horizontal stripes (the exception), gallery rail near top, rocky/island base, sea |
 | **Volcanic / infernal tower** (img 5) | rugged `blackstone`/`netherrack`/`basalt` | jagged broken crown, smoke (`campfire`) | cascading **lava veins** + `magma`/`shroomlight` glow, ruined irregular silhouette, organic rock base |
 
 ---
 
+## Worked build order (follow this sequence — don't stack boxes)
+
+A reliable recipe that produces a *real* tower instead of stacked crates. Adapt the materials/crown to
+the archetype; the **order and the moves** are the point. Say the shaft is ~9×9; centre it on a wider
+base.
+
+1. **Foundation & flared base.** `fill` a solid foundation slab one course tall, slightly **wider**
+   than the shaft (e.g. 11×11 under a 9×9 shaft). Build the base as a 3–4-course `hollow` plinth that
+   is wider than the shaft and ideally **steps/batters inward** as it rises to meet the shaft width —
+   on rough `cobblestone`/`cobbled_deepslate`. This is the flare; never start the shaft straight off
+   grass.
+2. **Shaft shell.** One `hollow` for the body (≥5×5 *interior* so floors are usable). Keep it tall.
+3. **Vertical ribs, full height.** `line` a contrasting rib (`*_log axis:y`, basalt, a wall column) up
+   **one corner**, then `rotate` it ×3 about the tower centre to get all four. Ribs that run *through*
+   the whole shaft are what stop it reading as separate boxes.
+4. **A corbel/string ring** (`walls` of `*_slab type:top` or `*_stairs half:top`) projecting **1 block
+   past the shaft** at ~⅔ height — the overhang.
+5. **Setback upper tier.** Above the ring, a **narrower** `hollow` tier (step in 1–2 blocks) so the
+   tower **tapers**. This is the difference between a tower and a chimney.
+6. **Crown — never a flat lid.** Either a **battlement** (`walls` of `*_wall`/blocks, then `fill` an
+   air index on alternate rim cells for crenels) over a corbel ring, **or** a **spire**: the `roof` op
+   with `style:"hip"` over the top tier makes a pyramidal/conical cap to a point — cap the apex with a
+   `lightning_rod`/`end_rod`/`*_fence`+`lantern` finial (+ a `*_banner` mast for medieval).
+7. **Floors & stair core.** `fill` a `*_slab`/plank floor per storey (leave the stair hole), and run a
+   **spiral stair** as short `stairs` ops (quarter-runs turning 90°, with `fill` + `clear`) hugging the
+   inner wall.
+8. **Openings.** Carve tall narrow window slits to air, **aligned up a vertical line** on each face,
+   glaze with `*_pane`/`iron_bars`, and back them with a light block so they glow. Carve an **arched
+   doorway** at the base with a step approach.
+9. **Break the outline.** Add 2–3 projections at different heights — a **balcony** on corbels with a
+   fence rail, a **bay window**, a **bracket-arm hanging lantern**, a small **bartizan** with its own
+   spire. Asymmetry is good.
+10. **Dress it.** Hang `chain`+`lantern` swags off the rings, drape `vine`/`glow_lichen` down the
+    stone, noise ~10–20% `mossy_`/`cracked_` into the field, and **furnish every interior floor** as a
+    distinct themed room (see "The interior").
+11. **Review the cutaways** — fix a flat top, an un-tapered shaft, bare interiors, or dark floors
+    before stopping.
+
 ## Tower audit (catch in the preview — [`07`](07-workflow.md))
 
-- ❌ Constant-width extruded column → ✅ flared base + tiered/tapering shaft + distinct crown.
+- ❌ A stack of identical boxes with hard seams between storeys → ✅ continuous ribs/buttresses running
+  through the storeys + a real taper, so it reads as one tower, not piled crates.
+- ❌ Constant-width extruded monolith → ✅ flared base + tiered/tapering shaft + distinct crown.
+- ❌ Plain square, every face the same, no projections → ✅ pick an archetype and break the outline
+  with balconies, bay windows, bartizans, bracket lanterns, vines (asymmetry welcome).
+- ❌ Empty/bare interior floors (just a stair in a tube) → ✅ each floor a distinct furnished themed
+  room (library/study/lab/hall) with a chandelier, lit, walls dressed.
 - ❌ Pole on flat grass → ✅ battered base / buttress fins / stepped foundation on rock or an island.
 - ❌ Flat top that just stops → ✅ parapet, spire, or horn/finial crown, ideally wider/busier than
   the shaft top, with the focal element up there.

@@ -55,6 +55,7 @@ right way in the copy automatically. This is the cure for the #1 manual-symmetry
 | `rotate` | `from`, `to`, `turns:1\|2\|3`, `pivot?:[x,z]` | Turns the region `turns` clockwise quarter-turns about `pivot` (default region centre). Build **one arm** of a cross / one corner tower, rotate it 2–4×. Rotates `facing` and swaps `axis` (x↔z) on odd turns. |
 | `repeat` | `from`, `to`, `axis`, `step`, `count` | Tiles the region `count` times, each offset `step` along `axis` (negative allowed). Window bays, columns, balusters, fence runs. Pure translation (no blockstate change). |
 | `roof` | `from`, `to`, `state` (`*_stairs`), `style?`, `ridge?`, `fill?` | Lays a pitched stair roof over the eave rectangle, deriving the per-side stair `facing` (and corner `shape` for `"hip"`). `ridge` = the axis the ridge runs along (gable; default the longer side). `fill` plugs the gap under each step for a solid roof / attic floor. Roofs are where builds break — use this instead of hand-placing stairs. |
+| `stairs` | `from` (BOTTOM step), `to` (TOP step), `state` (`*_stairs`), `fill?`, `clear?` | Builds a real climbable flight. Axis-aligned; rises one block per cell, so `from`=[x,y,z] → `to`=[x,y+3,z+3] is a 4-step run climbing south. Every step is `half:bottom` facing the ascent direction (never inverted/blocking, top step never missing). Width = perpendicular spread of `from`/`to`. `fill` = solid block index placed under each tread (a stringer, so it never floats). `clear` = your AIR index → carves 2 blocks of headroom above every step AND cuts the stairwell hole through the floor above. **Always use this for staircases — never hand-place `*_stairs`.** |
 
 So a symmetric manor is: build the left half with fill/hollow ops → one `mirror` for the right
 half → one `roof`. A 4-fold cross plan: build one wing → `rotate` ×3. This is both far fewer
@@ -82,7 +83,7 @@ output tokens **and** guaranteed-correct orientation.
 - You may still use `blocks` alone for a tiny build, but for anything room-sized or bigger,
   **ops are mandatory for acceptable speed**. Don't expand a box into hundreds of `blocks`.
 - **`mirror`/`rotate`/`repeat` take no `state`** — they copy existing cells. Place the source
-  geometry first, then transform it. (`roof`'s `state` must be a `*_stairs` block.)
+  geometry first, then transform it. (`roof` and `stairs` both need a `*_stairs` block as `state`.)
 - **Don't air-fill outside your build.** The compiler clears each occupied column's interior
   with air automatically and **leaves everything outside your footprint as world terrain**, so a
   non-rectangular footprint (cross, L, wings) places cleanly without gouging a rectangular hole.

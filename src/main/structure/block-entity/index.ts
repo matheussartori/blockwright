@@ -8,6 +8,7 @@ import { resolveChest } from './chest';
 import { resolveBed } from './bed';
 import { resolveWallBanner } from './banner';
 import { resolveDecoratedPot } from './decorated-pot';
+import { resolveSkull } from './skull';
 
 /** Resolve a block-entity block into a synthesized model, or null when the
  *  block isn't one we render specially. */
@@ -16,6 +17,7 @@ export function resolveBlockEntity(name: string, properties: Record<string, stri
     resolveChest(name, properties) ??
     resolveBed(name, properties) ??
     resolveWallBanner(name, properties) ??
-    resolveDecoratedPot(name, properties)
+    resolveDecoratedPot(name, properties) ??
+    resolveSkull(name, properties)
   );
 }

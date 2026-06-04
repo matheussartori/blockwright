@@ -78,29 +78,34 @@ shutters on the outside for charm, or a `oak_slab`/`stairs` sill below.
 
 ## Stairs between floors
 
-Build the steps from **actual `*_stairs` blocks**, one block up per step — *not* a zig-zag of
-stacked full blocks (that reads as rubble, not a staircase). A run climbs much better when the
-**underside is filled**, not left as a row of stairs floating over empty air:
+**Use the `stairs` op — never hand-place a staircase from individual `*_stairs` blocks.** Hand-placed
+flights are where builds break: steps end up facing the wrong way, an upside-down `half:top` step gets
+stacked on top and blocks the climb, or the last step is simply missing. The op makes all of that
+impossible — it always produces a correct, climbable flight.
 
-- Under each `*_stairs` step, place a **full block** (matching `planks`/stone) so the run sits on
-  a solid stringer — or use a second `*_stairs half:top` tucked beneath, mirroring the step, for a
-  clean zig-zag underside. Either kills the ugly floating-step look.
-- The run must climb **through a hole cut in the ceiling/floor above** onto real walkable space —
-  never into a solid ceiling or a blank wall (see [`10`](10-design-principles.md) §Physical validity).
-- **Headroom & hole size.** Leave **2 blocks of clear air above every step** so a player can walk
-  the run without hitting the ceiling, and cut the ceiling/floor opening to **just the footprint of
-  the stair run** — a player should *walk down the stairs*, not drop through an oversized hole beside
-  them. No open shaft to fall down: the hole is the width of the stairs and the run fills it step by
-  step, meeting solid floor at the bottom.
-- **The run lands flush with each floor — no extra step.** The **bottom** step sits *at* the lower
-  floor level (its base on the floor, walkable straight off the floor), and the **top** step rises so
-  its walkable surface is **level with the upper floor** — you step off the last stair directly onto
-  the upper floor. Don't add a full block or an extra stair above the top step (that makes a stub you
-  bump into / climb over), and don't stop the run a block short so there's a lip to jump. Count it:
-  for a 3-block rise the run is 3 steps at `y, y+1, y+2`, and the upper floor is at `y+3` — the top
-  step's top face meets it flush.
-- Keep the steps clear: don't park a chest, barrel, cauldron, or carpet on or directly above the
-  staircase — it blocks the passage.
+```json
+{ "op": "stairs", "from": [4, 1, 2], "to": [4, 4, 5], "state": 7, "fill": 3, "clear": 0 }
+```
+
+- `from` = the **bottom** step (at the lower floor), `to` = the **top** step. The run is axis-aligned
+  and rises **one block per cell**, so `from y=1 → to y=4` over `z=2→5` is a 4-step flight climbing
+  south, landing flush with the upper floor at `y=5`. Count it: for a 3-block rise the upper floor is
+  at `y+3` and the op puts steps at `y, y+1, y+2` so the top tread meets it flush — no stub, no lip.
+- `state` = a `*_stairs` palette index. The op sets each step's `facing` to the ascent direction and
+  keeps them all `half:bottom` (a proper flight, never an inverted blocking step).
+- `fill` (optional) = a solid block index → a support block under every tread, so the run never floats
+  over empty air (the old "floating steps" look).
+- `clear` (optional) = your **air** index → carves 2 blocks of headroom above every step **and cuts the
+  stairwell hole** through the floor/ceiling above, so the climb lands on real walkable space instead of
+  into a solid ceiling. The hole is exactly the stair footprint — no oversized shaft to fall down.
+- **Width:** give `from`/`to` a spread on the perpendicular axis for a wider flight (e.g. `from [3,1,2]`
+  `to [5,4,5]` is a 3-wide run).
+- **One flight per rise.** Don't add a second run (or a `half:top` mirror) over the same climb — it
+  blocks the passage. And keep the steps clear: never park a chest, barrel, cauldron, or carpet on or
+  directly above the staircase.
+
+(For a *spiral* stair around a central post, place short `stairs` ops turning 90° at each landing, or
+fall back to per-block `*_stairs` only when the op's straight run truly can't express it.)
 
 ## Ceiling & roofs
 

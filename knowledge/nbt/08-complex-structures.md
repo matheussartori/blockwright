@@ -246,8 +246,9 @@ blur together.
 **Connect, light & atmosphere (underground is pitch black — over-light it):**
 
 - **Access:** a stairwell or ladder down from the surface lands in an **entry chamber/landing**;
-  corridors keep a consistent headroom and floor level; cut every ceiling hole for stairs. Every
-  room must be reachable on foot — no sealed pockets.
+  corridors keep a consistent headroom and floor level. Build the descent with the **`stairs` op**
+  (`from`=bottom step, `to`=top step, `clear`=air index) so it climbs correctly and auto-cuts the
+  ceiling hole — never hand-place the steps. Every room must be reachable on foot — no sealed pockets.
 - **Lighting everywhere, all VISIBLE:** `lantern`/`soul_lantern` on the walls and **hung on `chain`s**
   from tall ceilings, `wall_torch`, `glowstone`/`sea_lantern` accents, floor lights set into the
   paving (the glowstone-in-floor look), `candle`s on tables. Never `minecraft:light`. A dark room

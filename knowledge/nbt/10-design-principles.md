@@ -65,7 +65,11 @@ one of these before handing off:
   backwards: the heavy block supports the light, never the reverse. Hang a chandelier as `chain` →
   `lantern[hanging=true]` *descending from the ceiling*, not as a lantern propping up a post. A
   hanging lantern with **nothing above it** (no ceiling/beam/chain it attaches to) is floating —
-  put it on the floor instead, or give it something solid directly above to hang from.
+  put it on the floor instead, or give it something solid directly above to hang from. A lantern also
+  **does not stick to the side of a wall**: a bare lantern sitting in the middle of a wall face, with
+  air above and below it, is floating and wrong. For a light *on* a wall use a `wall_torch`, or set the
+  lantern on a small bracket that projects from the wall (a `*_trapdoor`/`*_fence`/`*_slab`) so it has
+  a solid block beneath it — never a lantern stuck flat to the wall.
 - **Chains hang from a solid block above — and stay short.** A `chain` must connect to a solid block
   (or another chain) **at its top**; a chain with air above it floats and breaks. A pendant light is
   `chain[axis=y]` → `lantern[hanging=true]` dropping **a block or two** from the ceiling/beam — **do
@@ -74,10 +78,14 @@ one of these before handing off:
   `lantern` on a block instead of trailing a chain down to it.
 - **Wall-mounted torches use `wall_torch`, not `torch`.** To put a torch *on a wall*, use
   `wall_torch`/`soul_wall_torch`/`redstone_wall_torch` with `facing` = the direction **away from the
-  wall** (a torch on a north wall is `facing:south`) so it leans on the wall behind it. A plain
+  wall** (a torch on a north wall is `facing:south`) so it leans on the wall behind it. The wall_torch
+  occupies the **empty (air) cell in front of the wall — never the wall cell itself** (writing it into
+  the wall cell deletes that wall block and leaves a hole, with the torch embedded flush). A plain
   `torch`/`redstone_torch` is the **floor** variant — it needs a solid block **directly beneath** it
   and pops off on spawn if floated against a wall face. Never leave a torch hanging in the air off a
-  wall; pick the `wall_*` variant and back it with a solid block.
+  wall (a torch in mid-air, or facing the wrong way, is a glaring tell); pick the `wall_*` variant,
+  put it in the air cell against the wall, set `facing` away from the wall, and keep the wall solid
+  behind it.
 - **Gravity blocks need a floor.** `sand`, `red_sand`, `gravel`, `*_concrete_powder`, and anvils
   fall if the cell under them is air — keep a solid block beneath them.
 - **Floor fixtures rest ON the floor — they are never on the ceiling or stuck to a wall.** A
@@ -112,10 +120,12 @@ one of these before handing off:
   the air* beside/against it — never on top of a block the structure needs.
 - **Cobweb is sparse decoration, not a building material.** `cobweb` is **not** a stair, ladder,
   scaffold, floor, or path — you cannot climb it or walk up it, and a diagonal run of cobwebs is not
-  a staircase, it's just floating junk. Use it only as the occasional *single* strand tucked into a
-  corner or ceiling angle for an "abandoned/cave" mood (and only when the prompt wants that), always
-  touching a solid block. To actually move between heights, build real `*_stairs` against structure
-  or a `ladder` flush to a wall (see below) — never a cobweb climb.
+  a staircase, it's just floating junk. Use it only as the occasional *single* strand tucked into an
+  **open** corner or ceiling angle (in an air cell where two surfaces meet) for an "abandoned/cave"
+  mood (and only when the prompt wants that). A cobweb is a **full-cube block**, so a cobweb sitting
+  **flat on a flat wall face has replaced that wall block** and left a hole behind it — never place a
+  cobweb on a wall, only in open air at a corner/ceiling angle. To actually move between heights, use
+  the `stairs` op or a `ladder` flush to a wall (see below) — never a cobweb climb.
 - **Doors actually block a doorway — no gap beside them.** A door fills a **1-wide opening in an
   otherwise solid wall**, both the lower and upper block of the opening, framed by solid blocks on
   *both* sides. If there's an empty (air) cell right next to the door, the door is pointless — you
@@ -131,13 +141,15 @@ one of these before handing off:
   middle of a room or in open air to "fill" it.** A pile of free-floating stairs sitting in a room is
   the clearest "fake build" tell of all — every stair must be part of a supported staircase, roof,
   or furniture piece, resting on or attached to something solid.
-- **A staircase is built from `*_stairs` blocks, with headroom, and a hole sized to the run.** Make
-  the steps **actual `*_stairs`** climbing one block per step — *not* a zig-zag of full blocks (a
-  "staircase" of stacked full cubes reads as unfinished rubble). Above every step keep **2 blocks of
-  clear headroom** so a player can walk up/down without hitting the ceiling, and cut the
-  floor/ceiling opening to **just the footprint of the stair run** — a player should *descend the
-  stairs*, not drop through an oversized hole next to them. No open shaft you fall down: the hole is
-  the width of the stairs, the run fills it step by step, and there's solid floor at the bottom.
+- **Build staircases with the `stairs` op — do not hand-place them.** The `stairs` op (`from`=bottom
+  step, `to`=top step, `state`=a `*_stairs` block, `fill`=tread support, `clear`=air for headroom +
+  the stairwell hole) guarantees a correct climbable flight: every step faces the ascent direction,
+  the top step is always present, and there is exactly **one** run per rise. Hand-placing is what
+  produces the classic breakages — a step facing the wrong way, an upside-down `half:top` step stacked
+  on top that **blocks the climb**, or a **missing last step**. Never stack two runs over the same
+  climb, and never list loose `*_stairs` for a flight when the op can do it. The op keeps **2 blocks of
+  headroom** above each step and cuts the floor/ceiling hole to **just the footprint of the run** — no
+  oversized shaft beside the stairs, solid floor at the bottom, flush landing at the top.
 - **Walkways and rooms stay clear — don't block your own circulation.** A floor `lantern`, `torch`,
   `campfire`, pot, or any prop dropped in the middle of a corridor, doorway, or stair run blocks the
   path the player walks. Keep lights and props against walls or hang them from the ceiling so the

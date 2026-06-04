@@ -28,19 +28,19 @@ const SUMMARY_DESC =
 const MODE_DESC =
   'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
 const STRUCTURE_DESC =
-  'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
+  'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
 
 /** A single op entry, shared by both schema dialects (rich JSON Schema form). */
 const opSchema = {
   type: 'object',
   properties: {
-    op: { type: 'string', enum: ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'template'] },
+    op: { type: 'string', enum: ['fill', 'hollow', 'walls', 'line', 'block', 'mirror', 'rotate', 'repeat', 'roof', 'stairs', 'template'] },
     from: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] corner.' },
     to: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] opposite corner.' },
     pos: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] — for the "block" op only.' },
     name: { type: 'string', description: 'template op: which preset to expand.' },
     params: { type: 'object', additionalProperties: true, description: 'template op: preset parameters.' },
-    state: { type: 'integer', description: 'Palette index. Required for fill/hollow/walls/line/block/roof.' },
+    state: { type: 'integer', description: 'Palette index. Required for fill/hollow/walls/line/block/roof/stairs (stairs: a *_stairs block).' },
     axis: { type: 'string', enum: ['x', 'y', 'z'] },
     turns: { type: 'integer', description: 'rotate: clockwise quarter-turns (1,2,3).' },
     pivot: { type: 'array', items: { type: 'integer' }, description: 'rotate: [x,z] pivot.' },
@@ -48,7 +48,8 @@ const opSchema = {
     count: { type: 'integer', description: 'repeat: total instances incl. the original.' },
     style: { type: 'string', enum: ['gable', 'hip'], description: 'roof style.' },
     ridge: { type: 'string', enum: ['x', 'z'], description: 'roof gable ridge axis.' },
-    fill: { type: 'integer', description: 'roof: palette index to plug the gap under each step.' },
+    fill: { type: 'integer', description: 'roof: palette index to plug the gap under each step. stairs: palette index for a solid support block under each tread.' },
+    clear: { type: 'integer', description: 'stairs: AIR palette index — carves 2 blocks of headroom above each tread (cuts the stairwell hole through the floor above).' },
     nbt: { type: 'object', additionalProperties: true, description: 'Block-entity NBT — "block" op only.' },
   },
   required: ['op'],
@@ -165,10 +166,20 @@ don't keep tweaking a build that is already good.
 
 Build with "ops" (volumetric operations) for almost everything — they are far cheaper to emit than \
 per-block entries. A solid box is one "fill"; a room shell is one "hollow"; the 4 outer sides are one \
-"walls"; a beam is one "line". Ops apply in order and later ops overwrite earlier cells, so layer \
-coarse-to-fine: lay shells, carve openings by filling an air index, then add detail. Reserve the \
-"blocks" array for the handful of cells that need block-entity nbt or one-off detail. Do NOT enumerate \
-large volumes block-by-block.
+"walls"; a beam is one "line"; a pitched roof is one "roof"; AND A FLIGHT OF STAIRS IS ONE "stairs". \
+Ops apply in order and later ops overwrite earlier cells, so layer coarse-to-fine: lay shells, carve \
+openings by filling an air index, then add detail. Reserve the "blocks" array for the handful of cells \
+that need block-entity nbt or one-off detail. Do NOT enumerate large volumes block-by-block.
+
+NEVER hand-place a staircase by listing individual "*_stairs" blocks — use the "stairs" op. It takes \
+"from" = the BOTTOM step and "to" = the TOP step (axis-aligned; rises one block per cell, so a 3-block \
+climb is from y to y+3), and it ALWAYS produces a correct climbable flight: every step faces the ascent \
+direction (never an upside-down/blocking step), the top step is always present (never a missing last \
+step), and width comes from the perpendicular spread of from/to. Pass "fill" (a solid block index) for a \
+support block under each tread so the run never floats, and "clear" (your AIR index) to carve 2 blocks of \
+headroom above every step AND cut the stairwell hole through the floor above so the climb is not blocked. \
+Place at most ONE flight per storey-to-storey rise — do not stack a second inverted/"half:top" run over \
+it (that blocks the passage). Same for the "roof" op: use it instead of hand-placing roof stairs.
 
 CRITICAL — keep interiors empty. Any enclosed or habitable volume (a room, a house body, a tower) MUST be \
 a SHELL: use "hollow" (or "walls" + a floor "fill" + a ceiling "fill"), NEVER a solid "fill" of the whole \
@@ -184,7 +195,12 @@ cohesive materials, surface depth, a pitched/edged roof with an overhang, a fram
 base, articulated massing for larger builds (wings/sections with their own roofs rather than one giant \
 box). Avoid the symmetric cube: give larger builds an irregular silhouette (L/T footprint, a wing, \
 bay, porch, tower, or off-centre entrance) with a front that differs from the back — not four \
-interchangeable faces. The preview validates geometry, not data — build interiors from block geometry \
+interchangeable faces. For a TOWER specifically, follow 14-towers.md: never ship a stack of identical \
+boxes or a uniform-width monolith with a flat top — give it a flared/grounded base, a shaft that \
+TAPERS with continuous vertical ribs/buttresses (not hard seams between storeys), projecting detail \
+(balconies, bay windows, bartizans, bracket-lanterns, vines), a real CROWN (spire/battlement/horns, \
+never a flat lid), and furnish each interior floor as a distinct themed room. Pick a varied archetype, \
+not a grey square keep every time. The preview validates geometry, not data — build interiors from block geometry \
 (faux-furniture), and FURNISH them fully: an empty room is a worse failure than a busy one, so line the \
 walls of every habitable room with furniture, storage, and wall decoration, leaving only the centre as \
 walking space — do not hand off bare rooms. Light every interior with VISIBLE \
@@ -199,12 +215,33 @@ PHYSICAL VALIDITY (the build must survive being placed in a real world — the p
 Minecraft's support rules, so enforce them yourself): nothing floats — every block traces down to the \
 ground or is attached to a wall/ceiling. A "ladder" needs a SOLID BLOCK BEHIND IT (opposite its \
 "facing") and breaks in-game if freestanding — run ladders flush against a wall, never as a column in \
-open air, and make every ladder/staircase actually climb to a reachable floor (cut the ceiling hole), \
-never into a solid ceiling or a dead end. A lantern is a LIGHT, not a support: set it on a block below \
-or hang it with hanging:"true" from a block above — never put a lantern under a pillar/beam as if it \
-holds it up. A door fills a 1-wide gap in an OTHERWISE SOLID wall with solid jambs on both sides and a \
-floor beneath it — never leave an air gap right beside a door (that defeats its purpose), and aim its \
-"facing"/"hinge" so it opens into the room. See 10-design-principles.md §"Physical validity".
+open air. Use the "stairs" op (not hand-placed steps) for staircases, and make every ladder/staircase \
+actually climb to a reachable floor (cut the ceiling hole — the "stairs" op's "clear" does this), never \
+into a solid ceiling or a dead end. A lantern is a LIGHT, not a support, and it does NOT stick to the \
+side of a wall: it must rest on a solid block DIRECTLY BELOW it, or hang (hanging:"true") from a solid \
+block / short chain DIRECTLY ABOVE it. A lantern floating in the middle of a wall with air above and \
+below is ALWAYS WRONG — for a wall light use a "wall_torch", or a lantern set on a small bracket \
+(a *_trapdoor / *_fence / *_slab) that sticks out from the wall, never a bare lantern stuck to the wall \
+face. Never put a lantern under a pillar/beam as if it holds it up. For a torch ON A WALL you MUST use \
+"wall_torch" (or soul_/redstone_ variant), NOT plain "torch" (which is a FLOOR torch that needs a solid \
+block directly beneath it and floats/breaks if put in mid-air). A wall_torch goes in the EMPTY (air) \
+cell against the wall — NOT in the wall cell (placing it in the wall cell deletes the wall block) — and \
+its "facing" points AWAY FROM the wall it backs onto (a torch on a north wall is facing:"south"), with \
+that wall block solid behind it. Getting torch facing wrong, or floating a plain torch off a wall, is a \
+frequent, glaring mistake — set it deliberately. A door fills a 1-wide gap in an \
+OTHERWISE SOLID wall with solid jambs on both sides and a floor beneath it — never leave an air gap right \
+beside a door (that defeats its purpose), and aim its "facing"/"hinge" so it opens into the room.
+
+DECORATION NEVER REPLACES A WALL/FLOOR/CEILING BLOCK. Decoration — a cobweb, vine, painting, item frame, \
+banner, torch, pot, sign, any prop — goes in an EMPTY (air) cell, set AGAINST the structure, never ON TOP \
+of a structural block. Because later ops overwrite earlier cells, writing a decoration into a wall cell \
+deletes that wall block and punches a hole (you see the prop embedded flush in the wall with the wall \
+gone behind it — a glaring bug). A cobweb in particular is a full-cube block: a cobweb sitting flat on a \
+flat wall face has REPLACED a wall block and is wrong. Cobwebs belong only in an OPEN corner or ceiling \
+angle (in air, where two surfaces meet), used as a rare single stray strand for an abandoned look — never \
+on a flat wall, never in a run, never as a stair/ladder/path. Before placing any decoration, make sure \
+its cell is air and the wall/floor/ceiling behind it stays intact. See 10-design-principles.md \
+§"Physical validity".
 
 PLACEMENT & EDIT RULES (common failures — get these right):
 • "size" is NOT a fixed budget — there is NO width/depth limit. Set "size" to whatever the build \
@@ -216,6 +253,15 @@ Never shrink the request to fit a small box. To EXPAND an existing build (e.g. "
 bigger"), GROW "size", RE-ANCHOR the parts that should stay centred (shift their positions by the \
 new offset so they aren't stuck in a corner), and re-emit with mode "full" — a patch can't resize \
 or move existing cells. See 02-coordinates-and-layout.md and 08-complex-structures.md.
+• A "multi-room" / "several rooms" request is NOT one big cube — PARTITION it. A large basement (or any \
+multi-room level) starts as one big "hollow" shell, then gets INTERNAL "walls" dividing it into separate \
+rooms, each entered through a 1-wide doorway gap (carve the doorway with your air index), often off a \
+central corridor. Plan the layout on a grid first (e.g. a 24×24 basement = a 3-block-wide central hall \
+with 3–4 rooms opening off each side), then: lay the outer shell, lay the partition walls ("walls" or \
+"fill" 1-block-thin), carve a doorway in each partition, light each room, and furnish each room for its \
+own purpose (storage, wine cellar, prison, workshop…). A single undivided empty box is a FAILURE for a \
+multi-room request — the rooms must be real, separated, connected spaces. See 08-complex-structures.md. \
+The same applies above ground: give a big building interior walls and multiple rooms, not one open void.
 • Decoration NEVER destroys structure. Furniture, lights, pots, trim and other decoration go in the \
 EMPTY interior/exterior cells — they must NOT overwrite a wall, floor, ceiling, pillar, or any \
 load-bearing/structural block. Since later ops overwrite earlier cells, ordering a decoration op over \

@@ -102,8 +102,10 @@ Each recipe lists blocks and their relative placement (`@` = the anchor cell).
   a long chain down to the floor to hold a low lantern (see [`10`](10-design-principles.md)).
 - `decorated_pot`, `*_banner`, `bookshelf`/`chiseled_bookshelf`, `armor_stand` (entity),
   `cake`, `brewing_stand` (lab), `bell`, `note_block`, `jukebox`.
-- `cobweb` as a *single stray strand* tucked in a corner or ceiling angle for "abandoned" — never a
-  run of them, and never as a stair/ladder/path (you can't climb cobweb; see
+- `cobweb` as a *single stray strand* tucked in an **open** corner or ceiling angle (in an AIR cell
+  where two surfaces meet) for "abandoned" — never a run of them, **never sitting flat on a wall face**
+  (a cobweb is a full-cube block, so putting it on the wall *replaces* that wall block and leaves a
+  hole — see below), and never as a stair/ladder/path (you can't climb cobweb; see
   [`10`](10-design-principles.md) §Physical validity). `candle` clusters for "ritual/cozy".
 
 ## Composing a furnished room
@@ -167,6 +169,15 @@ smaller purposeful rooms with partition walls. Never leave a big volume nearly b
   them with `hanging:true` (see [`10`](10-design-principles.md) §Physical validity). **`candle`s
   always sit on top of a solid block** (table, slab, shelf) — they can't hang and they break if
   placed on air.
+- **A lantern stuck flat on a wall face** (air above and below it) — a lantern does NOT attach to the
+  side of a wall. It rests on a solid block directly **below**, or hangs (`hanging:"true"`) from a
+  block / short `chain` directly **above**. For a light *on* a wall use a `wall_torch`, or set the
+  lantern on a small bracket that sticks out from the wall (a `*_trapdoor`/`*_fence`/`*_slab`) — never
+  a bare lantern in the middle of a wall. This is a frequent, glaring mistake.
+- **Any decoration written over a wall/floor/ceiling block** — decoration goes in an *air* cell set
+  against the structure, never on top of a structural block. Because later ops overwrite earlier cells,
+  a decoration op aimed at a wall cell *deletes* that wall block (you get the prop embedded flush with
+  a hole behind it). Check each prop's cell is empty before placing it.
 - A carpet, pressure plate, torch, or rail laid over air or a gap — these need a solid block
   directly beneath or they break on spawn; never float them or run them across a stairwell.
 - A `chest`/`barrel` facing into a wall (you can't open it) or perched over a stairwell blocking
