@@ -11,37 +11,46 @@ produces the structure. **Target version: Minecraft Java 1.21.1 only** (DataVers
 
 ## How the app uses this
 
-The flow Blockwright is being built toward:
+File ▸ New Structure opens a chat that generates `.nbt`s. The flow:
 
-1. User opens a generation panel, types a prompt, and optionally attaches **reference
-   `.nbt` files** and/or **reference images**.
-2. The app spawns an agent with this folder available as context.
-3. The agent reads the relevant guides here, then emits a structure in the **authoring
-   format** (see below).
-4. The app compiles the authoring format → a real gzipped `.nbt` and **renders a live 3D
-   preview**.
-5. The agent inspects the preview / structure stats, validates against the request, and
-   iterates. This loop is the core feature — see [`07-workflow.md`](07-workflow.md).
+1. User types a prompt, and optionally attaches **reference `.nbt` files** / **reference
+   images** and a structured "[Build details]" brief (preset shell + theme, size, floors…).
+2. The app runs the chosen AI provider with these guides as the system prompt (situational
+   ones — e.g. the tower playbook — are dropped unless the prompt calls for them, to save tokens).
+3. The model emits a structure in the **authoring format** (see below) via the `emit_structure`
+   tool, describing geometry with **volumetric `ops`** and **`template`s** rather than thousands
+   of per-block entries.
+4. The app **validates + compiles** that JSON → a real gzipped `.nbt` (running the
+   post-processing passes / placement backstop), and **renders it live in the 3D viewer**.
+5. The compiled build is **screenshotted from several angles and fed back to the model**, which
+   critiques it against the prompt and **re-emits an improved version** — an emit → render →
+   review → refine loop walked through ordered design passes (massing → roof → facade → interior
+   → circulation → audit), not one shot. See [`07-workflow.md`](07-workflow.md).
 
-The agent is never editing binary NBT by hand. It writes a plain, reviewable
-intermediate; the app owns the binary encoding (correct tag types, gzip, DataVersion).
+The model never edits binary NBT by hand. It writes a plain, reviewable intermediate; the app
+owns the binary encoding (correct tag types, gzip, DataVersion) and a set of safety-net passes.
 
 ## Authoring format (decision)
 
 **The agent emits JSON**, not binary NBT and not SNBT. Reasons: LLMs are reliable at JSON,
-it maps 1:1 onto the NBT tag tree, and it's diffable for edits. The app is responsible for
-compiling that JSON to a gzipped `.nbt` with the correct NBT tag *types* (NBT distinguishes
-`int` / `double` / `byte` / `string` / typed lists — JSON does not, so the compiler applies
-the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
+it maps 1:1 onto the NBT tag tree, and it's diffable for edits. The app compiles that JSON to a
+gzipped `.nbt` with the correct NBT tag *types* (NBT distinguishes `int` / `double` / `byte` /
+`string` / typed lists — JSON does not, so the compiler applies the type rules documented in
+[`01-nbt-format.md`](01-nbt-format.md)). All examples in these guides are written in this JSON
+authoring format.
 
-> Status: the JSON→NBT compiler in the app is **not built yet**. These guides define the
-> contract it must satisfy. SNBT examples are included for reference because Minecraft's own
-> structure-block UI and `/data` use SNBT, and reference files are easiest to discuss in it.
+> The model emits **`ops`/`template`** for geometry and reserves the flat `blocks` list for
+> tiny builds and block-entity detail — see [`00-volumetric-ops.md`](00-volumetric-ops.md) and
+> [`13-templates.md`](13-templates.md). After compiling, the app runs post-processing passes
+> that fix common placement slips (floating lights, unsupported wall fixtures, fence/pane
+> connections, stairwell headroom). Treat the backstop as a net, not a license — a build that
+> needs no fixes renders right the first time and costs fewer review rounds.
 
 ## Reading order
 
 | File | What it covers |
 |------|----------------|
+| [`00-volumetric-ops.md`](00-volumetric-ops.md) | **Start here for geometry.** The volumetric build ops (`fill`/`hollow`/`walls`/`line`/`block` + `mirror`/`rotate`/`repeat`/`roof`/`stairs`) — emit these, not per-block lists. |
 | [`01-nbt-format.md`](01-nbt-format.md) | The structure `.nbt` tag tree, types, and the JSON authoring schema. |
 | [`02-coordinates-and-layout.md`](02-coordinates-and-layout.md) | Coordinate system, `size`, origin, orientation, rotations. |
 | [`03-blocks-and-blockstates.md`](03-blocks-and-blockstates.md) | Common building blocks and their blockstate properties. |
@@ -54,6 +63,7 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
 | [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |
 | [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md) | Block-by-block facade grammar & style archetypes: timber framing, dormers, balconies, porches, towers, chimneys, mansion massing & grounds. |
+| [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`house`/`basement`) × decoration theme (`abandoned`/`plain`), then layer your own ops on top. |
 | [`14-towers.md`](14-towers.md) | Standalone towers: refusing the stacked-box/monolith failures, base→shaft→crown massing, vertical emphasis, tier/machicolation rings, projecting balconies/bays/bartizans/bracket-lanterns/vines, crowns (spire/parapet/horns), a worked build order, furnished floor-by-floor interiors, lighting, bright & dark archetypes. |
 
 ## Hard rules (read before generating)
@@ -65,6 +75,9 @@ the type rules documented in [`01-nbt-format.md`](01-nbt-format.md)).
   `0 <= pos < size` on each axis (see [`02`](02-coordinates-and-layout.md)).
 - **The first palette entry by convention is `minecraft:air`**, but air blocks may simply be
   omitted from `blocks` — empty space needs no entry. Prefer omitting air to keep files small.
+- **Describe geometry with `ops`, not a giant `blocks` list** ([`00`](00-volumetric-ops.md)), and
+  stand up shells with the `template` op ([`13`](13-templates.md)). Output tokens are the dominant
+  cost; one `fill` is a whole wall. Reserve flat `blocks` for tiny builds and block-entity detail.
 - **Blockstate property values are always strings in NBT** (`"true"`, `"north"`, `"8"`),
   even when they look numeric/boolean.
 - When unsure whether a block or property exists, prefer a simpler, known-good block over an
