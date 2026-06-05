@@ -9,6 +9,11 @@ import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
 
 export interface PassContext {
   size: Vec3;
+  /** The selected structure-type id (e.g. `'house'`) when the build came from a
+   *  structure module, else undefined. Lets structure-scoped passes gate themselves —
+   *  but the gating itself is driven by the module's declared finalizers (see
+   *  `compile.ts`), so a pass receives this only for its own geometry decisions. */
+  structureType?: string;
 }
 
 export interface PassResult {

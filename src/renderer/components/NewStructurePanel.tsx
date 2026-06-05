@@ -165,6 +165,15 @@ function buildSelection(d: BuildDetails): BuildSelection {
 const hasDetails = (d: BuildDetails): boolean =>
   d.structureType !== '' || d.decoration !== '' || d.roof !== '' || d.basement !== '';
 
+/** Does a roof/basement module apply to the chosen structure? True when it declares no
+ *  `appliesTo` (fits any structure) or its `appliesTo` includes the chosen structure id.
+ *  Mirrors `moduleAppliesTo` in the domain — the renderer can't import main code, so the
+ *  trivial check is duplicated here. Drives the Details select filtering. */
+function moduleFits(m: GenerationModule, structureType: string): boolean {
+  if (!m.appliesTo || m.appliesTo.length === 0) return true;
+  return structureType !== '' && m.appliesTo.includes(structureType);
+}
+
 /** The generate chat body. Rendered inside the dock/floating chrome (which
  *  provides the title bar, detach/redock and minimize), so it only owns its own
  *  toolbar (New / Close), the warning, the transcript and the composer. */
@@ -333,12 +342,13 @@ export function GenerateContent() {
 
   const setField = useCallback(
     (key: 'structureType' | 'decoration' | 'roof' | 'basement', value: string) =>
-      // Switching structure drops the old type's params + size (they don't carry over).
-      // A basement choice re-derives the size (clears any manual override) so picking a
+      // Switching structure drops the old type's params + size (they don't carry over)
+      // AND clears the roof/basement (the compatible set is structure-specific). A
+      // basement choice re-derives the size (clears any manual override) so picking a
       // cellar auto-grows the box, mirroring the old basement param.
       setDetails((d) =>
         key === 'structureType'
-          ? { ...d, structureType: value, params: {}, size: null }
+          ? { ...d, structureType: value, params: {}, size: null, roof: '', basement: '' }
           : key === 'basement'
             ? { ...d, basement: value, size: null }
             : { ...d, [key]: value },
@@ -586,14 +596,14 @@ export function GenerateContent() {
                 <span>Roof</span>
                 <select value={details.roof} onChange={(e) => setField('roof', e.target.value)} disabled={busy || !details.structureType}>
                   <option value="">Auto</option>
-                  {(catalog?.roof ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {(catalog?.roof ?? []).filter((m) => moduleFits(m, details.structureType)).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
               <label className="gen-field">
                 <span>Basement</span>
                 <select value={details.basement} onChange={(e) => setField('basement', e.target.value)} disabled={busy || !details.structureType}>
                   <option value="">None</option>
-                  {(catalog?.basement ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  {(catalog?.basement ?? []).filter((m) => moduleFits(m, details.structureType)).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
             </div>

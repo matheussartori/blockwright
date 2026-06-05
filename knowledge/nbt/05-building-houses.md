@@ -119,12 +119,15 @@ impossible — it always produces a correct, climbable flight.
 - **One flight per rise.** Don't add a second run (or a `half:top` mirror) over the same climb — it
   blocks the passage. And keep the steps clear: never park a chest, barrel, cauldron, or carpet on or
   directly above the staircase.
-- **Don't run a flight into the shell.** A staircase needs 2 cells of headroom above every tread and
-  a clear landing at top and bottom — that space must come out of the *interior*, never the roof or
-  an outer wall. Keep interior stairs **at least one cell off the outer walls** (a stair flush to the
-  shell forces the headroom carve to gut a structural wall), and put **attic / top-floor stairs under
-  the ridge** (the tall centre of a gable roof) where there's real headroom — never under a low eave,
-  where climbing out punches a hole in the roof slope and leaves a suffocating, capped exit.
+- **Don't run a flight into the shell — and don't glue it to a wall.** A staircase needs 2 cells of
+  headroom above every tread and a clear landing at top and bottom — that space must come out of the
+  *interior*, never the roof or an outer wall. **Keep every flight at least ONE empty cell off the
+  outer walls** — never flush against a wall or jammed into a corner. The flight (and the cell you
+  stand in to start climbing) must have open floor beside it; a stair that begins glued to the wall
+  leaves no approach/standing room and forces the headroom carve to gut a structural wall. Inset the
+  whole stair core by one block from the shell. Put **attic / top-floor stairs under the ridge** (the
+  tall centre of a gable roof) where there's real headroom — never under a low eave, where climbing
+  out punches a hole in the roof slope and leaves a suffocating, capped exit.
 
 (For a *spiral* stair around a central post, place short `stairs` ops turning 90° at each landing, or
 fall back to per-block `*_stairs` only when the op's straight run truly can't express it.)
@@ -181,11 +184,15 @@ let the build's bottom be the foundation.
 
 ## Chimneys, porches, extensions
 
-- **Chimney**: a **1×1** column of `bricks`/`stone_bricks` (use 2×2 only on a genuinely large/grand
-  build) that **starts at the roof or a wall and runs the same width all the way up**, rising only
-  ~1–3 blocks past the ridge, capped with a `campfire` (smoke) or trapdoors. Keep it **modest** — a
-  chimney that's much wider/taller than its house, or a thin 1×1 stalk topped with an oversized 2×2
-  cap (a "lollipop"), looks wrong. Constant width, short, anchored to the build — not a tower.
+- **Chimney**: **exactly ONE** on a normal house (a single flue — only a genuinely large multi-wing
+  manor gets more than one). It must be **COMPLETE and CONTINUOUS**: a constant-width **1×1** column of
+  `bricks`/`stone_bricks` (2×2 only on a grand build) with **NO gaps**, seated on the **hearth/firebox
+  at floor level** and running unbroken **up the wall and OUT THROUGH the roof**, rising only ~1–3
+  blocks past the ridge. Cap it with a `campfire` (smoke) or trapdoors **resting ON the column's top
+  block** — never a campfire floating in mid-air, and never a stack that stops below the roofline (an
+  incomplete chimney that doesn't pierce the roof reads as broken). Keep it **modest** — a chimney much
+  wider/taller than its house, or a thin 1×1 stalk topped with an oversized 2×2 cap (a "lollipop"),
+  looks wrong. Constant width, short, anchored to the build — not a tower.
 - **Porch**: extend the floor out past the entrance, add `oak_fence` posts holding a small
   slab/stair roof.
 - **Bay window / wing**: bump the footprint out by 1–2 blocks on one side; keep walls/roof

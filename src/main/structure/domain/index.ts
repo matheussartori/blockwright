@@ -1,9 +1,10 @@
 // Public API of the composable generation domain: modules grouped by category
 // (structure × decoration, crossed by `composeStructure` — what the authoring
-// `template` op expands — plus roof/basement modules that are selectable guidance but
-// not yet geometry-wired), the catalog the UI lists, and the selection→knowledge-guide
-// mapping the system prompt uses.
-import type { AuthoringStructure } from '../authoring/types';
+// `template` op expands — plus roof/basement modules whose own geometry runs via
+// `composeModule`/`composeModulePreview`), the catalog the UI lists, and the
+// selection→knowledge-guide mapping the system prompt uses.
+import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
+import { composeModulePreview } from './compose';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
 import { basementModules, getBasement, listBasements } from './basements';
 import { getRoof, listRoofs, roofModules } from './roofs';
@@ -16,6 +17,8 @@ import {
 
 export {
   composeStructure,
+  composeModule,
+  composeModulePreview,
   composeBlockNames,
   isKnownStructure,
   knownStructureNames,
@@ -27,7 +30,9 @@ export {
   structureTypeIds,
   listStructureTypes,
   structureModules,
+  structureFinalizers,
   type StructureType,
+  type FinalizePass,
 } from './structure-types';
 export {
   getDecoration,
@@ -82,17 +87,30 @@ export interface ModuleSelection {
   basement?: string;
 }
 
+/** Does a module apply to a given host structure? True when it has no `appliesTo`
+ *  (applies to every structure) or its `appliesTo` includes `host`. A module with an
+ *  `appliesTo` but no host to match against does not apply. */
+export function moduleAppliesTo(appliesTo: string[] | undefined, host: string | undefined): boolean {
+  if (!appliesTo || appliesTo.length === 0) return true;
+  return host !== undefined && appliesTo.includes(host);
+}
+
 /** The module guides to include for an explicit selection (paths relative to the
  *  knowledge dir, e.g. `nbt/modules/structure/tower.md`). One guide per selected
- *  module — a roof/basement guide is loaded only when that type is chosen. */
+ *  module — a roof/basement guide loads only when that type is chosen AND it applies to
+ *  the chosen structure (so a house-only roof guide is never sent for another type). */
 export function selectedGuides(sel: ModuleSelection): string[] {
-  const lookups = [
-    sel.structureType ? getStructureType(sel.structureType) : undefined,
-    sel.decoration ? getDecoration(sel.decoration) : undefined,
-    sel.roof ? getRoof(sel.roof) : undefined,
-    sel.basement ? getBasement(sel.basement) : undefined,
-  ];
-  return lookups.flatMap((m) => (m?.knowledge ? [m.knowledge] : []));
+  const out: string[] = [];
+  const add = (m?: ModuleMeta) => {
+    if (m?.knowledge) out.push(m.knowledge);
+  };
+  add(sel.structureType ? getStructureType(sel.structureType) : undefined);
+  add(sel.decoration ? getDecoration(sel.decoration) : undefined);
+  const roof = sel.roof ? getRoof(sel.roof) : undefined;
+  if (moduleAppliesTo(roof?.appliesTo, sel.structureType)) add(roof);
+  const basement = sel.basement ? getBasement(sel.basement) : undefined;
+  if (moduleAppliesTo(basement?.appliesTo, sel.structureType)) add(basement);
+  return out;
 }
 
 /** The module guides a free-text prompt pulls in via keyword (the fallback when no
@@ -103,12 +121,37 @@ export function promptGuides(prompt: string): string[] {
     .map((m) => m.knowledge!);
 }
 
-/** Build the representative authoring structure for a module's gallery preview, or
- *  null if the module has no preview (e.g. the metadata-only roof/basement modules,
- *  whose geometry isn't wired yet). A structure preview renders that structure under the
- *  default decoration; a decoration preview renders it on the host structure. Pure — the
+/** A get-or-create palette intern over a fresh palette array (the domain-side intern
+ *  shape: name + props → index). Local to avoid a value import from the authoring layer
+ *  (which imports the domain), keeping the module boundary one-directional. */
+function localIntern(palette: AuthoringPaletteEntry[]): (name: string, props?: Record<string, string>) => number {
+  const seen = new Map<string, number>();
+  return (name, props) => {
+    const key = `${name}|${props ? Object.keys(props).sort().map((k) => `${k}=${props[k]}`).join(',') : ''}`;
+    const hit = seen.get(key);
+    if (hit !== undefined) return hit;
+    const i = palette.push({ Name: name, Properties: props }) - 1;
+    seen.set(key, i);
+    return i;
+  };
+}
+
+/** Build the representative authoring structure for a module's gallery preview, or null
+ *  if the module has no preview. A structure preview renders that structure under the
+ *  default decoration; a decoration preview renders it on the host structure (both via a
+ *  `template` op the compiler expands). A roof/basement preview runs the module's OWN
+ *  geometry (`composeModulePreview`) and ships the pre-expanded ops + palette. Pure — the
  *  caller compiles. */
 export function buildModulePreview(category: ModuleCategory, id: string): AuthoringStructure | null {
+  if (category === 'roof' || category === 'basement') {
+    const meta = category === 'roof' ? getRoof(id) : getBasement(id);
+    if (!meta?.preview) return null;
+    const [w, h, d] = meta.preview.size;
+    const palette: AuthoringPaletteEntry[] = [];
+    const ops: AuthoringOp[] = composeModulePreview(category, id, [0, 0, 0], [w - 1, h - 1, d - 1], localIntern(palette));
+    return { DataVersion: 3955, size: [w, h, d], palette, ops };
+  }
+
   let meta: ModuleMeta | undefined;
   let name: string;
   let params: Record<string, unknown>;
@@ -116,12 +159,10 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     meta = getStructureType(id);
     name = id;
     params = { decoration: DEFAULT_DECORATION };
-  } else if (category === 'decoration') {
+  } else {
     meta = getDecoration(id);
     name = PREVIEW_HOST_STRUCTURE;
     params = { decoration: id };
-  } else {
-    return null; // roof/basement are metadata-only — no preview geometry yet
   }
   if (!meta?.preview) return null;
   const [w, h, d] = meta.preview.size;

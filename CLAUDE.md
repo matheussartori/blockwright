@@ -72,11 +72,15 @@ src/
                            maps roles→blocks + decay + weathering.
         basements/ roofs/  Categories "basement"/"roof": one file per typology (roof: gable/hip;
                            basement: full/half/modular) + types.ts + index.ts (registry). SELECTABLE
-                           in the composer Details + listed in the gallery, but METADATA-ONLY — no
-                           build() geometry is wired into composeStructure yet (build/params/defaults
-                           are optional on the contracts). A pick rides into the prompt as guidance +
-                           loads only its knowledge guide. Each declares `appliesTo` (the structures
-                           it pairs with, e.g. ['house']) — a growing link for future filtering.
+                           in the composer Details (filtered by the chosen structure's `appliesTo`) +
+                           listed in the gallery. Each carries GENERIC geometry (`build()`, any host)
+                           + optional HOST-SPECIFIC extras (`integrations[host]`, e.g. house-only
+                           gable vents), run by `composeModule`/`composeModulePreview` — roofs render
+                           live in the gallery; a pick also rides into the prompt as guidance + loads
+                           only its knowledge guide. NOT yet wired into a structure type's own build
+                           (the house still emits its own roof; module delegation is the next step).
+                           Each declares `appliesTo` (the structures it pairs with, e.g. ['house']) —
+                           a growing link that drives the Details filtering + guide gating.
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -107,15 +111,23 @@ src/
                           before NBT, so the model emits ~ops not ~1000s of blocks.
       passes/             Post-processing pipeline: each Pass is (blocks,palette,ctx)→
                           {blocks,palette,fixes?,warnings?}; runPasses chains them, accumulating
-                          fixes/warnings. carveStairwells (open the shaft over a flight +
-                          clear a standing landing in front of the bottom step),
-                          connectBlocks (derive pane/bar/fence/wall sides from neighbours — the AI
-                          omits north/south/east/west, so an isolated pane would render as the bare
-                          `_post` column; splits palette per side combo), fillInteriorAir (clear
-                          each column's interior without gouging terrain). NEW quality checks plug
-                          in as a Pass here (e.g. the placement validator).
+                          fixes/warnings. ctx carries `size` + the selected `structureType`.
+                          ALWAYS-ON: carveStairwells (open the shaft over a flight + clear a standing
+                          landing in front of the bottom step), connectBlocks (derive pane/bar/fence/
+                          wall sides from neighbours — the AI omits north/south/east/west, so an
+                          isolated pane would render as the bare `_post` column; splits palette per
+                          side combo), fixDoors, fixPlacement, fillInteriorAir (clear each column's
+                          interior without gouging terrain). STRUCTURE-SCOPED finalizers, gated by the
+                          selected structure module's declared `finalize` list (see domain): insetStairs
+                          ('stairs' — any storeyed structure: shift a flight pressed against the shell
+                          one cell into the open interior, else warn; runs before carve) and fixChimney
+                          ('chimney' — house only: campfire-anchored, complete the flue / drop a
+                          floating cap / keep one chimney). NEW always-on checks plug in here; new
+                          per-structure fixes add a `FinalizePass` id + a module `finalize` entry.
       compile.ts          compileStructure / compileStructureReport / writeStructureFile
-                          (validate → resolveBlocks → runPasses → encode). writeStructureFile
+                          (validate → resolveBlocks → runPasses → encode), each taking optional
+                          CompileOptions {structureType}; `pipelineFor(structureType)` assembles the
+                          always-on passes + the module's gated finalizers. writeStructureFile
                           returns a CompileReport ({fixes,warnings}) for the generator to surface.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: initTheme() then createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
@@ -235,20 +247,34 @@ decoration, and a new module is one small file.
 - **Each type ships its own material `defaults`** (a "kit"), so it looks right even under a
   sparse decoration. `tower` carries **exterior-only** detailing (battered base, inset shaft,
   quoins, string-courses, machicolation/parapet crown, bracket lanterns) that the house lacks.
+- **A type declares its `finalize` passes** — the modular "which code fix applies to which
+  structure" map (`FinalizePass[]`). `house = ['stairs','chimney']`, `tower = ['stairs']`. The
+  compile pipeline (`pipelineFor`, via `structureFinalizers(id)`) runs each gated pass only when
+  that structure is the SELECTED one (`BuildSelection.structureType`, threaded to `writeStructureFile`)
+  — so e.g. the single-chimney fix runs on a house but never on a tower. These run on AI free-form
+  builds too (gated by the Details selection), since the model is bad at the same details code can repair.
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
   **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
   (the structure ids it pairs with — a growing link; omit = applies to all).
-- **basement/roof are selectable but METADATA-ONLY categories** (`basements/`: full/half/modular;
-  `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge`), surfaced in
-  the composer Details + the gallery, but `build()`/`params`/`defaults` are **optional** and **NOT
-  wired into `composeStructure`** yet. A selection rides into the prompt as a plain-language
-  `[Build details]` line and loads ONLY its knowledge guide (no `keywords`, so an unused roof/basement
-  guide never bloats the prompt). The house keeps `roof`/`basement` in its param spec for the legacy
-  `template name:'house'` path, marked `module:'roof'|'basement'` in `ParamDef` so `paramFields` hides
-  them from the house's own Details controls (no duplicate). **Add a roof/basement:** new file +
-  register in its `index.ts`; give it `appliesTo` + a `knowledge/nbt/modules/{roof,basement}/<id>.md`.
+- **basement/roof modules carry geometry + knowledge** (`basements/`: full/half/modular;
+  `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge` + optional
+  `build`/`params`/`defaults`/`integrations`), surfaced in the composer Details + the gallery. A
+  module's logic has two layers: a GENERIC `build()` (runs on any host) and HOST-SPECIFIC
+  `integrations[host]` (extra ops layered on only for that structure — e.g. `gable.integrations.house`
+  adds gable-end vents). Both run through **`composeModule`** (and **`composeModulePreview`**, which
+  gives a roof a host wall box) — the same palette/param machinery as a structure type, via the
+  refactored `makePalette(defaults, …)`. This powers the **gallery 3D preview** for roofs today.
+  A selection ALSO rides into the prompt as a plain-language `[Build details]` line and loads ONLY
+  its knowledge guide (no `keywords`, so an unused roof/basement guide never bloats the prompt), gated
+  by `appliesTo` (`selectedGuides` skips a roof guide that doesn't fit the chosen structure). **Not
+  yet** wired into a structure type's own build — the house still emits its own roof; the next step is
+  letting a type DELEGATE roof/basement to a module (then `composeModule(..., host)` runs in the real
+  build). The house keeps `roof`/`basement` in its param spec for the legacy `template name:'house'`
+  path, marked `module:'roof'|'basement'` in `ParamDef` so `paramFields` hides them from the house's
+  own Details controls (no duplicate). **Add a roof/basement:** new file + register in its `index.ts`;
+  give it `appliesTo` + optional `build()`/`integrations` + a `knowledge/nbt/modules/{roof,basement}/<id>.md`.
 - **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
   `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
   (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→
@@ -359,14 +385,16 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   AND ride along as a structured `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`) so
   the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`). Roof/Basement are enabled once a
-  structure is chosen and (for now) show ALL modules regardless of structure; the `appliesTo` link is
-  the hook for future per-structure filtering. The selects are registry-backed: the composer fetches the
+  structure is chosen and are FILTERED by the chosen structure's `appliesTo` (a roof that doesn't fit
+  is hidden; switching structure clears an incompatible pick) — the renderer's `moduleFits` mirrors the
+  domain's `moduleAppliesTo`. The selects are registry-backed: the composer fetches the
   categorized module catalog once via the `generationCatalog` IPC channel (`listModuleCatalog` from
   `structure/domain`), so they grow as the registries do. A "Modules" button (+ a link in Details)
   opens the **Module Gallery** (`ModulesModal`): categories (Structure/Decoration/Basement/Roof) with
   a description, the `appliesTo` link ("Applies to: House"), and a live 3D preview per module
-  (`previewModule` IPC → `catalog/module-preview.ts`) — roof/basement are metadata-only so they show
-  "Preview coming soon" until geometry is wired.
+  (`previewModule` IPC → `catalog/module-preview.ts`) — roofs render their geometry on a host wall box
+  (`composeModulePreview`); basements have geometry too but no `preview` spec yet, so they show
+  "Preview coming soon".
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

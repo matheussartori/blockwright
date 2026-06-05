@@ -30,8 +30,10 @@ do not want. Build the massing from scratch so each house reads as its own struc
 5. **Circulation with the `stairs` op.** Link every walkable level with ONE flight per
    rise using the `stairs` op (pass `fill` for tread support and `clear` to carve the
    stairwell hole + headroom). Never hand-place `*_stairs`, never stack a second inverted
-   run, never run a flight into a ceiling. Reach an attic with a flush wall ladder through
-   a carved hole, not a flight through the roof.
+   run, never run a flight into a ceiling. **Inset the stair core ≥1 cell off the outer
+   walls** — never glue the flight to a wall or jam it in a corner; the bottom step and the
+   cell you stand in to climb need open floor beside them. Reach an attic with a flush wall
+   ladder through a carved hole, not a flight through the roof.
 6. **Openings.** Carve window holes and a door gap in the otherwise-solid walls (fill an
    air index), then seat a real `*_door` in the doorway (solid jambs both sides, a floor
    beneath, hinge/facing so it opens into the room) — never leave a bare gap.
@@ -42,6 +44,11 @@ do not want. Build the massing from scratch so each house reads as its own struc
 
 1. **Roof overhang + depth.** Extend the roof one block past the walls and add a fascia
    (a slab/stair trim course) under the eave. A flush roof is the #1 "boxy" tell.
+   - **Chimney (one, complete).** If the house has a hearth, give it **exactly one** chimney:
+     a continuous `bricks`/`stone_bricks` column with no gaps, seated on the firebox and
+     running unbroken up and **through the roof** to ~1–3 blocks past the ridge, capped with a
+     `campfire`/trapdoor **resting on the top block**. Never a second stray chimney, a stack
+     that stops below the roofline, or a campfire floating above the column.
 2. **Entrance.** Seat the `*_door` in the opening, add a 1–2 block stoop/step, and frame
    the door with the `accent` material or a small porch overhang. Light it (lantern/wall
    torch beside the door).
@@ -72,5 +79,8 @@ do not want. Build the massing from scratch so each house reads as its own struc
   materials (the `cozy` decoration already spreads wall/floor/roof/accent for you).
 - No roof overhang, flush windows, a door with no frame or step.
 - A solid `fill` body that buries the interior; two roofs; a flat-lidded house.
-- Stairs that don't connect every level, or a flight punched through the roof.
+- A second/stray chimney, a chimney that stops below the roofline (doesn't pierce the roof),
+  or a campfire floating in the air above the stack instead of resting on it.
+- Stairs that don't connect every level, a flight punched through the roof, or a flight glued
+  to a wall/corner with no standing room beside it (keep the core ≥1 cell off the walls).
 - Forgetting interior light → dark, dead rooms in the preview.

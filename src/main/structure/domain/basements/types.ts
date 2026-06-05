@@ -20,8 +20,12 @@ export interface BasementModule extends ModuleMeta {
   /** This module's default block per role — its material "kit". Optional for a
    *  metadata-only basement. */
   defaults?: Partial<Record<Role, string>>;
-  /** Emit the massing as volumetric ops in terms of roles. Optional until the basement
-   *  gains code geometry — a metadata-only basement rides into generation as plain-language
-   *  guidance + its knowledge guide instead of stamping ops. */
+  /** GENERIC massing as volumetric ops in terms of roles — runs on ANY host. Optional
+   *  until the basement gains code geometry (a metadata-only basement omits it and rides
+   *  in as guidance). */
   build?(args: BuildArgs): AuthoringOp[];
+  /** HOST-SPECIFIC extra geometry, keyed by structure-type id (e.g. `house`): extra ops
+   *  layered on top of `build()` only when the basement sits under that structure.
+   *  `args.host` is the same id. Keys should be a subset of `appliesTo`. Optional. */
+  integrations?: Partial<Record<string, (args: BuildArgs) => AuthoringOp[]>>;
 }

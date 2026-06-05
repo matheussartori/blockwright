@@ -155,13 +155,14 @@ The entrance is the focal point — scale it to the build:
 
 (Modest sizing rule still applies — see [`05`](05-building-houses.md) §Chimneys.)
 
-- A constant-width `bricks`/`stone_bricks` stack anchored to a wall or rising through the roof, ~1–3
-  blocks past the ridge.
-- **Chimney pots:** top it with `*_fence`/`*_wall`/`flower_pot`/`campfire` "pots", or a cluster of
-  them on a grand multi-flue stack (the manor references have several).
-- **Smoke:** a `campfire` in the cap reads as a lit, smoking chimney.
-- Big houses can have **two or more** chimneys (one per wing/fireplace) — they help balance a long
-  silhouette.
+- A constant-width `bricks`/`stone_bricks` stack, **continuous with no gaps**, anchored to the hearth
+  and rising **through the roof** to ~1–3 blocks past the ridge (it must actually pierce the roof, not
+  stop short below the roofline).
+- **Chimney pots:** top it with `*_fence`/`*_wall`/`flower_pot`/`campfire` "pots" **resting on the
+  column's top block** (never floating above it), or a cluster of them on a grand multi-flue stack.
+- **Smoke:** a `campfire` seated on the cap reads as a lit, smoking chimney.
+- **One chimney per house by default.** Only a genuinely large, multi-wing manor gets two or more (one
+  per wing/fireplace); a normal home has a single flue — don't scatter extra stray chimneys.
 
 ---
 

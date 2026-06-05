@@ -26,6 +26,8 @@ export const house: StructureType = {
     'Decoration supplies the materials and (optionally) decay.',
   knowledge: 'nbt/modules/structure/house.md',
   preview: { size: [11, 13, 9], params: { floors: 2, attic: 'storage' } },
+  // Multi-storey (stair cleanup) + a single complete chimney — the house-only finalizers.
+  finalize: ['stairs', 'chimney'],
   params: {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
     // Surfaced in Details as the separate "Basement" module select (category

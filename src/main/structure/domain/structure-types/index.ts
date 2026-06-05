@@ -9,7 +9,7 @@ import { house } from './house';
 import { tower } from './tower';
 import type { StructureType } from './types';
 
-export type { StructureType, BuildArgs, RolePalette, Box } from './types';
+export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
 const STRUCTURE_TYPES: Record<string, StructureType> = {
   [house.id]: house,
@@ -40,4 +40,11 @@ export function listStructureTypes(): ModuleSummary[] {
 /** Every structure module (for the knowledge loader / gallery preview). */
 export function structureModules(): StructureType[] {
   return Object.values(STRUCTURE_TYPES);
+}
+
+/** The code post-processing passes a structure type opts into (empty for an unknown
+ *  id). Drives the compile pipeline's per-structure gating — the modular "which fix
+ *  applies to which structure" lookup. */
+export function structureFinalizers(id: string | undefined): import('./types').FinalizePass[] {
+  return (id ? STRUCTURE_TYPES[id]?.finalize : undefined) ?? [];
 }

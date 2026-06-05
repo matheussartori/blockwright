@@ -2,9 +2,12 @@
 // `.nbt` structure file: validate → expand ops to blocks → run the post-processing
 // passes → encode. This is the JSON→NBT step the knowledge base describes.
 import fs from 'node:fs/promises';
+import { structureFinalizers } from '../domain';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
-import { carveStairwells, connectBlocks, fillInteriorAir, fixDoors, fixPlacement, runPasses, type Pass } from './passes';
+import {
+  carveStairwells, connectBlocks, fillInteriorAir, fixChimney, fixDoors, fixPlacement, insetStairs, runPasses, type Pass,
+} from './passes';
 import type { AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
 
@@ -15,20 +18,40 @@ export interface CompileReport {
   warnings: string[];
 }
 
-// Order matters: stairwells are carved before connections are derived; door hinges
-// are mirrored on the as-authored leaves; placement is fixed against the real blocks;
-// the interior air-fill runs last so it doesn't interfere with neighbour/support
-// lookups.
-const PIPELINE: Pass[] = [carveStairwells, fixDoors, connectBlocks, fixPlacement, fillInteriorAir];
+/** Options threaded into compilation — notably the SELECTED structure-type id, so the
+ *  pipeline can run that structure's declared finalize passes (e.g. the house's chimney
+ *  fix). Omit for a context-free build (no structure-scoped passes run). */
+export interface CompileOptions {
+  structureType?: string;
+}
+
+/** Build the pass pipeline for a build. The ALWAYS-ON passes repair any structure;
+ *  the STRUCTURE-SCOPED ones are gated by the selected structure module's declared
+ *  `finalize` list (the modular "which fix applies to which structure" mapping):
+ *  `'stairs'` (multi-storey) runs BEFORE carving so the headroom carve lands on the
+ *  inset flight; `'chimney'` (house) runs after the shell is settled. */
+function pipelineFor(structureType?: string): Pass[] {
+  const fin = structureFinalizers(structureType);
+  const passes: Pass[] = [];
+  if (fin.includes('stairs')) passes.push(insetStairs);
+  // Order matters: stairwells are carved before connections are derived; door hinges
+  // are mirrored on the as-authored leaves; placement is fixed against the real blocks;
+  // the interior air-fill runs last so it doesn't interfere with neighbour/support lookups.
+  passes.push(carveStairwells, fixDoors, connectBlocks, fixPlacement);
+  if (fin.includes('chimney')) passes.push(fixChimney);
+  passes.push(fillInteriorAir);
+  return passes;
+}
 
 /** Compile to a `.nbt` buffer plus the post-processing report. */
-export function compileStructureReport(s: AuthoringStructure): { buffer: Buffer; report: CompileReport } {
+export function compileStructureReport(s: AuthoringStructure, opts?: CompileOptions): { buffer: Buffer; report: CompileReport } {
   validateAuthoring(s);
   const size = (s.size ?? [0, 0, 0]) as [number, number, number];
-  // Expand volumetric ops → blocks (transform/roof ops may extend the palette),
-  // then run the passes (connections, stairwell headroom, interior air).
+  // Expand volumetric ops → blocks (transform/roof ops may extend the palette), then
+  // run the passes (structure-scoped finalizers + connections, stairwell headroom, air).
   const resolved = resolveBlocks(s);
-  const result = runPasses(resolved.blocks, resolved.palette, { size }, PIPELINE);
+  const ctx = { size, structureType: opts?.structureType };
+  const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
     dataVersion: s.DataVersion ?? 3955,
     size,
@@ -40,13 +63,13 @@ export function compileStructureReport(s: AuthoringStructure): { buffer: Buffer;
 }
 
 /** Compile to a gzip-compressed `.nbt` buffer (Java big-endian). */
-export function compileStructure(s: AuthoringStructure): Buffer {
-  return compileStructureReport(s).buffer;
+export function compileStructure(s: AuthoringStructure, opts?: CompileOptions): Buffer {
+  return compileStructureReport(s, opts).buffer;
 }
 
 /** Compile and write the authoring JSON to `filePath`, returning the report. */
-export async function writeStructureFile(s: AuthoringStructure, filePath: string): Promise<CompileReport> {
-  const { buffer, report } = compileStructureReport(s);
+export async function writeStructureFile(s: AuthoringStructure, filePath: string, opts?: CompileOptions): Promise<CompileReport> {
+  const { buffer, report } = compileStructureReport(s, opts);
   await fs.writeFile(filePath, buffer);
   return report;
 }

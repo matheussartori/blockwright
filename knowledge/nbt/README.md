@@ -85,10 +85,13 @@ never speculatively. Categories:
 | [`modules/basement/half.md`](modules/basement/half.md) | basement | The `half-buried` basement: semi-sunk with a clerestory window band for daylight. |
 | [`modules/basement/modular.md`](modules/basement/modular.md) | basement | The `modular` undercroft: large multi-room cellar direction (geometry not yet wired). |
 
-> Roof/basement modules are **metadata + guidance** today: picking one briefs the model in
-> plain language and loads its guide, but the geometry is still built by you (the model), not
-> stamped from code. Each module declares `appliesTo` (the structures it pairs with, `['house']`
-> for now) — a growing link for reusing a roof/basement on future structure types.
+> Picking a roof/basement briefs the model in plain language and loads its guide. The modules
+> also carry their own code geometry (a generic `build()` + optional host-specific extras), used
+> for the gallery preview — but in normal generation **you (the model) still build the roof/basement
+> yourself** following the guide; the code geometry isn't stamped into your output. Each module
+> declares `appliesTo` (the structures it pairs with, `['house']` for now) — a growing link that
+> filters the picker and gates which guide loads, and lets a roof/basement be reused on future
+> structure types.
 
 ## Hard rules (read before generating)
 

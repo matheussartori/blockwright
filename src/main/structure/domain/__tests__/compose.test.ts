@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { composeStructure, isKnownStructure, knownStructureNames, type Intern } from '../compose';
-import { listModuleCatalog } from '../index';
+import { composeStructure, composeModule, composeModulePreview, isKnownStructure, knownStructureNames, type Intern } from '../compose';
+import { buildModulePreview, listModuleCatalog, selectedGuides, structureFinalizers } from '../index';
+import { compileStructure } from '../../authoring';
 
 /** A throwaway intern that just hands out incrementing indices per distinct key. */
 function stubIntern(): Intern {
@@ -88,6 +89,79 @@ describe('compose: structure types × decorations', () => {
     }
   });
 
+  it('structure modules declare their finalize passes (modular per-structure code gating)', () => {
+    // House is a hearth home → stair cleanup + single-chimney; tower is storeyed but has
+    // no chimney; an unknown id contributes nothing.
+    expect(structureFinalizers('house')).toEqual(expect.arrayContaining(['stairs', 'chimney']));
+    expect(structureFinalizers('tower')).toEqual(['stairs']);
+    expect(structureFinalizers('tower')).not.toContain('chimney');
+    expect(structureFinalizers(undefined)).toEqual([]);
+    expect(structureFinalizers('castle')).toEqual([]);
+  });
+});
+
+describe('composeModule: roof/basement module geometry runs through the compose layer', () => {
+  const from: [number, number, number] = [0, 0, 0];
+  const to: [number, number, number] = [8, 6, 8];
+
+  it('runs a roof module build() — generic geometry, any host', () => {
+    const ops = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern());
+    const roofs = ops.filter((o) => o.op === 'roof');
+    expect(roofs).toHaveLength(1);
+    expect((roofs[0] as Extract<(typeof roofs)[number], { op: 'roof' }>).style).toBe('gable');
+  });
+
+  it('layers HOST-SPECIFIC integration ops on top only for the matching host', () => {
+    const generic = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern());
+    const onHouse = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern(), 'house');
+    const onTower = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern(), 'tower');
+    // The house adds gable-end vents; a host with no integration adds nothing extra.
+    expect(onHouse.length).toBeGreaterThan(generic.length);
+    expect(onTower.length).toBe(generic.length);
+  });
+
+  it('runs a basement module build() (sealed room: floor, ceiling, walls, light)', () => {
+    const ops = composeModule('basement', 'full', from, to, { decoration: 'cozy' }, stubIntern());
+    expect(ops.filter((o) => o.op === 'fill').length).toBeGreaterThanOrEqual(2); // floor + ceiling
+    expect(ops.some((o) => o.op === 'walls')).toBe(true);
+    expect(ops.some((o) => o.op === 'block')).toBe(true); // the light
+  });
+
+  it('throws on an unknown module id', () => {
+    expect(() => composeModule('roof', 'nope', from, to, {}, stubIntern())).toThrow(/unknown roof module/);
+  });
+
+  it('composeModulePreview gives a roof a host wall box to sit on', () => {
+    const ops = composeModulePreview('roof', 'gable', from, to, stubIntern());
+    expect(ops.some((o) => o.op === 'walls')).toBe(true); // host walls under the roof
+    expect(ops.some((o) => o.op === 'roof')).toBe(true);
+  });
+
+  it('buildModulePreview returns a compilable structure for a roof, null for a preview-less basement', () => {
+    const roof = buildModulePreview('roof', 'gable');
+    expect(roof).not.toBeNull();
+    expect(roof!.palette!.length).toBeGreaterThan(0);
+    expect(roof!.ops!.some((o) => o.op === 'roof')).toBe(true);
+    expect(() => compileStructure(roof!)).not.toThrow(); // the pre-expanded ops + palette compile
+    // Basements ship no preview spec yet → no gallery preview.
+    expect(buildModulePreview('basement', 'full')).toBeNull();
+  });
+});
+
+describe('selectedGuides: roof/basement guides respect appliesTo', () => {
+  it('loads a roof guide when it applies to the chosen structure', () => {
+    const guides = selectedGuides({ structureType: 'house', roof: 'gable' });
+    expect(guides).toContain('nbt/modules/roof/gable.md');
+  });
+
+  it('does NOT load a roof guide for a structure it does not apply to', () => {
+    // gable applies to ['house']; on a tower its guide must not ride along.
+    const guides = selectedGuides({ structureType: 'tower', roof: 'gable' });
+    expect(guides).not.toContain('nbt/modules/roof/gable.md');
+  });
+});
+
+describe('compose: house roof form + determinism', () => {
   it('the roof param forces the roof form (overriding the seeded pick)', () => {
     const big: [number, number, number] = [14, 20, 14];
     const base = { floors: 1, seed: 4 };

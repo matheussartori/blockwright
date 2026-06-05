@@ -221,7 +221,9 @@ export async function generateStructure(
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
     let report: CompileReport;
     try {
-      report = await writeStructureFile(authoring, nbtPath);
+      // Thread the selected structure type so the compile runs that structure's
+      // declared finalize passes (e.g. the house's single-chimney + stair-inset fixes).
+      report = await writeStructureFile(authoring, nbtPath, { structureType: selection?.structureType });
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     } catch (err) {
       captureError = `Failed to compile the structure: ${errMessage(err)}`;

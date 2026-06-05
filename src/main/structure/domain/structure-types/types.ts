@@ -48,14 +48,28 @@ export interface RolePalette {
 }
 
 /** Everything a structure type's builder needs. The builder returns volumetric ops
- *  in terms of roles; `compose` has already resolved the theme, params, and seed. */
+ *  in terms of roles; `compose` has already resolved the theme, params, and seed.
+ *  Roof/basement modules reuse this same arg shape. */
 export interface BuildArgs {
   box: Box;
   params: ParamValues;
   palette: RolePalette;
   /** Stable per-build seed (explicit `seed` param, else derived from the box). */
   seed: number;
+  /** The host structure-type id this module is being applied to (e.g. `'house'`),
+   *  when applicable. Lets a roof/basement module run GENERIC geometry for any host
+   *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
+   *  Undefined for a structure type building itself, or a context-free preview. */
+  host?: string;
 }
+
+/** A code-owned post-processing pass a structure type opts into. The compile pipeline
+ *  maps each id to a generic pass in `authoring/passes/` and runs it ONLY when the
+ *  build's selected structure type declares it (so the gating is data on the module,
+ *  not a hardcoded `if structureType === …` buried in the pass):
+ *   - `'stairs'`  — multi-storey circulation cleanup (any storeyed structure).
+ *   - `'chimney'` — single complete chimney enforcement (house-style homes only). */
+export type FinalizePass = 'stairs' | 'chimney';
 
 /** A buildable structure archetype (house, tower, …). Behaviour-only: it never
  *  names concrete blocks, so any type composes with any decoration. Carries the
@@ -70,6 +84,11 @@ export interface StructureType extends ModuleMeta {
   defaults: Partial<Record<Role, string>>;
   /** Emit the massing as volumetric ops in terms of roles. */
   build(args: BuildArgs): AuthoringOp[];
+  /** Code post-processing passes this type opts into (run at compile when this type is
+   *  the selected structure). Omit → none. This is the modular "which fix applies to
+   *  which structure" declaration — e.g. house = `['stairs','chimney']`, tower =
+   *  `['stairs']`. */
+  finalize?: FinalizePass[];
   /** Optional system-prompt fragment (wired into the generator prompt later). */
   prompt?: string;
 }

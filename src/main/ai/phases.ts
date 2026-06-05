@@ -41,8 +41,12 @@ export const PHASES: Phase[] = [
       'or gaps along the ridge and eaves. No flat lid. Match the roof pitch and material to the style; give ' +
       'distinct wings/sections their own roofs rather than one giant span. Do NOT hand-place a slab ridge-cap ' +
       'or a slab "shelf" cantilevered off the ridge/chimney with air beneath it (the classic floating-slab bug) ' +
-      '— let the roof op cap the ridge, and build a chimney as a SOLID column flush with the roof, not a ' +
-      'perched slab. The only slabs with air below them should be a continuous eave running along the wall line. ' +
+      '— let the roof op cap the ridge. Give the house EXACTLY ONE chimney (a normal home has a single flue; ' +
+      'only a large multi-wing manor gets more): a CONTINUOUS solid column with NO gaps, rising from the ' +
+      'hearth/firebox at floor level up THROUGH the roof to ~1–3 blocks past the ridge, with its campfire/cap ' +
+      'block RESTING on the column top — NEVER a campfire floating in the air, a stack that stops below the ' +
+      'roofline (incomplete), or a second stray chimney. The only slabs with air below them should be a ' +
+      'continuous eave running along the wall line. ' +
       'CLOSE the gable-end triangles — the vertical wall under each slope at the two ends — so you can\'t see ' +
       'into the attic (pass "fill" to the roof op, or wall them yourself; they may hold a window but must not be open).',
   },
@@ -84,7 +88,9 @@ export const PHASES: Phase[] = [
       'of headroom, and a stairwell hole through the floor above — and must NOT block a doorway or a ' +
       "container's front. Its top tread must be level with the floor it serves so you walk straight off it. " +
       'Put basement/upper access in a BACK CORNER or side room — NEVER in the entrance bay or the high-traffic ' +
-      'path right inside the front door (a stair descending in front of the door is a bad layout). The stair ' +
+      'path right inside the front door (a stair descending in front of the door is a bad layout). Keep every ' +
+      'flight at least ONE cell OFF the outer walls — never flush in a corner or hugging a wall — so there is ' +
+      'standing/approach room beside it and the headroom carve does not gut a structural wall. The stair ' +
       'DOWN to the cellar must LAND in open cellar floor (a usable area) — it must not pierce the cellar shell ' +
       'and dead-end in a wall or in dirt; if there is no open floor where it lands, ENLARGE the cellar so the ' +
       'landing sits inside it. Keep door swing space and the cell in front of every chest/furnace/ladder clear.',
@@ -147,10 +153,10 @@ export interface AuditCheck {
 
 export const AUDIT_CHECKS: AuditCheck[] = [
   { id: 'massing', label: 'Massing', ask: 'Is the silhouette articulated (NOT a plain cube), with the front different from the back?' },
-  { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney?' },
+  { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney; EXACTLY ONE chimney that is a continuous column running from the hearth THROUGH the roof to ~1–3 past the ridge with its cap resting on it (no floating campfire, no chimney stopping below the roofline, no second chimney)?' },
   { id: 'facade', label: 'Facade', ask: 'Windows symmetric and centered with EQUAL end margins (not 2 one side, 3 the other), aligned across storeys; walls articulated with depth; a framed entrance (not a bare hole)?' },
   { id: 'interior', label: 'Interior', ask: 'Is EVERY habitable room both furnished and lit (no empty boxes), and any usable attic accessible + furnished (not sealed/empty)?' },
-  { id: 'circulation', label: 'Circulation', ask: 'Stairs have a clear landing at the bottom AND top (room to step on/off), headroom, REACH the floor they serve (no jump), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
+  { id: 'circulation', label: 'Circulation', ask: 'Stairs have a clear landing at the bottom AND top (room to step on/off), headroom, REACH the floor they serve (no jump), sit at least ONE cell OFF the outer walls (not flush in a corner), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
   { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor?' },
 ];
 

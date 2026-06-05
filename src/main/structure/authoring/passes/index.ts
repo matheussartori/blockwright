@@ -6,11 +6,13 @@ import type { Pass, PassContext, PassResult } from './types';
 
 export type { Pass, PassContext, PassResult } from './types';
 export { carveStairwells } from './carve-stairwells';
+export { fixChimney } from './chimney';
 export { connectBlocks, connFamily } from './connect-blocks';
 export { computeEnvelope } from './envelope';
 export { fillInteriorAir } from './fill-air';
 export { fixDoors } from './fix-doors';
 export { fixPlacement } from './placement';
+export { insetStairs } from './stairs';
 
 /** Run `passes` in order over the resolved blocks, threading each pass's output
  *  (blocks + possibly-grown palette) into the next and accumulating their

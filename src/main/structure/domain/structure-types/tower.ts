@@ -24,6 +24,8 @@ export const tower: StructureType = {
   knowledge: 'nbt/modules/structure/tower.md',
   keywords: /\b(tower|spire|turret|belfry|minaret|steeple|torre|campan|farol)\w*/i,
   preview: { size: [9, 18, 9], params: { crown: 'parapet' } },
+  // Storeyed → stair cleanup, but NO chimney finalizer (a tower isn't a hearth home).
+  finalize: ['stairs'],
   params: {
     crown: {
       kind: 'enum', default: 'parapet', values: ['parapet', 'spire', 'flat'], label: 'Crown',
