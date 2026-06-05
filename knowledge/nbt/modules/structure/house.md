@@ -32,8 +32,12 @@ do not want. Build the massing from scratch so each house reads as its own struc
    stairwell hole + headroom). Never hand-place `*_stairs`, never stack a second inverted
    run, never run a flight into a ceiling. **Inset the stair core ≥1 cell off the outer
    walls** — never glue the flight to a wall or jam it in a corner; the bottom step and the
-   cell you stand in to climb need open floor beside them. Reach an attic with a flush wall
-   ladder through a carved hole, not a flight through the roof.
+   cell you stand in to climb need open floor beside them. **In a tight footprint** (a small
+   plan with no room for a flight PLUS a breathing-room landing at the bottom and top), don't
+   cram a flight into a corner — climb with a flush **wall ladder** instead: a `ladder` column
+   against an inner face of an outer wall, rising through a 1×1 hole carved in the upper floor.
+   A ladder is one cell wide, so it fits where a flight can't. Reach an attic the same way — a
+   wall ladder through a carved hole, never a flight punched through the roof.
 6. **Openings.** Carve window holes and a door gap in the otherwise-solid walls (fill an
    air index), then seat a real `*_door` in the doorway (solid jambs both sides, a floor
    beneath, hinge/facing so it opens into the room) — never leave a bare gap.

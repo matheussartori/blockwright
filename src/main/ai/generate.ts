@@ -20,6 +20,7 @@ import { reserveLibraryPath, slugify } from './output-dir';
 import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
+import { aiLog, fixLog } from './gen-log';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
 import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 import { unknownBlockIds } from '../structure/assets/content-pack';
@@ -75,6 +76,12 @@ export async function generateStructure(
   const seed = await buildSeed(resumable, session, basePath);
   const effectivePrompt = seed + prompt;
 
+  aiLog(
+    `Starting generation with the “${cred.id}” provider (${cred.model})` +
+      `${critic ? ', independent critic enabled' : ''}. ` +
+      `The model will plan, emit geometry, then refine over the design passes.`,
+  );
+
   // Captured by the emit handler as the model emits the structure.
   let captured: Extract<GenerateResult, { ok: true }> | null = null;
   let captureError: string | null = null;
@@ -122,6 +129,7 @@ export async function generateStructure(
       currentThinking = 0;
       turns += 1;
       phase = 'thinking';
+      aiLog(`Turn ${turns}: the model is thinking through the geometry…`);
       emitProgress();
     },
     addInput(tokens) {
@@ -134,6 +142,7 @@ export async function generateStructure(
     },
     toolStarted() {
       phase = 'building';
+      aiLog('The model is writing the structure (emitting volumetric ops & blocks)…');
       emitProgress(true);
     },
     outputChars(totalChars) {
@@ -158,6 +167,10 @@ export async function generateStructure(
     const text = (t: string, isError = false): EmitToolResult => ({ content: [{ type: 'text', text: t }], isError, stop: false });
     phase = 'compiling';
     emitProgress(true);
+    aiLog(
+      `The model emitted a ${args.mode === 'patch' ? 'patch' : 'full'} structure for the ` +
+        `“${phaseAt(phaseIndex).label}” pass — validating and compiling it.`,
+    );
 
     // A patch reuses the previous version as its base and appends new geometry
     // (palette entries are append-only; later ops overwrite earlier cells). Falls
@@ -222,9 +235,14 @@ export async function generateStructure(
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
     let report: CompileReport;
     try {
+      fixLog('Compiling to .nbt and running the code fix-up passes over the build:');
       // Thread the selected structure type so the compile runs that structure's
       // declared finalize passes (e.g. the house's single-chimney + stair-inset fixes).
-      report = await writeStructureFile(authoring, nbtPath, { structureType: selection?.structureType });
+      // `log` streams each pass's play-by-play into the Console dock (fix-tagged).
+      report = await writeStructureFile(authoring, nbtPath, {
+        structureType: selection?.structureType,
+        log: fixLog,
+      });
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     } catch (err) {
       captureError = `Failed to compile the structure: ${errMessage(err)}`;
@@ -232,6 +250,12 @@ export async function generateStructure(
     }
 
     session.version = version;
+
+    fixLog(
+      report.fixes.length || report.warnings.length
+        ? `Fine-tuning complete: ${report.fixes.length} auto-fix(es), ${report.warnings.length} warning(s) left for the model.`
+        : 'Fine-tuning complete: the build needed no code corrections.',
+    );
 
     // Mirror this version to the user's library as one clean, browsable file
     // (`<slug>.nbt`) — reserved once per session from the first prompt, then
@@ -265,15 +289,16 @@ export async function generateStructure(
     if (ENV_MAX_ROUNDS == null && rounds === 1) {
       maxRounds = maxRoundsFor(size[0] * size[1] * size[2], null);
     }
-    // Per-round telemetry (dev terminal) to profile time/token cost across rounds.
-    console.log(
-      `[gen] round ${rounds}/${maxRounds} pass=${phaseAt(phaseIndex).label} ` +
-        `t=${((Date.now() - startedAt) / 1000).toFixed(1)}s in=${inputTokens} out=${displayedOutput()} ` +
-        `v${version} ${size.join('×')} ${blockCount} blocks`,
+    // Per-round telemetry (Console dock + dev terminal) to profile time/token cost.
+    aiLog(
+      `Built v${version} (${size.join('×')}, ${blockCount} blocks) on round ${rounds}/${maxRounds} · ` +
+        `pass “${phaseAt(phaseIndex).label}” · ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ` +
+        `in=${inputTokens} out=${displayedOutput()} tokens.`,
     );
 
     // Render this version and feed screenshots back so the model can review.
     phase = 'rendering';
+    aiLog('Rendering the build and capturing multi-angle screenshots for review…');
     emitProgress(true);
     let shot: { images?: GenerateImage[]; error?: string } = {};
     if (capture) {
@@ -284,6 +309,7 @@ export async function generateStructure(
       }
     }
     phase = 'reviewing';
+    aiLog('Sending the screenshots back to the model to review against the prompt and refine…');
     emitProgress(true);
 
     const atCap = rounds >= maxRounds;
@@ -359,6 +385,7 @@ export async function generateStructure(
     if (onAudit && !atCap) {
       if (critic && shot.images && shot.images.length > 0) {
         phase = 'reviewing';
+        aiLog('Audit pass: an independent critic (fresh context) is judging the build against the checklist…');
         emitProgress(true);
         try {
           const c = await critic({
@@ -370,6 +397,11 @@ export async function generateStructure(
           auditReported = true;
           bySelf = false;
           auditFailed = c.failed.map((f) => ({ label: labelFor(f.check), note: f.note }));
+          aiLog(
+            c.failed.length
+              ? `Critic verdict: ${c.failed.length} check(s) need more work — ${c.failed.map((f) => labelFor(f.check)).join(', ')}.`
+              : 'Critic verdict: every audit check passed.',
+          );
         } catch {
           /* critic unavailable this round — fall back to the self-report below */
         }
@@ -391,6 +423,12 @@ export async function generateStructure(
     });
     content.push({ type: 'text', text: gate.text });
     phaseIndex = nextIdx; // advance the pointer for the next emit (clamped at audit)
+
+    aiLog(
+      gate.stop
+        ? (atCap ? 'Reached the round budget — finishing with the current build.' : 'Audit passed — the build is accepted, finishing.')
+        : `Moving on to the “${phaseAt(nextIdx).label}” pass for the next revision.`,
+    );
 
     return { content, isError: false, stop: gate.stop };
   };
@@ -430,10 +468,10 @@ export async function generateStructure(
     endRun(sessionId, ac);
   }
 
-  // Run summary (dev terminal): the before/after baseline for efficiency work.
-  console.log(
-    `[gen] done in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${rounds} rounds · ${turns} turns · ` +
-      `in=${inputTokens} out=${displayedOutput()} tokens`,
+  // Run summary (Console dock + dev terminal): the before/after baseline for efficiency work.
+  aiLog(
+    `Generation finished in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${rounds} rounds · ${turns} turns · ` +
+      `in=${inputTokens} out=${displayedOutput()} tokens.`,
   );
 
   // `captured` is only ever assigned inside the onEmit/setSessionId closures, so

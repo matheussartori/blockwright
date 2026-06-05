@@ -5,8 +5,11 @@ import './index.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { initTheme } from './state/theme';
+import { initLogs } from './state/logs';
 
-// Apply the saved theme before the first paint of the app tree.
+// Capture console output into the Console dock from the first line, then apply
+// the saved theme before the first paint of the app tree.
+initLogs();
 initTheme();
 
 createRoot(document.getElementById('app')!).render(<App />);

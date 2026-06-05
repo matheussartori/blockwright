@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { carveStairwells, computeEnvelope, connectBlocks, fillInteriorAir, fixDoors } from '../passes';
+import { findFlights, topCeilingY } from '../passes/flights';
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
 
 const ctx = (size: [number, number, number] = [16, 16, 16]): { size: [number, number, number] } => ({ size });
@@ -94,6 +95,52 @@ describe('carveStairwells', () => {
     expect(keys).toContain('3,6,3'); // the roof above the tread is left intact
     expect(keys).toContain('4,6,3');
     expect(r.warnings?.join(' ')).toMatch(/exterior shell/);
+  });
+});
+
+describe('findFlights: a gable roof of stairs is not a climbing flight', () => {
+  // 0 = east stairs, 1 = west stairs, 2 = stone (floor/wall), 3 = planks (upper floor).
+  const palette: AuthoringPaletteEntry[] = [
+    { Name: 'minecraft:oak_stairs', Properties: { facing: 'east', half: 'bottom' } },
+    { Name: 'minecraft:oak_stairs', Properties: { facing: 'west', half: 'bottom' } },
+    { Name: 'minecraft:stone' },
+    { Name: 'minecraft:oak_planks' },
+  ];
+  // A two-storey shell (full floor planes at y=0 and y=5, perimeter walls y=1..4) with
+  // a gable roof built FROM stairs above the top floor — two opposing runs climbing to
+  // a ridge. Exactly the shape that used to be mistaken for staircases (and got its
+  // headroom gouged / spawned an attic ladder).
+  const W = 7, D = 7;
+  function shell(): AuthoringBlock[] {
+    const out: AuthoringBlock[] = [];
+    for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+      out.push({ state: 2, pos: [x, 0, z] }, { state: 3, pos: [x, 5, z] });
+    }
+    for (let y = 1; y <= 4; y++) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+      if (x === 0 || x === W - 1 || z === 0 || z === D - 1) out.push({ state: 2, pos: [x, y, z] });
+    }
+    for (let z = 0; z < D; z++) {
+      out.push({ state: 0, pos: [0, 6, z] }, { state: 0, pos: [1, 7, z] }, { state: 0, pos: [2, 8, z] });
+      out.push({ state: 1, pos: [6, 6, z] }, { state: 1, pos: [5, 7, z] }, { state: 1, pos: [4, 8, z] });
+    }
+    return out;
+  }
+
+  it('detects the ceiling plane at the top floor, below the roof', () => {
+    expect(topCeilingY(shell(), palette)).toBe(5);
+  });
+
+  it('treats none of the roof slopes as a flight', () => {
+    expect(findFlights(shell(), palette)).toHaveLength(0);
+  });
+
+  it('still detects a real interior staircase that tops out below the ceiling', () => {
+    const blocks = shell().concat([
+      { state: 0, pos: [2, 1, 3] }, { state: 0, pos: [3, 2, 3] }, { state: 0, pos: [4, 3, 3] },
+    ]);
+    const flights = findFlights(blocks, palette);
+    expect(flights).toHaveLength(1);
+    expect(flights[0].chain[0].pos).toEqual([2, 1, 3]);
   });
 });
 

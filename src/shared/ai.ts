@@ -125,10 +125,11 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     envVars: ['CODEX_API_KEY'],
     keyPlaceholder: 'sk-… (optional API key)',
     models: [
-      { id: 'gpt-5-codex', label: 'GPT-5 Codex' },
-      { id: 'gpt-5', label: 'GPT-5' },
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
     ],
-    defaultModel: 'gpt-5-codex',
+    defaultModel: 'gpt-5.5',
   },
 ];
 

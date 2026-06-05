@@ -27,6 +27,7 @@ import {
   setWorkspaceVersion,
 } from './workspace';
 import { exportStructure, notifyRecentWorkspaces, openFileDialog } from './window';
+import { getLogBacklog } from './logger';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
 
 /** Pending preview-render requests, keyed by requestId, resolved when the
@@ -54,6 +55,10 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.pathExists, async (_e, filePath: string) => {
     return fs.existsSync(filePath);
   });
+
+  // The main-process log backlog buffered before the renderer mounted, so the
+  // Console dock opens already populated with the session's history.
+  ipcMain.handle(IPC_CHANNELS.logBacklog, async () => getLogBacklog());
 
   // Recents mutations rebuild the native menu and broadcast the new list so the
   // welcome view stays in sync regardless of where the change originated.

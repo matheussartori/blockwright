@@ -14,7 +14,7 @@ import type {
   RenderResult,
   BuildSelection,
 } from './generation';
-import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory } from './app';
+import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
@@ -151,6 +151,15 @@ export interface BlockwrightApi {
   /** Notified when File ▸ Export File is chosen; the handler picks the build to
    *  save and calls `exportStructure`. */
   onExportFile: (cb: () => void) => void;
+  /** The main-process log backlog buffered before the renderer mounted, so the
+   *  Console dock starts with the full session history. */
+  getLogBacklog: () => Promise<LogEntry[]>;
+  /** Notified for each new main-process log line (live tail into the Console dock). */
+  onLogEntry: (cb: (entry: LogEntry) => void) => void;
+  /** Notified when View ▸ Block Catalog is chosen. */
+  onOpenCatalog: (cb: () => void) => void;
+  /** Notified when View ▸ Module Gallery is chosen. */
+  onOpenModules: (cb: () => void) => void;
 }
 
 declare global {

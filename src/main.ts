@@ -6,11 +6,16 @@ import { app, BrowserWindow, nativeImage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import { installMainLogger } from '@/main/logger';
 import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-protocol';
 import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
 import { buildAppMenu } from '@/main/app-menu';
 import { applyWorkspace, detectWorkspace } from '@/main/workspace';
+
+// Mirror the main-process console into the in-app Console dock from the very
+// first line (covers startup, before the window exists — buffered for the backlog).
+installMainLogger();
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {

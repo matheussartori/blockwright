@@ -25,12 +25,16 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceCh
     });
     api.onNewStructure(() => newDoc());
     api.onExportFile(() => void exportActive());
+    api.onOpenCatalog(() => st.setCatalogOpen(true));
+    api.onOpenModules(() => st.setModulesOpen(true));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
     api.onToggleWindow((id) => {
       const w = windowsStore.getState();
-      if (!w[id].visible && id !== 'controls') w.openPanel(id);
+      // `controls` (shortcuts popover) and `console` (bottom dock) are plain
+      // visibility toggles; the dockable sidebar panels surface via openPanel.
+      if (!w[id].visible && id !== 'controls' && id !== 'console') w.openPanel(id);
       else w.setVisible(id, !w[id].visible);
     });
     api.onResetWindows(() => windowsStore.getState().resetAll());
@@ -61,6 +65,8 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceCh
         jigsaw: { visible: w.jigsaw.visible, available: hasJigsaw },
         generate: { visible: w.generate.visible, available: true },
         versions: { visible: w.versions.visible, available: hasVersions },
+        // The Console dock is always available (logs exist regardless of state).
+        console: { visible: w.console.visible, available: true },
       };
       const key = JSON.stringify({ open, report });
       if (key === lastKey.current) return;

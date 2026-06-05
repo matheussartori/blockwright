@@ -8,8 +8,28 @@ export type ExportResult =
   | { ok: true; path: string }
   | { ok: false; canceled?: boolean; error?: string };
 
-/** The standardized panels/windows the View menu can show/hide. */
-export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions';
+/** The standardized panels/windows the View menu can show/hide. `console` is the
+ *  bottom log dock (see `LogEntry`); like `controls` it tracks visibility only. */
+export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions' | 'console';
+
+/** A captured console message, shared from either process into the in-app Console
+ *  dock so packaged builds surface the same logs the dev terminal shows. */
+export type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
+export type LogSource = 'main' | 'renderer';
+/** Optional category for a log line, used to colour-code the Console dock during AI
+ *  generation: `ai` = the model's own steps (planning/emitting/reviewing), `fix` =
+ *  the code-side fine-tuning passes that repair the model's build. */
+export type LogTag = 'ai' | 'fix';
+export interface LogEntry {
+  /** Epoch milliseconds when the message was emitted. */
+  ts: number;
+  level: LogLevel;
+  source: LogSource;
+  /** The fully formatted, single-string message (args already joined). */
+  text: string;
+  /** Category badge/colour for the Console dock (AI step vs code fix-up). */
+  tag?: LogTag;
+}
 
 /** Per-window state the renderer reports to main so the View menu reflects it.
  *  `available` gates the menu item's enabled state (its content can exist);

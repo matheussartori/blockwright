@@ -6,7 +6,7 @@ import { structureFinalizers } from '../domain';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
 import {
-  carveStairwells, connectBlocks, fillInteriorAir, fixChimney, fixDoors, fixPlacement, insetStairs, runPasses, type Pass,
+  carveStairwells, connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, insetStairs, runPasses, stairsToLadder, type Pass,
 } from './passes';
 import type { AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
@@ -23,6 +23,9 @@ export interface CompileReport {
  *  fix). Omit for a context-free build (no structure-scoped passes run). */
 export interface CompileOptions {
   structureType?: string;
+  /** Optional sink for the per-pass code-fix play-by-play (the AI Console dock).
+   *  Omit for context-free compiles (catalog/module previews) so they stay quiet. */
+  log?: (message: string) => void;
 }
 
 /** Build the pass pipeline for a build. The ALWAYS-ON passes repair any structure;
@@ -33,11 +36,15 @@ export interface CompileOptions {
 function pipelineFor(structureType?: string): Pass[] {
   const fin = structureFinalizers(structureType);
   const passes: Pass[] = [];
-  if (fin.includes('stairs')) passes.push(insetStairs);
+  // 'stairs': first nudge a flight off the wall (insetStairs), then convert a flight that
+  // STILL can't fit with clearance into a wall ladder (stairsToLadder) — both before carve.
+  if (fin.includes('stairs')) passes.push(insetStairs, stairsToLadder);
   // Order matters: stairwells are carved before connections are derived; door hinges
   // are mirrored on the as-authored leaves; placement is fixed against the real blocks;
-  // the interior air-fill runs last so it doesn't interfere with neighbour/support lookups.
-  passes.push(carveStairwells, fixDoors, connectBlocks, fixPlacement);
+  // circulation cleanup (drop broken ladders / cap orphan floor holes) runs once the
+  // stairwell carving + placement have settled; the interior air-fill runs last so it
+  // doesn't interfere with neighbour/support lookups.
+  passes.push(carveStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
   if (fin.includes('chimney')) passes.push(fixChimney);
   passes.push(fillInteriorAir);
   return passes;
@@ -50,7 +57,7 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
   // Expand volumetric ops → blocks (transform/roof ops may extend the palette), then
   // run the passes (structure-scoped finalizers + connections, stairwell headroom, air).
   const resolved = resolveBlocks(s);
-  const ctx = { size, structureType: opts?.structureType };
+  const ctx = { size, structureType: opts?.structureType, log: opts?.log };
   const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
     dataVersion: s.DataVersion ?? 3955,

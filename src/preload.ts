@@ -15,6 +15,7 @@ import type {
   RenderResult,
   JigsawCandidate,
   JigsawPlan,
+  LogEntry,
   StructureData,
   VersionInfo,
   Workspace,
@@ -143,6 +144,16 @@ const api: BlockwrightApi = {
   },
   onExportFile: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportFile, () => cb());
+  },
+  getLogBacklog: () => ipcRenderer.invoke(IPC_CHANNELS.logBacklog),
+  onLogEntry: (cb: (entry: LogEntry) => void) => {
+    ipcRenderer.on(IPC_EVENTS.logEntry, (_e, entry: LogEntry) => cb(entry));
+  },
+  onOpenCatalog: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.openCatalog, () => cb());
+  },
+  onOpenModules: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.openModules, () => cb());
   },
   onFileDrop: (cb: (path: string) => void) => {
     window.addEventListener('dragover', (e) => e.preventDefault());

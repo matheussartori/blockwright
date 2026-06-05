@@ -24,6 +24,9 @@ src/
   main/
     window.ts             BrowserWindow creation, open dialog, pending-open queue, BW_CAPTURE
     ipc.ts                ipcMain.handle registrations for IPC_CHANNELS
+    logger.ts             Patches the main-process console: mirrors every line into a ring buffer
+                          (backlog for the Console dock) + tails it live to the renderer over IPC,
+                          still calling the original so the terminal keeps working
     app-menu.ts           Native application menu (OS menu bar): File ▸ Open / Open Recent / Workspace
     recents.ts            Persisted "recently opened" files (last 10) in userData
     recent-workspaces.ts  Persisted "recently opened" mod workspaces (last 10) in userData
@@ -148,15 +151,17 @@ src/
                           components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
                           (Module Gallery: structure/decoration/basement/roof modules + 3D preview —
-                          store.modulesOpen)
+                          store.modulesOpen), ConsoleDock (the full-width bottom log dock — see below)
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
                           Build dialogs/controls from these so fonts/spacing/styles stay consistent.
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
-    hooks/useStores.ts    useApp / useSettings / useWindows (React bindings over the vanilla stores)
+    hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
-                          windows.ts (floating-window layout, persisted), theme.ts (apply light/dark)
+                          windows.ts (floating-window layout + the Console dock visibility/height,
+                          persisted), logs.ts (the Console dock store: patches the renderer console,
+                          pulls main's backlog + tails its live lines, capped + deduped), theme.ts
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
                           bridge) + mesh/geometry/texture building. Focused concerns split out of the
@@ -454,6 +459,16 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   shows/hides each window and offers Layout ▸ Reset Window Positions; `App.tsx` reports
   `{visible,available}` per window to main (`reportWindows`) so the menu's checkmarks/enabled state
   track the renderer (which owns the state). Don't inline window positions — go through the store.
+- **Console dock:** a `WindowId` like the others, but it's the **full-width bottom dock** (not a
+  sidebar tab or floating window), so — like `controls` — it tracks visibility only (plus a persisted,
+  resizable `consoleHeight`) and is NOT a `PanelId`. App.tsx wraps the stage row + `ConsoleDock` in a
+  `.stage-area` column so the console spans the full width (under the sidebar) while the stage shrinks
+  (the WebGL canvas resizes instead of being covered). Toggled from View ▸ Console (Cmd+Shift+K); the
+  `onToggleWindow` handler treats `console`/`controls` as plain visibility toggles (no `openPanel`).
+  It shows BOTH processes' `console.*` output (see `main/logger.ts` + `state/logs.ts`) so packaged
+  builds — with no terminal — stay inspectable. The View menu also opens the Block Catalog
+  (Cmd+Shift+B) + Module Gallery (Cmd+Shift+M) modals via their own divider group (they're modals,
+  not window toggles, so they `notifyOpenCatalog/Modules` → `store.setCatalogOpen/ModulesOpen`).
 - **Home / tabs:** `activeId === null` (documents store) is the **Home** state — the Welcome screen
   shows whenever there's no active doc, even with tabs still open. The title-bar logo button
   (`TabBar`, `goHome()`) returns there; clicking a tab restores it. The Generate dock tab has no

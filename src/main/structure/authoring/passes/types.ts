@@ -14,6 +14,10 @@ export interface PassContext {
    *  but the gating itself is driven by the module's declared finalizers (see
    *  `compile.ts`), so a pass receives this only for its own geometry decisions. */
   structureType?: string;
+  /** Optional sink for the per-pass play-by-play (the AI Console dock). When set,
+   *  `runPasses` reports each pass's intent + any fixes/warnings through it. Left
+   *  undefined for non-AI compiles (catalog/module previews) so they stay quiet. */
+  log?: (message: string) => void;
 }
 
 export interface PassResult {

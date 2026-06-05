@@ -11,6 +11,8 @@ import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './worksp
 import {
   notifyClose,
   notifyExportFile,
+  notifyOpenCatalog,
+  notifyOpenModules,
   notifyOpenSettings,
   notifyNewStructure,
   notifyRecents,
@@ -36,6 +38,7 @@ let windowsState: WindowsReport = {
   jigsaw: { visible: true, available: false },
   generate: { visible: false, available: true },
   versions: { visible: false, available: false },
+  console: { visible: false, available: true },
 };
 
 /** Update the open-file flag and rebuild the menu if it changed. */
@@ -133,6 +136,12 @@ export function buildAppMenu(): void {
       windowItem('inspector', 'Inspector', 'CmdOrCtrl+1'),
       windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+2'),
       windowItem('versions', 'Versions', 'CmdOrCtrl+3'),
+      windowItem('console', 'Console', 'CmdOrCtrl+Shift+K'),
+      // Browsers/galleries: modals rather than docked panels, so they get their
+      // own group apart from the window toggles above.
+      { type: 'separator' },
+      { label: 'Block Catalog', accelerator: 'CmdOrCtrl+Shift+B', click: () => notifyOpenCatalog() },
+      { label: 'Module Gallery', accelerator: 'CmdOrCtrl+Shift+M', click: () => notifyOpenModules() },
       { type: 'separator' },
       windowItem('controls', 'Keyboard Shortcuts', 'CmdOrCtrl+/'),
       { type: 'separator' },

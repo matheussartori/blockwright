@@ -26,6 +26,7 @@ import { ModulesModal } from './components/ModulesModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
+import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 
 function Shell() {
@@ -60,36 +61,39 @@ function Shell() {
       <div className="topbar">
         <TabBar onNew={flow.newDoc} onClose={flow.closeDocById} />
       </div>
-      <main className="stage">
-        <div className="stage-main">
-          <Viewport />
-          {!activeDoc && (
-            <Welcome
-              onOpen={() => void flow.open()}
-              onLoad={(p) => void flow.openFile(p)}
-              onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
-              onGenerate={flow.newDoc}
+      <div className="stage-area">
+        <main className="stage">
+          <div className="stage-main">
+            <Viewport />
+            {!activeDoc && (
+              <Welcome
+                onOpen={() => void flow.open()}
+                onLoad={(p) => void flow.openFile(p)}
+                onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
+                onGenerate={flow.newDoc}
+              />
+            )}
+            {activeDoc && !fileOpen && !activeDoc.loading && (
+              <div className="empty-tab">
+                <p>This tab is empty.</p>
+                <p className="empty-tab-hint">
+                  Describe a build in the Generate panel, or open an <code>.nbt</code> file.
+                </p>
+              </div>
+            )}
+            <FloatingPanels availability={availability} />
+            <WorkspaceBadge />
+            <WorkspaceSuggest
+              onAccept={() => void flow.acceptSuggest()}
+              onDismiss={() => store.getState().setSuggest(null)}
             />
-          )}
-          {activeDoc && !fileOpen && !activeDoc.loading && (
-            <div className="empty-tab">
-              <p>This tab is empty.</p>
-              <p className="empty-tab-hint">
-                Describe a build in the Generate panel, or open an <code>.nbt</code> file.
-              </p>
-            </div>
-          )}
-          <FloatingPanels availability={availability} />
-          <WorkspaceBadge />
-          <WorkspaceSuggest
-            onAccept={() => void flow.acceptSuggest()}
-            onDismiss={() => store.getState().setSuggest(null)}
-          />
-          <ShortcutsHelp available={fileOpen} />
-          <Loading />
-        </div>
-        <InspectorDock availability={availability} />
-      </main>
+            <ShortcutsHelp available={fileOpen} />
+            <Loading />
+          </div>
+          <InspectorDock availability={availability} />
+        </main>
+        <ConsoleDock />
+      </div>
       <Statusbar />
       <SettingsModal />
       <CatalogModal />

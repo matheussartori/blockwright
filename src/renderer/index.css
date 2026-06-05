@@ -347,10 +347,20 @@ body {
    shrinks `.stage-main` so the canvas (a ResizeObserver target) resizes to fit
    instead of being covered. `.stage-main` is the positioning parent for the
    viewport, overlays, badges and any torn-off floating panels. */
+/* Column wrapper for grid row 2: the stage row on top, the bottom Console dock
+   below it. Lets the console span the full width (under the sidebar too) while
+   the stage shrinks so the WebGL canvas resizes instead of being covered. */
+.stage-area {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 .stage {
   display: flex;
   overflow: hidden;
   min-height: 0;
+  flex: 1;
 }
 .stage-main {
   position: relative;
@@ -766,6 +776,202 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* --- Console (bottom log dock) --------------------------------------------- */
+
+/* A full-width dock pinned below the stage. Shares the inspector dock's surface
+   tokens for cohesion; height is set inline (resizable + persisted) so it never
+   covers the viewport — the stage shrinks above it. */
+.console-dock {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+/* The top-edge grab handle: a thin hit area straddling the border, with an
+   accent hairline on hover so it reads as draggable. */
+.console-resize {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: row-resize;
+  z-index: 2;
+}
+.console-resize::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+.console-resize:hover::after {
+  background: var(--accent);
+}
+body.row-resizing {
+  cursor: row-resize;
+  user-select: none;
+}
+
+.console-head {
+  /* Reuses .dock-head; just tightens the right-side controls into one row. */
+  gap: 8px;
+}
+.console-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text);
+}
+.console-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--panel-strong);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.console-search {
+  -webkit-app-region: no-drag;
+  flex: 1;
+  min-width: 0;
+  max-width: 280px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+.console-search:focus {
+  border-color: var(--accent);
+}
+.console-search::placeholder {
+  color: var(--text-muted);
+}
+.console-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.console-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.console-empty {
+  padding: 16px 14px;
+  color: var(--text-muted);
+  font-family: var(--font, inherit);
+  font-size: 12px;
+}
+
+/* One log line: monospace timestamp, a source pill, then the wrapped message.
+   A left rail tints by level so warnings/errors scan at a glance. */
+.log-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 1px 14px 1px 11px;
+  border-left: 3px solid transparent;
+}
+.log-row:hover {
+  background: var(--panel-strong);
+}
+.log-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.log-src {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: var(--panel-strong);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.log-src-main {
+  color: var(--accent);
+}
+.log-text {
+  color: var(--text-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.log-warn {
+  border-left-color: var(--warn);
+}
+.log-warn .log-text {
+  color: var(--warn);
+}
+.log-error {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+.log-error .log-text {
+  color: var(--danger);
+}
+.log-debug .log-text {
+  color: var(--text-muted);
+}
+
+/* Generation play-by-play: a left rail + inline badge colour-code who acted —
+   'ai' (accent/blue) = the model's own steps, 'fix' (green) = the code fix-up
+   passes. Placed after the level rules so the tag rail wins for info-level lines. */
+.log-tag-ai {
+  border-left-color: var(--accent);
+}
+.log-tag-fix {
+  border-left-color: var(--ok);
+}
+.log-badge {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: 1px;
+}
+.log-badge-ai {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.log-badge-fix {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+}
+/* Indented detail lines (the per-fix "↳ …" / "⚠ …") read as muted, secondary. */
+.log-tag-ai .log-text {
+  color: color-mix(in srgb, var(--accent) 30%, var(--text));
+}
+.log-tag-fix .log-text {
+  color: color-mix(in srgb, var(--ok) 32%, var(--text));
 }
 
 /* --- Keyboard-shortcuts help (? button + popover) -------------------------- */

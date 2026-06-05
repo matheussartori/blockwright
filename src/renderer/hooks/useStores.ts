@@ -4,6 +4,7 @@ import { useStore } from 'zustand';
 import { store, type AppState } from '../state/store';
 import { settingsStore, type SettingsState } from '../state/settings';
 import { windowsStore, type WindowsStore } from '../state/windows';
+import { logsStore, type LogsState } from '../state/logs';
 import {
   documentsStore,
   activeDocument,
@@ -30,4 +31,8 @@ export function useSettings<T>(selector: (s: SettingsState) => T): T {
 
 export function useWindows<T>(selector: (s: WindowsStore) => T): T {
   return useStore(windowsStore, selector);
+}
+
+export function useLogs<T>(selector: (s: LogsState) => T): T {
+  return useStore(logsStore, selector);
 }

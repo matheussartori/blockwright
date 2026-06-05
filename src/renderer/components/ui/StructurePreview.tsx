@@ -66,10 +66,11 @@ export function StructurePreview({ data }: { data: StructureData | null }) {
     ro.observe(mount);
 
     let raf = 0;
-    const clock = new THREE.Clock();
+    const timer = new THREE.Timer(); // THREE.Clock is deprecated; Timer is the replacement
     const animate = () => {
       raf = requestAnimationFrame(animate);
-      const dt = Math.min(clock.getDelta(), 0.1); // clamp to avoid a jump after a stall
+      timer.update();
+      const dt = Math.min(timer.getDelta(), 0.1); // clamp to avoid a jump after a stall
       if (contentRef.current) contentRef.current.rotation.y += SPIN_RATE * dt;
       renderer.render(scene, camera);
     };

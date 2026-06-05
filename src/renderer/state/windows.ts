@@ -23,14 +23,20 @@ export interface WindowState {
   y: number;
 }
 
-/** Width of a panel when floating (matches the docked sidebar width in CSS). */
+/** Width of a panel when floating (matches the docked sidebar width in CSS).
+ *  `console` is a full-width bottom dock, so its width is unused (0). */
 export const WINDOW_WIDTHS: Record<WindowId, number> = {
   controls: 200,
   inspector: 288,
   jigsaw: 288,
   generate: 380,
   versions: 240,
+  console: 0,
 };
+
+/** Default / minimum height of the bottom Console dock (px), persisted + resizable. */
+export const DEFAULT_CONSOLE_H = 240;
+export const MIN_CONSOLE_H = 120;
 
 const TITLEBAR_H = 36; // the single slim top bar (see .tabbar)
 const STATUS_H = 30;
@@ -68,6 +74,9 @@ export function homePosition(id: WindowId): { x: number; y: number } {
         x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.versions - MARGIN * 2),
         y: MARGIN,
       };
+    case 'console':
+      // Bottom dock — docked, not free-floating; position is unused.
+      return { x: MARGIN, y: MARGIN };
   }
 }
 
@@ -90,10 +99,14 @@ interface WindowsLayout {
   jigsaw: WindowState;
   generate: WindowState;
   versions: WindowState;
+  /** The bottom Console dock — like `controls`, only its `.visible` matters. */
+  console: WindowState;
   /** Which docked panel's tab is active. */
   activeTab: PanelId;
   /** When true the docked sidebar is collapsed to a thin rail. */
   sidebarCollapsed: boolean;
+  /** Height of the bottom Console dock in px (resizable, persisted). */
+  consoleHeight: number;
 }
 
 function defaults(): WindowsLayout {
@@ -107,8 +120,11 @@ function defaults(): WindowsLayout {
     // Versions docks as a sidebar tab and (like inspector/jigsaw) shows itself
     // whenever it's available — i.e. once the tab has a generated build.
     versions: freshWindow('versions'),
+    // Console starts hidden; opened on demand from View ▸ Console.
+    console: { ...freshWindow('console'), visible: false },
     activeTab: 'inspector',
     sidebarCollapsed: false,
+    consoleHeight: DEFAULT_CONSOLE_H,
   };
 }
 
@@ -127,6 +143,11 @@ function load(): WindowsLayout {
     // Generate persists like the other panels: its visibility/float/position/
     // minimized are all restored, so leaving it open re-opens it next launch.
     base.generate = { ...base.generate, ...saved.generate };
+    // Console persists its open state + height across launches.
+    base.console = { ...base.console, ...saved.console };
+    if (typeof saved.consoleHeight === 'number') {
+      base.consoleHeight = Math.max(MIN_CONSOLE_H, saved.consoleHeight);
+    }
     if (
       saved.activeTab === 'inspector' ||
       saved.activeTab === 'jigsaw' ||
@@ -153,6 +174,8 @@ export interface WindowsStore extends WindowsLayout {
   setFloating: (id: PanelId, floating: boolean) => void;
   setActiveTab: (id: PanelId) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  /** Set the bottom Console dock's height (clamped to the minimum). */
+  setConsoleHeight: (height: number) => void;
   /** Re-dock every panel, re-show the sidebar, and reset floating positions. */
   resetAll: () => void;
 }
@@ -181,6 +204,7 @@ export const windowsStore = createStore<WindowsStore>((set) => ({
     }) as Partial<WindowsStore>),
   setActiveTab: (id) => set({ activeTab: id }),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  setConsoleHeight: (height) => set({ consoleHeight: Math.max(MIN_CONSOLE_H, height) }),
   resetAll: () => set(defaults()),
 }));
 
@@ -191,8 +215,10 @@ function snapshot(s: WindowsStore): WindowsLayout {
     jigsaw: s.jigsaw,
     generate: s.generate,
     versions: s.versions,
+    console: s.console,
     activeTab: s.activeTab,
     sidebarCollapsed: s.sidebarCollapsed,
+    consoleHeight: s.consoleHeight,
   };
 }
 

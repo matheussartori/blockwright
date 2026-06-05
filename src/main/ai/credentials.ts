@@ -154,7 +154,11 @@ export function setModel(id: AiProviderId, model: string): void {
 /** The model chosen for a provider, falling back to its default. */
 export function modelFor(id: AiProviderId): string {
   const meta = providerMeta(id);
-  return prefs().models[id]?.trim() || meta?.defaultModel || '';
+  const saved = prefs().models[id]?.trim();
+  // Ignore a stored model that the provider no longer offers (e.g. a model id
+  // that was deprecated upstream), so a stale pref can't keep sending a dead id.
+  if (saved && meta?.models.some((m) => m.id === saved)) return saved;
+  return meta?.defaultModel || '';
 }
 
 // --- environment-pinned credentials ------------------------------------------

@@ -121,6 +121,16 @@ export function notifyNewStructure(): void {
   mainWindow?.webContents.send(IPC_EVENTS.newStructure);
 }
 
+/** Ask the renderer to open the Block Catalog modal (View menu). */
+export function notifyOpenCatalog(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openCatalog);
+}
+
+/** Ask the renderer to open the Module Gallery modal (View menu). */
+export function notifyOpenModules(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openModules);
+}
+
 /** Window icon (the standardized logo-dark) for Windows/Linux — macOS uses the
  *  app bundle icon. */
 function windowIcon(): string | undefined {

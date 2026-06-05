@@ -87,6 +87,9 @@ export const IPC_CHANNELS = {
   chatHistoryGet: 'chat-history:get',
   /** Persist per-NBT chat history (payload: key + ChatRecord). */
   chatHistorySave: 'chat-history:save',
+  /** The buffered main-process logs captured before/while the renderer mounts,
+   *  so the Console dock starts populated → LogEntry[]. */
+  logBacklog: 'log:backlog',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -118,4 +121,11 @@ export const IPC_EVENTS = {
    *  against the reference. Payload: { requestId, path, version }; the renderer
    *  replies on IPC_CHANNELS.aiRenderResult. */
   aiRenderRequest: 'ai-render-request',
+  /** A console message captured in the main process, pushed live to the renderer's
+   *  Console dock — payload is a LogEntry. */
+  logEntry: 'log-entry',
+  /** Open the Block Catalog modal (View menu). */
+  openCatalog: 'open-catalog',
+  /** Open the Module Gallery modal (View menu). */
+  openModules: 'open-modules',
 } as const;
