@@ -92,6 +92,11 @@ src/
                             Anthropic/OpenAI; flat string-schema for Gemini/Codex)
       credentials.ts        Multi-provider credential store (per-provider secret via safeStorage) +
                             active-provider/model prefs + env precedence
+      session.ts            Per-chat session state (provider session id + version counter + hidden
+                            scratch dir `<userData>/generated/<sessionId>/vN.nbt`) + AbortControllers
+      output-dir.ts         The user's browsable structure LIBRARY: configurable folder (default
+                            `~/Documents/Blockwright`, `BW_OUTPUT_DIR` overrides) where each session's
+                            current build is mirrored as one clean `<slug-from-prompt>.nbt` file
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
@@ -288,7 +293,8 @@ decoration, and a new module is one small file.
 File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation is
 **provider-agnostic** (`src/main/ai/`): `generate.ts` owns everything backend-neutral — sessions, the
 `emit_structure` handler that validates + compiles the authoring JSON (`structure/authoring/`) to a
-versioned temp `.nbt`, the emit→render→**review** loop (screenshots fed back so the model refines
+versioned scratch `.nbt` (hidden under `<userData>/generated/`, `session.ts`) that is also mirrored to
+a clean `<slug>.nbt` in the user's browsable library (`output-dir.ts`), the emit→render→**review** loop (screenshots fed back so the model refines
 against the prompt/reference, not blind), the round budget, and the live token/phase progress — then
 dispatches the LLM transport to a **provider driver** (`providers/`). The shared contract lives in
 `providers/types.ts` (`Driver` + `onEmit` + `DriverProgress`); the shared system prompt + tool schema

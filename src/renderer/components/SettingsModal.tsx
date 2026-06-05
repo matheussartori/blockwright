@@ -1,4 +1,4 @@
-// The Settings dialog: a tabbed panel (Appearance / Viewer / AI / About) built on
+// The Settings dialog: a tabbed panel (Appearance / Viewer / AI / Library / About) built on
 // the shared Modal primitive, with a left nav like the OS settings apps. Each tab is
 // its own component in ./settings; this shell owns only the nav + tab dispatch. Tabs
 // mutate `settingsStore`; applying values to the viewer/theme happens in one place
@@ -11,13 +11,15 @@ import { Modal } from './ui/Modal';
 import { AppearanceTab } from './settings/AppearanceTab';
 import { ViewerTab } from './settings/ViewerTab';
 import { AiTab } from './settings/AiTab';
+import { LibraryTab } from './settings/LibraryTab';
 import { AboutTab } from './settings/AboutTab';
 
-type TabId = 'appearance' | 'viewer' | 'ai' | 'about';
+type TabId = 'appearance' | 'viewer' | 'ai' | 'library' | 'about';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'viewer', label: 'Viewer' },
   { id: 'ai', label: 'AI' },
+  { id: 'library', label: 'Library' },
   { id: 'about', label: 'About' },
 ];
 
@@ -68,6 +70,7 @@ export function SettingsModal() {
         {tab === 'appearance' && <AppearanceTab />}
         {tab === 'viewer' && <ViewerTab />}
         {tab === 'ai' && <AiTab />}
+        {tab === 'library' && <LibraryTab />}
         {tab === 'about' && <AboutTab />}
       </div>
     </Modal>

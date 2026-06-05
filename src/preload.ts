@@ -86,6 +86,9 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiPrimeSession, sessionId, sdkSessionId, version),
   aiListVersions: (sessionId: string): Promise<VersionInfo[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiListVersions, sessionId),
+  aiGetOutputDir: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.aiGetOutputDir),
+  aiChooseOutputDir: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.aiChooseOutputDir),
+  revealPath: (target: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.revealPath, target),
   chatHistoryGet: (key: string): Promise<ChatRecord | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.chatHistoryGet, key),
   chatHistorySave: (key: string, record: ChatRecord): Promise<void> =>

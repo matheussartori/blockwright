@@ -16,6 +16,7 @@ import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, P
 import { auditGateFeedback } from './audit-gate';
 import { maxRoundsFor } from './rounds';
 import { beginRun, endRun, getSession } from './session';
+import { reserveLibraryPath, slugify } from './output-dir';
 import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
@@ -231,6 +232,18 @@ export async function generateStructure(
     }
 
     session.version = version;
+
+    // Mirror this version to the user's library as one clean, browsable file
+    // (`<slug>.nbt`) — reserved once per session from the first prompt, then
+    // overwritten each version. Best-effort: the scratch `vN.nbt` stays the
+    // source of truth, so a failed copy never aborts generation.
+    try {
+      if (session.libraryPath === undefined) session.libraryPath = reserveLibraryPath(slugify(prompt));
+      if (session.libraryPath) await fsp.copyFile(nbtPath, session.libraryPath);
+    } catch {
+      /* library mirror failed — keep going on the scratch version */
+    }
+
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     const blockCount = resolveBlocks(authoring).blocks.length;
     captured = {

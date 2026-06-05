@@ -1,5 +1,5 @@
 // Registers the main-process handlers for the IPC contract in shared/ipc.ts.
-import { app, dialog, ipcMain, nativeTheme } from 'electron';
+import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { AssembleOptions, BuildSelection, ChatRecord, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
@@ -12,6 +12,7 @@ import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { getConfig, setActiveProvider, setModel, setCredential, clearCredential } from './ai/credentials';
+import { getOutputDir, setOutputDir } from './ai/output-dir';
 import type { AiProviderId } from '@/shared/ai';
 import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/jigsaw/template-pool';
@@ -166,6 +167,24 @@ export function registerIpc(): void {
     primeSession(sessionId, sdkSessionId, version),
   );
   ipcMain.handle(IPC_CHANNELS.aiListVersions, async (_e, sessionId: string) => listVersions(sessionId));
+
+  ipcMain.handle(IPC_CHANNELS.aiGetOutputDir, async () => getOutputDir());
+  ipcMain.handle(IPC_CHANNELS.aiChooseOutputDir, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: getOutputDir(),
+    });
+    const picked = result.canceled ? null : result.filePaths[0];
+    return picked ? setOutputDir(picked) : null;
+  });
+  ipcMain.handle(IPC_CHANNELS.revealPath, async (_e, target: string) => {
+    try {
+      fs.mkdirSync(target, { recursive: true });
+    } catch {
+      /* reveal a path that may already exist / can't be made — let openPath decide */
+    }
+    await shell.openPath(target);
+  });
 
   ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
   ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));

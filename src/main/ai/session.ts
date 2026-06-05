@@ -15,6 +15,11 @@ export interface Session {
   version: number;
   /** Per-session scratch dir under the generated root. */
   dir: string;
+  /** Clean library file this session mirrors its current build to (`<slug>.nbt`
+   *  under the user's output dir — see output-dir.ts). Reserved once on the first
+   *  emit, then overwritten each version. `undefined` until the first emit;
+   *  `null` once reserved if the folder couldn't be created (don't retry). */
+  libraryPath?: string | null;
 }
 
 const sessions = new Map<string, Session>();
@@ -23,11 +28,12 @@ const sessions = new Map<string, Session>();
 // and a new run supersedes the previous one.
 const activeRuns = new Map<string, AbortController>();
 
-/** Temp root for generated structures: repo-local `.generated` in dev (gitignored),
- *  userData when packaged. Override with `BW_GENERATED`. */
+/** Hidden scratch root for the iteration churn (`<sessionId>/vN.nbt`) — lives in
+ *  userData in dev and packaged alike (the user-facing copies go to the browsable
+ *  library, see output-dir.ts). Override with `BW_GENERATED`. */
 function generatedRoot(): string {
   if (process.env.BW_GENERATED) return process.env.BW_GENERATED;
-  return app.isPackaged ? path.join(app.getPath('userData'), 'generated') : path.join(app.getAppPath(), '.generated');
+  return path.join(app.getPath('userData'), 'generated');
 }
 
 /** The scratch dir for a session (its id sanitised to a safe folder name). */

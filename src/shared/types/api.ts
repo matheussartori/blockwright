@@ -83,6 +83,12 @@ export interface BlockwrightApi {
   /** List the compiled versions (`vN.nbt`) on disk for a generation session, so the
    *  Versions panel can offer earlier builds to view. Empty when none/unknown. */
   aiListVersions: (sessionId: string) => Promise<VersionInfo[]>;
+  /** The folder where finished structures are auto-saved as clean `<slug>.nbt` files. */
+  aiGetOutputDir: () => Promise<string>;
+  /** Open a native folder picker for the library folder; resolves to the chosen (persisted) dir, or null if cancelled. */
+  aiChooseOutputDir: () => Promise<string | null>;
+  /** Reveal a path in the OS file manager (Finder/Explorer), creating the folder first if missing. */
+  revealPath: (target: string) => Promise<void>;
   /** Load persisted chat history for a key (a file path, or a session id), or null. */
   chatHistoryGet: (key: string) => Promise<ChatRecord | null>;
   /** Persist chat history for a key (debounced by the caller). */

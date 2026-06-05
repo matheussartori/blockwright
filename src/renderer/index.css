@@ -2109,6 +2109,11 @@ body {
   align-items: center;
   gap: 8px;
 }
+/* Breathing room when the key input sits directly under the Model select row
+   (API providers have no note between them — they'd otherwise touch). */
+.setting-row + .setting-key-row {
+  margin-top: 12px;
+}
 .setting-key-input {
   flex: 1;
   min-width: 0;
@@ -2172,12 +2177,19 @@ body {
   margin-left: auto;
 }
 
-/* Active-provider banner: a compact, accent-led summary of what runs. */
+/* Active-provider banner: a compact, accent-led summary of what runs. Reads as a
+   self-contained card (accent rail + soft tint) rather than a bare border line, so
+   the accent bar never sits flush against the text. */
 .ai-active-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 11px 14px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
   border-left: 3px solid var(--accent);
+  border-radius: 8px;
 }
 .ai-active-label {
   font-size: 12px;

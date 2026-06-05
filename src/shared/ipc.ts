@@ -63,6 +63,12 @@ export const IPC_CHANNELS = {
   aiPrimeSession: 'ai:prime-session',
   /** List a session's compiled versions on disk (payload: sessionId) → VersionInfo[]. */
   aiListVersions: 'ai:list-versions',
+  /** Get the folder where finished structures are saved (the browsable library) → string. */
+  aiGetOutputDir: 'ai:get-output-dir',
+  /** Open a native folder picker for the library folder; returns the chosen dir (persisted) or null. */
+  aiChooseOutputDir: 'ai:choose-output-dir',
+  /** Reveal a path in the OS file manager (Finder/Explorer); creates the folder first if missing. */
+  revealPath: 'shell:reveal-path',
   /** Renderer's reply to an aiRenderRequest: the captured preview image(s) (or an
    *  error). Payload: requestId + { images? , error? }. */
   aiRenderResult: 'ai:render-result',
