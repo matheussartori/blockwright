@@ -8,6 +8,14 @@ export interface GenerateImage {
   data: string;
 }
 
+/** The modules the user picked in the composer Details (structure type + decoration).
+ *  Threaded into generation as STRUCTURED data — separate from the prompt text — so the
+ *  system prompt loads only the selected modules' knowledge guides. */
+export interface BuildSelection {
+  structureType?: string;
+  decoration?: string;
+}
+
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
  *  its metadata, or an error message for the UI to surface. */
 export type GenerateResult =

@@ -13,8 +13,9 @@ import type { OpCtx } from './context';
  *  comes from the perpendicular extent of the box (give `from`/`to` a spread on
  *  the other horizontal axis for a wider flight). Optional `fill` puts a solid
  *  support block under each tread (a stringer, so the run never floats); optional
- *  `clear` (an air index) carves 2 blocks of headroom above every tread, cutting
- *  the stairwell hole through any floor/ceiling above so the climb isn't blocked. */
+ *  `clear` (an air index) carves 2 blocks of headroom above every tread (cutting
+ *  the stairwell hole through any floor/ceiling above) AND the arrival landing one
+ *  cell past the top tread, so the climb isn't blocked at either end. */
 export function applyStairs(op: Extract<AuthoringOp, { op: 'stairs' }>, ctx: OpCtx): void {
   const { cells, palette, intern, size } = ctx;
   const [ax, ay, az] = op.from;
@@ -45,6 +46,20 @@ export function applyStairs(op: Extract<AuthoringOp, { op: 'stairs' }>, ctx: OpC
       set(x, y, z, stairIdx);
       if (op.fill !== undefined) set(x, y - 1, z, op.fill); // solid tread support (stringer)
       if (op.clear !== undefined) { set(x, y + 1, z, op.clear); set(x, y + 2, z, op.clear); } // headroom + stairwell hole
+    }
+  }
+  // Clear the arrival LANDING: the cell one step PAST the top tread, at walking
+  // height + head. Standing on the top tread your feet are at yTop+1, and you step
+  // forward onto the upper floor — without this the top step butts straight into
+  // the upper wall/ceiling and there's no room to walk off the flight.
+  if (op.clear !== undefined) {
+    const topAlong = runStart + runSign * steps; // one past the last tread
+    const topY = ay + ySign * (steps - 1);
+    for (let w = wMin; w <= wMax; w++) {
+      const x = runX ? topAlong : w;
+      const z = runX ? w : topAlong;
+      set(x, topY + 1, z, op.clear);
+      set(x, topY + 2, z, op.clear);
     }
   }
 }

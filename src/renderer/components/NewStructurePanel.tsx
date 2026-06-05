@@ -15,7 +15,7 @@ import { documentsStore } from '../state/documents';
 import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc } from '../hooks/useStores';
 import { api } from '../api';
-import type { GenerateProgress, FloorDef, GenerationCatalog } from '@/shared/types';
+import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
@@ -65,73 +65,90 @@ const EXAMPLES = [
   'A cozy cabin with a pitched spruce roof and a porch',
 ];
 
-/** Optional, non-binding hints the user can set to steer a fresh build. They're
- *  folded into the prompt as a structured brief — every field is optional. */
+/** The build modules the user picked for a fresh build: a structure type, a
+ *  decoration, and the structure's tunable params (floors/basement/attic/…). They
+ *  describe WHAT to build as plain-language guidance AND ride along as a structured
+ *  selection so the system prompt loads only those modules' guides. They never emit a
+ *  `template` op — the model designs the build itself (no stamped initial shell). */
 interface BuildDetails {
-  buildType: string;
-  style: string;
-  width: string;
-  depth: string;
-  height: string;
-  floors: string;
-  rooms: string;
-  basement: string;
-  materials: string;
-  decay: string;
-  furnished: string;
-  lighting: string;
-  /** A ready-made shell to start from (a structure-type id from the registry), and
-   *  the decoration theme to build it with — both expanded by a `template` op. */
-  presetType: string;
-  theme: string;
+  structureType: string;
+  decoration: string;
+  /** Structure-type param values, keyed by param name. Missing keys fall back to
+   *  the param's default when the brief is built. */
+  params: Record<string, string | number>;
+  /** Explicit build size [W, D, H]. `null` = use the size derived from the params
+   *  (so picking floors/basement/attic auto-sizes the box); set when the user edits. */
+  size: { w: number; d: number; h: number } | null;
 }
 
-const EMPTY_DETAILS: BuildDetails = {
-  buildType: '', style: '', width: '', depth: '', height: '', floors: '',
-  rooms: '', basement: '', materials: '', decay: '', furnished: '', lighting: '',
-  presetType: '', theme: '',
-};
+const EMPTY_DETAILS: BuildDetails = { structureType: '', decoration: '', params: {}, size: null };
 
-const BUILD_TYPES = ['House', 'Tower', 'Cabin', 'Ruin', 'Bridge', 'Wall', 'Dungeon room', 'Shrine', 'Barn', 'Tree house', 'Other'];
-const BASEMENTS = ['None', 'Small', 'Large', 'Multi-room complex'];
-const DECAYS = ['None', 'Light', 'Moderate', 'Heavy'];
-const FURNISHINGS = ['Empty', 'Basic', 'Detailed'];
-const LIGHTINGS = ['Dim', 'Medium', 'Bright'];
-
-/** Build the structured-hints block appended to the prompt, or '' if nothing set. */
-function buildBrief(d: BuildDetails): string {
-  const lines: string[] = [];
-  if (d.presetType) {
-    const theme = d.theme ? ` with the "${d.theme}" decoration theme` : '';
-    const themeParam = d.theme ? `, params.theme "${d.theme}"` : '';
-    lines.push(
-      `- Start from the "${d.presetType}" preset shell${theme}: emit a \`template\` op ` +
-      `(name "${d.presetType}"${themeParam}) as the base massing, then layer your own ops on top.`,
-    );
-  }
-  if (d.buildType) lines.push(`- Type: ${d.buildType}`);
-  if (d.style) lines.push(`- Style/theme: ${d.style}`);
-  if (d.width || d.depth || d.height) {
-    lines.push(`- Approx footprint W×D / height: ${d.width || '?'}×${d.depth || '?'} / ${d.height || '?'}`);
-  }
-  if (d.floors) lines.push(`- Floors: ${d.floors}`);
-  if (d.rooms) lines.push(`- Rooms: ${d.rooms}`);
-  if (d.basement) {
-    lines.push(
-      d.basement === 'Multi-room complex'
-        ? '- Underground: a large MULTI-ROOM underground complex (dungeon/undercroft/catacomb) — many connected rooms off corridors, with at least one bigger/taller pillared hall, and stairs/landings linking it to the surface. Every room must be COMPLETELY DIFFERENT — its own function, layout, materials, furniture and light colour (e.g. library, prison, forge, bath, vault) — not the same room repeated or rooms that only differ in size. Make the underground footprint MUCH larger than the surface build and centre any surface build over it. Build it per 08-complex-structures.md §"Multi-room underground complex" (room grammar included).'
-        : `- Basement: ${d.basement}`,
-    );
-  }
-  if (d.materials) lines.push(`- Preferred materials: ${d.materials}`);
-  if (d.decay) lines.push(`- Decay / ruin level: ${d.decay}`);
-  if (d.furnished) lines.push(`- Interior: ${d.furnished}`);
-  if (d.lighting) lines.push(`- Lighting: ${d.lighting}`);
-  if (lines.length === 0) return '';
-  return `\n\n[Build details — optional hints from the user; honor them unless they conflict with the request above or with sound building.]\n${lines.join('\n')}`;
+/** The full param set for the chosen structure: the user's picks merged over each
+ *  param's default — so the brief always names every structural param explicitly,
+ *  never leaving floors/basement/attic to the model to infer. */
+function resolveDetailParams(d: BuildDetails, struct: GenerationModule | undefined): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const p of struct?.params ?? []) out[p.name] = d.params[p.name] ?? p.default;
+  return out;
 }
 
-const hasDetails = (d: BuildDetails): boolean => Object.values(d).some((v) => v.trim() !== '');
+/** A sensible default build size for the chosen structure + params, so the box is
+ *  never too small for the levels asked for (the old "suffocatingly small" failure).
+ *  A storeyed structure (one with a `floors` param) sizes its height to fit the
+ *  basement + floors + roof; others get a tall-ish default. The user can override. */
+function derivedSize(struct: GenerationModule | undefined, params: Record<string, string | number>): { w: number; d: number; h: number } {
+  const hasFloors = (struct?.params ?? []).some((p) => p.name === 'floors');
+  const w = 11, d = 11;
+  if (!hasFloors) return { w: 9, d: 9, h: 16 }; // e.g. a tower
+  const floors = Number(params.floors ?? 1);
+  const basement = params.basement && params.basement !== 'none' ? 1 : 0;
+  const attic = params.attic && params.attic !== 'none' ? 1 : 0;
+  const levels = floors + basement;
+  const h = levels * 5 + Math.floor(Math.min(w, d) / 2) + 1 + (attic ? 2 : 0);
+  return { w, d, h };
+}
+
+/** The effective size: the user's override, else the derived default. */
+function effectiveSize(d: BuildDetails, struct: GenerationModule | undefined): { w: number; d: number; h: number } {
+  return d.size ?? derivedSize(struct, resolveDetailParams(d, struct));
+}
+
+/** Build the structured-hints block appended to the prompt, or '' if no structure
+ *  module was chosen. The structure picker is OPTIONAL guidance: it tells the model
+ *  WHAT to build (type, decoration, size, per-type params) in plain language and asks
+ *  it to design the build ITSELF from scratch with its own ops. It deliberately does
+ *  NOT emit a `template` op — no stamped initial shell (that made every house look the
+ *  same); the per-type params (floors/basement/attic/…) ride along only as intent. */
+function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): string {
+  if (!d.structureType) return '';
+  const s = catalog?.structure.find((m) => m.id === d.structureType);
+  const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
+  const sz = effectiveSize(d, s);
+  const label = s?.label ?? d.structureType;
+  const decoClause = deco ? ` with the "${deco.label}" decoration (its materials and mood)` : '';
+  // Plain-language characteristics from the per-type params (floors/basement/…),
+  // skipping internal-only knobs the user never sets as design intent.
+  const traits = Object.entries(resolveDetailParams(d, s))
+    .filter(([k]) => k !== 'seed' && k !== 'decay')
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(', ');
+  return (
+    `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +
+    `- Build a ${label}${decoClause}, roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D).\n` +
+    (traits ? `- Desired characteristics: ${traits}.\n` : '') +
+    `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`
+  );
+}
+
+/** The structured selection sent alongside the prompt (drives knowledge loading). */
+function buildSelection(d: BuildDetails): { structureType?: string; decoration?: string } {
+  return {
+    structureType: d.structureType || undefined,
+    decoration: d.decoration || undefined,
+  };
+}
+
+const hasDetails = (d: BuildDetails): boolean => d.structureType !== '' || d.decoration !== '';
 
 /** The generate chat body. Rendered inside the dock/floating chrome (which
  *  provides the title bar, detach/redock and minimize), so it only owns its own
@@ -144,7 +161,6 @@ export function GenerateContent() {
   const progress = doc?.progress ?? null;
   const startedAt = doc?.startedAt ?? null;
 
-  const structure = doc?.structure ?? null;
   const floors = doc?.floors ?? [];
 
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -197,18 +213,13 @@ export function GenerateContent() {
     return () => store.getState().setFloorsEditing(false);
   }, [showFloors]);
 
-  // Pre-fill the Details size from the open structure (an existing .nbt, or a
-  // generated build) so editing starts from its real dimensions — but only while
-  // the user hasn't typed their own size yet. size is [W, H, D].
+  // Details (structure/decoration) is an optional convenience, not a required first
+  // step — start every conversation with it collapsed so a build can come from a
+  // free-form prompt alone.
   useEffect(() => {
-    const sz = structure?.size;
-    if (!sz) return;
-    setDetails((d) =>
-      d.width || d.depth || d.height
-        ? d
-        : { ...d, width: String(sz[0]), height: String(sz[1]), depth: String(sz[2]) },
-    );
-  }, [structure?.size]);
+    setShowDetails(false);
+    setShowFloors(false);
+  }, [doc?.id]);
 
   // Floor edits persist immediately (with the chat history) so a defined plan
   // survives a restart even before the next prompt is sent.
@@ -266,17 +277,19 @@ export function GenerateContent() {
   const send = useCallback(async () => {
     const prompt = input.trim();
     const staged = attachments;
-    const brief = buildBrief(details);
+    const brief = buildBrief(details, catalog);
     if (!prompt && staged.length === 0 && !brief) return;
     // Generate into the active tab; if the panel was opened with no tab open,
     // create one so the build has somewhere to live.
     const ds = documentsStore.getState();
     const docId = ds.activeId ?? ds.newDoc();
     if (ds.documents.find((d) => d.id === docId)?.busy) return;
-    // Fold the optional details into the prompt as a structured brief. They steer
-    // a fresh build, so clear them after sending (follow-up edits shouldn't keep
-    // re-sending stale hints).
+    // Fold the chosen modules into the prompt as a structured brief, and send the
+    // selection separately so the system prompt loads only those modules' guides.
+    // They steer a fresh build, so clear them after sending (follow-up edits
+    // shouldn't keep re-sending stale hints).
     const composed = prompt ? prompt + brief : brief ? `Generate a structure with these details:${brief}` : prompt;
+    const selection = buildSelection(details);
     setInput('');
     setAttachments([]);
     setDetails(EMPTY_DETAILS);
@@ -286,8 +299,9 @@ export function GenerateContent() {
       docId,
       composed,
       staged.map((a) => a.dataUrl),
+      selection,
     );
-  }, [input, attachments, details]);
+  }, [input, attachments, details, catalog]);
 
   const cancel = useCallback(() => {
     if (doc) cancelGeneration(doc.id);
@@ -303,7 +317,22 @@ export function GenerateContent() {
   }, [doc]);
 
   const setField = useCallback(
-    (key: keyof BuildDetails, value: string) => setDetails((d) => ({ ...d, [key]: value })),
+    (key: 'structureType' | 'decoration', value: string) =>
+      // Switching structure drops the old type's params + size (they don't carry over).
+      setDetails((d) => (key === 'structureType' ? { ...d, structureType: value, params: {}, size: null } : { ...d, [key]: value })),
+    [],
+  );
+
+  // Changing a structural param re-derives the size (clears any manual override), so
+  // picking "2 floors + basement" auto-grows the box instead of staying too small.
+  const setParam = useCallback(
+    (name: string, value: string | number) => setDetails((d) => ({ ...d, params: { ...d.params, [name]: value }, size: null })),
+    [],
+  );
+
+  const setSize = useCallback(
+    (axis: 'w' | 'd' | 'h', value: number, base: { w: number; d: number; h: number }) =>
+      setDetails((d) => ({ ...d, size: { ...(d.size ?? base), [axis]: Math.max(3, Math.min(64, value)) } })),
     [],
   );
 
@@ -314,6 +343,13 @@ export function GenerateContent() {
   const clearVersions = useCallback(() => {
     if (doc) clearVersioning(doc.id);
   }, [doc]);
+
+  // A structure module is OPTIONAL — a build can come from a free-form prompt alone.
+  // The selected structure (if any) drives the param controls + an adaptable scaffold.
+  const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
+  const canSend =
+    available !== false &&
+    (!!input.trim() || attachments.length > 0 || !!details.structureType);
 
   return (
     <div className="gen-content" role="dialog" aria-label="Generate structure">
@@ -335,6 +371,13 @@ export function GenerateContent() {
           onClick={() => store.getState().setCatalogOpen(true)}
         >
           Blocks
+        </button>
+        <button
+          className="btn sm"
+          title="Browse the structure/decoration modules with live 3D previews"
+          onClick={() => store.getState().setModulesOpen(true)}
+        >
+          Modules
         </button>
       </div>
 
@@ -492,81 +535,84 @@ export function GenerateContent() {
         )}
         {showDetails && (
           <div className="gen-details">
+            <p className="gen-details-hint">
+              Optional: pick a structure as an adaptable starting scaffold, and a
+              decoration for its look. Leave them empty to build purely from your prompt.{' '}
+              Open the{' '}
+              <button className="link" onClick={() => store.getState().setModulesOpen(true)} disabled={busy}>
+                module gallery
+              </button>{' '}
+              to preview what each one builds.
+            </p>
             <div className="gen-details-grid">
               <label className="gen-field">
-                <span>Preset shell</span>
-                <select value={details.presetType} onChange={(e) => setField('presetType', e.target.value)} disabled={busy}>
+                <span>Structure</span>
+                <select value={details.structureType} onChange={(e) => setField('structureType', e.target.value)} disabled={busy}>
                   <option value="">None</option>
-                  {(catalog?.structureTypes ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  {(catalog?.structure ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
               <label className="gen-field">
-                <span>Theme</span>
-                <select value={details.theme} onChange={(e) => setField('theme', e.target.value)} disabled={busy || !details.presetType}>
+                <span>Decoration</span>
+                <select value={details.decoration} onChange={(e) => setField('decoration', e.target.value)} disabled={busy || !details.structureType}>
                   <option value="">Default</option>
-                  {(catalog?.themes ?? []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-              </label>
-              <label className="gen-field">
-                <span>Type</span>
-                <select value={details.buildType} onChange={(e) => setField('buildType', e.target.value)} disabled={busy}>
-                  <option value="">Any</option>
-                  {BUILD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </label>
-              <label className="gen-field gen-field-wide">
-                <span>Style / theme</span>
-                <input type="text" value={details.style} placeholder="cozy, abandoned, medieval…" onChange={(e) => setField('style', e.target.value)} disabled={busy} />
-              </label>
-              <label className="gen-field gen-field-size">
-                <span>Size (W×D×H)</span>
-                <span className="gen-size-inputs">
-                  <input type="number" min={1} value={details.width} placeholder="W" onChange={(e) => setField('width', e.target.value)} disabled={busy} />
-                  <input type="number" min={1} value={details.depth} placeholder="D" onChange={(e) => setField('depth', e.target.value)} disabled={busy} />
-                  <input type="number" min={1} value={details.height} placeholder="H" onChange={(e) => setField('height', e.target.value)} disabled={busy} />
-                </span>
-              </label>
-              <label className="gen-field gen-field-sm">
-                <span>Floors</span>
-                <input type="number" min={1} value={details.floors} placeholder="—" onChange={(e) => setField('floors', e.target.value)} disabled={busy} />
-              </label>
-              <label className="gen-field gen-field-sm">
-                <span>Rooms</span>
-                <input type="number" min={1} value={details.rooms} placeholder="—" onChange={(e) => setField('rooms', e.target.value)} disabled={busy} />
-              </label>
-              <label className="gen-field">
-                <span>Basement</span>
-                <select value={details.basement} onChange={(e) => setField('basement', e.target.value)} disabled={busy}>
-                  <option value="">—</option>
-                  {BASEMENTS.map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </label>
-              <label className="gen-field gen-field-wide">
-                <span>Materials</span>
-                <input type="text" value={details.materials} placeholder="spruce, cobblestone, dark oak…" onChange={(e) => setField('materials', e.target.value)} disabled={busy} />
-              </label>
-              <label className="gen-field">
-                <span>Decay</span>
-                <select value={details.decay} onChange={(e) => setField('decay', e.target.value)} disabled={busy}>
-                  <option value="">—</option>
-                  {DECAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </label>
-              <label className="gen-field">
-                <span>Interior</span>
-                <select value={details.furnished} onChange={(e) => setField('furnished', e.target.value)} disabled={busy}>
-                  <option value="">—</option>
-                  {FURNISHINGS.map((f) => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </label>
-              <label className="gen-field">
-                <span>Lighting</span>
-                <select value={details.lighting} onChange={(e) => setField('lighting', e.target.value)} disabled={busy}>
-                  <option value="">—</option>
-                  {LIGHTINGS.map((l) => <option key={l} value={l}>{l}</option>)}
+                  {(catalog?.decoration ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
             </div>
+            {selStruct?.params && selStruct.params.length > 0 && (
+              <div className="gen-details-grid">
+                {selStruct.params.map((p) => (
+                  <label key={p.name} className="gen-field">
+                    <span>{p.label}</span>
+                    {p.kind === 'int' ? (
+                      <input
+                        type="number"
+                        min={p.min}
+                        max={p.max}
+                        value={Number(details.params[p.name] ?? p.default)}
+                        disabled={busy}
+                        onChange={(e) => {
+                          const n = Math.trunc(Number(e.target.value));
+                          setParam(p.name, Math.max(p.min, Math.min(p.max, Number.isFinite(n) ? n : p.default)));
+                        }}
+                      />
+                    ) : (
+                      <select
+                        value={String(details.params[p.name] ?? p.default)}
+                        disabled={busy}
+                        onChange={(e) => setParam(p.name, e.target.value)}
+                      >
+                        {p.options.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </label>
+                ))}
+              </div>
+            )}
+            {selStruct && (
+              <div className="gen-details-grid">
+                {(['w', 'd', 'h'] as const).map((axis) => {
+                  const sz = effectiveSize(details, selStruct);
+                  const label = axis === 'w' ? 'Width' : axis === 'd' ? 'Depth' : 'Height';
+                  return (
+                    <label key={axis} className="gen-field">
+                      <span>{label}{details.size ? '' : ' (auto)'}</span>
+                      <input
+                        type="number"
+                        min={3}
+                        max={64}
+                        value={sz[axis]}
+                        disabled={busy}
+                        onChange={(e) => setSize(axis, Math.trunc(Number(e.target.value)) || sz[axis], sz)}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         {showFloors && (
@@ -667,7 +713,7 @@ export function GenerateContent() {
           </button>
           <button
             className={`btn sm gen-details-toggle${hasDetails(details) ? ' has-details' : ''}`}
-            title="Optional build details (type, size, materials…)"
+            title="Optional build details: structure type, decoration, floors/basement/attic…"
             aria-pressed={showDetails}
             disabled={busy || available === false}
             onClick={() =>
@@ -703,7 +749,7 @@ export function GenerateContent() {
             <button
               className="btn primary gen-send"
               onClick={() => void send()}
-              disabled={(!input.trim() && attachments.length === 0) || available === false}
+              disabled={!canSend}
             >
               Send
             </button>

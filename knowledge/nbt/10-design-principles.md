@@ -51,7 +51,8 @@ one of these before handing off:
 > drops floor torches/candles/carpets/plates with nothing solid under them, re-anchors or removes
 > wall fixtures with no solid backing (or ones facing into a wall), seats floating `top` slabs onto
 > the block below, clears anything sitting on a chest lid, opens doorways plugged by a wall, and carves
-> stairwell headroom + a bottom landing. Treat this as a net for slips — NOT permission to relax.
+> stairwell headroom + a clear landing at the bottom AND top of every flight. Treat this as a net
+> for slips — NOT permission to relax.
 > A build that needs no fixes renders right the first time and spends fewer revision rounds, so still
 > place everything correctly per the rules below; the rules and the compiler agree, the compiler just
 > catches misses.
@@ -267,6 +268,14 @@ The entrance should be the **focal point**, not just a hole.
   or flower box outside.
 - **Rhythm:** repeat windows on a regular grid (e.g. 2-wide panes separated by 1–2 wall blocks),
   and **align them vertically** between storeys. Irregular, random windows read as a mistake.
+- **Centre the row — equal end margins.** A row of windows must sit symmetric on its face: the
+  wall left of the first window equals the wall right of the last. Compute it, don't eyeball it.
+  For a face of width `W` with `n` windows of width `w` and `n-1` equal gaps `g`, the leftover
+  `W − n·w − (n−1)·g` must split into two **equal** end margins — so it has to be even. If it isn't,
+  change `n`, `w`, or `g` (or add/drop a window) until the ends match; never let one end be 2 blocks
+  and the other 3. Tip: **odd window counts centre more easily** — put one window dead-centre on the
+  bay's middle column and mirror the rest outward. A wall of `2, win, 3, win, 3, win, 3` (margins
+  2 vs 3) is the classic mistake; `2, win, 2, win, 2, win, 2` or a centred odd layout reads as built.
 - Use `glass_pane`/`iron_bars` for a paned/leaded look, full `glass` for big modern openings,
   `*_stained_glass` as an accent (chapel, feature wall).
 
@@ -330,7 +339,8 @@ Catch these in the preview ([`07`](07-workflow.md)):
 - ❌ Air gap beside a door → ✅ wall sealed flush to both jambs so the door actually blocks the way.
 - ❌ Perfect symmetric cube → ✅ rectangular/L-shaped footprint, wing/bay/tower, distinct front.
 - ❌ Build sits on flat grass → ✅ foundation course, path, planting, terrain tie-in.
-- ❌ Random/misaligned windows → ✅ regular rhythm, vertically aligned, framed/inset.
+- ❌ Random/misaligned/off-centre windows → ✅ regular rhythm, vertically aligned, centred with
+  equal end margins, framed/inset.
 - ❌ Dark or empty/cluttered rooms → ✅ lit, zoned, anchor + supporting props, no bare floors.
 - ❌ Floating block / freestanding ladder / lantern "holding up" a pillar → ✅ everything supported,
   ladders flush to a wall, lights hung from above or set on a block.

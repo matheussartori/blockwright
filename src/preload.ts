@@ -4,11 +4,13 @@ import type { AiConfig, AiProviderId } from '@/shared/ai';
 import type {
   AssembleOptions,
   BlockwrightApi,
+  BuildSelection,
   ChatRecord,
   ExportResult,
   GenerateImage,
   GenerateProgress,
   GenerateResult,
+  ModuleCategory,
   RenderRequest,
   RenderResult,
   JigsawCandidate,
@@ -34,6 +36,8 @@ const api: BlockwrightApi = {
   listCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.catalogList),
   previewBlock: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.previewBlock, id),
   generationCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.generationCatalog),
+  previewModule: (category: ModuleCategory, id: string): Promise<StructureData> =>
+    ipcRenderer.invoke(IPC_CHANNELS.previewModule, category, id),
   setThemeSource: (pref: 'system' | 'light' | 'dark') => ipcRenderer.invoke(IPC_CHANNELS.themeSet, pref),
   openWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceOpen),
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
@@ -66,8 +70,14 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiSetCredential, id, secret),
   aiClearCredential: (id: AiProviderId): Promise<AiConfig> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiClearCredential, id),
-  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string): Promise<GenerateResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, basePath),
+  aiGenerate: (
+    sessionId: string,
+    prompt: string,
+    images?: GenerateImage[],
+    selection?: BuildSelection,
+    basePath?: string,
+  ): Promise<GenerateResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, selection, basePath),
   aiCancel: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiCancel, sessionId),
   aiResetSession: (sessionId: string): Promise<void> =>

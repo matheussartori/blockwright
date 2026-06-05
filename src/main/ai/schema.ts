@@ -10,7 +10,7 @@
 //
 // Both resolve to the same EmitArgs the orchestrator's handler consumes.
 import { type AuthoringStructure, OP_NAMES } from '../structure/authoring';
-import { loadKnowledge } from './knowledge';
+import { loadKnowledge, type ModuleSelection } from './knowledge';
 import { AUDIT_CHECK_IDS, PHASE_IDS, phaseOverview } from './phases';
 
 export const EMIT_TOOL_NAME = 'emit_structure';
@@ -227,7 +227,7 @@ cohesive materials, surface depth, a pitched/edged roof with an overhang, a fram
 base, articulated massing for larger builds (wings/sections with their own roofs rather than one giant \
 box). Avoid the symmetric cube: give larger builds an irregular silhouette (L/T footprint, a wing, \
 bay, porch, tower, or off-centre entrance) with a front that differs from the back — not four \
-interchangeable faces. For a TOWER specifically, follow 14-towers.md: never ship a stack of identical \
+interchangeable faces. For a TOWER specifically, follow the tower module guide: never ship a stack of identical \
 boxes or a uniform-width monolith with a flat top — give it a flared/grounded base, a shaft that \
 TAPERS with continuous vertical ribs/buttresses (not hard seams between storeys), projecting detail \
 (balconies, bay windows, bartizans, bracket-lanterns, vines), a real CROWN (spire/battlement/horns, \
@@ -322,8 +322,9 @@ it before building: map each listed block to a palette entry, fix "size" from th
 and lay out each floor from its plan — this is a precision copy, not a free interpretation.`;
 
 /** The full system prompt: instructions, the phased design workflow, then the NBT
- *  knowledge base (only the guides relevant to `prompt` — situational ones like the
- *  tower playbook are dropped when the build doesn't call for them). */
-export function systemPrompt(prompt = ''): string {
-  return `${INSTRUCTIONS}\n\n# Design passes\n\n${phaseOverview()}\n\n# NBT generation knowledge base\n\n${loadKnowledge(prompt)}`;
+ *  knowledge base (every core guide, plus the module guides for the selected
+ *  structure/decoration — or, with no selection, the ones the prompt's keywords pull
+ *  in — so unrelated module playbooks don't bloat the cached prompt). */
+export function systemPrompt(prompt = '', selection?: ModuleSelection): string {
+  return `${INSTRUCTIONS}\n\n# Design passes\n\n${phaseOverview()}\n\n# NBT generation knowledge base\n\n${loadKnowledge(prompt, selection)}`;
 }

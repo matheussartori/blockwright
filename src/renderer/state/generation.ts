@@ -9,7 +9,7 @@
 // its conversation and the SDK session can resume.
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage, FloorDef } from '@/shared/types';
+import type { GenerateImage, FloorDef, BuildSelection } from '@/shared/types';
 import { basename, dirname } from '../ui/path';
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
@@ -190,6 +190,7 @@ export async function runGeneration(
   docId: string,
   prompt: string,
   imageUrls: string[],
+  selection?: BuildSelection,
 ): Promise<void> {
   const docs = documentsStore.getState();
   const doc = docs.documents.find((d) => d.id === docId);
@@ -227,7 +228,7 @@ export async function runGeneration(
   // "change X" edits it rather than building anew (main ignores its own outputs).
   const basePath = doc.path ?? undefined;
   try {
-    const result = await api.aiGenerate(doc.sessionId, promptText, images, basePath);
+    const result = await api.aiGenerate(doc.sessionId, promptText, images, selection, basePath);
     if (result.ok) {
       docs.appendChat(docId, {
         role: 'assistant',

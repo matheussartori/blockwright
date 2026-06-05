@@ -34,14 +34,31 @@ export interface CatalogBlock {
   texture: string | null;
 }
 
-/** A selectable id+label pair (a structure type or a decoration theme). */
-export interface GenerationCatalogItem {
+/** The four generation module categories. */
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof';
+
+/** A structure type's tunable param, projected for the composer's Details controls. */
+export type ModuleParam =
+  | { name: string; kind: 'int'; label: string; default: number; min: number; max: number }
+  | { name: string; kind: 'enum'; label: string; default: string; options: { value: string; label: string }[] };
+
+/** A generation module, as surfaced to the composer's selects + the module gallery. */
+export interface GenerationModule {
   id: string;
   label: string;
+  category: ModuleCategory;
+  /** One-paragraph description for the gallery screen. */
+  description: string;
+  /** Whether a 3D preview can be composed for this module (gallery). */
+  hasPreview: boolean;
+  /** Tunable params (structure types only) → the Details controls. */
+  params?: ModuleParam[];
 }
 
-/** The composable generation registry, surfaced to the composer's preset picker. */
+/** The generation module registry, grouped by category. */
 export interface GenerationCatalog {
-  structureTypes: GenerationCatalogItem[];
-  themes: GenerationCatalogItem[];
+  structure: GenerationModule[];
+  decoration: GenerationModule[];
+  basement: GenerationModule[];
+  roof: GenerationModule[];
 }

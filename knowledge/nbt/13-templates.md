@@ -1,4 +1,4 @@
-# Templates (structure types × decoration themes)
+# Templates (structure types × decorations)
 
 A **template** op stands up a whole building shell for you. Instead of hand-authoring
 every wall, floor and the roof, you emit one `template` op and the compiler turns it
@@ -6,9 +6,16 @@ into correct geometry. Templates are the cheapest way to start a believable shel
 use one as the starting massing, then layer your own `ops`/`blocks` on top to make it
 specific (the visual review loop will show you what to refine).
 
-A template names a **structure type** (the massing — `house`, `basement`) and is given
-a **decoration theme** (the look — `abandoned`, `plain`). The same type composes with
-any theme, so you pick the form and the mood independently.
+A template names a **structure type** (the massing — currently `tower`) and is given a
+**decoration** (the look — `cozy`). The same type composes with any decoration, so you
+pick the form and the mood independently. Each structure type has its own deeper guide
+(the module guide for `tower`), loaded when you select or mention it.
+
+> **Houses do NOT have a template — build them yourself.** There is no `house` preset:
+> when the user wants a house/cottage/cabin, design and lay its massing, roof, floors,
+> stairs, doors and windows with your own ops (see `05-building-houses.md` and the house
+> module guide). Never emit `{ op: 'template', name: 'house' }` — it is not a structure
+> type, and a stamped house shell is exactly what we do NOT want.
 
 ## The `template` op
 
@@ -18,21 +25,21 @@ any theme, so you pick the form and the mood independently.
   "name": "house",
   "from": [0, 0, 0],
   "to": [20, 12, 16],
-  "params": { "theme": "abandoned", "wall": "minecraft:cobblestone", "floors": 2, "decay": 0.25 }
+  "params": { "decoration": "cozy", "wall": "minecraft:spruce_planks", "floors": 2 }
 }
 ```
 
 - `from`/`to` — the inclusive bounding box the template fills, in the same 0-indexed
   coordinates as every other op. It MUST fit inside `size`.
-- `name` — the structure type: **`house`** or **`basement`**. (The old names
-  `abandoned_house` and `large_basement` still work as aliases for `house`/`basement`
-  with the `abandoned` theme.)
+- `name` — the structure type: **`tower`** (houses have no template — build them by hand).
 - `params` — all optional; sensible defaults apply:
-  - `theme` — `abandoned` (default: weathered, with decay) or `plain` (intact, no decay).
+  - `decoration` — the look. Currently **`cozy`** (the default): warm woods, lantern
+    light, intact (no decay). (`theme` is accepted as a legacy alias for `decoration`.)
   - **per-role block overrides** — any of `wall`, `floor`, `ceiling`, `roof`, `corner`,
-    `window`, `pillar`, `light`, … set a full 1.21.1 block ID (`minecraft:spruce_planks`)
-    for that role, overriding the theme. A mod namespace works when a workspace is active.
-  - **shape/behaviour params** — per type (see below): `floors`, `decay`, `shape`, `seed`.
+    `window`, `trim`, `foundation`, `light`, … set a full 1.21.1 block ID
+    (`minecraft:spruce_planks`) for that role, overriding the decoration. A mod namespace
+    works when a workspace is active.
+  - **shape/behaviour params** — per type (see below): `floors`, `crown`, `decay`, `seed`.
 
 A `template` op is just a normal op: it applies **in order** with everything else, and
 **later ops overwrite earlier cells**. So the usual pattern is:
@@ -46,69 +53,41 @@ give you a correct starting point, not a finished build.
 
 ## Structure types
 
-### `house`
-A storeyed house: foundation slab, 4-sided walls with framed corner posts, upper-storey
-floors, a centred door, window bands per storey, a pitched stair roof, and (under the
-`abandoned` theme) optional decay (holes + moss). Box should be at least `5×5` footprint
-and `5` tall (so the roof fits); taller/wider reads better.
+### `tower`
+A tall, vertically-emphasised tower built as **base → shaft → crown**: a wider battered
+base, an inset shaft with corner quoins, per-storey string-course rings and window slits,
+bracket lanterns, and a crown. Use a small square-ish footprint (≈`5×5`–`9×9`) and make
+it tall (`H ≥ 9` for a real crown). See the tower module guide for the full playbook.
 
 | param | default | meaning |
 |-------|---------|---------|
-| `wall` | `minecraft:cobblestone` | main wall block |
-| `corner` (or `accent`) | `minecraft:spruce_log` | corner posts |
-| `floor` | `minecraft:spruce_planks` | upper-storey floor slabs |
-| `roof` | `minecraft:spruce_stairs` | roof block — **must be a `*_stairs`** |
-| `window` | `minecraft:glass_pane` | window block |
-| `floors` | `1` | number of storeys (1–4) |
-| `decay` | `0.2` | 0 = pristine, 1 = heavy ruin (holes + moss). The `plain` theme forces 0. |
+| `wall` | (decoration) | shaft walls |
+| `foundation` | (decoration) | battered base |
+| `corner` | (decoration) | corner quoin posts |
+| `trim` | (decoration) | string-course rings + cap |
+| `roof` | (decoration) | spire block (`*_stairs`) when `crown: spire` |
+| `crown` | `parapet` | `parapet` (machicolations + battlements) · `spire` (pitched) · `flat` |
+| `decay` | `0` (cozy) | ruin level, 0–1. Cozy keeps this at 0. |
 
-### `basement`
-A sunken cellar: a **sealed** stone shell with a distinct floor and ceiling and a grid of
-support pillars (each lit on top). Its **footprint is carved to a varied shape** (L / T /
-U / plus / rect) so cellars aren't always a plain square box — leave `shape` as the
-default `auto` to get a seeded plan, or pin one. Place the box **low** (small/zero `y`)
-and put the above-ground build on top of it within the same `size`. The cellar has **no
-built-in access on purpose** — the ceiling is solid so uneven terrain can never expose
-its interior; YOU connect it to the house by carving a stairwell (a `stairs` op + an
-air-index hole) down from the ground floor where they meet, placed in a back corner or
-side room (never the entrance).
+## Decorations
 
-| param | default | meaning |
-|-------|---------|---------|
-| `wall` | `minecraft:cobblestone` | shell walls |
-| `floor` | `minecraft:stone_bricks` | floor |
-| `ceiling` | `minecraft:cobblestone` | ceiling |
-| `pillar` | `minecraft:stone_bricks` | support pillars |
-| `light` | `minecraft:lantern` | pillar-top light fixture |
-| `decay` | `0.25` | moss weathering, 0–1. The `plain` theme forces 0. |
-| `shape` | `auto` | footprint: `auto` (seeded pick of `rect`/`l`/`t`/`u`) · or pin `rect`/`l`/`t`/`u`/`plus` (`plus` only when explicit) |
-| `seed` | from position | integer; change it to get a different `auto`/carved layout |
+| decoration | look |
+|------------|------|
+| `cozy` (default) | warm woods, lantern light, intact — no decay, no weathering |
 
-> The footprint only varies when the box is at least `5×5`; smaller boxes stay
-> rectangular. Pillars and decay all follow the carved shape.
+(More decorations are planned. If the user wants a ruined/abandoned look, say it isn't
+available yet rather than half-applying decay to cozy.)
 
-## Decoration themes
-
-| theme | look |
-|-------|------|
-| `abandoned` (default) | weathered: the type's decay level applies, and stone walls pick up moss |
-| `plain` | intact: decay forced to 0, no weathering — same materials, clean |
-
-## Worked example — house over a cellar
-
-`size` must contain both boxes. Here the cellar is `y 0..5`, the house `y 5..17`:
+## Worked example — a cozy tower
 
 ```json
 {
-  "size": [21, 18, 17],
+  "size": [9, 18, 9],
   "palette": [{ "Name": "minecraft:air" }],
   "ops": [
-    { "op": "template", "name": "basement",
-      "from": [1, 0, 1], "to": [19, 5, 15],
-      "params": { "theme": "abandoned", "decay": 0.3 } },
-    { "op": "template", "name": "house",
-      "from": [0, 5, 0], "to": [20, 17, 16],
-      "params": { "theme": "abandoned", "wall": "minecraft:cobblestone", "floors": 2, "decay": 0.25 } }
+    { "op": "template", "name": "tower",
+      "from": [0, 0, 0], "to": [8, 17, 8],
+      "params": { "decoration": "cozy", "crown": "parapet" } }
   ]
 }
 ```

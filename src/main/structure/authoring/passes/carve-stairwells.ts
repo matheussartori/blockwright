@@ -2,14 +2,15 @@
 //  1. an open shaft ABOVE it — 2 blocks of headroom over every tread, and a hole
 //     through whatever floor/ceiling sits at the top (else the stairs "lead
 //     nowhere", capped by the upper floor with no room to climb);
-//  2. a standing LANDING in front of the BOTTOM step — at least one clear cell (body
-//     + head height) to step onto before ascending. Models often jam the first step
-//     flush against a wall, so there's nowhere to stand to start the climb (and it
-//     looks bad).
-// This pass repairs both for any flight regardless of how it was authored: it finds
-// treads that belong to an actual climbing run (a same-facing stair one step up or
-// down along the ascent diagonal), clears the headroom above each, and — at the
-// bottom step of each run — clears the landing cell directly in front of it. It only
+//  2. a standing LANDING at each END — at the BOTTOM step, a clear cell (body + head)
+//     to step onto before ascending; at the TOP step, the same one cell forward where
+//     you walk off onto the upper floor. Models often jam the bottom step flush against
+//     a wall (nowhere to start the climb) or run the top step straight into the upper
+//     wall/ceiling (nowhere to get off) — both look bad and aren't traversable.
+// This pass repairs all of it for any flight regardless of how it was authored: it
+// finds treads that belong to an actual climbing run (a same-facing stair one step up
+// or down along the ascent diagonal), clears the headroom above each, and — at the
+// bottom/top step of each run — clears the landing cell back/forward of it. It only
 // fires on real flights and never deletes another stair, so decorative single stairs
 // (chairs, desks) and open roof slopes are left untouched.
 import { posKey } from '../geometry';
@@ -62,6 +63,17 @@ export const carveStairwells: Pass = (blocks, palette) => {
     if (!hasLowerBehind) {
       for (const dy of [0, 1]) {
         const key = posKey(x - fx, y + dy, z - fz);
+        const cell = at.get(key);
+        if (cell && !isBottomStair(cell.state)) remove.add(key);
+      }
+    }
+    // Top step of the run (no higher tread ahead) → clear the ARRIVAL landing one
+    // cell forward, at body + head height (the floor block you step onto stays).
+    // Without it the top step butts into the upper wall/ceiling with no room to walk
+    // off the flight — the recurring "no space to climb up/down" defect.
+    if (!hasUpperAhead) {
+      for (const dy of [1, 2]) {
+        const key = posKey(x + fx, y + dy, z + fz);
         const cell = at.get(key);
         if (cell && !isBottomStair(cell.state)) remove.add(key);
       }

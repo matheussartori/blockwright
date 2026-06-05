@@ -12,8 +12,9 @@ import type {
   GenerateProgress,
   RenderRequest,
   RenderResult,
+  BuildSelection,
 } from './generation';
-import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog } from './app';
+import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory } from './app';
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
@@ -65,7 +66,13 @@ export interface BlockwrightApi {
    *  Optional reference images are sent to the model as visual guidance. `basePath` is
    *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model with
    *  that structure so the first prompt edits it instead of building from scratch. */
-  aiGenerate: (sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string) => Promise<GenerateResult>;
+  aiGenerate: (
+    sessionId: string,
+    prompt: string,
+    images?: GenerateImage[],
+    selection?: BuildSelection,
+    basePath?: string,
+  ) => Promise<GenerateResult>;
   /** Cancel the in-flight generation for a session (resolves the pending aiGenerate as canceled). */
   aiCancel: (sessionId: string) => Promise<void>;
   /** Forget a generation session's conversation so the next prompt starts fresh. */
@@ -103,9 +110,12 @@ export interface BlockwrightApi {
   listCatalog: () => Promise<CatalogBlock[]>;
   /** Resolve a single block into a 1×1×1 StructureData (for the catalog's 3D preview). */
   previewBlock: (id: string) => Promise<StructureData>;
-  /** The composable generation registry (structure types × decoration themes) for
-   *  the composer's preset picker. */
+  /** The generation module registry (grouped by category) for the composer's selects
+   *  and the module gallery. */
   generationCatalog: () => Promise<GenerationCatalog>;
+  /** Compose + compile a module's representative build into StructureData (the module
+   *  gallery's 3D preview). Resolves null-shaped data only if the module has no preview. */
+  previewModule: (category: ModuleCategory, id: string) => Promise<StructureData>;
   /** Drive the native appearance (macOS vibrancy + traffic lights + the renderer's
    *  prefers-color-scheme) so a forced theme isn't fighting a vibrancy stuck on the OS. */
   setThemeSource: (pref: 'system' | 'light' | 'dark') => Promise<void>;

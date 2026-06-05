@@ -96,3 +96,6 @@ out/
 
 # AI-generated structures (temp versions written by File ▸ New Structure)
 .generated/
+
+# Compiled module-gallery previews (cached by the Module Gallery in dev)
+.module-previews/

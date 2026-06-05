@@ -4,6 +4,7 @@
 // `defaults` kit (sensible block per role) so it looks right even under a sparse
 // theme, and a `params` spec declaring its shape/behaviour knobs.
 import type { AuthoringOp } from '../../authoring/types';
+import type { ModuleMeta } from '../modules';
 import type { ParamSpec, ParamValues } from '../params';
 import type { Role } from '../roles';
 
@@ -56,12 +57,13 @@ export interface BuildArgs {
   seed: number;
 }
 
-/** A buildable structure archetype (house, basement, …). Behaviour-only: it never
- *  names concrete blocks, so any type composes with any theme. */
-export interface StructureType {
-  id: string;
-  label: string;
-  /** Shape/behaviour params (floors, decay, …). Block choices come from the theme. */
+/** A buildable structure archetype (house, tower, …). Behaviour-only: it never
+ *  names concrete blocks, so any type composes with any decoration. Carries the
+ *  shared module metadata (id/label/description/knowledge/preview); `category` is
+ *  always `'structure'`. */
+export interface StructureType extends ModuleMeta {
+  category: 'structure';
+  /** Shape/behaviour params (floors, decay, …). Block choices come from the decoration. */
   params: ParamSpec;
   /** This type's default block per role — its material "kit", overridable by the
    *  theme and by per-op role params. */

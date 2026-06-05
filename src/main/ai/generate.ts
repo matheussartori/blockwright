@@ -9,7 +9,7 @@
 // provider + model in Settings (see credentials.ts).
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage } from '@/shared/types';
+import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, BuildSelection } from '@/shared/types';
 import { systemPrompt } from './schema';
 import type { EmitArgs } from './schema';
 import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, PHASES, summarizeAudit } from './phases';
@@ -59,6 +59,7 @@ export async function generateStructure(
   sessionId: string,
   prompt: string,
   images?: GenerateImage[],
+  selection?: BuildSelection,
   onProgress?: (p: GenerateProgress) => void,
   capture?: CapturePreview,
   basePath?: string,
@@ -393,7 +394,7 @@ export async function generateStructure(
     const driver = await getDriver(cred.id);
     driverResult = await driver({
       credential: cred,
-      systemPrompt: systemPrompt(prompt),
+      systemPrompt: systemPrompt(prompt, selection),
       userText: effectivePrompt,
       images: images ?? [],
       thinkingBudget: THINKING_BUDGET,

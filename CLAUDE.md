@@ -51,17 +51,26 @@ src/
         jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
         template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
         jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
-      domain/              Composable generation: STRUCTURE TYPES × DECORATION THEMES, expanded by
-                           the `template` op in the authoring compiler (the model emits one op, the
-                           code produces the geometry). See "Composable generation domain" below.
+      domain/              Composable generation: MODULES by CATEGORY (structure × decoration, +
+                           scaffolded basement/roof), crossed by the `template` op in the authoring
+                           compiler (the model emits one op, the code produces the geometry). See
+                           "Composable generation domain" below.
+        modules.ts         ModuleCategory + ModuleMeta (id/label/category/description/knowledge/
+                           keywords/preview) shared by every module, across categories.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
         params.ts          ParamSpec/ParamDef + resolveParams (single per-type param declaration)
-        compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure +
-                           name aliases (abandoned_house→house+abandoned, large_basement→basement+abandoned)
-        structure-types/   One file per archetype (house, basement) + types.ts (contract + Box/logProps)
-                           + index.ts (registry). A type emits ops in terms of roles; never names blocks.
-        themes/            One file per look (abandoned, plain) + types.ts (contract) + index.ts (registry,
-                           DEFAULT_THEME='abandoned'). A theme maps roles→blocks + decay + weathering.
+        compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
+                           (decoration param accepts `decoration` or legacy `theme`)
+        index.ts           barrel + catalog (listModuleCatalog), selection→guide mapping
+                           (selectedGuides/promptGuides), buildModulePreview (gallery)
+        structure-types/   Category "structure": one file per archetype (house, tower) + types.ts
+                           (contract + Box/logProps) + index.ts (registry). A type emits ops in terms
+                           of roles; never names blocks. Tower carries exterior-only detailing.
+        decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
+                           contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
+                           maps roles→blocks + decay + weathering.
+        basements/ roofs/  Scaffolded categories: contract + (basement: a parked seed) registry, NOT
+                           yet wired into composeStructure. Ready for the modular-basement / roof pass.
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -75,9 +84,10 @@ src/
                             active-provider/model prefs + env precedence
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
-      knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt
-                            (conditionally — `knowledge-select.ts` drops situational guides like
-                            the tower playbook unless the prompt calls for them, to cut tokens)
+      knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
+                            all CORE guides always, plus a MODULE guide (knowledge/nbt/modules/**)
+                            only when its module is selected or the prompt's keywords match it
+                            (`knowledge-select.ts` + the domain's selectedGuides/promptGuides), to cut tokens
     structure/authoring/    Validate + compile authoring JSON → gzipped .nbt (the JSON↔NBT
                           pipeline). Decomposed by responsibility, with a unit-test suite in
                           __tests__/ (run `npm run test`). Public API via the barrel `index.ts`.
@@ -113,9 +123,12 @@ src/
                           cards), TabBar (the single slim top bar — no separate titlebar), WorkspaceBadge/
                           Suggest, Loading, SettingsModal (tabbed shell; each tab is a component in
                           components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
-                          (Block Catalog: list/grid + 3D preview — store.catalogOpen)
+                          (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
+                          (Module Gallery: structure/decoration/basement/roof modules + 3D preview —
+                          store.modulesOpen)
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
-                          (themed <picture>), BlockPreview (standalone Three.js single-block render).
+                          (themed <picture>), StructurePreview (standalone Three.js scene that frames any
+                          StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
                           Build dialogs/controls from these so fonts/spacing/styles stay consistent.
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows (React bindings over the vanilla stores)
@@ -197,33 +210,38 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 
 ### Composable generation domain
 
-`structure/domain/` is the data-driven model behind the authoring `template` op, built so
-the two growth axes — **structure types** and **decoration themes** — combine without N×M
-code. A **StructureType** (`house`, `basement`) owns only the *massing* (shell, openings,
-structural detail) and emits ops in terms of **semantic roles** (`wall`, `floor`, `roof`…),
-never concrete blocks. A **DecorationTheme** (`abandoned`, `plain`) owns the *look*: it maps
+`structure/domain/` is the data-driven model behind the authoring `template` op. Everything
+is a **module** in one of four **categories** (`structure`, `decoration`, `basement`, `roof`
+— `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
+knowledge/keywords/preview). The two live growth axes — **structure types** × **decorations**
+— combine without N×M code. A **StructureType** (`house`, `tower`) owns only the *massing*
+(shell, openings, structural detail) and emits ops in terms of **semantic roles** (`wall`,
+`floor`, `roof`…), never concrete blocks. A **Decoration** (`cozy`) owns the *look*: it maps
 roles→blocks (sparsely), sets a decay level, and weathers blocks. `composeStructure` crosses
-them: it resolves a role's block by **per-op override > theme.blocks > type.defaults >
+them: it resolves a role's block by **per-op override > decoration.blocks > type.defaults >
 BASE_BLOCKS**, resolves the type's params (`params.ts`, the single param declaration), and
-calls `type.build(...)` against a theme-backed `RolePalette`. So any type works with any
-theme, and a new type or theme is one small file.
+calls `type.build(...)` against a decoration-backed `RolePalette`. So any type works with any
+decoration, and a new module is one small file.
 
-- **The `template` op is unchanged** in the authoring schema: `op.name` is a structure-type
-  id, `op.params.theme` picks the theme, and any param keyed by a role name is a block
-  override. Compiled in `authoring/ops/index.ts` via `composeStructure`.
-- **Behaviour preserved:** each type ships its own material `defaults` (a "kit"), so the
-  `abandoned` theme is transparent (no block overrides — just decay + weathering) and
-  `house`/`basement` + `abandoned` reproduce the old `abandoned_house`/`large_basement`
-  output. The old names still resolve via aliases in `compose.ts`.
+- **The `template` op:** `op.name` is a structure-type id, `op.params.decoration` (or the
+  legacy `theme`) picks the look, and any param keyed by a role name is a block override.
+  Compiled in `authoring/ops/index.ts` via `composeStructure`; default decoration is `cozy`.
+- **Each type ships its own material `defaults`** (a "kit"), so it looks right even under a
+  sparse decoration. `tower` carries **exterior-only** detailing (battered base, inset shaft,
+  quoins, string-courses, machicolation/parapet crown, bracket lanterns) that the house lacks.
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
-  **Add a theme:** new file in `themes/`, register in its `index.ts`. **Add a role:** extend
-  `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`).
-- **Three consumers** (all via the `domain/` barrel): `authoring/ops/index.ts`
-  (`composeStructure`), `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`),
-  `ai/generate.ts` (`composeBlockNames` — the per-role override block ids it validates against
-  the content pack). The model-facing guide is `knowledge/nbt/13-templates.md`.
-- **Future:** `DecorationTheme.furnish()` is a defined-but-unused extension point for
-  furniture/decoration ops (interiors still come from the AI + authoring passes today).
+  **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
+  extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
+  path (its guide) + optional `keywords` + optional `preview` spec.
+- **basement/roof are scaffolded categories** (`basements/`, `roofs/`): contracts + registries
+  exist (basement has a parked seed) but are NOT yet wired into `composeStructure`.
+- **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
+  `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
+  (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→
+  guide mapping), `main/ipc.ts` (`listModuleCatalog` for the composer/gallery + `buildModulePreview`
+  via `catalog/module-preview.ts` for the gallery's 3D preview). Model-facing guides:
+  `knowledge/nbt/13-templates.md` + the per-module guides under `knowledge/nbt/modules/`.
+- **Future:** `Decoration.furnish()` is a defined-but-unused extension point for furniture ops.
 
 ### AI structure generation
 
@@ -315,21 +333,21 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   (one `fill` = a whole wall) instead of thousands of blocks. (There is no time cap — generation runs
   until the model is satisfied, hits `BW_AI_MAX_ROUNDS`, errors, or the user cancels.)
 - **Templates (`template` op):** the cheapest geometry primitive — `{ op:'template', name, from,
-  to, params }` expands a named preset (`structure/templates/`) into ops at compile time, so the
-  model stands up a whole building shell in ~5 lines and then layers its own ops on top. Documented
-  for the model in `knowledge/nbt/13-templates.md`; block-name params are validated against the real
-  content pack in `generate.ts` (templates intern their own palette, so those names never reach
-  `palette`). Add a preset in `templates/index.ts` + its block-name params in `BLOCK_PARAM_KEYS`.
-- **Optional build details:** `NewStructurePanel`'s composer has a "⚙ Details" section (preset shell +
-  theme, type, style, size, floors, rooms, basement, materials, decay, interior, lighting). All
-  optional; they're folded into the prompt as a structured "[Build details]" brief (renderer-side) and
-  cleared after sending, so follow-up edits don't re-send stale hints.
-  - **Preset shell × Theme** are registry-backed: the composer fetches the composable generation
-    catalog (structure types × decoration themes) once via the `generationCatalog` IPC channel
-    (`listStructureTypes`/`listThemes` from `structure/domain`), and the picker grows automatically as
-    the registry does. Choosing them appends a directive to use a `template` op with that name +
-    `params.theme`. The free-text "Type"/"Style" creative hints stay alongside (a different layer — a
-    nudge to build from scratch, vs. a ready-made shell).
+  to, params }` expands a structure type × decoration (`structure/domain/`) into ops at compile
+  time, so the model stands up a whole building shell in ~5 lines and then layers its own ops on
+  top. Documented for the model in `knowledge/nbt/13-templates.md`; block-name params (per-role
+  overrides) are validated against the real content pack in `generate.ts` (templates intern their
+  own palette, so those names never reach `palette`).
+- **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with just
+  two precise selects — **Structure** (house/tower) and **Decoration** (cozy). Choosing a structure
+  appends a `template`-op directive (name + `params.decoration`) to the prompt as a "[Build details]"
+  brief (cleared after sending), AND rides along as a structured `BuildSelection` so the system
+  prompt loads only those modules' knowledge guides (threaded `aiGenerate → generateStructure →
+  systemPrompt → loadKnowledge`). The selects are registry-backed: the composer fetches the
+  categorized module catalog once via the `generationCatalog` IPC channel (`listModuleCatalog` from
+  `structure/domain`), so they grow as the registries do. A "Modules" button (+ a link in Details)
+  opens the **Module Gallery** (`ModulesModal`): categories (Structure/Decoration/Basement/Roof) with
+  a description + a live 3D preview per module (`previewModule` IPC → `catalog/module-preview.ts`).
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

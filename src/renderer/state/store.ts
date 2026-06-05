@@ -49,6 +49,8 @@ export interface AppState {
   floorsEditing: boolean;
   /** Whether the Block Catalog modal is open. */
   catalogOpen: boolean;
+  /** Whether the module gallery modal is open. */
+  modulesOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
   versionPromptName: string | null;
   /** A chat image being shown full-size in the lightbox overlay, or null. */
@@ -66,6 +68,7 @@ export interface AppState {
   setSettingsSection: (section: string | null) => void;
   setFloorsEditing: (editing: boolean) => void;
   setCatalogOpen: (open: boolean) => void;
+  setModulesOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
 }
@@ -87,6 +90,7 @@ export const store = createStore<AppState>((set) => ({
   settingsSection: null,
   floorsEditing: false,
   catalogOpen: false,
+  modulesOpen: false,
   versionPromptName: null,
   imagePreview: null,
 
@@ -102,6 +106,7 @@ export const store = createStore<AppState>((set) => ({
   setSettingsSection: (settingsSection) => set({ settingsSection }),
   setFloorsEditing: (floorsEditing) => set({ floorsEditing }),
   setCatalogOpen: (catalogOpen) => set({ catalogOpen }),
+  setModulesOpen: (modulesOpen) => set({ modulesOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),
 }));

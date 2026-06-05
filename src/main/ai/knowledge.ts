@@ -1,14 +1,16 @@
-// Loads the `knowledge/nbt/*.md` guides — the agent's "training" for generating
+// Loads the `knowledge/nbt/**.md` guides — the agent's "training" for generating
 // structures — into the model's system context. Resolved like the content pack: an
-// override, the packaged resource, or the repo folder. Big situational guides (e.g.
-// the tower playbook) are only included when the prompt calls for them, to keep the
-// cached system prompt — and so the per-round token/latency cost — down.
+// override, the packaged resource, or the repo folder. CORE guides (everything not
+// under `nbt/modules/`) always load; MODULE guides (per structure/decoration/…) load
+// only when their module is selected or the prompt calls for them, to keep the cached
+// system prompt — and so the per-round token/latency cost — down.
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { relevantGuides } from './knowledge-select';
+import { includedModuleGuides, isModuleGuide, type ModuleSelection } from './knowledge-select';
 
-export { relevantGuides } from './knowledge-select';
+export { includedModuleGuides, isModuleGuide } from './knowledge-select';
+export type { ModuleSelection } from './knowledge-select';
 
 /** Locate the knowledge folder: explicit override, bundled resource, or repo root. */
 export function knowledgeDir(): string {
@@ -19,24 +21,38 @@ export function knowledgeDir(): string {
   return candidates.find((c) => fs.existsSync(c)) ?? candidates[0];
 }
 
-// Per-file bodies, read once. The composed system text is rebuilt per call (cheap
-// string join) since the included set now depends on the prompt.
-let fileCache: { name: string; body: string }[] | null = null;
+// Per-file bodies, read once. The `path` is relative to knowledgeDir() with forward
+// slashes (e.g. `nbt/00-volumetric-ops.md`, `nbt/modules/structure/tower.md`) so it
+// matches the module guide paths declared in the domain. The composed system text is
+// rebuilt per call (cheap string join) since the included set depends on the build.
+let fileCache: { path: string; body: string }[] | null = null;
 
-function loadFiles(): { name: string; body: string }[] {
-  if (fileCache) return fileCache;
-  const dir = path.join(knowledgeDir(), 'nbt');
-  let names: string[];
+/** Recursively collect `*.md` files under `dir`, returning each path relative to
+ *  `root` with forward slashes. */
+function walkMarkdown(dir: string, root: string): string[] {
+  const out: string[] = [];
+  let entries: fs.Dirent[];
   try {
-    names = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
+    entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
-    fileCache = [];
-    return fileCache;
+    return out;
   }
-  const out: { name: string; body: string }[] = [];
-  for (const name of names) {
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkMarkdown(full, root));
+    else if (e.isFile() && e.name.endsWith('.md')) out.push(path.relative(root, full).split(path.sep).join('/'));
+  }
+  return out;
+}
+
+function loadFiles(): { path: string; body: string }[] {
+  if (fileCache) return fileCache;
+  const root = knowledgeDir();
+  const rels = walkMarkdown(path.join(root, 'nbt'), root).sort();
+  const out: { path: string; body: string }[] = [];
+  for (const rel of rels) {
     try {
-      out.push({ name, body: fs.readFileSync(path.join(dir, name), 'utf8') });
+      out.push({ path: rel, body: fs.readFileSync(path.join(root, rel), 'utf8') });
     } catch {
       // Skip an unreadable guide rather than failing the whole load.
     }
@@ -45,13 +61,17 @@ function loadFiles(): { name: string; body: string }[] {
   return fileCache;
 }
 
-/** The relevant NBT guides for `prompt`, concatenated. Each file is fenced with its
- *  name so the model can cite specific guides; reading order follows the README. */
-export function loadKnowledge(prompt = ''): string {
+/** The knowledge guides for `prompt` + `selection`, concatenated: every CORE guide
+ *  always, plus each selected/keyword-matched MODULE guide. Each file is fenced with
+ *  its path so the model can cite specific guides; reading order follows the path sort
+ *  (core `nbt/00..` first, then `nbt/modules/…`). The README is excluded (it's an index
+ *  for humans, not generation guidance). */
+export function loadKnowledge(prompt = '', selection?: ModuleSelection): string {
   const files = loadFiles();
-  const keep = new Set(relevantGuides(files.map((f) => f.name), prompt));
+  const included = includedModuleGuides(prompt, selection);
   return files
-    .filter((f) => keep.has(f.name))
-    .map((f) => `===== knowledge/nbt/${f.name} =====\n${f.body}`)
+    .filter((f) => f.path.toLowerCase() !== 'nbt/readme.md')
+    .filter((f) => !isModuleGuide(f.path) || included.has(f.path))
+    .map((f) => `===== knowledge/${f.path} =====\n${f.body}`)
     .join('\n\n');
 }

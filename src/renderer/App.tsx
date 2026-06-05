@@ -22,6 +22,7 @@ import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { SettingsModal } from './components/SettingsModal';
 import { CatalogModal } from './components/CatalogModal';
+import { ModulesModal } from './components/ModulesModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
@@ -92,6 +93,7 @@ function Shell() {
       <Statusbar />
       <SettingsModal />
       <CatalogModal />
+      <ModulesModal />
       <VersionSelectModal />
       <ImagePreview />
     </>

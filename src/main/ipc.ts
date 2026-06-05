@@ -2,13 +2,14 @@
 import { app, dialog, ipcMain, nativeTheme } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, ChatRecord, GenerateImage, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BuildSelection, ChatRecord, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
-import { listStructureTypes, listThemes } from './structure/domain';
+import { previewModule } from './structure/catalog/module-preview';
+import { listModuleCatalog } from './structure/domain';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { getConfig, setActiveProvider, setModel, setCredential, clearCredential } from './ai/credentials';
 import type { AiProviderId } from '@/shared/ai';
@@ -142,7 +143,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.aiRenderResult, async (_e, result: RenderResult) => {
     pendingRenders.get(result.requestId)?.(result);
   });
-  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[], basePath?: string) => {
+  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[], selection?: BuildSelection, basePath?: string) => {
     const capture: CapturePreview = (path, version) =>
       new Promise((resolve) => {
         const requestId = randomUUID();
@@ -157,7 +158,7 @@ export function registerIpc(): void {
         });
         e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, sessionId, path, version });
       });
-    return generateStructure(sessionId, prompt, images, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath);
+    return generateStructure(sessionId, prompt, images, selection, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath);
   });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));
@@ -168,10 +169,10 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
   ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));
-  ipcMain.handle(IPC_CHANNELS.generationCatalog, async () => ({
-    structureTypes: listStructureTypes(),
-    themes: listThemes(),
-  }));
+  ipcMain.handle(IPC_CHANNELS.generationCatalog, async () => listModuleCatalog());
+  ipcMain.handle(IPC_CHANNELS.previewModule, async (_e, category: ModuleCategory, id: string) =>
+    previewModule(category, id),
+  );
 
   // Drive the native appearance so a forced light/dark theme also flips the macOS
   // vibrancy material (otherwise dark text lands on a dark vibrancy backdrop) and

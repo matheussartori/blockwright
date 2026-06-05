@@ -54,8 +54,11 @@ export const PHASES: Phase[] = [
       'Give the EXTERIOR walls depth and articulation: framed window reveals, a string course / trim band, ' +
       'slight offsets or pilasters so walls are not flat, a grounded base course, and a FRAMED ENTRANCE ' +
       '(porch, portal or recessed doorway — not a bare hole). Use 3-5 cohesive materials. Believable, not noisy. ' +
-      'WINDOWS must read as deliberate and symmetric: even spacing, aligned across storeys, and CENTERED — ' +
-      'use an odd width (1 or 3 wide) centered on its bay rather than a 2-wide window jammed against one side.',
+      'WINDOWS must read as deliberate and symmetric: even spacing, aligned across storeys, and CENTERED on ' +
+      'the face with EQUAL END MARGINS — the wall left of the first window must equal the wall right of the ' +
+      'last (compute it: leftover = W − n·w − (n−1)·g must split evenly into two ends; change the count/width/' +
+      'gap until it does). Never leave one end 2 blocks and the other 3. Odd window counts centre most easily; ' +
+      'use an odd window width (1 or 3 wide) on each bay rather than a 2-wide window jammed against one side.',
   },
   {
     id: 'interior',
@@ -145,9 +148,9 @@ export interface AuditCheck {
 export const AUDIT_CHECKS: AuditCheck[] = [
   { id: 'massing', label: 'Massing', ask: 'Is the silhouette articulated (NOT a plain cube), with the front different from the back?' },
   { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney?' },
-  { id: 'facade', label: 'Facade', ask: 'Windows symmetric, aligned across storeys and centered; walls articulated with depth; a framed entrance (not a bare hole)?' },
+  { id: 'facade', label: 'Facade', ask: 'Windows symmetric and centered with EQUAL end margins (not 2 one side, 3 the other), aligned across storeys; walls articulated with depth; a framed entrance (not a bare hole)?' },
   { id: 'interior', label: 'Interior', ask: 'Is EVERY habitable room both furnished and lit (no empty boxes), and any usable attic accessible + furnished (not sealed/empty)?' },
-  { id: 'circulation', label: 'Circulation', ask: 'Stairs have a bottom landing + headroom, REACH the floor they serve (no jump), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
+  { id: 'circulation', label: 'Circulation', ask: 'Stairs have a clear landing at the bottom AND top (room to step on/off), headroom, REACH the floor they serve (no jump), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
   { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor?' },
 ];
 

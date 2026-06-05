@@ -1,16 +1,19 @@
-// Structure-type registry. Register a new archetype here (one file per type) and it
-// immediately composes with every decoration theme — that's the whole point of the
-// type↔theme split. Names are validated against this registry (plus compose's
-// aliases) before a build runs.
-import { basement } from './basement';
+// Structure-type registry (category "structure"). Register a new archetype here (one
+// file per type) and it immediately composes with every decoration — that's the whole
+// point of the type↔decoration split. Names are validated against this registry before
+// a build runs. (Basements/roofs are their own categories now; see ../basements,
+// ../roofs.)
+import { toSummary, type ModuleSummary } from '../modules';
+import { paramFields } from '../params';
 import { house } from './house';
+import { tower } from './tower';
 import type { StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box } from './types';
 
 const STRUCTURE_TYPES: Record<string, StructureType> = {
   [house.id]: house,
-  [basement.id]: basement,
+  [tower.id]: tower,
 };
 
 /** Look up a structure type by id (undefined if unknown). */
@@ -28,7 +31,13 @@ export function structureTypeIds(): string[] {
   return Object.keys(STRUCTURE_TYPES);
 }
 
-/** Every structure type as `{ id, label }` (for the composer's preset picker). */
-export function listStructureTypes(): { id: string; label: string }[] {
-  return Object.values(STRUCTURE_TYPES).map((t) => ({ id: t.id, label: t.label }));
+/** Every structure type, as a module summary (for the composer picker + gallery),
+ *  carrying its tunable params so the Details controls are registry-driven. */
+export function listStructureTypes(): ModuleSummary[] {
+  return Object.values(STRUCTURE_TYPES).map((t) => ({ ...toSummary(t), params: paramFields(t.params) }));
+}
+
+/** Every structure module (for the knowledge loader / gallery preview). */
+export function structureModules(): StructureType[] {
+  return Object.values(STRUCTURE_TYPES);
 }

@@ -1,19 +1,32 @@
-// Which knowledge guides to include for a given prompt. Kept free of Electron/fs
-// imports so it's unit-testable in isolation (knowledge.ts, which reads the files,
-// imports `app` from electron).
+// Which knowledge guides to include for a given build. Core guides (everything NOT
+// under `nbt/modules/`) always ride along; a MODULE guide is included only when its
+// module is selected in the composer Details, or — as a fallback — when the free-text
+// prompt mentions it (so "build a tall tower" still pulls the tower guide).
+//
+// Kept free of Electron/fs imports so it's unit-testable in isolation. The actual file
+// reading lives in knowledge.ts; the selection→guide-path mapping lives in the domain
+// (each module declares its own `knowledge` path + optional `keywords`).
+import { promptGuides, selectedGuides, type ModuleSelection } from '../structure/domain';
 
-// Guides that are large AND only relevant to a specific kind of build — included
-// only when the prompt matches, instead of riding along in every system prompt.
-const SITUATIONAL: { file: string; keywords: RegExp }[] = [
-  { file: '14-towers.md', keywords: /\b(tower|spire|turret|belfry|minaret|steeple|torre|campan|farol)\w*/i },
-];
+export type { ModuleSelection } from '../structure/domain';
 
-/** Which guides to include for `prompt`: every core guide always, plus a situational
- *  guide only when the prompt mentions its subject. Pure (filenames + prompt in →
- *  filenames out). */
-export function relevantGuides(files: string[], prompt: string): string[] {
-  return files.filter((f) => {
-    const sit = SITUATIONAL.find((s) => f.endsWith(s.file));
-    return !sit || sit.keywords.test(prompt);
-  });
+/** Is `relPath` (relative to the knowledge dir, e.g. `nbt/modules/structure/tower.md`)
+ *  a module guide rather than a core guide? */
+export function isModuleGuide(relPath: string): boolean {
+  return relPath.includes('/modules/');
+}
+
+/** The set of module guide paths to include for a build: the explicitly selected
+ *  modules' guides, plus any pulled in by keyword from the free-text prompt. Pure. */
+export function includedModuleGuides(prompt: string, selection?: ModuleSelection): Set<string> {
+  const set = new Set<string>();
+  if (selection) for (const g of selectedGuides(selection)) set.add(normalize(g));
+  for (const g of promptGuides(prompt)) set.add(normalize(g));
+  return set;
+}
+
+/** Normalize a declared guide path to compare against discovered file paths
+ *  (forward slashes, no leading `./`). */
+function normalize(p: string): string {
+  return p.replace(/\\/g, '/').replace(/^\.\//, '');
 }

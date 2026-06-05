@@ -7,12 +7,18 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { type FootprintShape, makeFootprint } from '../footprint';
 import { mulberry32 } from '../rng';
-import type { StructureType } from './types';
-import { logProps } from './types';
+import { logProps } from '../structure-types/types';
+import type { BasementModule } from './types';
 
-export const basement: StructureType = {
+export const basement: BasementModule = {
   id: 'basement',
-  label: 'Basement',
+  label: 'Modular basement',
+  category: 'basement',
+  description:
+    'A sunken stone undercroft on a varied footprint (rect/L/T/U/plus): a sealed shell with ' +
+    'a grid of lit support pillars. Designed to grow into a large multi-room complex beneath a ' +
+    'host structure. Scaffolded for an upcoming pass — not yet buildable from the composer.',
+  knowledge: 'nbt/modules/basement/modular.md',
   params: {
     decay: { kind: 'unit', default: 0.25 },
     shape: { kind: 'enum', default: 'auto', values: ['rect', 'l', 't', 'u', 'plus', 'auto'] },

@@ -63,8 +63,21 @@ authoring format.
 | [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |
 | [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md) | Block-by-block facade grammar & style archetypes: timber framing, dormers, balconies, porches, towers, chimneys, mansion massing & grounds. |
-| [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`house`/`basement`) × decoration theme (`abandoned`/`plain`), then layer your own ops on top. |
-| [`14-towers.md`](14-towers.md) | Standalone towers: refusing the stacked-box/monolith failures, base→shaft→crown massing, vertical emphasis, tier/machicolation rings, projecting balconies/bays/bartizans/bracket-lanterns/vines, crowns (spire/parapet/horns), a worked build order, furnished floor-by-floor interiors, lighting, bright & dark archetypes. |
+| [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`house`/`tower`) × decoration (`cozy`), then layer your own ops on top. |
+
+### Module guides (loaded only when selected / relevant)
+
+The generation domain is **modular**: structures, decorations (and, later, basements and
+roofs) are separate modules, each with its own guide under `modules/`. Only the selected
+module's guide rides in the system prompt (or one pulled in by a matching prompt keyword),
+so the core stays small. Categories:
+
+| File | Category | What it covers |
+|------|----------|----------------|
+| [`modules/structure/house.md`](modules/structure/house.md) | structure | The `house` type: what the template gives you + a house refinement checklist. |
+| [`modules/structure/tower.md`](modules/structure/tower.md) | structure | The `tower` type: base→shaft→crown massing, exterior detailing, crowns, furnished floors, lighting. |
+| [`modules/decoration/cozy.md`](modules/decoration/cozy.md) | decoration | The `cozy` look: warm palette, lighting, soft furnishings, hearth, plants. |
+| [`modules/basement/modular.md`](modules/basement/modular.md) | basement | Scaffolded (not yet wired into generation) — the planned modular undercroft. |
 
 ## Hard rules (read before generating)
 

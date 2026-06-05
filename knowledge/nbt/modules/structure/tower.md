@@ -1,6 +1,14 @@
-# 14 — Towers & vertical focal points (standalone)
+# Structure module — Towers & vertical focal points (standalone)
 
-[`05`](05-building-houses.md) builds a house shell and [`12`](12-exterior-and-facade-detailing.md)
+> Module guide for the **tower** structure type. It loads into the system prompt only
+> when a tower is selected (or the prompt asks for one). The composer can stand up a
+> tower shell with `{ op: 'template', name: 'tower', params: { crown, decoration } }`
+> (`crown` = `parapet` | `spire` | `flat`), then layer your own ops on top. The
+> `template` already emits a battered base, an inset shaft with corner quoins, per-storey
+> string-course rings and window slits, bracket lanterns, and the chosen crown — your job
+> is to refine and furnish it, not rebuild the shell.
+
+`05-building-houses.md` builds a house shell and `12-exterior-and-facade-detailing.md`
 treats a tower as *one feature of a bigger house*. This file is about the **tower as the whole
 build** — a tall vertical structure that has to read as deliberate from the ground to the crown:
 wizard spire, watchtower, dark-fantasy keep, lighthouse, Barad-dûr / Eye-of-Sauron style horned
