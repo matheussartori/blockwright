@@ -61,20 +61,31 @@ describe('compose: structure types × decorations', () => {
     expect(stairs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('the catalog projects structure params for the Details controls (no decay/unit)', () => {
+  it('the catalog projects structure params for the Details controls (no decay/unit, no module-owned)', () => {
     const cat = listModuleCatalog();
     const house = cat.structure.find((m) => m.id === 'house');
     const names = (house?.params ?? []).map((p) => p.name);
-    expect(names).toEqual(expect.arrayContaining(['floors', 'basement', 'attic', 'balcony', 'roof']));
+    expect(names).toEqual(expect.arrayContaining(['floors', 'attic', 'balcony']));
     expect(names).not.toContain('decay'); // unit params belong to the decoration, not the UI
+    // roof + basement are promoted to their own module-category selects, so they no
+    // longer appear as the house's own param controls (they stay in the build spec).
+    expect(names).not.toContain('roof');
+    expect(names).not.toContain('basement');
     const floors = house?.params?.find((p) => p.name === 'floors');
     expect(floors).toMatchObject({ kind: 'int', label: 'Floors', min: 1, max: 4 });
-    const basement = house?.params?.find((p) => p.name === 'basement');
-    expect(basement?.kind).toBe('enum');
-    if (basement?.kind === 'enum') expect(basement.options.map((o) => o.value)).toEqual(['none', 'full', 'half']);
     // Tower exposes only its own params (crown), never the house's.
     const tower = cat.structure.find((m) => m.id === 'tower');
     expect((tower?.params ?? []).map((p) => p.name)).toEqual(['crown']);
+  });
+
+  it('roof + basement are their own module categories, linked to the house via appliesTo', () => {
+    const cat = listModuleCatalog();
+    expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip']));
+    expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['full', 'half', 'basement']));
+    // Every roof/basement module declares the structures it pairs with (house for now).
+    for (const m of [...cat.roof, ...cat.basement]) {
+      expect(m.appliesTo).toContain('house');
+    }
   });
 
   it('the roof param forces the roof form (overriding the seeded pick)', () => {

@@ -51,10 +51,11 @@ src/
         jigsaw.ts            Extract jigsaw connectors from a structure's block-entity NBT
         template-pool.ts     Resolve worldgen template pools + structure templates (namespace-aware)
         jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
-      domain/              Composable generation: MODULES by CATEGORY (structure × decoration, +
-                           scaffolded basement/roof), crossed by the `template` op in the authoring
-                           compiler (the model emits one op, the code produces the geometry). See
-                           "Composable generation domain" below.
+      domain/              Composable generation: MODULES by CATEGORY (structure × decoration
+                           crossed by the `template` op in the authoring compiler — the model emits
+                           one op, the code produces the geometry — plus roof/basement modules that
+                           are selectable guidance but not yet geometry-wired). See "Composable
+                           generation domain" below.
         modules.ts         ModuleCategory + ModuleMeta (id/label/category/description/knowledge/
                            keywords/preview) shared by every module, across categories.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
@@ -69,8 +70,13 @@ src/
         decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
                            contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
                            maps roles→blocks + decay + weathering.
-        basements/ roofs/  Scaffolded categories: contract + (basement: a parked seed) registry, NOT
-                           yet wired into composeStructure. Ready for the modular-basement / roof pass.
+        basements/ roofs/  Categories "basement"/"roof": one file per typology (roof: gable/hip;
+                           basement: full/half/modular) + types.ts + index.ts (registry). SELECTABLE
+                           in the composer Details + listed in the gallery, but METADATA-ONLY — no
+                           build() geometry is wired into composeStructure yet (build/params/defaults
+                           are optional on the contracts). A pick rides into the prompt as guidance +
+                           loads only its knowledge guide. Each declares `appliesTo` (the structures
+                           it pairs with, e.g. ['house']) — a growing link for future filtering.
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -232,9 +238,17 @@ decoration, and a new module is one small file.
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
   **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
-  path (its guide) + optional `keywords` + optional `preview` spec.
-- **basement/roof are scaffolded categories** (`basements/`, `roofs/`): contracts + registries
-  exist (basement has a parked seed) but are NOT yet wired into `composeStructure`.
+  path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
+  (the structure ids it pairs with — a growing link; omit = applies to all).
+- **basement/roof are selectable but METADATA-ONLY categories** (`basements/`: full/half/modular;
+  `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge`), surfaced in
+  the composer Details + the gallery, but `build()`/`params`/`defaults` are **optional** and **NOT
+  wired into `composeStructure`** yet. A selection rides into the prompt as a plain-language
+  `[Build details]` line and loads ONLY its knowledge guide (no `keywords`, so an unused roof/basement
+  guide never bloats the prompt). The house keeps `roof`/`basement` in its param spec for the legacy
+  `template name:'house'` path, marked `module:'roof'|'basement'` in `ParamDef` so `paramFields` hides
+  them from the house's own Details controls (no duplicate). **Add a roof/basement:** new file +
+  register in its `index.ts`; give it `appliesTo` + a `knowledge/nbt/modules/{roof,basement}/<id>.md`.
 - **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
   `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
   (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→
@@ -338,16 +352,21 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   top. Documented for the model in `knowledge/nbt/13-templates.md`; block-name params (per-role
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
-- **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with just
-  two precise selects — **Structure** (house/tower) and **Decoration** (cozy). Choosing a structure
-  appends a `template`-op directive (name + `params.decoration`) to the prompt as a "[Build details]"
-  brief (cleared after sending), AND rides along as a structured `BuildSelection` so the system
-  prompt loads only those modules' knowledge guides (threaded `aiGenerate → generateStructure →
-  systemPrompt → loadKnowledge`). The selects are registry-backed: the composer fetches the
+- **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with four
+  registry-backed selects — **Structure** (house/tower), **Decoration** (cozy), **Roof** (gable/hip)
+  and **Basement** (full/half/modular). The picks are folded into the prompt as a plain-language
+  "[Build details]" brief (NOT a `template` op — see "House template retired"; cleared after sending),
+  AND ride along as a structured `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`) so
+  the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
+  `aiGenerate → generateStructure → systemPrompt → loadKnowledge`). Roof/Basement are enabled once a
+  structure is chosen and (for now) show ALL modules regardless of structure; the `appliesTo` link is
+  the hook for future per-structure filtering. The selects are registry-backed: the composer fetches the
   categorized module catalog once via the `generationCatalog` IPC channel (`listModuleCatalog` from
   `structure/domain`), so they grow as the registries do. A "Modules" button (+ a link in Details)
   opens the **Module Gallery** (`ModulesModal`): categories (Structure/Decoration/Basement/Roof) with
-  a description + a live 3D preview per module (`previewModule` IPC → `catalog/module-preview.ts`).
+  a description, the `appliesTo` link ("Applies to: House"), and a live 3D preview per module
+  (`previewModule` IPC → `catalog/module-preview.ts`) — roof/basement are metadata-only so they show
+  "Preview coming soon" until geometry is wired.
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

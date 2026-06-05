@@ -51,6 +51,10 @@ export interface GenerationModule {
   description: string;
   /** Whether a 3D preview can be composed for this module (gallery). */
   hasPreview: boolean;
+  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`) — a growing
+   *  link. The UI shows all modules for now; this drives future category filtering
+   *  (e.g. show only the roofs that fit the chosen structure). Omit → applies to all. */
+  appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
 }

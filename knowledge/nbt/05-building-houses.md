@@ -68,6 +68,17 @@ Leave the two cells `(x=mid, y=1, z=L-1)` and `(x=mid, y=2, z=L-1)` for the door
 two-block `oak_door` there:
 - lower half at `(mid, 1, L-1)`, upper at `(mid, 2, L-1)`, both `facing:south`, same `hinge`.
 
+**Clearance — a door is an entrance, not a closet.** Leave **at least 3 open cells of walking
+space directly in front of and behind** the door (at `y=1..2`), not a wall one block away. A door
+that opens straight into a partition feels like a cupboard. Put the door where a person can
+actually approach and pass through into a room or hall.
+
+**Double doors (two leaves side by side):** give the two leaves **opposite** `hinge` values so the
+hinges sit on the **outer jambs** and the handles meet in the **centre** — then opening swings each
+leaf out to its own side. Same `hinge` on both is wrong: the handles end up on the outside and the
+leaves swing into each other in the middle. (The compiler also corrects double-door hinges, but
+author them right.)
+
 (See door blockstate in [`03`](03-blocks-and-blockstates.md).)
 
 ## Windows
@@ -75,6 +86,11 @@ two-block `oak_door` there:
 Replace selected wall cells (usually at `y=2`, the "eye level" course) with `glass_pane` or
 `glass`. A nice rhythm: windows two wide, separated by one wall block. Add `oak_trapdoor`
 shutters on the outside for charm, or a `oak_slab`/`stairs` sill below.
+
+**Below grade, use `iron_bars`, not glass.** A basement / cellar window sits in the earth, so a
+clear glass pane looking out into dirt reads wrong. Use `iron_bars` (a barred cellar vent) for any
+opening on a wall that is below the ground floor; reserve `glass`/`glass_pane` for above-ground
+storeys.
 
 ## Stairs between floors
 
@@ -103,6 +119,12 @@ impossible — it always produces a correct, climbable flight.
 - **One flight per rise.** Don't add a second run (or a `half:top` mirror) over the same climb — it
   blocks the passage. And keep the steps clear: never park a chest, barrel, cauldron, or carpet on or
   directly above the staircase.
+- **Don't run a flight into the shell.** A staircase needs 2 cells of headroom above every tread and
+  a clear landing at top and bottom — that space must come out of the *interior*, never the roof or
+  an outer wall. Keep interior stairs **at least one cell off the outer walls** (a stair flush to the
+  shell forces the headroom carve to gut a structural wall), and put **attic / top-floor stairs under
+  the ridge** (the tall centre of a gable roof) where there's real headroom — never under a low eave,
+  where climbing out punches a hole in the roof slope and leaves a suffocating, capped exit.
 
 (For a *spiral* stair around a central post, place short `stairs` ops turning 90° at each landing, or
 fall back to per-block `*_stairs` only when the op's straight run truly can't express it.)

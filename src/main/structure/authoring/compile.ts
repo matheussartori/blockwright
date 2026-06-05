@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
-import { carveStairwells, connectBlocks, fillInteriorAir, fixPlacement, runPasses, type Pass } from './passes';
+import { carveStairwells, connectBlocks, fillInteriorAir, fixDoors, fixPlacement, runPasses, type Pass } from './passes';
 import type { AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
 
@@ -15,10 +15,11 @@ export interface CompileReport {
   warnings: string[];
 }
 
-// Order matters: stairwells are carved before connections are derived; placement
-// is fixed against the real blocks; the interior air-fill runs last so it doesn't
-// interfere with neighbour/support lookups.
-const PIPELINE: Pass[] = [carveStairwells, connectBlocks, fixPlacement, fillInteriorAir];
+// Order matters: stairwells are carved before connections are derived; door hinges
+// are mirrored on the as-authored leaves; placement is fixed against the real blocks;
+// the interior air-fill runs last so it doesn't interfere with neighbour/support
+// lookups.
+const PIPELINE: Pass[] = [carveStairwells, fixDoors, connectBlocks, fixPlacement, fillInteriorAir];
 
 /** Compile to a `.nbt` buffer plus the post-processing report. */
 export function compileStructureReport(s: AuthoringStructure): { buffer: Buffer; report: CompileReport } {

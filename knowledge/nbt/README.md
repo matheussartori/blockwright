@@ -14,7 +14,8 @@ produces the structure. **Target version: Minecraft Java 1.21.1 only** (DataVers
 File ▸ New Structure opens a chat that generates `.nbt`s. The flow:
 
 1. User types a prompt, and optionally attaches **reference `.nbt` files** / **reference
-   images** and a structured "[Build details]" brief (preset shell + theme, size, floors…).
+   images** and a structured "[Build details]" brief (structure type + decoration + roof +
+   basement + size/floors…) — plain-language guidance, not a stamped preset shell.
 2. The app runs the chosen AI provider with these guides as the system prompt (situational
    ones — e.g. the tower playbook — are dropped unless the prompt calls for them, to save tokens).
 3. The model emits a structure in the **authoring format** (see below) via the `emit_structure`
@@ -67,17 +68,27 @@ authoring format.
 
 ### Module guides (loaded only when selected / relevant)
 
-The generation domain is **modular**: structures, decorations (and, later, basements and
-roofs) are separate modules, each with its own guide under `modules/`. Only the selected
-module's guide rides in the system prompt (or one pulled in by a matching prompt keyword),
-so the core stays small. Categories:
+The generation domain is **modular**: structures, decorations, roofs and basements are
+separate modules, each with its own guide under `modules/`. Only the selected module's
+guide rides in the system prompt (or one pulled in by a matching prompt keyword), so the
+core stays small — and a roof/basement guide loads **only when that exact type is picked**,
+never speculatively. Categories:
 
 | File | Category | What it covers |
 |------|----------|----------------|
-| [`modules/structure/house.md`](modules/structure/house.md) | structure | The `house` type: what the template gives you + a house refinement checklist. |
+| [`modules/structure/house.md`](modules/structure/house.md) | structure | The `house` type: design it yourself (no template) + a house refinement checklist. |
 | [`modules/structure/tower.md`](modules/structure/tower.md) | structure | The `tower` type: base→shaft→crown massing, exterior detailing, crowns, furnished floors, lighting. |
 | [`modules/decoration/cozy.md`](modules/decoration/cozy.md) | decoration | The `cozy` look: warm palette, lighting, soft furnishings, hearth, plants. |
-| [`modules/basement/modular.md`](modules/basement/modular.md) | basement | Scaffolded (not yet wired into generation) — the planned modular undercroft. |
+| [`modules/roof/gable.md`](modules/roof/gable.md) | roof | The `gable` roof: two slopes + a triangular gable end, ridge axis, overhang/fascia, attic void. |
+| [`modules/roof/hip.md`](modules/roof/hip.md) | roof | The `hip` roof: four sloped sides, wrap-around eave, dormers for light, no gable ends. |
+| [`modules/basement/full.md`](modules/basement/full.md) | basement | The `full` cellar: fully buried storey, barred vents (no glass into dirt), interior light. |
+| [`modules/basement/half.md`](modules/basement/half.md) | basement | The `half-buried` basement: semi-sunk with a clerestory window band for daylight. |
+| [`modules/basement/modular.md`](modules/basement/modular.md) | basement | The `modular` undercroft: large multi-room cellar direction (geometry not yet wired). |
+
+> Roof/basement modules are **metadata + guidance** today: picking one briefs the model in
+> plain language and loads its guide, but the geometry is still built by you (the model), not
+> stamped from code. Each module declares `appliesTo` (the structures it pairs with, `['house']`
+> for now) — a growing link for reusing a roof/basement on future structure types.
 
 ## Hard rules (read before generating)
 

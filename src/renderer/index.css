@@ -1874,6 +1874,17 @@ body {
   line-height: 1.5;
   margin: 6px 0 0;
 }
+.modules-detail-applies {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+}
+.modules-detail-applies-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--text);
+}
 .gen-details-hint {
   font-size: 12px;
   color: var(--text-muted);

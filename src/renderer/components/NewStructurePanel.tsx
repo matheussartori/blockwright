@@ -15,7 +15,7 @@ import { documentsStore } from '../state/documents';
 import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc } from '../hooks/useStores';
 import { api } from '../api';
-import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule } from '@/shared/types';
+import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule, BuildSelection } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
   thinking: 'Thinking…',
@@ -73,6 +73,10 @@ const EXAMPLES = [
 interface BuildDetails {
   structureType: string;
   decoration: string;
+  /** Selected roof module id (category 'roof'), or '' for none/auto. */
+  roof: string;
+  /** Selected basement module id (category 'basement'), or '' for none. */
+  basement: string;
   /** Structure-type param values, keyed by param name. Missing keys fall back to
    *  the param's default when the brief is built. */
   params: Record<string, string | number>;
@@ -81,7 +85,7 @@ interface BuildDetails {
   size: { w: number; d: number; h: number } | null;
 }
 
-const EMPTY_DETAILS: BuildDetails = { structureType: '', decoration: '', params: {}, size: null };
+const EMPTY_DETAILS: BuildDetails = { structureType: '', decoration: '', roof: '', basement: '', params: {}, size: null };
 
 /** The full param set for the chosen structure: the user's picks merged over each
  *  param's default — so the brief always names every structural param explicitly,
@@ -108,9 +112,12 @@ function derivedSize(struct: GenerationModule | undefined, params: Record<string
   return { w, d, h };
 }
 
-/** The effective size: the user's override, else the derived default. */
+/** The effective size: the user's override, else the derived default. The selected
+ *  basement module (now its own select, not a house param) is folded back in so a
+ *  basement still auto-grows the box. */
 function effectiveSize(d: BuildDetails, struct: GenerationModule | undefined): { w: number; d: number; h: number } {
-  return d.size ?? derivedSize(struct, resolveDetailParams(d, struct));
+  const params = { ...resolveDetailParams(d, struct), basement: d.basement || 'none' };
+  return d.size ?? derivedSize(struct, params);
 }
 
 /** Build the structured-hints block appended to the prompt, or '' if no structure
@@ -123,10 +130,12 @@ function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): string 
   if (!d.structureType) return '';
   const s = catalog?.structure.find((m) => m.id === d.structureType);
   const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
+  const roof = d.roof ? catalog?.roof.find((m) => m.id === d.roof) : undefined;
+  const basement = d.basement ? catalog?.basement.find((m) => m.id === d.basement) : undefined;
   const sz = effectiveSize(d, s);
   const label = s?.label ?? d.structureType;
   const decoClause = deco ? ` with the "${deco.label}" decoration (its materials and mood)` : '';
-  // Plain-language characteristics from the per-type params (floors/basement/…),
+  // Plain-language characteristics from the per-type params (floors/attic/…),
   // skipping internal-only knobs the user never sets as design intent.
   const traits = Object.entries(resolveDetailParams(d, s))
     .filter(([k]) => k !== 'seed' && k !== 'decay')
@@ -136,19 +145,25 @@ function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): string 
     `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +
     `- Build a ${label}${decoClause}, roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D).\n` +
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
+    (roof ? `- Roof: a ${roof.label} roof (see its module guide).\n` : '') +
+    (basement ? `- Basement: a ${basement.label} (see its module guide).\n` : '') +
     `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`
   );
 }
 
-/** The structured selection sent alongside the prompt (drives knowledge loading). */
-function buildSelection(d: BuildDetails): { structureType?: string; decoration?: string } {
+/** The structured selection sent alongside the prompt (drives knowledge loading: one
+ *  guide per selected module, so an unused roof/basement guide is never sent). */
+function buildSelection(d: BuildDetails): BuildSelection {
   return {
     structureType: d.structureType || undefined,
     decoration: d.decoration || undefined,
+    roof: d.roof || undefined,
+    basement: d.basement || undefined,
   };
 }
 
-const hasDetails = (d: BuildDetails): boolean => d.structureType !== '' || d.decoration !== '';
+const hasDetails = (d: BuildDetails): boolean =>
+  d.structureType !== '' || d.decoration !== '' || d.roof !== '' || d.basement !== '';
 
 /** The generate chat body. Rendered inside the dock/floating chrome (which
  *  provides the title bar, detach/redock and minimize), so it only owns its own
@@ -317,9 +332,17 @@ export function GenerateContent() {
   }, [doc]);
 
   const setField = useCallback(
-    (key: 'structureType' | 'decoration', value: string) =>
+    (key: 'structureType' | 'decoration' | 'roof' | 'basement', value: string) =>
       // Switching structure drops the old type's params + size (they don't carry over).
-      setDetails((d) => (key === 'structureType' ? { ...d, structureType: value, params: {}, size: null } : { ...d, [key]: value })),
+      // A basement choice re-derives the size (clears any manual override) so picking a
+      // cellar auto-grows the box, mirroring the old basement param.
+      setDetails((d) =>
+        key === 'structureType'
+          ? { ...d, structureType: value, params: {}, size: null }
+          : key === 'basement'
+            ? { ...d, basement: value, size: null }
+            : { ...d, [key]: value },
+      ),
     [],
   );
 
@@ -557,6 +580,20 @@ export function GenerateContent() {
                 <select value={details.decoration} onChange={(e) => setField('decoration', e.target.value)} disabled={busy || !details.structureType}>
                   <option value="">Default</option>
                   {(catalog?.decoration ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </label>
+              <label className="gen-field">
+                <span>Roof</span>
+                <select value={details.roof} onChange={(e) => setField('roof', e.target.value)} disabled={busy || !details.structureType}>
+                  <option value="">Auto</option>
+                  {(catalog?.roof ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </label>
+              <label className="gen-field">
+                <span>Basement</span>
+                <select value={details.basement} onChange={(e) => setField('basement', e.target.value)} disabled={busy || !details.structureType}>
+                  <option value="">None</option>
+                  {(catalog?.basement ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
             </div>

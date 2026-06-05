@@ -118,6 +118,14 @@ export function ModulesModal() {
                 <span className="catalog-detail-name">{selected.label}</span>
               </div>
               <p className="modules-detail-desc">{selected.description}</p>
+              {selected.appliesTo && selected.appliesTo.length > 0 && (
+                <p className="modules-detail-applies">
+                  <span className="modules-detail-applies-label">Applies to</span>{' '}
+                  {selected.appliesTo
+                    .map((id) => catalog?.structure.find((s) => s.id === id)?.label ?? id)
+                    .join(', ')}
+                </p>
+              )}
             </div>
           )}
         </aside>

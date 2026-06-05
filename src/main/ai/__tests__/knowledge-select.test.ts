@@ -42,4 +42,19 @@ describe('includedModuleGuides — explicit selection', () => {
   it('ignores an unknown selection id without throwing', () => {
     expect(includedModuleGuides('', { structureType: 'castle' }).size).toBe(0);
   });
+
+  it('loads a selected roof/basement guide, and ONLY the selected one', () => {
+    const set = includedModuleGuides('', { structureType: 'house', roof: 'gable', basement: 'full' });
+    expect(set).toContain('nbt/modules/roof/gable.md');
+    expect(set).toContain('nbt/modules/basement/full.md');
+    // The roof/basement the user did NOT pick must not ride along.
+    expect(set).not.toContain('nbt/modules/roof/hip.md');
+    expect(set).not.toContain('nbt/modules/basement/half.md');
+  });
+
+  it('does not pull any roof/basement guide for a plain prompt with no selection', () => {
+    const set = includedModuleGuides('a cozy stone house with a porch');
+    expect([...set].some((p) => p.startsWith('nbt/modules/roof/'))).toBe(false);
+    expect([...set].some((p) => p.startsWith('nbt/modules/basement/'))).toBe(false);
+  });
 });

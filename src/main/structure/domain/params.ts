@@ -3,14 +3,18 @@
 // the loose `template` op params to typed values against that spec. Block-id params
 // are NOT declared here — any op param whose key is a Role (see roles.ts) is treated
 // as a per-role block override and resolved by the palette instead.
-import type { ModuleParam } from './modules';
+import type { ModuleCategory, ModuleParam } from './modules';
 
 /** One parameter's shape, default, and bounds. `label` (+ enum `labels`) are
- *  optional UI metadata so the composer can render a control generically. */
+ *  optional UI metadata so the composer can render a control generically. `module`
+ *  marks a param that is now SURFACED as a separate module-category select in the UI
+ *  (e.g. the house's `roof`/`basement`): it stays in the spec so `build()` keeps
+ *  resolving it, but `paramFields` omits it from the structure's Details controls so
+ *  it isn't shown twice. */
 export type ParamDef =
-  | { kind: 'int'; default: number; min: number; max: number; label?: string }
-  | { kind: 'unit'; default: number; label?: string } // a 0..1 fraction (e.g. decay)
-  | { kind: 'enum'; default: string; values: readonly string[]; labels?: Record<string, string>; label?: string };
+  | { kind: 'int'; default: number; min: number; max: number; label?: string; module?: ModuleCategory }
+  | { kind: 'unit'; default: number; label?: string; module?: ModuleCategory } // a 0..1 fraction (e.g. decay)
+  | { kind: 'enum'; default: string; values: readonly string[]; labels?: Record<string, string>; label?: string; module?: ModuleCategory };
 
 /** A type's full parameter spec, keyed by param name. */
 export type ParamSpec = Record<string, ParamDef>;
@@ -43,11 +47,13 @@ export function resolveParams(spec: ParamSpec, raw: Record<string, unknown>): Pa
 }
 
 /** Project a param spec into renderer-facing fields for the composer's Details —
- *  one control per param. `unit` params (e.g. decay) are omitted: they belong to
- *  the decoration, not the structural picker. */
+ *  one control per param. `unit` params (e.g. decay) are omitted (they belong to the
+ *  decoration, not the structural picker), as are `module`-marked params (surfaced as
+ *  their own module-category select, e.g. roof/basement). */
 export function paramFields(spec: ParamSpec): ModuleParam[] {
   const out: ModuleParam[] = [];
   for (const [name, def] of Object.entries(spec)) {
+    if (def.module) continue; // surfaced as a separate module-category select (e.g. roof/basement)
     if (def.kind === 'int') {
       out.push({ name, kind: 'int', label: def.label ?? name, default: def.default, min: def.min, max: def.max });
     } else if (def.kind === 'enum') {

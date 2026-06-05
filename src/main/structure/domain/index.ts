@@ -1,11 +1,12 @@
 // Public API of the composable generation domain: modules grouped by category
 // (structure × decoration, crossed by `composeStructure` — what the authoring
-// `template` op expands — plus the scaffolded basement/roof categories), the catalog
-// the UI lists, and the selection→knowledge-guide mapping the system prompt uses.
+// `template` op expands — plus roof/basement modules that are selectable guidance but
+// not yet geometry-wired), the catalog the UI lists, and the selection→knowledge-guide
+// mapping the system prompt uses.
 import type { AuthoringStructure } from '../authoring/types';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
-import { listBasements } from './basements';
-import { listRoofs } from './roofs';
+import { basementModules, getBasement, listBasements } from './basements';
+import { getRoof, listRoofs, roofModules } from './roofs';
 import type { ModuleCategory, ModuleMeta, ModuleSummary } from './modules';
 import {
   getStructureType,
@@ -37,8 +38,8 @@ export {
   type Decoration,
   type DecorationTheme,
 } from './decorations';
-export { listBasements, type BasementModule } from './basements';
-export { listRoofs, type RoofModule } from './roofs';
+export { listBasements, getBasement, type BasementModule } from './basements';
+export { listRoofs, getRoof, type RoofModule } from './roofs';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
 export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpec } from './modules';
@@ -67,24 +68,31 @@ export function listModuleCatalog(): ModuleCatalog {
 
 /** Every module across categories (for selection→guide mapping + lookups). */
 function allModules(): ModuleMeta[] {
-  return [...structureModules(), ...decorationModules()];
+  return [...structureModules(), ...decorationModules(), ...roofModules(), ...basementModules()];
 }
 
-/** Which structure/decoration the user picked in the composer Details. */
+/** Which modules the user picked in the composer Details: a structure type, a
+ *  decoration, and (for the structure) a roof + basement typology. Each maps to its
+ *  own knowledge guide, loaded ONLY when selected — so an unused roof/basement guide
+ *  never bloats the system prompt. */
 export interface ModuleSelection {
   structureType?: string;
   decoration?: string;
+  roof?: string;
+  basement?: string;
 }
 
 /** The module guides to include for an explicit selection (paths relative to the
- *  knowledge dir, e.g. `nbt/modules/structure/tower.md`). */
+ *  knowledge dir, e.g. `nbt/modules/structure/tower.md`). One guide per selected
+ *  module — a roof/basement guide is loaded only when that type is chosen. */
 export function selectedGuides(sel: ModuleSelection): string[] {
-  const out: string[] = [];
-  const s = sel.structureType ? getStructureType(sel.structureType) : undefined;
-  if (s?.knowledge) out.push(s.knowledge);
-  const d = sel.decoration ? getDecoration(sel.decoration) : undefined;
-  if (d?.knowledge) out.push(d.knowledge);
-  return out;
+  const lookups = [
+    sel.structureType ? getStructureType(sel.structureType) : undefined,
+    sel.decoration ? getDecoration(sel.decoration) : undefined,
+    sel.roof ? getRoof(sel.roof) : undefined,
+    sel.basement ? getBasement(sel.basement) : undefined,
+  ];
+  return lookups.flatMap((m) => (m?.knowledge ? [m.knowledge] : []));
 }
 
 /** The module guides a free-text prompt pulls in via keyword (the fallback when no
@@ -96,9 +104,10 @@ export function promptGuides(prompt: string): string[] {
 }
 
 /** Build the representative authoring structure for a module's gallery preview, or
- *  null if the module has no preview (e.g. the scaffolded basement/roof modules). A
- *  structure preview renders that structure under the default decoration; a
- *  decoration preview renders it on the host structure. Pure — the caller compiles. */
+ *  null if the module has no preview (e.g. the metadata-only roof/basement modules,
+ *  whose geometry isn't wired yet). A structure preview renders that structure under the
+ *  default decoration; a decoration preview renders it on the host structure. Pure — the
+ *  caller compiles. */
 export function buildModulePreview(category: ModuleCategory, id: string): AuthoringStructure | null {
   let meta: ModuleMeta | undefined;
   let name: string;
@@ -112,7 +121,7 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     name = PREVIEW_HOST_STRUCTURE;
     params = { decoration: id };
   } else {
-    return null; // basement/roof previews not wired yet
+    return null; // roof/basement are metadata-only — no preview geometry yet
   }
   if (!meta?.preview) return null;
   const [w, h, d] = meta.preview.size;

@@ -16,6 +16,14 @@ Conventions below: `@` = the anchor cell, `x+`/`y+`/`z+` = offsets, "facing" fol
 [`03`](03-blocks-and-blockstates.md) (stairs ascend toward `facing`; the tall riser is on that
 side). Always confirm orientation in the preview.
 
+> **Furniture lives in the interior, never in the wall.** Place every prop in an **interior air
+> cell** — never in a cell that is part of an outer wall, and never overlapping one. Many furniture
+> blocks (beds, lanterns, barrels with their banding, pots) have models that bulge past the cell, so
+> a bed or lantern set flush against — or worse, *inside* — the wall plane visibly pokes through the
+> exterior. Keep furniture **one cell clear of the outer walls**: a bed's head against an interior
+> partition is fine, but a bed jammed into the shell, or a wall sconce/lantern occupying a wall cell,
+> clips through to the outside. Decoration must sit *in front of* the wall, not in it.
+
 ---
 
 ## Seating — sofas, armchairs, benches

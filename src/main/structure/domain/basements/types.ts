@@ -14,10 +14,14 @@ import type { BuildArgs } from '../structure-types/types';
 
 export interface BasementModule extends ModuleMeta {
   category: 'basement';
-  /** Shape/behaviour params (decay, shape, …). Block choices come from the decoration. */
-  params: ParamSpec;
-  /** This module's default block per role — its material "kit". */
-  defaults: Partial<Record<Role, string>>;
-  /** Emit the massing as volumetric ops in terms of roles. */
-  build(args: BuildArgs): AuthoringOp[];
+  /** Shape/behaviour params (decay, shape, …). Block choices come from the decoration.
+   *  Optional: a metadata-only basement (guidance + knowledge guide, no geometry) omits it. */
+  params?: ParamSpec;
+  /** This module's default block per role — its material "kit". Optional for a
+   *  metadata-only basement. */
+  defaults?: Partial<Record<Role, string>>;
+  /** Emit the massing as volumetric ops in terms of roles. Optional until the basement
+   *  gains code geometry — a metadata-only basement rides into generation as plain-language
+   *  guidance + its knowledge guide instead of stamping ops. */
+  build?(args: BuildArgs): AuthoringOp[];
 }

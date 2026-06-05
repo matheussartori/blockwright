@@ -1,14 +1,22 @@
-// Basement registry (category "basement"). SCAFFOLDED: the contract is defined and a
-// seed module is registered so the gallery can describe it, but basements are not yet
-// wired into `composeStructure` (no preview / not selectable in the composer). The
-// upcoming "modular basement" pass will attach these beneath a host structure.
+// Basement registry (category "basement"). Each basement typology is one module file
+// (full, half, modular …). They are METADATA-ONLY for now: no `build()` geometry is
+// wired into `composeStructure` — a selected basement rides into generation as
+// plain-language guidance + its own knowledge guide (loaded ONLY when selected, so an
+// unused basement guide never bloats the prompt) and is documented in the gallery.
+// Each basement links to the structures it fits via `appliesTo` (a growing list —
+// start with `['house']`, add more later). The "modular" seed keeps a `build()` for
+// the upcoming geometry pass; full/half are guidance-only.
 import { toSummary, type ModuleSummary } from '../modules';
 import { basement } from './basement';
+import { full } from './full';
+import { half } from './half';
 import type { BasementModule } from './types';
 
 export type { BasementModule } from './types';
 
 const BASEMENTS: Record<string, BasementModule> = {
+  [full.id]: full,
+  [half.id]: half,
   [basement.id]: basement,
 };
 

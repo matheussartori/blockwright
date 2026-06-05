@@ -28,9 +28,12 @@ export const house: StructureType = {
   preview: { size: [11, 13, 9], params: { floors: 2, attic: 'storage' } },
   params: {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
+    // Surfaced in Details as the separate "Basement" module select (category
+    // 'basement'), so it's omitted from the house's own param controls — but kept here
+    // so the legacy `template name:'house'` build path still resolves it.
     basement: {
       kind: 'enum', default: 'none', values: ['none', 'full', 'half'], label: 'Basement',
-      labels: { none: 'None', full: 'Full cellar', half: 'Half-buried' },
+      labels: { none: 'None', full: 'Full cellar', half: 'Half-buried' }, module: 'basement',
     },
     attic: {
       kind: 'enum', default: 'none', values: ['none', 'storage', 'finished'], label: 'Attic',
@@ -40,9 +43,12 @@ export const house: StructureType = {
       kind: 'enum', default: 'none', values: ['none', 'front', 'side'], label: 'Balcony',
       labels: { none: 'None', front: 'Front', side: 'Side' },
     },
+    // Surfaced in Details as the separate "Roof" module select (category 'roof'), so
+    // it's omitted from the house's own param controls — but kept here so the legacy
+    // `template name:'house'` build path still resolves it.
     roof: {
       kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip'], label: 'Roof',
-      labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip' },
+      labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip' }, module: 'roof',
     },
     decay: { kind: 'unit', default: 0.2 },
   },

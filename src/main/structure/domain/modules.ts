@@ -37,6 +37,12 @@ export interface ModuleMeta {
    *  selection (e.g. typing "a tall tower" loads the tower guide). Omit for modules
    *  that should only load when explicitly selected. */
   keywords?: RegExp;
+  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`). This is a
+   *  GROWING link: a roof built for the house can later also declare a new structure
+   *  here and be reused by it. Omit → the module is standalone / applies to every
+   *  structure. For now the UI shows all modules regardless; this drives future
+   *  category filtering (e.g. "show only roofs that fit the chosen structure"). */
+  appliesTo?: string[];
   /** How to render this module in the gallery (omit → no preview). */
   preview?: PreviewSpec;
 }
@@ -55,6 +61,9 @@ export interface ModuleSummary {
   description: string;
   /** Whether a 3D preview can be composed for this module. */
   hasPreview: boolean;
+  /** Structure-type ids this module pairs with (the growing `appliesTo` link); the UI
+   *  shows all for now but can later filter on it. Omit → applies to every structure. */
+  appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
 }
@@ -67,5 +76,6 @@ export function toSummary(m: ModuleMeta): ModuleSummary {
     category: m.category,
     description: m.description,
     hasPreview: m.preview !== undefined,
+    appliesTo: m.appliesTo,
   };
 }

@@ -19,6 +19,7 @@ export const basement: BasementModule = {
     'a grid of lit support pillars. Designed to grow into a large multi-room complex beneath a ' +
     'host structure. Scaffolded for an upcoming pass — not yet buildable from the composer.',
   knowledge: 'nbt/modules/basement/modular.md',
+  appliesTo: ['house'],
   params: {
     decay: { kind: 'unit', default: 0.25 },
     shape: { kind: 'enum', default: 'auto', values: ['rect', 'l', 't', 'u', 'plus', 'auto'] },

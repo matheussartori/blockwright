@@ -12,8 +12,11 @@ import type { BuildArgs } from '../structure-types/types';
 
 export interface RoofModule extends ModuleMeta {
   category: 'roof';
-  /** Shape/behaviour params (pitch, overhang, …). Block choices come from the decoration. */
-  params: ParamSpec;
-  /** Emit the roof as volumetric ops over the host's wall box. */
-  build(args: BuildArgs): AuthoringOp[];
+  /** Shape/behaviour params (pitch, overhang, …). Block choices come from the decoration.
+   *  Optional: a metadata-only roof (guidance + knowledge guide, no geometry yet) omits it. */
+  params?: ParamSpec;
+  /** Emit the roof as volumetric ops over the host's wall box. Optional until the roof
+   *  gains code geometry — a metadata-only roof rides into generation as plain-language
+   *  guidance + its knowledge guide instead of stamping ops. */
+  build?(args: BuildArgs): AuthoringOp[];
 }
