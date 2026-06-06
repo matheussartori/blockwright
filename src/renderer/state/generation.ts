@@ -9,8 +9,11 @@
 // its conversation and the SDK session can resume.
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage, FloorDef, BuildSelection, BuildBrief } from '@/shared/types';
+import type { GenerateImage, BuildSelection, BuildBrief } from '@/shared/types';
 import { basename, dirname } from '../ui/path';
+import { buildFloorPlan, normalizeFloor } from '../generation/floors';
+
+export { buildFloorPlan, normalizeFloor };
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
  *  it's the active tab. Provided by App, which owns the viewers.
@@ -59,34 +62,6 @@ export function persistDoc(docId: string): void {
     baselinePath: doc.baselinePath,
     floors: doc.floors,
   });
-}
-
-/** Normalize a floor's range to ascending [from, to], tolerating legacy records
- *  that only stored a base `y` (treated as a single-layer level at that y). */
-export function normalizeFloor(f: FloorDef & { y?: number }): FloorDef {
-  const from = f.from ?? f.y ?? 0;
-  const to = f.to ?? f.y ?? from;
-  return { id: f.id, name: f.name, from: Math.min(from, to), to: Math.max(from, to), role: f.role };
-}
-
-/** Build the floor-plan context block appended to every AI prompt, or '' if no
- *  levels are defined. Sorted bottom-up; each level states its inclusive y range,
- *  so the model can map "the basement"/"the top floor" to concrete y values and
- *  keep the layout consistent across edits. */
-export function buildFloorPlan(floors: Document['floors']): string {
-  if (!floors.length) return '';
-  const sorted = [...floors].map(normalizeFloor).sort((a, b) => a.from - b.from);
-  const lines = sorted.map((f, i) => {
-    const name = f.name.trim() || `Level ${i + 1}`;
-    const range = f.to > f.from ? `y ${f.from}–${f.to}` : `y ${f.from}`;
-    return `- ${name}: ${range}`;
-  });
-  return (
-    `\n\n[Floor plan — named vertical levels the user defined for this build. ` +
-    `Minecraft is Y-up and y=0 is the lowest layer. Build each level within its ` +
-    `inclusive y range and keep this layout consistent across edits, so a request ` +
-    `like "add windows to the basement" maps to the right y range.]\n${lines.join('\n')}`
-  );
 }
 
 /** Record a compiled version on the document (deduped by number) and mark it as
@@ -200,8 +175,16 @@ export interface GenerationInput {
   selection?: BuildSelection;
 }
 
-/** Run a generation/edit for `docId`. Writes all results onto the document by id (not
- *  "active"), so it completes correctly even after the user switches tabs. */
+/**
+ * Run a generation/edit for a document. Writes all results onto the document BY ID (not
+ * "active"), so it completes correctly even after the user switches tabs.
+ *
+ * @param docId - The document whose AI session this turn runs against.
+ * @param input - The turn inputs (see {@link GenerationInput}): the model prompt kept
+ *   separate from the chat text + build card, plus staged images and the module selection.
+ * @returns Resolves when the turn finishes (success, cancel, or error) and the result has
+ *   been appended to the document's chat — it never rejects (errors land in the transcript).
+ */
 export async function runGeneration(docId: string, input: GenerationInput): Promise<void> {
   const docs = documentsStore.getState();
   const doc = docs.documents.find((d) => d.id === docId);

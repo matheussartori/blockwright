@@ -13,5 +13,5 @@ export const library: RoomModule = {
     'glassed cabinet), a central study table with lecterns and candles, a reading chair by a ' +
     'window, and a chandelier. Studious and warm.',
   knowledge: 'nbt/modules/room/library.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };

@@ -15,21 +15,19 @@ function stubIntern(): Intern {
 
 const from: [number, number, number] = [0, 0, 0];
 const house: [number, number, number] = [10, 7, 8];
-const tower: [number, number, number] = [8, 17, 8];
 
 describe('compose: structure types × decorations', () => {
   it('recognises the registered structure types, rejects unknowns and retired names', () => {
     expect(isKnownStructure('house')).toBe(true);
-    expect(isKnownStructure('tower')).toBe(true);
-    expect(isKnownStructure('basement')).toBe(false); // basement is its own (unwired) category now
+    expect(isKnownStructure('basement')).toBe(false); // basement is its own category, not a structure type
     expect(isKnownStructure('abandoned_house')).toBe(false); // alias retired
     expect(isKnownStructure('castle')).toBe(false);
-    expect(knownStructureNames()).toEqual(expect.arrayContaining(['house', 'tower']));
+    expect(knownStructureNames()).toEqual(['house']);
   });
 
   it('builds with the default (cozy) decoration and is deterministic for a seed', () => {
-    const a = composeStructure('tower', from, tower, { seed: 7 }, stubIntern());
-    const b = composeStructure('tower', from, tower, { seed: 7 }, stubIntern());
+    const a = composeStructure('house', from, house, { seed: 7 }, stubIntern());
+    const b = composeStructure('house', from, house, { seed: 7 }, stubIntern());
     expect(a.length).toBe(b.length);
     expect(a.length).toBeGreaterThan(0);
   });
@@ -74,27 +72,25 @@ describe('compose: structure types × decorations', () => {
     expect(names).not.toContain('basement');
     const floors = house?.params?.find((p) => p.name === 'floors');
     expect(floors).toMatchObject({ kind: 'int', label: 'Floors', min: 1, max: 4 });
-    // Tower exposes only its own params (crown), never the house's.
-    const tower = cat.structure.find((m) => m.id === 'tower');
-    expect((tower?.params ?? []).map((p) => p.name)).toEqual(['crown']);
   });
 
-  it('roof + basement are their own module categories, linked to the house via appliesTo', () => {
+  it('every roof/basement/room module is linked to the house via appliesTo', () => {
     const cat = listModuleCatalog();
     expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip']));
     expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['cellar', 'crypt', 'cult-temple']));
-    // Every roof/basement module declares the structures it pairs with (house for now).
-    for (const m of [...cat.roof, ...cat.basement]) {
-      expect(m.appliesTo).toContain('house');
+    expect(cat.room.map((m) => m.id)).toEqual(expect.arrayContaining(['living', 'kitchen', 'library']));
+    // Every roof/basement/room module declares the structures it pairs with, and all of
+    // them currently include the house (more structure ids can be added later, e.g. a
+    // crypt basement gaining 'tower' → ['house','tower']).
+    for (const m of [...cat.roof, ...cat.basement, ...cat.room]) {
+      expect(m.appliesTo, `${m.id} must declare appliesTo`).toBeTruthy();
+      expect(m.appliesTo, `${m.id} must apply to house`).toContain('house');
     }
   });
 
   it('structure modules declare their finalize passes (modular per-structure code gating)', () => {
-    // House is a hearth home → stair cleanup + single-chimney; tower is storeyed but has
-    // no chimney; an unknown id contributes nothing.
+    // House is a hearth home → stair cleanup + single-chimney; an unknown id contributes nothing.
     expect(structureFinalizers('house')).toEqual(expect.arrayContaining(['stairs', 'chimney']));
-    expect(structureFinalizers('tower')).toEqual(['stairs']);
-    expect(structureFinalizers('tower')).not.toContain('chimney');
     expect(structureFinalizers(undefined)).toEqual([]);
     expect(structureFinalizers('castle')).toEqual([]);
   });
@@ -114,10 +110,10 @@ describe('composeModule: roof/basement module geometry runs through the compose 
   it('layers HOST-SPECIFIC integration ops on top only for the matching host', () => {
     const generic = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern());
     const onHouse = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern(), 'house');
-    const onTower = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern(), 'tower');
+    const onOther = composeModule('roof', 'gable', from, to, { decoration: 'cozy' }, stubIntern(), 'barn');
     // The house adds gable-end vents; a host with no integration adds nothing extra.
     expect(onHouse.length).toBeGreaterThan(generic.length);
-    expect(onTower.length).toBe(generic.length);
+    expect(onOther.length).toBe(generic.length);
   });
 
   it('runs a basement module build() (sealed cellar: floor/ceiling, walls, pillars, light)', () => {
@@ -161,8 +157,8 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
   });
 
   it('does NOT load a roof guide for a structure it does not apply to', () => {
-    // gable applies to ['house']; on a tower its guide must not ride along.
-    const guides = selectedGuides({ structureType: 'tower', roof: 'gable' });
+    // gable applies to ['house']; for any other structure its guide must not ride along.
+    const guides = selectedGuides({ structureType: 'barn', roof: 'gable' });
     expect(guides).not.toContain('nbt/modules/roof/gable.md');
   });
 });
@@ -177,6 +173,41 @@ describe('compose: house roof form + determinism', () => {
     };
     expect(roofOf('hip').style).toBe('hip');
     expect(roofOf('gable').style).toBe('gable');
+  });
+
+  it('delegates the roof to the module — the gable form carries its host-integration vents', () => {
+    // The house owns placement but DELEGATES roof geometry to the roof module. Roof form
+    // doesn't change the house's other block ops (windows/door/chimney), so the only
+    // block-op difference between gable and hip at a fixed seed is the gable module's
+    // host integration: a vent at each gable end (+2). Proves the delegate ran build +
+    // integration through the seam.
+    const big: [number, number, number] = [14, 20, 14];
+    const base = { floors: 2, seed: 9 };
+    const blocks = (roof: string) =>
+      composeStructure('house', from, big, { ...base, roof }, stubIntern()).filter((o) => o.op === 'block').length;
+    expect(blocks('gable')).toBe(blocks('hip') + 2);
+  });
+
+  it('delegates the below-grade level to the basement module (adds the cellar room)', () => {
+    const big: [number, number, number] = [14, 22, 14];
+    const base = { floors: 2, seed: 5 };
+    const withCellar = composeStructure('house', from, big, { ...base, basement: 'full' }, stubIntern());
+    const noCellar = composeStructure('house', from, big, { ...base, basement: 'none' }, stubIntern());
+    // The delegated cellar adds a sealed room (floor/ceiling + perimeter walls + a grid of
+    // lit support pillars) the no-basement build doesn't have, while the single-roof and
+    // stair-core invariants still hold.
+    expect(withCellar.length).toBeGreaterThan(noCellar.length);
+    expect(withCellar.filter((o) => o.op === 'roof')).toHaveLength(1);
+    expect(withCellar.some((o) => o.op === 'stairs')).toBe(true);
+  });
+
+  it('the basement "half" variant adds the clerestory the "full" one omits', () => {
+    const big: [number, number, number] = [14, 22, 14];
+    const base = { floors: 2, seed: 5 };
+    const full = composeStructure('house', from, big, { ...base, basement: 'full' }, stubIntern());
+    const half = composeStructure('house', from, big, { ...base, basement: 'half' }, stubIntern());
+    // Same delegated cellar room; 'half' layers the high clerestory window band on top.
+    expect(half.length).toBeGreaterThan(full.length);
   });
 
   it('house params are deterministic for the same box + params + seed', () => {

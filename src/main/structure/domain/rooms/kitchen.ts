@@ -13,5 +13,5 @@ export const kitchen: RoomModule = {
     'cooktop and a cauldron sink), overhead and base storage of barrels and composters, a ' +
     'pantry, and a small dining nook. Functional, lit, and tidy.',
   knowledge: 'nbt/modules/room/kitchen.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };

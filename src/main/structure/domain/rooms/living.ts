@@ -13,5 +13,5 @@ export const living: RoomModule = {
     'cluster of stair "sofas" on a wool rug, a low table, shelves and wall pictures, and warm ' +
     'ambient light. The welcoming centre of the home.',
   knowledge: 'nbt/modules/room/living.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };

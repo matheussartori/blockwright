@@ -6,7 +6,8 @@
 // and is documented in the gallery. Each links to the structures it fits via
 // `appliesTo`. Add a room: new file here + register below + a knowledge guide under
 // `knowledge/nbt/modules/room/<id>.md`.
-import { toSummary, type ModuleSummary } from '../modules';
+import type { ModuleSummary } from '../modules';
+import { createRegistry } from '../registry';
 import { bedroom } from './bedroom';
 import { dormitory } from './dormitory';
 import { kitchen } from './kitchen';
@@ -17,26 +18,19 @@ import type { RoomModule } from './types';
 
 export type { RoomModule } from './types';
 
-const ROOMS: Record<string, RoomModule> = {
-  [living.id]: living,
-  [kitchen.id]: kitchen,
-  [library.id]: library,
-  [bedroom.id]: bedroom,
-  [dormitory.id]: dormitory,
-  [storage.id]: storage,
-};
+const registry = createRegistry<RoomModule>([living, kitchen, library, bedroom, dormitory, storage]);
 
 /** Look up a room module by id (undefined if unknown). */
 export function getRoom(id: string): RoomModule | undefined {
-  return ROOMS[id];
+  return registry.get(id);
 }
 
 /** Every room module, as a module summary (for the composer + gallery). */
 export function listRooms(): ModuleSummary[] {
-  return Object.values(ROOMS).map(toSummary);
+  return registry.list();
 }
 
 /** Every room module (for the knowledge loader). */
 export function roomModules(): RoomModule[] {
-  return Object.values(ROOMS);
+  return registry.all();
 }

@@ -61,6 +61,30 @@ export interface BuildArgs {
    *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
    *  Undefined for a structure type building itself, or a context-free preview. */
   host?: string;
+  /**
+   * Delegate a region's geometry to a roof/basement MODULE — so a structure type
+   * OWNS placement (where the roof/basement box is) while the module OWNS the geometry
+   * (the single source of that typology's shape). The module runs against THIS build's
+   * palette + seed with the calling structure as `host`, so its materials match the
+   * structure's kit + decoration and its host-specific integration (e.g. gable-end
+   * vents) is included. Injected by the compose layer (see `composeStructure`).
+   *
+   * @param category - 'roof' or 'basement' (which module registry to resolve `id` in).
+   * @param id - The module id (e.g. 'gable', 'cellar').
+   * @param from - One corner of the box the module builds into [x, y, z].
+   * @param to - The opposite corner of that box [x, y, z].
+   * @param extra - Params layered over the build's params for the module (e.g. a roof's
+   *   `ridge`, a basement's `shape`).
+   * @returns The module's ops (generic build + host integration), or [] if the module
+   *   is unknown / has no geometry.
+   */
+  composeModule(
+    category: 'roof' | 'basement',
+    id: string,
+    from: [number, number, number],
+    to: [number, number, number],
+    extra?: Record<string, unknown>,
+  ): AuthoringOp[];
 }
 
 /** A code-owned post-processing pass a structure type opts into. The compile pipeline
@@ -71,7 +95,7 @@ export interface BuildArgs {
  *   - `'chimney'` — single complete chimney enforcement (house-style homes only). */
 export type FinalizePass = 'stairs' | 'chimney';
 
-/** A buildable structure archetype (house, tower, …). Behaviour-only: it never
+/** A buildable structure archetype (house, …). Behaviour-only: it never
  *  names concrete blocks, so any type composes with any decoration. Carries the
  *  shared module metadata (id/label/description/knowledge/preview); `category` is
  *  always `'structure'`. */
@@ -86,8 +110,7 @@ export interface StructureType extends ModuleMeta {
   build(args: BuildArgs): AuthoringOp[];
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
-   *  which structure" declaration — e.g. house = `['stairs','chimney']`, tower =
-   *  `['stairs']`. */
+   *  which structure" declaration — e.g. house = `['stairs','chimney']`. */
   finalize?: FinalizePass[];
   /** Optional system-prompt fragment (wired into the generator prompt later). */
   prompt?: string;

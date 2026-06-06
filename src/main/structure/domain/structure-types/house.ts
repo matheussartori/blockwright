@@ -67,7 +67,7 @@ export const house: StructureType = {
     fence: 'minecraft:spruce_fence',
     light: 'minecraft:lantern',
   },
-  build({ box, params, palette, seed }) {
+  build({ box, params, palette, seed, composeModule }) {
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
     const basement = params.basement as string;
@@ -145,12 +145,14 @@ export const house: StructureType = {
       }
     }
 
-    // Below-grade walls + corners read as a stone cellar (cobblestone), not timber.
+    // Below-grade level: DELEGATE the cellar room to the basement module (the single
+    // source of basement geometry — a self-contained stone undercroft with a distinct
+    // floor/ceiling, perimeter walls and lit support pillars). The house owns placement
+    // (it fills the building footprint, so force a rect footprint, the ceiling landing on
+    // the ground slab) + burial depth; the 'half' clerestory below and the stair-core
+    // descent stay the house's own concern. The module brings its own stone palette.
     if (hasBasement && groundY - 1 >= y0 + 1) {
-      ops.push({ op: 'walls', from: [x0, y0 + 1, z0], to: [x1, groundY - 1, z1], state: found });
-      for (const [px, pz] of [[x0, z0], [x0, z1], [x1, z0], [x1, z1]] as [number, number][]) {
-        ops.push({ op: 'fill', from: [px, y0 + 1, pz], to: [px, groundY - 1, pz], state: found });
-      }
+      ops.push(...composeModule('basement', 'cellar', [x0, y0, z0], [x1, groundY, z1], { shape: 'rect' }));
     }
 
     // Stone plinth: a cobblestone water-table course at the ground-storey base, so the
@@ -166,16 +168,19 @@ export const house: StructureType = {
     else if (!doRoof) ops.push({ op: 'fill', from: [x0, wallTop, z0], to: [x1, wallTop, z1], state: floorIdx });
 
     // --- Roof (emitted ONCE — the model must never add another) ----------------
-    // The ridge runs along the LONG axis so the slope climbs the SHORT axis (=
-    // roofRings) and never overshoots the reserved height — and the seed varies the
-    // form (gable either way, or a hip) for a square-ish footprint.
+    // DELEGATED to the roof module (the single source of roof geometry): the house owns
+    // placement (the box over the wall top) + which form the seed/param picked; the
+    // module emits the pitched `roof` op (against this build's palette, so materials
+    // match) plus its host integration (gable-end vents). The seed varies the form
+    // (gable either way, or a hip) for a square-ish footprint.
     if (doRoof) {
-      const roofState = palette.get('roof');
+      const roofBoxFrom: [number, number, number] = [x0, wallTop + 1, z0];
+      const roofBoxTo: [number, number, number] = [x1, y1, z1];
       if (roofPick === 'hip') {
-        ops.push({ op: 'roof', from: [x0, wallTop + 1, z0], to: [x1, y1, z1], state: roofState, style: 'hip', fill: wall });
+        ops.push(...composeModule('roof', 'hip', roofBoxFrom, roofBoxTo));
       } else {
-        const ridge: 'x' | 'z' = roofPick === 'gx' ? 'x' : roofPick === 'gz' ? 'z' : W <= D ? 'z' : 'x';
-        ops.push({ op: 'roof', from: [x0, wallTop + 1, z0], to: [x1, y1, z1], state: roofState, style: 'gable', ridge, fill: wall });
+        const ridge = roofPick === 'gx' ? 'x' : roofPick === 'gz' ? 'z' : W <= D ? 'z' : 'x';
+        ops.push(...composeModule('roof', 'gable', roofBoxFrom, roofBoxTo, { ridge }));
       }
     }
 

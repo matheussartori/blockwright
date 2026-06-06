@@ -62,15 +62,18 @@ src/
                            generation domain" below.
         modules.ts         ModuleCategory + ModuleMeta (id/label/category/description/knowledge/
                            keywords/preview) shared by every module, across categories.
+        registry.ts        createRegistry<T extends ModuleMeta> — the shared factory (get/has/ids/
+                           all/list) every category's index.ts is built on, so the per-category
+                           lookup boilerplate exists once.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
-        params.ts          ParamSpec/ParamDef + resolveParams (single per-type param declaration)
+        params.ts          ParamSpec/ParamDef + resolveParams + paramFields (single per-type param decl)
         compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
                            (decoration param accepts `decoration` or legacy `theme`)
         index.ts           barrel + catalog (listModuleCatalog), selection→guide mapping
                            (selectedGuides/promptGuides), buildModulePreview (gallery)
-        structure-types/   Category "structure": one file per archetype (house, tower) + types.ts
-                           (contract + Box/logProps) + index.ts (registry). A type emits ops in terms
-                           of roles; never names blocks. Tower carries exterior-only detailing.
+        structure-types/   Category "structure": one file per archetype (house; add more here) +
+                           types.ts (contract + Box/logProps) + index.ts (registry). A type emits ops
+                           in terms of roles; never names blocks, and delegates roof/basement to modules.
         decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
                            contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
                            maps roles→blocks + decay + weathering.
@@ -81,23 +84,30 @@ src/
                            (`build()`, any host) + optional HOST-SPECIFIC extras (`integrations[host]`,
                            e.g. house-only gable vents), run by `composeModule`/`composeModulePreview`
                            — roofs + basements render live in the gallery; a pick also rides into the
-                           prompt as guidance + loads only its knowledge guide. NOT yet wired into a
-                           structure type's own build (the house still emits its own roof; module
-                           delegation is the next step). Each declares `appliesTo` (the structures it
+                           prompt as guidance + loads only its knowledge guide. A structure type also
+                           DELEGATES its own roof/basement to these modules at build time (the house calls
+                           `args.composeModule(...)` — see "Composable generation domain"), so a module is
+                           the single source of that geometry. Each declares `appliesTo` (the structures it
                            pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
         rooms/             Category "room": one file per interior program (living/kitchen/library/
                            bedroom/dormitory/storage) + types.ts (RoomModule = ModuleMeta, no geometry)
                            + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`: the user
                            assigns up to two rooms per floor in the composer Details (house), each
                            loads only its knowledge guide and rides into the prompt as a `[Room plan]`
-                           line per floor; the AI furnishes the interior. `appliesTo` = ['house','tower'].
+                           line per floor; the AI furnishes the interior. `appliesTo` = ['house'].
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     ai/                     AI structure generation (File ▸ New Structure)
       generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→
-                            review handler, round budget + progress; dispatches to a provider driver
+                            review handler, round budget + progress; dispatches to a provider driver.
+                            `generateStructure(GenerateStructureOptions)` takes an options object.
+      patch.ts              mergePatch(prev,input) — pure: append a `patch`-mode emit's palette/ops/
+                            blocks onto the previous version (size/floors/etc. inherited).
+      emit-validate.ts      validateEmit(authoring) — the pre-compile gates (structural validity →
+                            no `minecraft:light` → only real block ids); returns a {reason,feedback}
+                            rejection for the model to self-correct, or null.
       schema.ts             Shared system prompt + emit_structure schema (rich JSON Schema for
                             Anthropic/OpenAI; flat string-schema for Gemini/Codex)
       credentials.ts        Multi-provider credential store (per-provider secret via safeStorage) +
@@ -107,6 +117,7 @@ src/
       output-dir.ts         The user's browsable structure LIBRARY: configurable folder (default
                             `~/Documents/Blockwright`, `BW_OUTPUT_DIR` overrides) where each session's
                             current build is mirrored as one clean `<slug-from-prompt>.nbt` file
+                            (`mirrorToLibrary` — best-effort copy, reserves the slug once per session)
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
@@ -175,6 +186,10 @@ src/
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
                           Build dialogs/controls from these so fonts/spacing/styles stay consistent.
+    generation/           Pure (no-React, no-IO) helpers behind the Generate composer, extracted from
+                          NewStructurePanel/state so they're unit-testable: brief.ts (BuildDetails →
+                          the model's "[Build details]" brief + BuildSelection + the BuildBrief chat
+                          card + size/floor helpers) and floors.ts (normalizeFloor + buildFloorPlan).
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
@@ -194,6 +209,9 @@ src/
                           (structure, workspace, jigsaw, generation, app, api = BlockwrightApi) +
                           an index.ts barrel — so `@/shared/types` stays the one import path
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
+    domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
+                          two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
+                          Details filtering and the main guide gating call the SAME function).
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
     i18n/                 Tiny framework-free i18n shared by both processes: en.ts (canonical key
                           space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
@@ -281,7 +299,7 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 is a **module** in one of five **categories** (`structure`, `decoration`, `basement`, `roof`,
 `room` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
 knowledge/keywords/preview). The two live growth axes — **structure types** × **decorations**
-— combine without N×M code. A **StructureType** (`house`, `tower`) owns only the *massing*
+— combine without N×M code. A **StructureType** (`house`; more can be added) owns only the *massing*
 (shell, openings, structural detail) and emits ops in terms of **semantic roles** (`wall`,
 `floor`, `roof`…), never concrete blocks. A **Decoration** (`cozy`) owns the *look*: it maps
 roles→blocks (sparsely), sets a decay level, and weathers blocks. `composeStructure` crosses
@@ -294,14 +312,13 @@ decoration, and a new module is one small file.
   legacy `theme`) picks the look, and any param keyed by a role name is a block override.
   Compiled in `authoring/ops/index.ts` via `composeStructure`; default decoration is `cozy`.
 - **Each type ships its own material `defaults`** (a "kit"), so it looks right even under a
-  sparse decoration. `tower` carries **exterior-only** detailing (battered base, inset shaft,
-  quoins, string-courses, machicolation/parapet crown, bracket lanterns) that the house lacks.
+  sparse decoration.
 - **A type declares its `finalize` passes** — the modular "which code fix applies to which
-  structure" map (`FinalizePass[]`). `house = ['stairs','chimney']`, `tower = ['stairs']`. The
+  structure" map (`FinalizePass[]`). `house = ['stairs','chimney']`. The
   compile pipeline (`pipelineFor`, via `structureFinalizers(id)`) runs each gated pass only when
   that structure is the SELECTED one (`BuildSelection.structureType`, threaded to `writeStructureFile`)
-  — so e.g. the single-chimney fix runs on a house but never on a tower. These run on AI free-form
-  builds too (gated by the Details selection), since the model is bad at the same details code can repair.
+  — so e.g. the single-chimney fix runs on a house but not on a structure that doesn't declare it.
+  These run on AI free-form builds too (gated by the Details selection), since the model is bad at the same details code can repair.
   (NOTE: only `'chimney'` still gates a pass. `'stairs'` is now vestigial — `rebuildStairwells` owns
   circulation always-on + self-gating, so it works on free-form builds with no structureType too.)
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
@@ -319,22 +336,38 @@ decoration, and a new module is one small file.
   refactored `makePalette(defaults, …)`. This powers the **gallery 3D preview** for roofs + basements.
   A selection ALSO rides into the prompt as a plain-language `[Build details]` line and loads ONLY
   its knowledge guide (no `keywords`, so an unused roof/basement guide never bloats the prompt), gated
-  by `appliesTo` (`selectedGuides` skips a roof guide that doesn't fit the chosen structure). **Not
-  yet** wired into a structure type's own build — the house still emits its own roof; the next step is
-  letting a type DELEGATE roof/basement to a module (then `composeModule(..., host)` runs in the real
-  build). The house keeps `roof`/`basement` in its param spec for the legacy `template name:'house'`
-  path, marked `module:'roof'|'basement'` in `ParamDef` so `paramFields` hides them from the house's
-  own Details controls (no duplicate). **Add a roof/basement:** new file + register in its `index.ts`;
-  give it `appliesTo` + optional `build()`/`integrations` + a `knowledge/nbt/modules/{roof,basement}/<id>.md`.
+  by `appliesTo` (`selectedGuides` skips a roof guide that doesn't fit the chosen structure).
+- **`appliesTo` is REQUIRED on every roof/basement/room module** (those contracts narrow ModuleMeta's
+  optional `appliesTo` to required), so a module must always declare which structures it fits — never
+  silently apply to all. Every one currently lists `['house']`; it's a GROWING multi-structure link, so
+  a future structure type reuses an existing module by adding its id (e.g. a `tower` getting a `crypt`
+  basement → `crypt.appliesTo = ['house', 'tower']`). `moduleAppliesTo` then shows it in the tower's
+  Details + loads its guide. (Decorations + structure types don't use `appliesTo` — a decoration crosses
+  with every structure.)
+- **A structure type DELEGATES roof/basement geometry to those modules** (the modules are the single
+  source — no parallel roof/basement geometry in the type). The type OWNS placement and calls the
+  `composeModule(category, id, from, to, extra?)` delegate injected into its `BuildArgs` (built by
+  `composeStructure` via `makeModuleComposer`, which runs the module's `build()` + host
+  `integrations[host]` through the shared `runModuleGeometry`). The house delegates its roof
+  (gable/hip, threading the seeded ridge as `extra.ridge`; the gable's host vents now ride along) and
+  its below-grade level (to the `cellar` module, forced `shape:'rect'` to fill the footprint).
+  **Palette strategy is per-category by design:** a **roof** reuses the HOST palette (it's part of the
+  host's exterior material story — the house's spruce trim), a **basement** gets the MODULE's own
+  palette (a cellar is a self-contained stone space, independent of the host's walls). The house keeps
+  `roof`/`basement` in its param spec (`roof`: auto/gable/hip; `basement`: none/full/half = burial
+  depth + the 'half' clerestory), marked `module:'roof'|'basement'` in `ParamDef` so `paramFields`
+  hides them from the house's own Details controls (no duplicate). **Add a roof/basement:** new file +
+  register in its `index.ts`; give it `appliesTo` + optional `build()`/`integrations` + a
+  `knowledge/nbt/modules/{roof,basement}/<id>.md`.
 - **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: living/kitchen/library/bedroom/dormitory/
   storage): each is a `RoomModule` (just `ModuleMeta` — no `build`/`params`/`preview`). The user assigns
   up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e. the house's
   `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each loads ONLY
   its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]` line per
-  floor (`buildRoomPlan` in `NewStructurePanel`). The AI furnishes each storey from those guides
+  floor (`buildRoomPlan` in `renderer/generation/brief.ts`). The AI furnishes each storey from those guides
   (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
   (the gallery lists them with their description + `appliesTo`). **Add a room:** new file in `rooms/` +
-  register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide. `appliesTo` = ['house','tower'].
+  register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide. `appliesTo` = ['house'].
 - **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
   `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
   (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→
@@ -440,7 +473,7 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with four
-  registry-backed selects — **Structure** (house/tower), **Decoration** (cozy), **Roof** (gable/hip)
+  registry-backed selects — **Structure** (house), **Decoration** (cozy), **Roof** (gable/hip)
   and **Basement** (cellar/crypt/cult-temple) — plus, for a storeyed structure (the house's `floors`
   param), a **per-floor room editor**: one row per floor with up to **two** room selects (living/
   kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks are folded into the
@@ -451,7 +484,8 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   one guide per pick (threaded `aiGenerate → generateStructure → systemPrompt → loadKnowledge`).
   Roof/Basement are enabled once a structure is chosen and are FILTERED by the chosen structure's
   `appliesTo` (a roof that doesn't fit is hidden; switching structure clears an incompatible pick +
-  the room rows) — the renderer's `moduleFits` mirrors the domain's `moduleAppliesTo`. The selects are
+  the room rows) — both the renderer's Details filtering and the main guide gating call the SAME pure
+  `moduleAppliesTo` (`shared/domain/applies-to.ts`), so the two can't drift. The selects are
   registry-backed: the composer fetches the categorized module catalog once via the `generationCatalog`
   IPC channel (`listModuleCatalog` from `structure/domain`), so they grow as the registries do. A
   "Modules" button (+ a link in Details) opens the **Module Gallery** (`ModulesModal`): categories
@@ -469,7 +503,8 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the
   chat history (`ChatRecord.floors`, written eagerly via `persistDoc` on every edit), so — unlike the
   one-shot Details brief — they ride along as a `[Floor plan]` context block on **every** prompt
-  (`buildFloorPlan` in `state/generation.ts`, appended to `promptText` only, never the visible
+  (`buildFloorPlan` in `renderer/generation/floors.ts`, re-exported by `state/generation.ts`; appended
+  to `promptText` only, never the visible
   transcript). That's what lets a follow-up like "redo the basement" map to a concrete y range.
   Each level is highlighted as a translucent band in the viewer (`Viewer.setFloorRegions` — one
   hued box + labelled sprite per level spanning the footprint, re-applied after every load since
@@ -502,6 +537,14 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   - **Tinting:** grayscale textures (water's still, the white banner cloth) are colored via
     `ModelFace.tint` (explicit sRGB `[r,g,b]`), which the renderer multiplies in; it takes
     precedence over the grass-green `tintindex` path. Lava/chests/bed textures are already colored.
+- **JSDoc convention:** a function with **≥4 positional params, or non-trivial branching /
+  multiple return shapes** carries explicit `@param`/`@returns` (and `@throws` where it
+  matters) — e.g. `composeStructure`/`composeModule` (`domain/compose.ts`), `mergePatch`,
+  `validateEmit`. A function that takes a single well-typed **options/params object**
+  documents the FIELDS on that interface (e.g. `GenerateStructureOptions` in `ai/generate.ts`,
+  `DriverParams`/`CritiqueInput` in `ai/providers/types.ts`), not as a redundant `@param`.
+  Self-evident one-liners keep the lighter prose-comment style used throughout. Prefer an
+  options object over a long positional list for anything that keeps growing.
 - **Path alias:** `@/*` → `src/*` (see `tsconfig.json`). Use it for cross-dir imports.
 - **Texture protocol CORS:** the `bw-texture://` scheme must be registered as privileged
   with `corsEnabled: true` *and* the handler must return an `access-control-allow-origin`

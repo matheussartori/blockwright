@@ -13,5 +13,5 @@ export const dormitory: RoomModule = {
     'own nightstand and lantern, divided by low partitions or rugs, a common wardrobe wall, and ' +
     'windows down the long side. An inn floor, barracks, or kids’ room.',
   knowledge: 'nbt/modules/room/dormitory.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };

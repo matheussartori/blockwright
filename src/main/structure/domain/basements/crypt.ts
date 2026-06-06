@@ -25,7 +25,7 @@ export const crypt: BasementModule = {
     'burial niches along the walls, lit by the cold blue flame of soul lanterns. Dress it ' +
     'with skulls, cobwebs, candles, and a central tomb. Pairs best with the Haunted look.',
   knowledge: 'nbt/modules/basement/crypt.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
   preview: { size: [11, 6, 11] },
   params: {
     decay: { kind: 'unit', default: 0.45 },

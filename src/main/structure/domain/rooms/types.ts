@@ -12,4 +12,8 @@ import type { ModuleMeta } from '../modules';
 
 export interface RoomModule extends ModuleMeta {
   category: 'room';
+  /** The structure-type ids this room pairs with — REQUIRED (narrows ModuleMeta's optional
+   *  `appliesTo`): a room must explicitly say which structures it fits, never silently apply
+   *  to all. A growing list — start with `['house']`, add more (e.g. `'tower'`) later. */
+  appliesTo: string[];
 }

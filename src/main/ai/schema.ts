@@ -247,7 +247,7 @@ cohesive materials, surface depth, a pitched/edged roof with an overhang, a fram
 base, articulated massing for larger builds (wings/sections with their own roofs rather than one giant \
 box). Avoid the symmetric cube: give larger builds an irregular silhouette (L/T footprint, a wing, \
 bay, porch, tower, or off-centre entrance) with a front that differs from the back — not four \
-interchangeable faces. For a TOWER specifically, follow the tower module guide: never ship a stack of identical \
+interchangeable faces. For a TALL / tower-like build: never ship a stack of identical \
 boxes or a uniform-width monolith with a flat top — give it a flared/grounded base, a shaft that \
 TAPERS with continuous vertical ribs/buttresses (not hard seams between storeys), projecting detail \
 (balconies, bay windows, bartizans, bracket-lanterns, vines), a real CROWN (spire/battlement/horns, \

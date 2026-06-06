@@ -3,7 +3,7 @@
 // (`build()` — a single hip `roof` op over the host's wall box, works on any structure).
 // No host-specific integration yet (a hip wraps evenly on every side, so it needs no
 // gable-end detailing) — add an `integrations` entry when a host wants one. Run by
-// `composeModule` (gallery preview today; structure-type delegation later).
+// `composeModule` — for the gallery preview AND the house's roof delegation.
 //
 // Linked to the `house` via `appliesTo`; add another structure id there to reuse it.
 import type { AuthoringOp } from '../../authoring/types';

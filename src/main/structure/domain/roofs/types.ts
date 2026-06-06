@@ -4,8 +4,8 @@
 //
 // A roof carries GENERIC geometry in `build()` (works on any host) plus optional
 // HOST-SPECIFIC extras in `integrations` (e.g. house-only gable-end vents). It's run by
-// `composeModule` (gallery preview today; structure-type delegation later). Structure
-// types still emit their own roof for now — see CLAUDE.md "Composable generation domain".
+// `composeModule` — both for the gallery preview AND when a structure type DELEGATES its
+// own roof to the module (the house does; see CLAUDE.md "Composable generation domain").
 import type { AuthoringOp } from '../../authoring/types';
 import type { ModuleMeta } from '../modules';
 import type { ParamSpec } from '../params';
@@ -14,6 +14,10 @@ import type { BuildArgs } from '../structure-types/types';
 
 export interface RoofModule extends ModuleMeta {
   category: 'roof';
+  /** The structure-type ids this roof pairs with — REQUIRED (narrows ModuleMeta's optional
+   *  `appliesTo`): a roof must explicitly say which structures it fits, never silently apply
+   *  to all. A growing list — start with `['house']`, add e.g. `'tower'` to reuse it there. */
+  appliesTo: string[];
   /** Shape/behaviour params (pitch, overhang, …). Block choices come from the decoration.
    *  Optional: a metadata-only roof (guidance + knowledge guide, no geometry yet) omits it. */
   params?: ParamSpec;

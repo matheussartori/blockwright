@@ -3,8 +3,8 @@
 // stack wrong: the campfire floats with a gap below it, the flue stops short, or there
 // are several stray chimneys. This pass anchors on that campfire cap (a strong, intentional
 // signal, so we never mistake a plain stone pillar for a chimney) and repairs it
-// deterministically. Gated to house-style structures by the compile pipeline (a tower has
-// no hearth), so it only ever runs where a chimney is expected.
+// deterministically. Gated to house-style structures by the compile pipeline (a structure
+// with no hearth doesn't opt in), so it only ever runs where a chimney is expected.
 //
 // It is conservative — it only TOUCHES campfire-capped columns:
 //  • Floating / short flue → fill the air gap from the cap down to the first solid block

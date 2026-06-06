@@ -24,7 +24,14 @@ import {
   structureTypeIds,
   type RolePalette,
 } from './structure-types';
-import { box } from './structure-types/types';
+import { box, type BuildArgs } from './structure-types/types';
+
+/** The geometry-bearing shape shared by roof + basement modules (a structural subset of
+ *  RoofModule/BasementModule), so the run helper doesn't care which registry it came from. */
+type GeometryModule = {
+  build?: (args: BuildArgs) => AuthoringOp[];
+  integrations?: Partial<Record<string, (args: BuildArgs) => AuthoringOp[]>>;
+};
 
 type Vec3 = [number, number, number];
 
@@ -61,9 +68,17 @@ function decorationId(params: Record<string, unknown>): string {
   return DEFAULT_DECORATION;
 }
 
-/** Build the role→palette-index resolver for a (defaults-kit, decoration, overrides)
- *  triple. `defaults` is the module's own block kit (a structure type's, or a roof/
- *  basement module's), consulted after the decoration and before BASE_BLOCKS. */
+/**
+ * Build the role→palette-index resolver for a (defaults-kit, decoration, overrides)
+ * triple. Resolution order per role: per-op override > decoration > defaults > BASE_BLOCKS.
+ *
+ * @param defaults - The module's own block kit (a structure type's, or a roof/basement
+ *   module's), consulted after the decoration and before BASE_BLOCKS.
+ * @param deco - The active decoration (maps roles→blocks + the weathering function).
+ * @param raw - The op's raw params; a key naming a Role is a per-op block override.
+ * @param intern - The compiler's get-or-create palette intern.
+ * @returns A {@link RolePalette} that interns a role's resolved (or weathered) block.
+ */
 function makePalette(
   defaults: Partial<Record<Role, string>>,
   deco: Decoration,
@@ -102,8 +117,67 @@ function seedFor(params: Record<string, unknown>, b: ReturnType<typeof box>): nu
     : seed3(b.x0, b.y0, b.z0);
 }
 
-/** Expand a `template` op into ordinary ops. Throws on an unknown type or decoration
- *  so validate/compile surfaces an actionable error to the generator. */
+/** Run a module's generic `build()` then its host-specific integration (when `host`
+ *  matches one) against pre-built args — the one place module geometry is assembled,
+ *  shared by the top-level `composeModule` and the delegate a structure type calls. */
+function runModuleGeometry(module: GeometryModule, host: string | undefined, args: BuildArgs): AuthoringOp[] {
+  const ops: AuthoringOp[] = [];
+  if (module.build) ops.push(...module.build(args)); // generic, any host
+  const integration = host ? module.integrations?.[host] : undefined;
+  if (integration) ops.push(...integration(args)); // host-specific extras
+  return ops;
+}
+
+/** Build the `composeModule` delegate injected into a build's args. The delegate resolves
+ *  a roof/basement module and runs its geometry with the caller as `host`, so its
+ *  host-specific integration is included.
+ *
+ *  Palette strategy differs by category, by design:
+ *  - **roof** reuses the caller's `hostPalette` — a roof is part of the host's exterior
+ *    material story (the house's roof should match its own trim, not the module's kit).
+ *  - **basement** gets its OWN palette from the module's `defaults` (over the decoration) —
+ *    a cellar is a self-contained stone space, independent of the host's (e.g. timber) walls.
+ *  `rawParams`/`deco`/`intern` let the module resolve its param spec + palette consistently. */
+function makeModuleComposer(
+  hostPalette: RolePalette,
+  seed: number,
+  deco: Decoration,
+  rawParams: Record<string, unknown>,
+  host: string | undefined,
+  intern: Intern,
+): BuildArgs['composeModule'] {
+  // A const arrow that references itself, so a delegated module can delegate again.
+  const delegate: BuildArgs['composeModule'] = (category, id, from, to, extra = {}) => {
+    const module = category === 'roof' ? getRoof(id) : getBasement(id);
+    if (!module) throw new Error(`unknown ${category} module "${id}"`);
+    const subBox = box(from, to);
+    const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
+    if (deco.decay !== undefined && extra.decay === undefined && rawParams.decay === undefined && 'decay' in subParams) {
+      subParams.decay = deco.decay;
+    }
+    const palette = category === 'roof'
+      ? hostPalette
+      : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern);
+    return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, composeModule: delegate });
+  };
+  return delegate;
+}
+
+/**
+ * Expand a `template` op into ordinary ops — the cross of a structure TYPE and a
+ * DECORATION resolved against a role palette.
+ *
+ * @param name - The structure-type id (e.g. 'house').
+ * @param from - One corner of the build box [x, y, z].
+ * @param to - The opposite corner of the build box [x, y, z].
+ * @param params - The op's loose params: a `decoration`/`theme` key, role-name block
+ *   overrides, a `seed`, and the type's own shape/behaviour knobs.
+ * @param intern - The compiler's get-or-create palette intern, so the composed build
+ *   interns into the same palette.
+ * @returns The volumetric ops the type's `build()` emits for the box.
+ * @throws If `name` is not a known structure type or `params` names an unknown decoration
+ *   (so validate/compile surfaces an actionable error to the generator).
+ */
 export function composeStructure(
   name: string,
   from: Vec3,
@@ -124,17 +198,33 @@ export function composeStructure(
     values.decay = deco.decay;
   }
   const seed = seedFor(params, b);
+  const palette = makePalette(type.defaults, deco, params, intern);
+  // The type owns placement; it DELEGATES roof/basement geometry to those modules via
+  // this injected composer (the modules are the single source of that geometry).
+  const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
 
-  return type.build({ box: b, params: values, palette: makePalette(type.defaults, deco, params, intern), seed });
+  return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
 }
 
-/** Run a roof/basement MODULE's own geometry through the same palette/param machinery a
- *  structure type uses — the execution path for a module's `build()` logic. A module can
- *  carry GENERIC geometry (`build()`, any host) PLUS HOST-SPECIFIC extras
- *  (`integrations[host]`, layered on top only for that structure). `host` is the
- *  structure-type id the module is applied to (omit for a context-free render). Returns
- *  ordinary ops interned via `intern`; empty if the module has no geometry yet. Throws on
- *  an unknown module/decoration. */
+/**
+ * Run a roof/basement MODULE's own geometry through the same palette/param machinery a
+ * structure type uses — the execution path for a module's `build()` logic. A module can
+ * carry GENERIC geometry (`build()`, any host) PLUS HOST-SPECIFIC extras
+ * (`integrations[host]`, layered on top only for that structure).
+ *
+ * @param category - Which module registry to look `id` up in ('roof' or 'basement').
+ * @param id - The module id (e.g. 'gable', 'cellar').
+ * @param from - One corner of the box the module builds into [x, y, z].
+ * @param to - The opposite corner of that box [x, y, z].
+ * @param params - Loose params: a `decoration`/`theme` key, role overrides, `seed`, and
+ *   the module's own knobs.
+ * @param intern - The compiler's get-or-create palette intern.
+ * @param host - The structure-type id the module is applied to (enables its
+ *   `integrations[host]` extras); omit for a context-free render.
+ * @returns The module's ordinary ops (generic `build()` then any host integration);
+ *   empty if the module has no geometry yet.
+ * @throws If the module id or the selected decoration is unknown.
+ */
 export function composeModule(
   category: 'roof' | 'basement',
   id: string,
@@ -158,19 +248,25 @@ export function composeModule(
   }
   const seed = seedFor(params, b);
   const palette = makePalette(module.defaults ?? {}, deco, params, intern);
-  const args = { box: b, params: values, palette, seed, host };
-
-  const ops: AuthoringOp[] = [];
-  if (module.build) ops.push(...module.build(args)); // generic, any host
-  const integration = host ? module.integrations?.[host] : undefined;
-  if (integration) ops.push(...integration(args)); // host-specific extras
-  return ops;
+  const args: BuildArgs = {
+    box: b, params: values, palette, seed, host,
+    composeModule: makeModuleComposer(palette, seed, deco, params, host, intern),
+  };
+  return runModuleGeometry(module, host, args);
 }
 
-/** Compose a roof/basement module for the gallery PREVIEW: render the module's own
- *  geometry in context. A roof gets a low host shell (floor + walls) so the pitch reads;
- *  a basement is shown as its own room. Uses the default decoration. Pure — the caller
- *  supplies `intern` and compiles the result. */
+/**
+ * Compose a roof/basement module for the gallery PREVIEW: render the module's own
+ * geometry in context. A roof gets a low host shell (floor + walls) so the pitch reads;
+ * a basement is shown as its own room. Uses the default decoration.
+ *
+ * @param category - Which module to preview ('roof' or 'basement').
+ * @param id - The module id.
+ * @param from - One corner of the preview box [x, y, z].
+ * @param to - The opposite corner of the preview box [x, y, z].
+ * @param intern - The compiler's get-or-create palette intern (the caller compiles the result).
+ * @returns The ops for the previewed module (plus a host shell for a roof).
+ */
 export function composeModulePreview(
   category: 'roof' | 'basement',
   id: string,

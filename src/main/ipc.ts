@@ -166,7 +166,10 @@ export function registerIpc(): void {
         });
         e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, sessionId, path, version });
       });
-    return generateStructure(sessionId, prompt, images, selection, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath, floors);
+    return generateStructure({
+      sessionId, prompt, images, selection, capture, basePath, floors,
+      onProgress: (p) => e.sender.send(IPC_EVENTS.aiProgress, p),
+    });
   });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));

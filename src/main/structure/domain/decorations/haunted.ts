@@ -3,7 +3,7 @@
 // instead of warm light. It is the deliberate opposite of `cozy`: where cozy is intact
 // and inviting, haunted is ruined and dreadful. It maps the structural roles to a dark
 // palette AND weathers stone to its mossy/cracked variants for decay patches, so any
-// structure type (house, tower) reads as derelict and uncanny rather than homely.
+// structure type reads as derelict and uncanny rather than homely.
 import type { Decoration } from './types';
 
 // Clean stone → its weathered (mossy/cracked) twin. The structure type / basement decay
@@ -27,7 +27,7 @@ export const haunted: Decoration = {
     'A derelict, ghost-ridden look: gloomy dark-oak timber over mossy cobblestone footings, ' +
     'grimy gray glass, and the cold blue flame of soul lanterns. Stone weathers to its mossy ' +
     'and cracked variants. The opposite of cozy — abandoned, decayed, and uncanny. Suits ' +
-    'haunted houses, ruined towers, crypts, and cursed chambers.',
+    'haunted houses, crypts, and cursed chambers.',
   knowledge: 'nbt/modules/decoration/haunted.md',
   // Previewed on a small house so the dark palette + blue light read at a glance.
   preview: { size: [9, 8, 7], params: {} },

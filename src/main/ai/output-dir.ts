@@ -7,6 +7,7 @@
 // as a tiny JSON in userData (cf. recents.ts); `BW_OUTPUT_DIR` overrides.
 import { app } from 'electron';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 let cache: string | null = null;
@@ -77,4 +78,34 @@ export function reserveLibraryPath(slug: string): string | null {
   let candidate = path.join(dir, `${slug}.nbt`);
   for (let n = 2; fs.existsSync(candidate); n++) candidate = path.join(dir, `${slug}-${n}.nbt`);
   return candidate;
+}
+
+/**
+ * Best-effort mirror of a freshly-compiled version into the user's library as one
+ * clean `<slug>.nbt` file. The scratch `vN.nbt` stays the source of truth, so a
+ * failed copy never aborts generation.
+ *
+ * @param libraryPath - The session's current library path: `undefined` to reserve one
+ *   from the prompt slug on this first call, a string to overwrite, or `null` when a
+ *   prior reservation failed (don't retry).
+ * @param prompt - The user's prompt, slugified into the library filename on first use.
+ * @param nbtPath - The scratch `vN.nbt` to copy into the library.
+ * @returns The library path to persist back on the session (a string once reserved, or
+ *   `null` if the folder couldn't be created) — never `undefined`, so the slug is
+ *   reserved at most once per session.
+ */
+export async function mirrorToLibrary(
+  libraryPath: string | null | undefined,
+  prompt: string,
+  nbtPath: string,
+): Promise<string | null> {
+  const target = libraryPath === undefined ? reserveLibraryPath(slugify(prompt)) : libraryPath;
+  if (target) {
+    try {
+      await fsp.copyFile(nbtPath, target);
+    } catch {
+      /* library mirror failed — keep going on the scratch version */
+    }
+  }
+  return target;
 }

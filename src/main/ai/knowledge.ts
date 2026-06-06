@@ -22,7 +22,7 @@ export function knowledgeDir(): string {
 }
 
 // Per-file bodies, read once. The `path` is relative to knowledgeDir() with forward
-// slashes (e.g. `nbt/00-volumetric-ops.md`, `nbt/modules/structure/tower.md`) so it
+// slashes (e.g. `nbt/00-volumetric-ops.md`, `nbt/modules/structure/house.md`) so it
 // matches the module guide paths declared in the domain. The composed system text is
 // rebuilt per call (cheap string join) since the included set depends on the build.
 let fileCache: { path: string; body: string }[] | null = null;

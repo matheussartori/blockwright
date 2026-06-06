@@ -1,11 +1,11 @@
 // The Basement contract (category "basement"). A basement module builds a sunken
-// undercroft — its massing expressed in roles, like a structure type — that will
-// later attach beneath a host structure. The contract mirrors StructureType's build
-// shape so basements reuse the same role palette + params machinery; `category` is
-// always `'basement'`.
+// undercroft — its massing expressed in roles, like a structure type. The contract
+// mirrors StructureType's build shape so basements reuse the same role palette + params
+// machinery; `category` is always `'basement'`.
 //
-// NOTE: basements are SCAFFOLDED but not yet wired into `composeStructure` — the
-// registry seeds a module (see basement.ts) for the future "modular basement" work.
+// A basement module is the SINGLE source of below-grade geometry: run via `composeModule`
+// for the gallery preview AND when a structure type delegates its below-grade level (the
+// house delegates to `cellar`). See CLAUDE.md "Composable generation domain".
 import type { AuthoringOp } from '../../authoring/types';
 import type { ModuleMeta } from '../modules';
 import type { ParamSpec } from '../params';
@@ -14,6 +14,11 @@ import type { BuildArgs } from '../structure-types/types';
 
 export interface BasementModule extends ModuleMeta {
   category: 'basement';
+  /** The structure-type ids this basement pairs with — REQUIRED (narrows ModuleMeta's
+   *  optional `appliesTo`): a basement must explicitly say which structures it fits, never
+   *  silently apply to all. A growing list — e.g. a future `tower` can have a `crypt` by
+   *  adding `'tower'` here (`['house', 'tower']`). */
+  appliesTo: string[];
   /** Shape/behaviour params (decay, shape, …). Block choices come from the decoration.
    *  Optional: a metadata-only basement (guidance + knowledge guide, no geometry) omits it. */
   params?: ParamSpec;

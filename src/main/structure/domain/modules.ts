@@ -1,5 +1,5 @@
 // The module model that unifies the generation domain. Every buildable piece —
-// a STRUCTURE (house/tower), a DECORATION (cozy), and later a BASEMENT or a ROOF —
+// a STRUCTURE (house), a DECORATION (cozy), a BASEMENT, a ROOF, a ROOM —
 // is a "module" belonging to one CATEGORY. A module carries shared metadata
 // (label, description, the knowledge guide it owns, and how to preview it) on top
 // of its category-specific behaviour contract. This is what lets one UI list them,
@@ -29,19 +29,21 @@ export interface ModuleMeta {
   category: ModuleCategory;
   /** One-paragraph description for the gallery screen (what it builds, when to use). */
   description: string;
-  /** Path (relative to the knowledge dir, e.g. `nbt/modules/structure/tower.md`) of
+  /** Path (relative to the knowledge dir, e.g. `nbt/modules/structure/house.md`) of
    *  this module's guide. Loaded into the system prompt only when the module is
    *  selected (see ai/knowledge.ts). Omit for modules with no dedicated guide. */
   knowledge?: string;
   /** Prompt keywords that should pull this module's guide even without an explicit
-   *  selection (e.g. typing "a tall tower" loads the tower guide). Omit for modules
+   *  selection (e.g. a structure whose keywords match the prompt). Omit for modules
    *  that should only load when explicitly selected. */
   keywords?: RegExp;
-  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`). This is a
-   *  GROWING link: a roof built for the house can later also declare a new structure
-   *  here and be reused by it. Omit → the module is standalone / applies to every
-   *  structure. For now the UI shows all modules regardless; this drives future
-   *  category filtering (e.g. "show only roofs that fit the chosen structure"). */
+  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`). A GROWING
+   *  link: a module built for the house can later also list another structure here to be
+   *  reused by it (e.g. a `crypt` basement gaining `'tower'` → `['house', 'tower']`). Drives
+   *  the composer Details filtering + knowledge-guide gating (`moduleAppliesTo`). Omit →
+   *  applies to every structure (decorations, which cross with all types). The roof/basement/
+   *  room contracts narrow this to REQUIRED, so those always declare their structure links
+   *  explicitly rather than silently applying to all. */
   appliesTo?: string[];
   /** How to render this module in the gallery (omit → no preview). */
   preview?: PreviewSpec;

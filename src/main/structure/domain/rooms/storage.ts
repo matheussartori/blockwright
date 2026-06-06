@@ -13,5 +13,5 @@ export const storage: RoomModule = {
     'hanging tools, and a single working lantern. The pantry / back room where the household keeps ' +
     'its supplies.',
   knowledge: 'nbt/modules/room/storage.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };

@@ -4,6 +4,7 @@
 // `composeModule`/`composeModulePreview`), the catalog the UI lists, and the
 // selection→knowledge-guide mapping the system prompt uses.
 import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
+import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { composeModulePreview } from './compose';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
 import { basementModules, getBasement, listBasements } from './basements';
@@ -100,16 +101,13 @@ export interface ModuleSelection {
   rooms?: string[];
 }
 
-/** Does a module apply to a given host structure? True when it has no `appliesTo`
- *  (applies to every structure) or its `appliesTo` includes `host`. A module with an
- *  `appliesTo` but no host to match against does not apply. */
-export function moduleAppliesTo(appliesTo: string[] | undefined, host: string | undefined): boolean {
-  if (!appliesTo || appliesTo.length === 0) return true;
-  return host !== undefined && appliesTo.includes(host);
-}
+// `moduleAppliesTo` is the shared pure predicate (src/shared/domain/applies-to.ts) so
+// the renderer's Details filtering and this guide gating stay in lock-step. Re-exported
+// for existing importers of the domain barrel.
+export { moduleAppliesTo };
 
 /** The module guides to include for an explicit selection (paths relative to the
- *  knowledge dir, e.g. `nbt/modules/structure/tower.md`). One guide per selected
+ *  knowledge dir, e.g. `nbt/modules/structure/house.md`). One guide per selected
  *  module — a roof/basement guide loads only when that type is chosen AND it applies to
  *  the chosen structure (so a house-only roof guide is never sent for another type). */
 export function selectedGuides(sel: ModuleSelection): string[] {
@@ -133,7 +131,7 @@ export function selectedGuides(sel: ModuleSelection): string[] {
 }
 
 /** The module guides a free-text prompt pulls in via keyword (the fallback when no
- *  explicit selection names them — e.g. typing "a tall tower"). */
+ *  explicit selection names them — for any module that declares `keywords`). */
 export function promptGuides(prompt: string): string[] {
   return allModules()
     .filter((m) => m.knowledge && m.keywords?.test(prompt))

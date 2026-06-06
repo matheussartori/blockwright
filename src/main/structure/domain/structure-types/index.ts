@@ -5,46 +5,43 @@
 // ../roofs.)
 import { toSummary, type ModuleSummary } from '../modules';
 import { paramFields } from '../params';
+import { createRegistry } from '../registry';
 import { house } from './house';
-import { tower } from './tower';
-import type { StructureType } from './types';
+import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-const STRUCTURE_TYPES: Record<string, StructureType> = {
-  [house.id]: house,
-  [tower.id]: tower,
-};
+const registry = createRegistry<StructureType>([house]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {
-  return STRUCTURE_TYPES[id];
+  return registry.get(id);
 }
 
 /** Is `id` a registered structure type? (Aliases are resolved in compose, not here.) */
 export function isStructureType(id: string): boolean {
-  return id in STRUCTURE_TYPES;
+  return registry.has(id);
 }
 
 /** Every registered structure-type id (for validation / UI / prompts). */
 export function structureTypeIds(): string[] {
-  return Object.keys(STRUCTURE_TYPES);
+  return registry.ids();
 }
 
 /** Every structure type, as a module summary (for the composer picker + gallery),
  *  carrying its tunable params so the Details controls are registry-driven. */
 export function listStructureTypes(): ModuleSummary[] {
-  return Object.values(STRUCTURE_TYPES).map((t) => ({ ...toSummary(t), params: paramFields(t.params) }));
+  return registry.all().map((t) => ({ ...toSummary(t), params: paramFields(t.params) }));
 }
 
 /** Every structure module (for the knowledge loader / gallery preview). */
 export function structureModules(): StructureType[] {
-  return Object.values(STRUCTURE_TYPES);
+  return registry.all();
 }
 
 /** The code post-processing passes a structure type opts into (empty for an unknown
  *  id). Drives the compile pipeline's per-structure gating — the modular "which fix
  *  applies to which structure" lookup. */
-export function structureFinalizers(id: string | undefined): import('./types').FinalizePass[] {
-  return (id ? STRUCTURE_TYPES[id]?.finalize : undefined) ?? [];
+export function structureFinalizers(id: string | undefined): FinalizePass[] {
+  return (id ? registry.get(id)?.finalize : undefined) ?? [];
 }

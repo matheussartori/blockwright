@@ -16,15 +16,15 @@ import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, P
 import { auditGateFeedback } from './audit-gate';
 import { maxRoundsFor } from './rounds';
 import { beginRun, endRun, getSession } from './session';
-import { reserveLibraryPath, slugify } from './output-dir';
+import { mirrorToLibrary } from './output-dir';
+import { mergePatch } from './patch';
+import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import { aiLog, fixLog } from './gen-log';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
-import { writeStructureFile, validateAuthoring, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
-import { unknownBlockIds } from '../structure/assets/content-pack';
-import { composeBlockNames } from '../structure/domain';
+import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),
  *  so the model can see its own build and refine it. Supplied by the IPC layer,
@@ -51,22 +51,39 @@ export { aiAvailable };
 // IPC-facing pieces so importers (ipc.ts) stay stable.
 export { cancelGeneration, listVersions, primeSession, resetSession } from './session';
 
-/** Generate (or edit) the structure for `sessionId` from `prompt`. Returns the
- *  written file path + metadata, or an error message for the UI to surface.
- *  `images` are optional reference images sent as visual guidance. `basePath` is
- *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model
- *  with that structure so the first prompt edits it rather than starting over.
- *  `onProgress` is called with live token/phase updates while the model works. */
-export async function generateStructure(
-  sessionId: string,
-  prompt: string,
-  images?: GenerateImage[],
-  selection?: BuildSelection,
-  onProgress?: (p: GenerateProgress) => void,
-  capture?: CapturePreview,
-  basePath?: string,
-  floors?: FloorDef[],
-): Promise<GenerateResult> {
+/** Everything a generation/edit turn needs. Bundled as one options object (rather than
+ *  a long positional list) so callers and drivers stay readable as the run grows. */
+export interface GenerateStructureOptions {
+  /** The AI session id (one per chat tab) whose scratch dir + version this run writes. */
+  sessionId: string;
+  /** The full prompt sent to the model (user words + composer brief + floor plan). */
+  prompt: string;
+  /** Optional reference images sent as visual guidance. */
+  images?: GenerateImage[];
+  /** The structured module selection (drives which knowledge guides load). */
+  selection?: BuildSelection;
+  /** Live token/phase callback, called as the model works. */
+  onProgress?: (p: GenerateProgress) => void;
+  /** Renders a just-emitted version and returns screenshots for the model to review. */
+  capture?: CapturePreview;
+  /** The `.nbt` currently open in the viewer; on a fresh session it seeds the model so
+   *  the first prompt edits that structure rather than starting over. */
+  basePath?: string;
+  /** The user's Floor plan (UI), overriding the storeys the model declares for grade. */
+  floors?: FloorDef[];
+}
+
+/**
+ * Generate (or edit) the structure for a session from a prompt, running the
+ * emit → compile → render → review loop until the model is satisfied, the round
+ * budget is spent, or the run is cancelled.
+ *
+ * @param opts - The run inputs (see {@link GenerateStructureOptions}).
+ * @returns The written `.nbt` path + metadata on success, or an error message
+ *   (with `canceled` set when the user aborted) for the UI to surface.
+ */
+export async function generateStructure(opts: GenerateStructureOptions): Promise<GenerateResult> {
+  const { sessionId, prompt, images, selection, onProgress, capture, basePath, floors } = opts;
   const session = getSession(sessionId);
   const cred = activeCredential();
   const resumable = RESUMABLE_PROVIDERS.has(cred.id);
@@ -181,58 +198,18 @@ export async function generateStructure(
     if (args.mode === 'patch' && session.version >= 1) {
       try {
         const prevJson = await fsp.readFile(path.join(session.dir, `v${session.version}.json`), 'utf8');
-        const prev = JSON.parse(prevJson) as AuthoringStructure;
-        authoring = {
-          DataVersion: input.DataVersion ?? prev.DataVersion,
-          size: (input.size ?? prev.size) as [number, number, number],
-          palette: [...(prev.palette ?? []), ...(input.palette ?? [])],
-          ops: [...(prev.ops ?? []), ...(input.ops ?? [])],
-          blocks: [...(prev.blocks ?? []), ...(input.blocks ?? [])],
-          entities: input.entities ?? prev.entities,
-          // Inherit the labelled storeys so a localized patch doesn't drop the grade
-          // (and with it the basement's structure_void surround). See gradeFromFloors.
-          floors: input.floors ?? prev.floors,
-        };
+        authoring = mergePatch(JSON.parse(prevJson) as AuthoringStructure, input);
       } catch (err) {
         captureError = `Could not load the previous version to patch: ${errMessage(err)}`;
         return text(`${captureError}. Re-emit a COMPLETE structure with mode "full".`, true);
       }
     }
 
-    try {
-      validateAuthoring(authoring);
-    } catch (err) {
-      const msg = errMessage(err);
-      captureError = `Generated structure was invalid: ${msg}`;
-      return text(`Validation failed: ${msg}. Re-emit a corrected structure.`, true);
-    }
-
-    // Reject minecraft:light: an invisible, command-only block that doesn't render
-    // in the preview and often fails to light a placed structure.
-    if ((authoring.palette ?? []).some((p) => /(^|:)light$/.test(p.Name))) {
-      captureError = 'Uses minecraft:light';
-      return text(
-        'Do not use "minecraft:light" — it is an invisible, command-only block that does not render in ' +
-          'the preview and often fails to light a placed structure. Replace every light block with a VISIBLE ' +
-          'fixture (lantern/soul_lantern, sea_lantern, glowstone, shroomlight, froglight, candles, ' +
-          'redstone_torch, lit redstone_lamp, end_rod) and re-emit.',
-        true,
-      );
-    }
-
-    // Reject unknown/misspelled block IDs (incl. template per-role override blocks).
-    const templateNames = (authoring.ops ?? []).flatMap((op) =>
-      op.op === 'template' ? composeBlockNames(op.params ?? {}) : [],
-    );
-    const unknown = unknownBlockIds([...(authoring.palette ?? []).map((p) => p.Name), ...templateNames]);
-    if (unknown.length > 0) {
-      captureError = `Unknown block ID(s): ${unknown.join(', ')}`;
-      return text(
-        `These palette block IDs do not exist in 1.21.1: ${unknown.join(', ')}. They would render as flat ` +
-          'fallback colours and place as missing blocks in-game. Fix each ID (check spelling and the exact ' +
-          'variant — e.g. "*_planks" vs "*_wood", "*_stairs", "_stained_glass" vs "_stained_glass_pane") and re-emit.',
-        true,
-      );
+    // Pre-compile gates: structurally valid, no minecraft:light, only real block ids.
+    const rejection = validateEmit(authoring);
+    if (rejection) {
+      captureError = rejection.reason;
+      return text(rejection.feedback, true);
     }
 
     const version = session.version + 1;
@@ -265,14 +242,8 @@ export async function generateStructure(
 
     // Mirror this version to the user's library as one clean, browsable file
     // (`<slug>.nbt`) — reserved once per session from the first prompt, then
-    // overwritten each version. Best-effort: the scratch `vN.nbt` stays the
-    // source of truth, so a failed copy never aborts generation.
-    try {
-      if (session.libraryPath === undefined) session.libraryPath = reserveLibraryPath(slugify(prompt));
-      if (session.libraryPath) await fsp.copyFile(nbtPath, session.libraryPath);
-    } catch {
-      /* library mirror failed — keep going on the scratch version */
-    }
+    // overwritten each version (best-effort; the scratch `vN.nbt` is the source).
+    session.libraryPath = await mirrorToLibrary(session.libraryPath, prompt, nbtPath);
 
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     const blockCount = resolveBlocks(authoring).blocks.length;

@@ -12,5 +12,5 @@ export const bedroom: RoomModule = {
     'lantern, a wardrobe and chest, a small rug, a curtained window, and an optional writing ' +
     'desk. Cozy and personal.',
   knowledge: 'nbt/modules/room/bedroom.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house'],
 };
