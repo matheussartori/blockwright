@@ -347,12 +347,24 @@ body {
    shrinks `.stage-main` so the canvas (a ResizeObserver target) resizes to fit
    instead of being covered. `.stage-main` is the positioning parent for the
    viewport, overlays, badges and any torn-off floating panels. */
-/* Column wrapper for grid row 2: the stage row on top, the bottom Console dock
-   below it. Lets the console span the full width (under the sidebar too) while
-   the stage shrinks so the WebGL canvas resizes instead of being covered. */
+/* Row wrapper for grid row 2: the viewport+console column on the left, the
+   docked inspector sidebar on the right spanning the FULL height (so it reads
+   as the more important surface and the console tucks under the viewport only,
+   not beneath the sidebar). */
 .stage-area {
   display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+}
+/* The left column: viewport on top, the bottom Console dock below it. The
+   console shrinks the viewport (so the WebGL canvas resizes instead of being
+   covered) but stops at the sidebar's edge. */
+.stage-col {
+  display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -663,8 +675,9 @@ body {
 
 /* --- Docked inspector sidebar ---------------------------------------------- */
 
-/* Sits at the right edge as a flex sibling of `.stage-main` (so it shrinks the
-   viewport rather than covering it). Holds the Info / Jigsaw panels as tabs. */
+/* Sits at the right edge as a flex sibling of `.stage-col` (so it spans the full
+   height — viewport + console — and shrinks them rather than covering them).
+   Holds the Info / Jigsaw / Generate panels as tabs. */
 .inspector-dock {
   flex: none;
   width: 288px;

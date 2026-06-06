@@ -62,37 +62,39 @@ function Shell() {
         <TabBar onNew={flow.newDoc} onClose={flow.closeDocById} />
       </div>
       <div className="stage-area">
-        <main className="stage">
-          <div className="stage-main">
-            <Viewport />
-            {!activeDoc && (
-              <Welcome
-                onOpen={() => void flow.open()}
-                onLoad={(p) => void flow.openFile(p)}
-                onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
-                onGenerate={flow.newDoc}
+        <div className="stage-col">
+          <main className="stage">
+            <div className="stage-main">
+              <Viewport />
+              {!activeDoc && (
+                <Welcome
+                  onOpen={() => void flow.open()}
+                  onLoad={(p) => void flow.openFile(p)}
+                  onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
+                  onGenerate={flow.newDoc}
+                />
+              )}
+              {activeDoc && !fileOpen && !activeDoc.loading && (
+                <div className="empty-tab">
+                  <p>This tab is empty.</p>
+                  <p className="empty-tab-hint">
+                    Describe a build in the Generate panel, or open an <code>.nbt</code> file.
+                  </p>
+                </div>
+              )}
+              <FloatingPanels availability={availability} />
+              <WorkspaceBadge />
+              <WorkspaceSuggest
+                onAccept={() => void flow.acceptSuggest()}
+                onDismiss={() => store.getState().setSuggest(null)}
               />
-            )}
-            {activeDoc && !fileOpen && !activeDoc.loading && (
-              <div className="empty-tab">
-                <p>This tab is empty.</p>
-                <p className="empty-tab-hint">
-                  Describe a build in the Generate panel, or open an <code>.nbt</code> file.
-                </p>
-              </div>
-            )}
-            <FloatingPanels availability={availability} />
-            <WorkspaceBadge />
-            <WorkspaceSuggest
-              onAccept={() => void flow.acceptSuggest()}
-              onDismiss={() => store.getState().setSuggest(null)}
-            />
-            <ShortcutsHelp available={fileOpen} />
-            <Loading />
-          </div>
-          <InspectorDock availability={availability} />
-        </main>
-        <ConsoleDock />
+              <ShortcutsHelp available={fileOpen} />
+              <Loading />
+            </div>
+          </main>
+          <ConsoleDock />
+        </div>
+        <InspectorDock availability={availability} />
       </div>
       <Statusbar />
       <SettingsModal />
