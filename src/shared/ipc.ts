@@ -83,6 +83,10 @@ export const IPC_CHANNELS = {
   previewModule: 'generation:preview-module',
   /** Drive the native theme (vibrancy + traffic lights + prefers-color-scheme): 'system'|'light'|'dark'. */
   themeSet: 'theme:set',
+  /** The current language preference + resolved locale → LanguageInfo. */
+  languageGet: 'language:get',
+  /** Set the language preference (payload: LanguagePref) → LanguageInfo. */
+  languageSet: 'language:set',
   /** Load persisted per-NBT chat history for a key (payload: key). */
   chatHistoryGet: 'chat-history:get',
   /** Persist per-NBT chat history (payload: key + ChatRecord). */
@@ -128,4 +132,6 @@ export const IPC_EVENTS = {
   openCatalog: 'open-catalog',
   /** Open the Module Gallery modal (View menu). */
   openModules: 'open-modules',
+  /** The language changed in main (menu picker) — payload is the new LanguageInfo. */
+  languageChanged: 'language-changed',
 } as const;

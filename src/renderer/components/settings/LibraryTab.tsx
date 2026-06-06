@@ -4,8 +4,10 @@
 // picker and a "Reveal in Finder/Explorer" shortcut.
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
+import { useT } from '../../hooks/useStores';
 
 export function LibraryTab() {
+  const t = useT();
   const [dir, setDir] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,18 +21,17 @@ export function LibraryTab() {
 
   return (
     <section className="settings-group">
-      <span className="settings-group-name">Saved structures folder</span>
+      <span className="settings-group-name">{t('library.folder')}</span>
       <p className="setting-note">
-        Finished builds are saved here as clean, named files (e.g. <code>cozy-cottage.nbt</code>) so you can browse them
-        outside the app — each generation also keeps its full version history internally.
+        {t('library.notePre')}<code>cozy-cottage.nbt</code>{t('library.notePost')}
       </p>
       <div className="setting-key-row">
         <input className="input setting-key-input" readOnly value={dir ?? ''} spellCheck={false} />
         <button className="btn sm no-drag" onClick={() => void choose()}>
-          Change…
+          {t('library.change')}
         </button>
         <button className="btn sm no-drag" onClick={() => dir && void api.revealPath(dir)} disabled={!dir}>
-          Reveal
+          {t('library.reveal')}
         </button>
       </div>
     </section>

@@ -6,7 +6,8 @@
 import { useEffect, useState } from 'react';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
-import { useApp } from '../hooks/useStores';
+import type { MessageKey } from '@/shared/i18n';
+import { useApp, useT } from '../hooks/useStores';
 import { Modal } from './ui/Modal';
 import { AppearanceTab } from './settings/AppearanceTab';
 import { ViewerTab } from './settings/ViewerTab';
@@ -15,17 +16,18 @@ import { LibraryTab } from './settings/LibraryTab';
 import { AboutTab } from './settings/AboutTab';
 
 type TabId = 'appearance' | 'viewer' | 'ai' | 'library' | 'about';
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'viewer', label: 'Viewer' },
-  { id: 'ai', label: 'AI' },
-  { id: 'library', label: 'Library' },
-  { id: 'about', label: 'About' },
+const TABS: { id: TabId; label: MessageKey }[] = [
+  { id: 'appearance', label: 'settings.tab.appearance' },
+  { id: 'viewer', label: 'settings.tab.viewer' },
+  { id: 'ai', label: 'settings.tab.ai' },
+  { id: 'library', label: 'settings.tab.library' },
+  { id: 'about', label: 'settings.tab.about' },
 ];
 
 const TAB_IDS = TABS.map((t) => t.id);
 
 export function SettingsModal() {
+  const t = useT();
   const open = useApp((s) => s.settingsOpen);
   const section = useApp((s) => s.settingsSection);
   const [tab, setTab] = useState<TabId>('appearance');
@@ -44,25 +46,25 @@ export function SettingsModal() {
     <Modal
       open={open}
       onClose={close}
-      title="Settings"
+      title={t('settings.title')}
       className="modal-lg settings"
       bodyClassName="settings-body"
       footer={
         <button className="link" onClick={() => settingsStore.getState().reset()}>
-          Reset to defaults
+          {t('settings.resetDefaults')}
         </button>
       }
     >
-      <nav className="settings-nav" role="tablist" aria-label="Settings sections">
-        {TABS.map((t) => (
+      <nav className="settings-nav" role="tablist" aria-label={t('settings.sections')}>
+        {TABS.map((tab2) => (
           <button
-            key={t.id}
+            key={tab2.id}
             role="tab"
-            aria-selected={tab === t.id}
-            className={`settings-nav-item${tab === t.id ? ' active' : ''}`}
-            onClick={() => setTab(t.id)}
+            aria-selected={tab === tab2.id}
+            className={`settings-nav-item${tab === tab2.id ? ' active' : ''}`}
+            onClick={() => setTab(tab2.id)}
           >
-            {t.label}
+            {t(tab2.label)}
           </button>
         ))}
       </nav>

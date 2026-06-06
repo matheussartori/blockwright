@@ -1,6 +1,7 @@
 // The preload bridge contract: every method/event the renderer reaches main
 // through (window.blockwright). One method per IPC channel/event in shared/ipc.ts.
 import type { AiConfig, AiProviderId } from '../ai';
+import type { LanguageInfo, LanguagePref } from '../i18n';
 import type { StructureData } from './structure';
 import type { Workspace } from './workspace';
 import type { AssembleOptions, JigsawPlan, JigsawCandidate } from './jigsaw';
@@ -125,6 +126,12 @@ export interface BlockwrightApi {
   /** Drive the native appearance (macOS vibrancy + traffic lights + the renderer's
    *  prefers-color-scheme) so a forced theme isn't fighting a vibrancy stuck on the OS. */
   setThemeSource: (pref: 'system' | 'light' | 'dark') => Promise<void>;
+  /** The current language preference + the concrete locale it resolves to. */
+  getLanguage: () => Promise<LanguageInfo>;
+  /** Persist a language preference; returns the resolved language info. */
+  setLanguage: (pref: LanguagePref) => Promise<LanguageInfo>;
+  /** Notified when the language changes (e.g. via the native Language menu). */
+  onLanguageChanged: (cb: (info: LanguageInfo) => void) => void;
   /** Recently opened files, most-recent first. All return the updated list. */
   listRecents: () => Promise<string[]>;
   addRecent: (path: string) => Promise<string[]>;

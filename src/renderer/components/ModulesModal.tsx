@@ -7,20 +7,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
-import { useApp } from '../hooks/useStores';
+import { useApp, useT } from '../hooks/useStores';
 import type { GenerationCatalog, GenerationModule, ModuleCategory, StructureData } from '@/shared/types';
+import type { MessageKey } from '@/shared/i18n';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
 import { StructurePreview } from './ui/StructurePreview';
 
-const CATEGORIES: { value: ModuleCategory; label: string }[] = [
-  { value: 'structure', label: 'Structure' },
-  { value: 'decoration', label: 'Decoration' },
-  { value: 'basement', label: 'Basement' },
-  { value: 'roof', label: 'Roof' },
+const CATEGORIES: { value: ModuleCategory; label: MessageKey }[] = [
+  { value: 'structure', label: 'modules.catStructure' },
+  { value: 'decoration', label: 'modules.catDecoration' },
+  { value: 'basement', label: 'modules.catBasement' },
+  { value: 'roof', label: 'modules.catRoof' },
 ];
 
 export function ModulesModal() {
+  const t = useT();
   const open = useApp((s) => s.modulesOpen);
 
   const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
@@ -70,22 +72,24 @@ export function ModulesModal() {
   }, [selected]);
 
   return (
-    <Modal open={open} onClose={close} title="Module Gallery" className="modal-lg catalog" bodyClassName="catalog-body">
+    <Modal open={open} onClose={close} title={t('modules.title')} className="modal-lg catalog" bodyClassName="catalog-body">
       <div className="catalog-main">
         <div className="catalog-left">
           <div className="catalog-toolbar">
             <Segmented<ModuleCategory>
-              ariaLabel="Module category"
+              ariaLabel={t('modules.category')}
               value={category}
               onChange={setCategory}
-              options={CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+              options={CATEGORIES.map((c) => ({ value: c.value, label: t(c.label) }))}
             />
           </div>
 
           <div className="modules-list">
-            {catalog === null && <div className="catalog-empty">Loading modules…</div>}
+            {catalog === null && <div className="catalog-empty">{t('modules.loading')}</div>}
             {catalog !== null && modules.length === 0 && (
-              <div className="catalog-empty">No {category} modules yet — coming soon.</div>
+              <div className="catalog-empty">
+                {t('modules.noneYet', { category: t(CATEGORIES.find((c) => c.value === category)!.label).toLowerCase() })}
+              </div>
             )}
             {modules.map((m) => (
               <button
@@ -108,7 +112,7 @@ export function ModulesModal() {
               <StructurePreview data={preview} />
             ) : (
               <div className="modules-preview-empty">
-                {selected ? (previewError ? 'Preview failed to build.' : 'Preview coming soon.') : 'Select a module.'}
+                {selected ? (previewError ? t('modules.previewFailed') : t('modules.previewSoon')) : t('modules.selectModule')}
               </div>
             )}
           </div>
@@ -120,7 +124,7 @@ export function ModulesModal() {
               <p className="modules-detail-desc">{selected.description}</p>
               {selected.appliesTo && selected.appliesTo.length > 0 && (
                 <p className="modules-detail-applies">
-                  <span className="modules-detail-applies-label">Applies to</span>{' '}
+                  <span className="modules-detail-applies-label">{t('modules.appliesTo')}</span>{' '}
                   {selected.appliesTo
                     .map((id) => catalog?.structure.find((s) => s.id === id)?.label ?? id)
                     .join(', ')}

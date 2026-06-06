@@ -176,8 +176,28 @@ src/
                           an index.ts barrel — so `@/shared/types` stays the one import path
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
+    i18n/                 Tiny framework-free i18n shared by both processes: en.ts (canonical key
+                          space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
+                          makeT/LanguageInfo). Flat dot-keyed `Record<MessageKey,string>`, `{token}`
+                          interpolation, fallback locale→en→key. See "Internationalization (i18n)".
 content/                  Extracted Minecraft content pack (assets/minecraft/...). Shipped as extraResource.
 ```
+
+### Internationalization (i18n)
+
+English + pt-BR, default = the OS language (`app.getLocale()`). **Main owns the language
+preference** (`main/language.ts`, persisted `language.json` in userData) so the native menu can
+localize at startup without a renderer round-trip; main strings use `mt(key)`. The renderer mirrors
+it through the `language:get`/`language:set` IPC channels + the `language-changed` event: `state/i18n.ts`
+is a Zustand store seeded by `initI18n()` (in `index.tsx`), and components read `const t = useT()`
+(`hooks/useStores.ts`) so they re-render when the locale changes. The language picker is in BOTH the
+native **Language** submenu (app menu on mac, File on win/linux) and **Settings ▸ Appearance**; both
+go through `setLanguage`, which rebuilds the menu + pushes `languageChanged`. **New user-facing string:**
+add it to `shared/i18n/en.ts` AND `pt-BR.ts` (pt-BR is typed against en, so a missing key won't
+compile), then `t('key')` in the renderer or `mt('key')` in main. The whole renderer UI is wired
+(shell, menu, all Settings tabs, Generate panel, catalogs, module gallery, inspector/jigsaw/versions
+panels, floating-window chrome); the only deliberately-untranslated strings are *data* from the
+registries — `shared/ai.ts` provider/model labels + blurbs and `structure/domain` module labels.
 
 ### IPC pattern
 

@@ -4,6 +4,9 @@
 import { Menu, app, dialog, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import type { WindowId, WindowsReport } from '@/shared/types';
+import { LOCALE_LABELS, SUPPORTED_LOCALES, type LanguagePref } from '@/shared/i18n';
+import { getLanguage, mt, setLanguage } from './language';
+import { notifyLanguageChanged } from './window';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/assets/content-pack';
@@ -56,8 +59,37 @@ export function setWindowsState(state: WindowsReport): void {
 
 async function openWorkspaceFromMenu(): Promise<void> {
   const { error } = await promptOpenWorkspace();
-  if (error) dialog.showErrorBox('Open mod workspace', error);
+  if (error) dialog.showErrorBox(mt('dialog.openWorkspaceTitle'), error);
   buildAppMenu(); // reflect the active workspace (Close item, etc.)
+}
+
+/** Persist a language pick from the menu, tell the renderer, and rebuild the
+ *  menu so it (and its checkmarks) reflect the new locale. */
+function chooseLanguage(pref: LanguagePref): void {
+  const info = setLanguage(pref);
+  notifyLanguageChanged(info);
+  buildAppMenu();
+}
+
+/** The Language submenu: System + one item per supported locale, the current
+ *  preference checked. */
+function languageSubmenu(): MenuItemConstructorOptions[] {
+  const { pref } = getLanguage();
+  return [
+    {
+      label: mt('menu.languageSystem'),
+      type: 'radio',
+      checked: pref === 'system',
+      click: () => chooseLanguage('system'),
+    },
+    { type: 'separator' },
+    ...SUPPORTED_LOCALES.map((locale) => ({
+      label: LOCALE_LABELS[locale],
+      type: 'radio' as const,
+      checked: pref === locale,
+      click: () => chooseLanguage(locale),
+    })),
+  ];
 }
 
 /** Build + install the native application menu (File ▸ Open / Open Recent /
@@ -69,9 +101,9 @@ export function buildAppMenu(): void {
     ? [
         ...recents.map((p) => ({ label: path.basename(p), toolTip: p, click: () => openFile(p) })),
         { type: 'separator' as const },
-        { label: 'Clear Recently Opened', click: () => { clearRecents(); refreshMenu(); } },
+        { label: mt('menu.clearRecent'), click: () => { clearRecents(); refreshMenu(); } },
       ]
-    : [{ label: 'No Recent Files', enabled: false }];
+    : [{ label: mt('menu.noRecentFiles'), enabled: false }];
 
   const recentWorkspaces = getRecentWorkspaces();
   const openRecentWorkspace: MenuItemConstructorOptions[] = recentWorkspaces.length
@@ -83,19 +115,24 @@ export function buildAppMenu(): void {
         })),
         { type: 'separator' as const },
         {
-          label: 'Clear Recent Workspaces',
+          label: mt('menu.clearRecentWorkspaces'),
           click: () => { clearRecentWorkspaces(); notifyRecentWorkspaces(); buildAppMenu(); },
         },
       ]
-    : [{ label: 'No Recent Workspaces', enabled: false }];
+    : [{ label: mt('menu.noRecentWorkspaces'), enabled: false }];
 
   // The Settings item lives where each OS expects it: under the app menu on
   // macOS (Cmd+,), and under File on Windows/Linux (Ctrl+,). Both route to the
   // same renderer-side panel via IPC.
   const settingsItem: MenuItemConstructorOptions = {
-    label: 'Settings…',
+    label: mt('menu.settings'),
     accelerator: 'CmdOrCtrl+,',
     click: () => notifyOpenSettings(),
+  };
+
+  const languageItem: MenuItemConstructorOptions = {
+    label: mt('menu.language'),
+    submenu: languageSubmenu(),
   };
 
   const appMenu: MenuItemConstructorOptions = {
@@ -103,9 +140,10 @@ export function buildAppMenu(): void {
     submenu: [
       // Route the native About to the in-app About (Settings ▸ About) so there's
       // one place for version/credits, not the default Electron panel.
-      { label: `About ${app.name}`, click: () => notifyOpenSettings('about') },
+      { label: mt('menu.about', { app: app.name }), click: () => notifyOpenSettings('about') },
       { type: 'separator' },
       settingsItem,
+      languageItem,
       { type: 'separator' },
       { role: 'services' },
       { type: 'separator' },
@@ -129,31 +167,31 @@ export function buildAppMenu(): void {
   });
 
   const viewMenu: MenuItemConstructorOptions = {
-    label: 'View',
+    label: mt('menu.view'),
     submenu: [
-      windowItem('generate', 'Generate', 'CmdOrCtrl+G'),
+      windowItem('generate', mt('menu.generate'), 'CmdOrCtrl+G'),
       { type: 'separator' },
-      windowItem('inspector', 'Inspector', 'CmdOrCtrl+1'),
-      windowItem('jigsaw', 'Jigsaw', 'CmdOrCtrl+2'),
-      windowItem('versions', 'Versions', 'CmdOrCtrl+3'),
-      windowItem('console', 'Console', 'CmdOrCtrl+Shift+K'),
+      windowItem('inspector', mt('menu.inspector'), 'CmdOrCtrl+1'),
+      windowItem('jigsaw', mt('menu.jigsaw'), 'CmdOrCtrl+2'),
+      windowItem('versions', mt('menu.versions'), 'CmdOrCtrl+3'),
+      windowItem('console', mt('menu.console'), 'CmdOrCtrl+Shift+K'),
       // Browsers/galleries: modals rather than docked panels, so they get their
       // own group apart from the window toggles above.
       { type: 'separator' },
-      { label: 'Block Catalog', accelerator: 'CmdOrCtrl+Shift+B', click: () => notifyOpenCatalog() },
-      { label: 'Module Gallery', accelerator: 'CmdOrCtrl+Shift+M', click: () => notifyOpenModules() },
+      { label: mt('menu.blockCatalog'), accelerator: 'CmdOrCtrl+Shift+B', click: () => notifyOpenCatalog() },
+      { label: mt('menu.moduleGallery'), accelerator: 'CmdOrCtrl+Shift+M', click: () => notifyOpenModules() },
       { type: 'separator' },
-      windowItem('controls', 'Keyboard Shortcuts', 'CmdOrCtrl+/'),
+      windowItem('controls', mt('menu.keyboardShortcuts'), 'CmdOrCtrl+/'),
       { type: 'separator' },
-      { role: 'resetZoom', label: 'Actual Size' },
+      { role: 'resetZoom', label: mt('menu.actualSize') },
       { role: 'zoomIn' },
       { role: 'zoomOut' },
       { type: 'separator' },
       { role: 'togglefullscreen' },
       { type: 'separator' },
       {
-        label: 'Layout',
-        submenu: [{ label: 'Reset Layout', click: () => notifyResetWindows() }],
+        label: mt('menu.layout'),
+        submenu: [{ label: mt('menu.resetLayout'), click: () => notifyResetWindows() }],
       },
     ],
   };
@@ -161,39 +199,39 @@ export function buildAppMenu(): void {
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [appMenu] : []),
     {
-      label: 'File',
+      label: mt('menu.file'),
       submenu: [
         {
-          label: 'New Structure…',
+          label: mt('menu.newStructure'),
           accelerator: 'CmdOrCtrl+N',
           click: () => notifyNewStructure(),
         },
         { type: 'separator' },
         {
-          label: 'Open File',
+          label: mt('menu.openFile'),
           accelerator: 'CmdOrCtrl+O',
           click: async () => {
             const p = await openFileDialog();
             if (p) openFile(p);
           },
         },
-        { label: 'Open Recent', submenu: openRecent },
+        { label: mt('menu.openRecent'), submenu: openRecent },
         {
-          label: 'Export File…',
+          label: mt('menu.exportFile'),
           accelerator: 'CmdOrCtrl+Shift+S',
           enabled: fileOpen,
           click: () => notifyExportFile(),
         },
-        { label: 'Close File', enabled: fileOpen, click: () => notifyClose() },
+        { label: mt('menu.closeFile'), enabled: fileOpen, click: () => notifyClose() },
         { type: 'separator' },
         {
-          label: 'Open Mod Workspace…',
+          label: mt('menu.openWorkspace'),
           accelerator: 'CmdOrCtrl+Shift+O',
           click: openWorkspaceFromMenu,
         },
-        { label: 'Open Recent Workspace', submenu: openRecentWorkspace },
+        { label: mt('menu.openRecentWorkspace'), submenu: openRecentWorkspace },
         {
-          label: 'Close Workspace',
+          label: mt('menu.closeWorkspace'),
           enabled: getActiveWorkspace() !== null,
           click: () => {
             applyWorkspace(null);
@@ -201,7 +239,7 @@ export function buildAppMenu(): void {
           },
         },
         { type: 'separator' },
-        ...(isMac ? [] : [settingsItem, { type: 'separator' as const }]),
+        ...(isMac ? [] : [settingsItem, languageItem, { type: 'separator' as const }]),
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },

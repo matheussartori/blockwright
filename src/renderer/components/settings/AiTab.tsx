@@ -5,6 +5,7 @@
 // behind a toggle.
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
+import { useT } from '../../hooks/useStores';
 import {
   AI_PROVIDERS, providerMeta,
   type AiConfig, type AiProviderId, type AiProviderMeta, type AiProviderState, type AiStability,
@@ -12,8 +13,9 @@ import {
 
 /** A "Stable"/"Beta" maturity badge (reuses the `.ai-pill` chrome). */
 function StabilityPill({ stability }: { stability: AiStability }) {
+  const t = useT();
   return (
-    <span className={`ai-pill ai-pill-${stability}`}>{stability === 'stable' ? 'Stable' : 'Beta'}</span>
+    <span className={`ai-pill ai-pill-${stability}`}>{stability === 'stable' ? t('ai.stable') : t('ai.beta')}</span>
   );
 }
 
@@ -23,6 +25,7 @@ function modelLabel(meta: AiProviderMeta | undefined, modelId: string): string {
 }
 
 export function AiTab() {
+  const t = useT();
   const [config, setConfig] = useState<AiConfig | null>(null);
   const [showBeta, setShowBeta] = useState(false);
 
@@ -54,7 +57,7 @@ export function AiTab() {
   return (
     <>
       <section className="settings-group ai-active-banner">
-        <span className="ai-active-label">Generating with</span>
+        <span className="ai-active-label">{t('ai.generatingWith')}</span>
         <span className="ai-active-name">{activeMeta?.label ?? config.activeProvider}</span>
         {activeMeta && <StabilityPill stability={activeMeta.stability} />}
         <span className="ai-active-model">{modelLabel(activeMeta, stateOf(config.activeProvider).model)}</span>
@@ -70,14 +73,11 @@ export function AiTab() {
           onClick={() => setShowBeta((v) => !v)}
         >
           <span className={`ai-beta-chevron${showBeta ? ' open' : ''}`} aria-hidden>›</span>
-          <span className="settings-group-name">Beta providers</span>
-          <span className="ai-pill ai-pill-beta">Beta</span>
+          <span className="settings-group-name">{t('ai.betaProviders')}</span>
+          <span className="ai-pill ai-pill-beta">{t('ai.beta')}</span>
           <span className="ai-beta-sub">{beta.map((b) => b.label).join(' · ')}</span>
         </button>
-        <p className="setting-note">
-          They work, but are less exercised — the self-review/critic loop is tuned for Claude. Expand to configure or
-          switch to one.
-        </p>
+        <p className="setting-note">{t('ai.betaNote')}</p>
       </section>
       {showBeta && beta.map(card)}
     </>
@@ -97,6 +97,7 @@ function ProviderCard({
   onChange: (c: AiConfig) => void;
   onActivate: (id: AiProviderId) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -122,12 +123,12 @@ function ProviderCard({
   };
 
   const status = state.fromEnv
-    ? 'From environment'
+    ? t('ai.fromEnv')
     : state.configured
-      ? `Configured (${state.hint})`
+      ? t('ai.configured', { hint: state.hint ?? '' })
       : meta.authKind === 'subscription'
-        ? 'CLI login'
-        : 'Not set';
+        ? t('ai.cliLogin')
+        : t('ai.notSet');
 
   return (
     <section className="settings-group ai-provider">
@@ -136,17 +137,17 @@ function ProviderCard({
         <StabilityPill stability={meta.stability} />
         <span className={`ai-pill${state.configured || state.fromEnv ? ' ai-pill-ok' : ''}`}>{status}</span>
         {active ? (
-          <span className="ai-pill ai-pill-active ai-provider-active">Active</span>
+          <span className="ai-pill ai-pill-active ai-provider-active">{t('ai.active')}</span>
         ) : (
           <button className="btn sm no-drag ai-provider-active" onClick={() => onActivate(meta.id)}>
-            Use
+            {t('ai.use')}
           </button>
         )}
       </div>
       <p className="setting-note">{meta.blurb}</p>
 
       <label className="setting-row">
-        <span className="setting-label">Model</span>
+        <span className="setting-label">{t('ai.model')}</span>
         <select
           className="input setting-select"
           value={state.model}
@@ -162,14 +163,13 @@ function ProviderCard({
 
       {state.fromEnv ? (
         <p className="setting-note">
-          Pinned by <code>{meta.envVars.join('</code> / <code>')}</code> in your environment. Unset it to manage the credential here.
+          {t('ai.pinnedPre')}<code>{meta.envVars.join('</code> / <code>')}</code>{t('ai.pinnedPost')}
         </p>
       ) : (
         <>
           {meta.authKind === 'subscription' && (
             <p className="setting-note">
-              Sign in via the CLI (Claude Code / <code>codex login</code>) and it just works — a token below is
-              optional, for machines without an interactive login.
+              {t('ai.subscriptionNotePre')}<code>codex login</code>{t('ai.subscriptionNotePost')}
             </p>
           )}
           <div className="setting-key-row">
@@ -188,11 +188,11 @@ function ProviderCard({
               }}
             />
             <button className="btn primary sm" onClick={() => void save()} disabled={busy || !draft.trim()}>
-              Save
+              {t('ai.save')}
             </button>
             {state.configured && (
               <button className="btn sm" onClick={() => void remove()} disabled={busy}>
-                Remove
+                {t('ai.remove')}
               </button>
             )}
           </div>

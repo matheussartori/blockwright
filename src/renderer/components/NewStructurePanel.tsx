@@ -13,16 +13,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { documentsStore } from '../state/documents';
 import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
-import { useApp, useActiveDoc } from '../hooks/useStores';
+import { useApp, useActiveDoc, useT } from '../hooks/useStores';
 import { api } from '../api';
+import type { MessageKey } from '@/shared/i18n';
 import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule, BuildSelection } from '@/shared/types';
 
-const PHASE_LABEL: Record<GenerateProgress['phase'], string> = {
-  thinking: 'Thinking…',
-  building: 'Writing structure…',
-  compiling: 'Compiling…',
-  rendering: 'Rendering preview…',
-  reviewing: 'Reviewing the result…',
+const PHASE_LABEL: Record<GenerateProgress['phase'], MessageKey> = {
+  thinking: 'gen.phase.thinking',
+  building: 'gen.phase.building',
+  compiling: 'gen.phase.compiling',
+  rendering: 'gen.phase.rendering',
+  reviewing: 'gen.phase.reviewing',
 };
 
 /** Image MIME types Claude accepts as reference attachments. */
@@ -59,11 +60,7 @@ function readImages(files: Iterable<File>): Promise<Attachment[]> {
   return Promise.all(reads);
 }
 
-const EXAMPLES = [
-  'A small oak cottage with a furnished interior',
-  'A stone watchtower, 5×5 footprint, 12 blocks tall',
-  'A cozy cabin with a pitched spruce roof and a porch',
-];
+const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
 /** The build modules the user picked for a fresh build: a structure type, a
  *  decoration, and the structure's tunable params (floors/basement/attic/…). They
@@ -178,6 +175,7 @@ function moduleFits(m: GenerationModule, structureType: string): boolean {
  *  provides the title bar, detach/redock and minimize), so it only owns its own
  *  toolbar (New / Close), the warning, the transcript and the composer. */
 export function GenerateContent() {
+  const t = useT();
   const settingsOpen = useApp((s) => s.settingsOpen);
   const doc = useActiveDoc();
   const chat = doc?.chat ?? [];
@@ -385,42 +383,42 @@ export function GenerateContent() {
     (!!input.trim() || attachments.length > 0 || !!details.structureType);
 
   return (
-    <div className="gen-content" role="dialog" aria-label="Generate structure">
+    <div className="gen-content" role="dialog" aria-label={t('gen.dialogLabel')}>
       <div className="gen-bar">
         <button className="btn sm" onClick={reset} disabled={busy || chat.length === 0}>
-          New
+          {t('gen.new')}
         </button>
         <button
           className="btn sm"
-          title="Clear the chat and version history, keeping the current build as a fresh original"
+          title={t('gen.clearVersionsTitle')}
           onClick={clearVersions}
           disabled={busy || generatedCount === 0}
         >
-          Clear versions
+          {t('gen.clearVersions')}
         </button>
         <button
           className="btn sm"
-          title="Browse the content pack's blocks and copy their ids"
+          title={t('gen.blocksTitle')}
           onClick={() => store.getState().setCatalogOpen(true)}
         >
-          Blocks
+          {t('gen.blocks')}
         </button>
         <button
           className="btn sm"
-          title="Browse the structure/decoration modules with live 3D previews"
+          title={t('gen.modulesTitle')}
           onClick={() => store.getState().setModulesOpen(true)}
         >
-          Modules
+          {t('gen.modules')}
         </button>
       </div>
 
       {available === false && (
         <div className="gen-warn">
-          No Anthropic API key yet.{' '}
+          {t('gen.noKeyPre')}
           <button className="link" onClick={() => store.getState().setSettingsOpen(true)}>
-            Add one in Settings
-          </button>{' '}
-          to start generating.
+            {t('gen.noKeyLink')}
+          </button>
+          {t('gen.noKeyPost')}
         </div>
       )}
 
@@ -428,18 +426,14 @@ export function GenerateContent() {
         {chat.length === 0 && (
           <div className="gen-empty">
             <p>
-              Describe a structure for Claude to build. It reads the Blockwright NBT guides, generates
-              a <code>.nbt</code>, and renders it here.
+              {t('gen.emptyDescPre')}<code>.nbt</code>{t('gen.emptyDescPost')}
             </p>
-            <p className="gen-hint">
-              Then keep chatting to refine it — “make the roof red”, “add a second floor”, “furnish
-              the interior”. You can also paste or attach reference images.
-            </p>
+            <p className="gen-hint">{t('gen.emptyHint')}</p>
             <ul className="gen-examples">
               {EXAMPLES.map((ex) => (
                 <li key={ex}>
-                  <button className="gen-example" onClick={() => setInput(ex)} disabled={busy}>
-                    {ex}
+                  <button className="gen-example" onClick={() => setInput(t(ex))} disabled={busy}>
+                    {t(ex)}
                   </button>
                 </li>
               ))}
@@ -454,32 +448,32 @@ export function GenerateContent() {
                   <span className="gen-stat gen-stat-version">v{m.meta.version}</span>
                 )}
                 {m.meta.size && (
-                  <span className="gen-stat" title="Dimensions (W×H×D)">
-                    <span className="gen-stat-label">Size</span>
+                  <span className="gen-stat" title={t('gen.statSizeTitle')}>
+                    <span className="gen-stat-label">{t('gen.statSize')}</span>
                     <span className="gen-stat-value">{m.meta.size.join('×')}</span>
                   </span>
                 )}
                 {m.meta.blockCount != null && (
-                  <span className="gen-stat" title="Block count">
-                    <span className="gen-stat-label">Blocks</span>
+                  <span className="gen-stat" title={t('gen.statBlocksTitle')}>
+                    <span className="gen-stat-label">{t('gen.statBlocks')}</span>
                     <span className="gen-stat-value">{m.meta.blockCount.toLocaleString()}</span>
                   </span>
                 )}
                 {m.meta.tookMs != null && (
-                  <span className="gen-stat" title="Generation time">
-                    <span className="gen-stat-label">Time</span>
+                  <span className="gen-stat" title={t('gen.statTimeTitle')}>
+                    <span className="gen-stat-label">{t('gen.statTime')}</span>
                     <span className="gen-stat-value">{formatElapsed(m.meta.tookMs)}</span>
                   </span>
                 )}
                 {m.meta.tokensIn != null && (
-                  <span className="gen-stat" title="Prompt tokens sent (incl. cached context)">
-                    <span className="gen-stat-label">↑ In</span>
+                  <span className="gen-stat" title={t('gen.statInTitle')}>
+                    <span className="gen-stat-label">{t('gen.statIn')}</span>
                     <span className="gen-stat-value">{m.meta.tokensIn.toLocaleString()}</span>
                   </span>
                 )}
                 {m.meta.tokensOut != null && (
-                  <span className="gen-stat" title="Tokens generated">
-                    <span className="gen-stat-label">↓ Out</span>
+                  <span className="gen-stat" title={t('gen.statOutTitle')}>
+                    <span className="gen-stat-label">{t('gen.statOut')}</span>
                     <span className="gen-stat-value">{m.meta.tokensOut.toLocaleString()}</span>
                   </span>
                 )}
@@ -493,7 +487,7 @@ export function GenerateContent() {
                     className="gen-msg-thumb"
                     src={src}
                     alt="reference"
-                    title="Click to preview"
+                    title={t('gen.imgPreviewTitle')}
                     onClick={() => store.getState().setImagePreview(src)}
                   />
                 ))}
@@ -507,7 +501,7 @@ export function GenerateContent() {
             <div className="gen-progress-head">
               <span className="gen-spinner" aria-hidden />
               <span className="gen-phase">
-                {progress ? PHASE_LABEL[progress.phase] : 'Generating…'}
+                {progress ? t(PHASE_LABEL[progress.phase]) : t('gen.phase.generating')}
                 {progress?.designPhase && (
                   <span className="gen-design-phase">
                     {' · '}{progress.designPhase}
@@ -517,18 +511,18 @@ export function GenerateContent() {
               </span>
             </div>
             <div className="gen-stats">
-              <span className="gen-stat" title="Elapsed time">
-                <span className="gen-stat-label">Time</span>
+              <span className="gen-stat" title={t('gen.elapsedTitle')}>
+                <span className="gen-stat-label">{t('gen.statTime')}</span>
                 <span className="gen-stat-value">{formatElapsed(elapsedMs)}</span>
               </span>
               {progress && progress.outputTokens > 0 && (
                 <>
-                  <span className="gen-stat" title="Prompt tokens sent">
-                    <span className="gen-stat-label">↑ In</span>
+                  <span className="gen-stat" title={t('gen.statInTitleLive')}>
+                    <span className="gen-stat-label">{t('gen.statIn')}</span>
                     <span className="gen-stat-value">{progress.inputTokens.toLocaleString()}</span>
                   </span>
-                  <span className="gen-stat" title="Tokens generated">
-                    <span className="gen-stat-label">↓ Out</span>
+                  <span className="gen-stat" title={t('gen.statOutTitle')}>
+                    <span className="gen-stat-label">{t('gen.statOut')}</span>
                     <span className="gen-stat-value">{progress.outputTokens.toLocaleString()}</span>
                   </span>
                 </>
@@ -556,8 +550,8 @@ export function GenerateContent() {
                 <img src={a.dataUrl} alt="reference" />
                 <button
                   className="gen-attachment-remove"
-                  title="Remove"
-                  aria-label="Remove image"
+                  title={t('gen.remove')}
+                  aria-label={t('gen.removeImage')}
                   onClick={() => removeAttachment(a.id)}
                 >
                   ✕
@@ -569,40 +563,38 @@ export function GenerateContent() {
         {showDetails && (
           <div className="gen-details">
             <p className="gen-details-hint">
-              Optional: pick a structure as an adaptable starting scaffold, and a
-              decoration for its look. Leave them empty to build purely from your prompt.{' '}
-              Open the{' '}
+              {t('gen.detailsHintPre')}
               <button className="link" onClick={() => store.getState().setModulesOpen(true)} disabled={busy}>
-                module gallery
-              </button>{' '}
-              to preview what each one builds.
+                {t('gen.detailsHintLink')}
+              </button>
+              {t('gen.detailsHintPost')}
             </p>
             <div className="gen-details-grid">
               <label className="gen-field">
-                <span>Structure</span>
+                <span>{t('gen.fieldStructure')}</span>
                 <select value={details.structureType} onChange={(e) => setField('structureType', e.target.value)} disabled={busy}>
-                  <option value="">None</option>
+                  <option value="">{t('gen.optNone')}</option>
                   {(catalog?.structure ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
               <label className="gen-field">
-                <span>Decoration</span>
+                <span>{t('gen.fieldDecoration')}</span>
                 <select value={details.decoration} onChange={(e) => setField('decoration', e.target.value)} disabled={busy || !details.structureType}>
-                  <option value="">Default</option>
+                  <option value="">{t('gen.optDefault')}</option>
                   {(catalog?.decoration ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
               <label className="gen-field">
-                <span>Roof</span>
+                <span>{t('gen.fieldRoof')}</span>
                 <select value={details.roof} onChange={(e) => setField('roof', e.target.value)} disabled={busy || !details.structureType}>
-                  <option value="">Auto</option>
+                  <option value="">{t('gen.optAuto')}</option>
                   {(catalog?.roof ?? []).filter((m) => moduleFits(m, details.structureType)).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
               <label className="gen-field">
-                <span>Basement</span>
+                <span>{t('gen.fieldBasement')}</span>
                 <select value={details.basement} onChange={(e) => setField('basement', e.target.value)} disabled={busy || !details.structureType}>
-                  <option value="">None</option>
+                  <option value="">{t('gen.optNone')}</option>
                   {(catalog?.basement ?? []).filter((m) => moduleFits(m, details.structureType)).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </label>
@@ -643,10 +635,10 @@ export function GenerateContent() {
               <div className="gen-details-grid">
                 {(['w', 'd', 'h'] as const).map((axis) => {
                   const sz = effectiveSize(details, selStruct);
-                  const label = axis === 'w' ? 'Width' : axis === 'd' ? 'Depth' : 'Height';
+                  const label = axis === 'w' ? t('gen.width') : axis === 'd' ? t('gen.depth') : t('gen.height');
                   return (
                     <label key={axis} className="gen-field">
-                      <span>{label}{details.size ? '' : ' (auto)'}</span>
+                      <span>{label}{details.size ? '' : t('gen.autoSuffix')}</span>
                       <input
                         type="number"
                         min={3}
@@ -665,31 +657,24 @@ export function GenerateContent() {
         {showFloors && (
           <div className="gen-floors">
             <div className="gen-floors-head">
-              <span>Floor plan</span>
-              <span className="gen-floors-hint">
-                Give each level a name and the Y where it starts and ends (y=0 is the ground). The
-                ranges are highlighted in the viewer and sent as context, so you can later say
-                “redo the basement”.
-              </span>
+              <span>{t('gen.floorPlan')}</span>
+              <span className="gen-floors-hint">{t('gen.floorPlanHint')}</span>
             </div>
             {floors.length === 0 && (
-              <p className="gen-floors-empty">
-                No floors yet. Add one to give the AI a vertical layout — e.g. Basement y 0–4,
-                Ground floor y 5–9, Upper floor y 10–14.
-              </p>
+              <p className="gen-floors-empty">{t('gen.floorsEmpty')}</p>
             )}
             {floors.map((f) => (
               <div key={f.id} className="gen-floor-row">
                 <input
                   className="gen-floor-name"
                   type="text"
-                  placeholder="Floor name (e.g. Basement)"
+                  placeholder={t('gen.floorNamePlaceholder')}
                   value={f.name}
                   disabled={busy}
                   onChange={(e) => updateFloor(f.id, { name: e.target.value })}
                 />
                 <label className="gen-floor-y">
-                  <span>From</span>
+                  <span>{t('gen.floorFrom')}</span>
                   <input
                     type="number"
                     value={f.from}
@@ -698,7 +683,7 @@ export function GenerateContent() {
                   />
                 </label>
                 <label className="gen-floor-y">
-                  <span>To</span>
+                  <span>{t('gen.floorTo')}</span>
                   <input
                     type="number"
                     value={f.to}
@@ -708,8 +693,8 @@ export function GenerateContent() {
                 </label>
                 <button
                   className="gen-floor-remove"
-                  title="Remove floor"
-                  aria-label="Remove floor"
+                  title={t('gen.removeFloor')}
+                  aria-label={t('gen.removeFloor')}
                   disabled={busy}
                   onClick={() => removeFloor(f.id)}
                 >
@@ -718,13 +703,13 @@ export function GenerateContent() {
               </div>
             ))}
             <button className="btn sm gen-floor-add" onClick={addFloor} disabled={busy}>
-              + Add floor
+              {t('gen.addFloor')}
             </button>
           </div>
         )}
         <textarea
           className="gen-input"
-          placeholder="Describe a structure…"
+          placeholder={t('gen.inputPlaceholder')}
           value={input}
           rows={3}
           disabled={busy || available === false}
@@ -752,15 +737,15 @@ export function GenerateContent() {
           />
           <button
             className="btn sm gen-attach"
-            title="Attach reference image"
+            title={t('gen.attachTitle')}
             disabled={busy || available === false}
             onClick={() => fileInput.current?.click()}
           >
-            🖼 Image
+            {t('gen.imageBtn')}
           </button>
           <button
             className={`btn sm gen-details-toggle${hasDetails(details) ? ' has-details' : ''}`}
-            title="Optional build details: structure type, decoration, floors/basement/attic…"
+            title={t('gen.detailsBtnTitle')}
             aria-pressed={showDetails}
             disabled={busy || available === false}
             onClick={() =>
@@ -771,11 +756,11 @@ export function GenerateContent() {
               })
             }
           >
-            ⚙ Details{hasDetails(details) ? ' •' : ''}
+            {t('gen.detailsBtn')}{hasDetails(details) ? ' •' : ''}
           </button>
           <button
             className={`btn sm gen-details-toggle${floors.length > 0 ? ' has-details' : ''}`}
-            title="Define the build's vertical levels (floors) as context for the AI"
+            title={t('gen.floorsBtnTitle')}
             aria-pressed={showFloors}
             disabled={busy}
             onClick={() =>
@@ -786,11 +771,11 @@ export function GenerateContent() {
               })
             }
           >
-            ▦ Floors{floors.length > 0 ? ` (${floors.length})` : ''}
+            {t('gen.floorsBtn')}{floors.length > 0 ? ` (${floors.length})` : ''}
           </button>
           {busy ? (
             <button className="btn gen-send gen-cancel" onClick={cancel}>
-              Cancel
+              {t('gen.cancel')}
             </button>
           ) : (
             <button
@@ -798,7 +783,7 @@ export function GenerateContent() {
               onClick={() => void send()}
               disabled={!canSend}
             >
-              Send
+              {t('gen.send')}
             </button>
           )}
         </div>

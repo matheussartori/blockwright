@@ -3,10 +3,11 @@
 // store so the overlay can render at the App root, above every panel. Dismiss by
 // clicking the backdrop, the ✕, or pressing Esc.
 import { useEffect } from 'react';
-import { useApp } from '../hooks/useStores';
+import { useApp, useT } from '../hooks/useStores';
 import { store } from '../state/store';
 
 export function ImagePreview() {
+  const t = useT();
   const src = useApp((s) => s.imagePreview);
 
   useEffect(() => {
@@ -21,12 +22,12 @@ export function ImagePreview() {
   if (!src) return null;
 
   return (
-    <div className="image-preview" role="dialog" aria-label="Image preview" onClick={() => store.getState().setImagePreview(null)}>
+    <div className="image-preview" role="dialog" aria-label={t('image.previewLabel')} onClick={() => store.getState().setImagePreview(null)}>
       <img src={src} alt="reference preview" onClick={(e) => e.stopPropagation()} />
       <button
         className="image-preview-close"
-        aria-label="Close preview"
-        title="Close"
+        aria-label={t('image.closePreview')}
+        title={t('image.close')}
         onClick={() => store.getState().setImagePreview(null)}
       >
         ✕

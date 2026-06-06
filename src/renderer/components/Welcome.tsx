@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
 import { basename, dirname } from '../ui/path';
-import { useApp } from '../hooks/useStores';
+import { useApp, useT } from '../hooks/useStores';
 import { store } from '../state/store';
 import { Logo } from './ui/Logo';
 
@@ -42,6 +42,7 @@ export function Welcome({
   onActivateWorkspace: (ws: Workspace) => void;
   onGenerate: () => void;
 }) {
+  const t = useT();
   const recents = useApp((s) => s.recents);
   const recentWorkspaces = useApp((s) => s.recentWorkspaces);
   const workspaceStructures = useApp((s) => s.workspaceStructures);
@@ -73,36 +74,36 @@ export function Welcome({
           <header className="welcome-hero">
             <Logo size={72} className="welcome-mark" />
             <h1>Blockwright</h1>
-            <p className="welcome-tagline">Build, view, and AI-generate Minecraft structures in 3D.</p>
+            <p className="welcome-tagline">{t('welcome.tagline')}</p>
           </header>
 
           <div className="welcome-actions">
             <button className="action-card accent" onClick={onGenerate}>
               <span className="action-ic"><ActionIcon name="spark" /></span>
               <span className="action-body">
-                <span className="action-title">Generate with AI</span>
-                <span className="action-sub">Describe a build, get a structure</span>
+                <span className="action-title">{t('welcome.generateTitle')}</span>
+                <span className="action-sub">{t('welcome.generateSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={onOpen}>
               <span className="action-ic"><ActionIcon name="file" /></span>
               <span className="action-body">
-                <span className="action-title">Open NBT file</span>
-                <span className="action-sub">View an existing structure</span>
+                <span className="action-title">{t('welcome.openTitle')}</span>
+                <span className="action-sub">{t('welcome.openSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={() => void api.openWorkspace()}>
               <span className="action-ic"><ActionIcon name="folder" /></span>
               <span className="action-body">
-                <span className="action-title">Open mod workspace</span>
-                <span className="action-sub">Load a mod's blocks &amp; structures</span>
+                <span className="action-title">{t('welcome.workspaceTitle')}</span>
+                <span className="action-sub">{t('welcome.workspaceSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={() => store.getState().setCatalogOpen(true)}>
               <span className="action-ic"><ActionIcon name="grid" /></span>
               <span className="action-body">
-                <span className="action-title">Block catalog</span>
-                <span className="action-sub">Browse every available block</span>
+                <span className="action-title">{t('welcome.catalogTitle')}</span>
+                <span className="action-sub">{t('welcome.catalogSub')}</span>
               </span>
             </button>
           </div>
@@ -110,7 +111,7 @@ export function Welcome({
           {hasPack !== null && (
             <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
               <span className="welcome-hint-dot" />
-              {hasPack ? 'Content pack detected — full textures available' : 'No content pack — blocks render as flat colors'}
+              {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
             </span>
           )}
 
@@ -119,14 +120,14 @@ export function Welcome({
               {total > 0 && (
                 <section className="list-card">
                   <div className="list-head">
-                    <span className="list-title">Workspace structures</span>
+                    <span className="list-title">{t('welcome.workspaceStructures')}</span>
                     <span className="list-count">{query.trim() ? `${matches.length}/${total}` : total}</span>
                   </div>
                   <div className="list-search-wrap">
                     <input
                       className="list-search"
                       type="search"
-                      placeholder="Search structures…"
+                      placeholder={t('welcome.searchPlaceholder')}
                       autoComplete="off"
                       spellCheck={false}
                       value={query}
@@ -135,7 +136,7 @@ export function Welcome({
                   </div>
                   <ul className="list-body">
                     {matches.length === 0 ? (
-                      <li className="list-empty">No structures match “{query}”.</li>
+                      <li className="list-empty">{t('welcome.noMatch', { query })}</li>
                     ) : (
                       matches.map((p) => (
                         <li key={p} className="recent-row" title={p} onClick={() => onLoad(p)}>
@@ -152,9 +153,9 @@ export function Welcome({
                   {recents.length > 0 && (
                     <section className="list-card">
                       <div className="list-head">
-                        <span className="list-title">Recent files</span>
+                        <span className="list-title">{t('welcome.recentFiles')}</span>
                         <button className="link" onClick={() => void api.clearRecents()}>
-                          Clear
+                          {t('common.clear')}
                         </button>
                       </div>
                       <ul className="list-body">
@@ -170,9 +171,9 @@ export function Welcome({
                   {recentWorkspaces.length > 0 && (
                     <section className="list-card">
                       <div className="list-head">
-                        <span className="list-title">Recent workspaces</span>
+                        <span className="list-title">{t('welcome.recentWorkspaces')}</span>
                         <button className="link" onClick={() => void api.clearRecentWorkspaces()}>
-                          Clear
+                          {t('common.clear')}
                         </button>
                       </div>
                       <ul className="list-body">

@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react';
 import type { StructureData, PaletteEntry } from '@/shared/types';
 import { api } from '../api';
-import { useActiveDoc, useSettings } from '../hooks/useStores';
+import { useActiveDoc, useSettings, useT } from '../hooks/useStores';
 import { useViewer } from '../viewer/ViewerProvider';
 
 interface BlockGroup {
@@ -76,6 +76,7 @@ function rgb(color: [number, number, number]): string {
 }
 
 export function InspectorContent() {
+  const t = useT();
   const structure = useActiveDoc()?.structure ?? null;
   const textureIcons = useSettings((s) => s.blockTextureIcons);
   const viewer = useViewer();
@@ -112,28 +113,28 @@ export function InspectorContent() {
           <button
             type="button"
             className="inspector-path"
-            title={copied ? 'Copied!' : `Click to copy\n${structure.path}`}
+            title={copied ? t('inspector.copied') : `${t('inspector.clickToCopy')}\n${structure.path}`}
             onClick={copyPath}
           >
-            {copied ? 'Copied to clipboard' : structure.path}
+            {copied ? t('inspector.copiedClipboard') : structure.path}
           </button>
         )}
         <dl className="meta">
           <div>
-            <dt>Size</dt>
+            <dt>{t('inspector.size')}</dt>
             <dd>{structure.size.join(' × ')}</dd>
           </div>
           <div>
-            <dt>Blocks</dt>
+            <dt>{t('inspector.blocks')}</dt>
             <dd>{structure.blockCount.toLocaleString()}</dd>
           </div>
           <div>
-            <dt>Palette</dt>
+            <dt>{t('inspector.palette')}</dt>
             <dd>{paletteCount}</dd>
           </div>
           {structure.jigsaws.length > 0 && (
             <div>
-              <dt>Jigsaws</dt>
+              <dt>{t('inspector.jigsaws')}</dt>
               <dd>{structure.jigsaws.length}</dd>
             </div>
           )}
@@ -157,7 +158,7 @@ export function InspectorContent() {
                   <span className="swatch" style={{ background: rgb(g.color) }} />
                 )}
                 <span className="block-name">{g.name}</span>
-                {!g.resolved && <span className="chip">flat</span>}
+                {!g.resolved && <span className="chip">{t('inspector.flat')}</span>}
                 <span className="block-count">({g.positions.length})</span>
               </button>
               {open && (
@@ -167,7 +168,7 @@ export function InspectorContent() {
                       <button
                         type="button"
                         className="instance-row"
-                        title="Focus this block"
+                        title={t('inspector.focusBlock')}
                         onClick={() => viewer?.focusBlock(pos)}
                       >
                         <span className="instance-idx">{i + 1}</span>

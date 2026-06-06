@@ -4,11 +4,12 @@
 // while its build is generating, so you can watch a background tab work while you
 // edit another. Always rendered (even with no docs) so the drag region and
 // traffic-light space persist on the welcome screen.
-import { useDocuments } from '../hooks/useStores';
+import { useDocuments, useT } from '../hooks/useStores';
 import { documentsStore } from '../state/documents';
 import { Logo } from './ui/Logo';
 
 export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: string) => void }) {
+  const t = useT();
   const documents = useDocuments((s) => s.documents);
   const activeId = useDocuments((s) => s.activeId);
 
@@ -26,8 +27,8 @@ export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: st
       <button
         type="button"
         className={`tab-home${activeId === null ? ' active' : ''}`}
-        title="Home"
-        aria-label="Home"
+        title={t('tab.home')}
+        aria-label={t('tab.home')}
         onClick={() => documentsStore.getState().goHome()}
       >
         <Logo size={20} />
@@ -51,8 +52,8 @@ export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: st
           <span className="tab-title">{d.title}</span>
           <button
             className="tab-close"
-            aria-label="Close tab"
-            title="Close tab"
+            aria-label={t('tab.closeTab')}
+            title={t('tab.closeTab')}
             onClick={(e) => {
               e.stopPropagation();
               onClose(d.id);
@@ -62,7 +63,7 @@ export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: st
           </button>
         </div>
       ))}
-      <button className="tab-new" title="New tab" aria-label="New tab" onClick={onNew}>
+      <button className="tab-new" title={t('tab.newTab')} aria-label={t('tab.newTab')} onClick={onNew}>
         +
       </button>
     </div>

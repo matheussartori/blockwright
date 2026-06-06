@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
-import { useApp } from '../hooks/useStores';
+import { useApp, useT } from '../hooks/useStores';
 import type { CatalogBlock } from '@/shared/types';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
@@ -60,6 +60,7 @@ function Thumb({ block }: { block: CatalogBlock }) {
 }
 
 export function CatalogModal() {
+  const t = useT();
   const open = useApp((s) => s.catalogOpen);
   const workspace = useApp((s) => s.workspace);
 
@@ -110,45 +111,45 @@ export function CatalogModal() {
   };
 
   return (
-    <Modal open={open} onClose={close} title="Block Catalog" className="modal-lg catalog" bodyClassName="catalog-body">
+    <Modal open={open} onClose={close} title={t('catalog.title')} className="modal-lg catalog" bodyClassName="catalog-body">
       <div className="catalog-main">
         <div className="catalog-left">
           <div className="catalog-toolbar">
             <input
               className="input catalog-search"
               type="search"
-              placeholder="Search blocks…"
+              placeholder={t('catalog.search')}
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             {modNamespace && (
               <Segmented<NsFilter>
-                ariaLabel="Namespace"
+                ariaLabel={t('catalog.namespace')}
                 value={ns}
                 onChange={setNs}
                 options={[
-                  { value: 'all', label: 'All' },
+                  { value: 'all', label: t('catalog.all') },
                   { value: 'minecraft', label: 'minecraft' },
                   { value: 'mod', label: modNamespace },
                 ]}
               />
             )}
             <Segmented<ViewMode>
-              ariaLabel="View"
+              ariaLabel={t('catalog.viewLabel')}
               variant="icon"
               value={view}
               onChange={setView}
               options={[
-                { value: 'grid', label: VIEW_ICONS.grid, title: 'Grid view' },
-                { value: 'list', label: VIEW_ICONS.list, title: 'List view' },
+                { value: 'grid', label: VIEW_ICONS.grid, title: t('catalog.gridView') },
+                { value: 'list', label: VIEW_ICONS.list, title: t('catalog.listView') },
               ]}
             />
           </div>
 
           <div className={view === 'grid' ? 'catalog-grid' : 'catalog-list'}>
-            {blocks === null && <div className="catalog-empty">Reading the content pack…</div>}
-            {blocks !== null && filtered.length === 0 && <div className="catalog-empty">No blocks match “{query}”.</div>}
+            {blocks === null && <div className="catalog-empty">{t('catalog.reading')}</div>}
+            {blocks !== null && filtered.length === 0 && <div className="catalog-empty">{t('catalog.noMatch', { query })}</div>}
             {view === 'grid'
               ? filtered.map((b) => (
                   <button
@@ -182,7 +183,7 @@ export function CatalogModal() {
                 ))}
           </div>
 
-          <div className="catalog-foot">{blocks ? `${filtered.length} blocks` : 'Loading…'}</div>
+          <div className="catalog-foot">{blocks ? t('catalog.blocksCount', { count: filtered.length }) : t('catalog.loading')}</div>
         </div>
 
         <aside className="catalog-side">
@@ -200,7 +201,7 @@ export function CatalogModal() {
               <button
                 type="button"
                 className="catalog-id-copy"
-                title="Copy block id"
+                title={t('catalog.copyId')}
                 onClick={() => copyId(selected.id)}
               >
                 <code className="catalog-detail-id">{selected.id}</code>
@@ -208,7 +209,7 @@ export function CatalogModal() {
               </button>
             </div>
           ) : (
-            <div className="catalog-detail catalog-detail-empty">Select a block to preview it.</div>
+            <div className="catalog-detail catalog-detail-empty">{t('catalog.selectToPreview')}</div>
           )}
         </aside>
       </div>

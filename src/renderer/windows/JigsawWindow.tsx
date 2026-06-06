@@ -9,7 +9,7 @@ import type { JigsawWarning, PlacedPiece, StructureData } from '@/shared/types';
 import { isJigsawSupported } from '@/shared/mc-version';
 import { api } from '../api';
 import { useViewer } from '../viewer/ViewerProvider';
-import { useApp, useSettings, useActiveDoc } from '../hooks/useStores';
+import { useApp, useSettings, useActiveDoc, useT } from '../hooks/useStores';
 import { settingsStore } from '../state/settings';
 import type { AssemblyPiece } from '../viewer/viewer';
 
@@ -26,6 +26,7 @@ function randomSeed(): number {
 }
 
 export function JigsawContent() {
+  const t = useT();
   const structure = useActiveDoc()?.structure ?? null;
   const workspace = useApp((s) => s.workspace);
   const contentVersion = useApp((s) => s.contentVersion);
@@ -134,8 +135,7 @@ export function JigsawContent() {
   if (!supported) {
     return (
       <p className="bw-note">
-        Jigsaw preview isn&apos;t supported for <strong>{version ?? 'this version'}</strong> yet.
-        It&apos;s currently validated on 1.21.x.
+        {t('jigsaw.unsupportedPre')}<strong>{version ?? t('jigsaw.thisVersion')}</strong>{t('jigsaw.unsupportedPost')}
       </p>
     );
   }
@@ -149,14 +149,14 @@ export function JigsawContent() {
           disabled={busy}
           onClick={() => void assemble()}
         >
-          Generate
+          {t('jigsaw.generate')}
         </button>
         <button
           className="btn sm icon"
           type="button"
           disabled={busy}
-          title="Randomize seed and re-assemble"
-          aria-label="Re-roll"
+          title={t('jigsaw.rerollTitle')}
+          aria-label={t('jigsaw.rerollAria')}
           onClick={reroll}
         >
           ↻
@@ -164,7 +164,7 @@ export function JigsawContent() {
       </div>
       <div className="bw-controls">
         <button className="btn sm grow" type="button" onClick={() => void reset()}>
-          Single piece
+          {t('jigsaw.singlePiece')}
         </button>
       </div>
 
@@ -174,12 +174,12 @@ export function JigsawContent() {
         aria-expanded={advanced}
         onClick={() => setAdvanced((v) => !v)}
       >
-        <span className={`bw-caret${advanced ? ' open' : ''}`}>▸</span> Advanced
+        <span className={`bw-caret${advanced ? ' open' : ''}`}>▸</span> {t('jigsaw.advanced')}
       </button>
       {advanced && (
         <div className="bw-controls bw-advanced">
           <label className="bw-field">
-            Depth
+            {t('jigsaw.depth')}
             <input
               type="number"
               min={1}
@@ -189,7 +189,7 @@ export function JigsawContent() {
             />
           </label>
           <label className="bw-field">
-            Seed
+            {t('jigsaw.seed')}
             <input type="number" value={seed} onChange={(e) => setSeed(Number(e.target.value))} />
           </label>
         </div>
@@ -197,7 +197,7 @@ export function JigsawContent() {
 
       {(pieceCount > 1 || warnings.length > 0) && (
         <div className="bw-warnings">
-          {pieceCount > 1 && <div className="bw-ok">Placed {pieceCount} pieces.</div>}
+          {pieceCount > 1 && <div className="bw-ok">{t('jigsaw.placedPieces', { count: pieceCount })}</div>}
           {warnings.length > 0 && (
             <ul className="bw-warn-list">
               {warnings.map((w, i) => (
@@ -210,14 +210,14 @@ export function JigsawContent() {
         </div>
       )}
 
-      <div className="bw-section">View</div>
+      <div className="bw-section">{t('jigsaw.view')}</div>
       <label className="bw-toggle">
         <input
           type="checkbox"
           checked={showJigsaw}
           onChange={(e) => settingsStore.getState().set('showJigsaw', e.target.checked)}
         />
-        <span>Show jigsaw blocks in viewer</span>
+        <span>{t('jigsaw.showBlocks')}</span>
       </label>
       <label className="bw-toggle">
         <input
@@ -225,18 +225,18 @@ export function JigsawContent() {
           checked={hideShell}
           onChange={(e) => settingsStore.getState().set('hideShell', e.target.checked)}
         />
-        <span>Hide piece shell (see inside)</span>
+        <span>{t('jigsaw.hideShell')}</span>
       </label>
 
       <div className="bw-section">
-        Connectors <span className="bw-count">{count}</span>
+        {t('jigsaw.connectors')} <span className="bw-count">{count}</span>
       </div>
       <ul className="bw-rows">
         {structure.jigsaws.map((j, i) => (
           <li key={i} className="bw-row static" title={j.orientation}>
-            <span className="bw-row-name">{short(j.name) || '(unnamed)'}</span>
+            <span className="bw-row-name">{short(j.name) || t('jigsaw.unnamed')}</span>
             <span className="bw-row-arrow">→</span>
-            <span className="bw-row-name">{short(j.target) || '(any)'}</span>
+            <span className="bw-row-name">{short(j.target) || t('jigsaw.any')}</span>
             <span className="bw-row-tag">{short(j.pool)}</span>
           </li>
         ))}

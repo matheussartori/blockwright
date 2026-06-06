@@ -3,8 +3,9 @@
 // a FloatingWindow; both render the exact same content component. Availability
 // is passed in from App (Info = a structure is open, Jigsaw = it has jigsaws).
 import type { FC } from 'react';
+import type { MessageKey } from '@/shared/i18n';
 import { windowsStore, type PanelId } from '../state/windows';
-import { useWindows } from '../hooks/useStores';
+import { useT, useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
 import { JigsawContent } from '../windows/JigsawWindow';
@@ -13,11 +14,11 @@ import { GenerateContent } from './NewStructurePanel';
 
 type Availability = Record<PanelId, boolean>;
 
-const PANELS: Record<PanelId, { title: string; Content: FC }> = {
-  inspector: { title: 'Info', Content: InspectorContent },
-  jigsaw: { title: 'Jigsaw', Content: JigsawContent },
-  versions: { title: 'Versions', Content: VersionsContent },
-  generate: { title: 'Generate', Content: GenerateContent },
+const PANELS: Record<PanelId, { title: MessageKey; Content: FC }> = {
+  inspector: { title: 'panel.info', Content: InspectorContent },
+  jigsaw: { title: 'panel.jigsaw', Content: JigsawContent },
+  versions: { title: 'panel.versions', Content: VersionsContent },
+  generate: { title: 'panel.generate', Content: GenerateContent },
 };
 
 const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];
@@ -27,6 +28,7 @@ const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];
 const FLUSH: Record<PanelId, boolean> = { inspector: false, jigsaw: false, versions: false, generate: true };
 
 export function InspectorDock({ availability }: { availability: Availability }) {
+  const t = useT();
   const inspector = useWindows((s) => s.inspector);
   const jigsaw = useWindows((s) => s.jigsaw);
   const versions = useWindows((s) => s.versions);
@@ -49,8 +51,8 @@ export function InspectorDock({ availability }: { availability: Availability }) 
         <button
           type="button"
           className="dock-rail-btn"
-          title="Expand sidebar"
-          aria-label="Expand sidebar"
+          title={t('panel.expandSidebar')}
+          aria-label={t('panel.expandSidebar')}
           onClick={() => windowsStore.getState().setSidebarCollapsed(false)}
         >
           ‹
@@ -74,7 +76,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
               className={`dock-tab${id === active ? ' active' : ''}`}
               onClick={() => windowsStore.getState().setActiveTab(id)}
             >
-              {PANELS[id].title}
+              {t(PANELS[id].title)}
             </button>
           ))}
         </div>
@@ -82,8 +84,8 @@ export function InspectorDock({ availability }: { availability: Availability }) 
           <button
             type="button"
             className="dock-btn"
-            title="Detach into a floating window"
-            aria-label="Detach panel"
+            title={t('panel.detach')}
+            aria-label={t('panel.detachAria')}
             onClick={() => windowsStore.getState().setFloating(active, true)}
           >
             ⤢
@@ -91,8 +93,8 @@ export function InspectorDock({ availability }: { availability: Availability }) 
           <button
             type="button"
             className="dock-btn"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            title={t('panel.collapseSidebar')}
+            aria-label={t('panel.collapseSidebar')}
             onClick={() => windowsStore.getState().setSidebarCollapsed(true)}
           >
             ›
@@ -108,13 +110,14 @@ export function InspectorDock({ availability }: { availability: Availability }) 
 
 /** A single panel rendered as a floating window when it's been torn off. */
 function FloatingPanel({ id, available }: { id: PanelId; available: boolean }) {
+  const t = useT();
   const floating = useWindows((s) => s[id].floating);
   if (!floating) return null;
   const { title, Content } = PANELS[id];
   return (
     <FloatingWindow
       id={id}
-      title={title}
+      title={t(title)}
       available={available}
       flush={FLUSH[id]}
       className={id === 'generate' ? 'gen-window' : undefined}

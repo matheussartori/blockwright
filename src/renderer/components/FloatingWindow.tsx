@@ -4,7 +4,7 @@
 // persisted `windows` store. A closed window is reopened from the View menu.
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { windowsStore, WINDOW_WIDTHS, type PanelId } from '../state/windows';
-import { useWindows } from '../hooks/useStores';
+import { useT, useWindows } from '../hooks/useStores';
 
 interface FloatingWindowProps {
   id: PanelId;
@@ -33,6 +33,7 @@ export function FloatingWindow({
   flush,
   children,
 }: FloatingWindowProps) {
+  const t = useT();
   const state = useWindows((s) => s[id]);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -77,8 +78,8 @@ export function FloatingWindow({
         <button
           type="button"
           className="bw-window-btn redock"
-          title="Dock to sidebar"
-          aria-label="Dock to sidebar"
+          title={t('window.dock')}
+          aria-label={t('window.dock')}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().setFloating(id, false)}
         >
@@ -87,8 +88,8 @@ export function FloatingWindow({
         <button
           type="button"
           className="bw-window-btn bw-window-min"
-          title={state.minimized ? 'Expand' : 'Minimize'}
-          aria-label={state.minimized ? 'Expand' : 'Minimize'}
+          title={state.minimized ? t('window.expand') : t('window.minimize')}
+          aria-label={state.minimized ? t('window.expand') : t('window.minimize')}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().toggleMinimized(id)}
         >
@@ -97,8 +98,8 @@ export function FloatingWindow({
         <button
           type="button"
           className="bw-window-btn bw-window-close"
-          title="Close (reopen from the View menu)"
-          aria-label="Close window"
+          title={t('window.close')}
+          aria-label={t('window.closeAria')}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().setVisible(id, false)}
         >

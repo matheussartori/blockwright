@@ -3,30 +3,32 @@
 // overlay that auto-appears whenever the camera enters fly mode. Replaces the
 // old always-on Controls window; its open state rides the `controls` window
 // slice so the View-menu "Keyboard Shortcuts" toggle keeps working.
+import type { MessageKey } from '@/shared/i18n';
 import { windowsStore } from '../state/windows';
-import { useApp, useWindows } from '../hooks/useStores';
+import { useApp, useT, useWindows } from '../hooks/useStores';
 
 interface Row {
   keys: string[];
-  label: string;
+  label: MessageKey;
 }
 
 const ORBIT: Row[] = [
-  { keys: ['Drag'], label: 'rotate' },
-  { keys: ['R-drag'], label: 'pan' },
-  { keys: ['Scroll'], label: 'zoom' },
-  { keys: ['F'], label: 'enter fly' },
+  { keys: ['Drag'], label: 'shortcuts.rotate' },
+  { keys: ['R-drag'], label: 'shortcuts.pan' },
+  { keys: ['Scroll'], label: 'shortcuts.zoom' },
+  { keys: ['F'], label: 'shortcuts.enterFly' },
 ];
 
 const FLY: Row[] = [
-  { keys: ['W', 'A', 'S', 'D'], label: 'move' },
-  { keys: ['Space', 'Shift'], label: 'up / down' },
-  { keys: ['Mouse'], label: 'look' },
-  { keys: ['Scroll'], label: 'speed' },
-  { keys: ['Esc', 'F'], label: 'exit' },
+  { keys: ['W', 'A', 'S', 'D'], label: 'shortcuts.move' },
+  { keys: ['Space', 'Shift'], label: 'shortcuts.upDown' },
+  { keys: ['Mouse'], label: 'shortcuts.look' },
+  { keys: ['Scroll'], label: 'shortcuts.speed' },
+  { keys: ['Esc', 'F'], label: 'shortcuts.exit' },
 ];
 
 function Group({ name, rows, active }: { name: string; rows: Row[]; active?: boolean }) {
+  const t = useT();
   return (
     <div className={`ch-group${active ? ' ch-group--active' : ''}`}>
       <div className="ch-group-name">{name}</div>
@@ -36,7 +38,7 @@ function Group({ name, rows, active }: { name: string; rows: Row[]; active?: boo
             {row.keys.map((k) => (
               <kbd key={k}>{k}</kbd>
             ))}
-            <span>{row.label}</span>
+            <span>{t(row.label)}</span>
           </li>
         ))}
       </ul>
@@ -45,6 +47,7 @@ function Group({ name, rows, active }: { name: string; rows: Row[]; active?: boo
 }
 
 export function ShortcutsHelp({ available }: { available: boolean }) {
+  const t = useT();
   const flying = useApp((s) => s.navMode === 'fly');
   const open = useWindows((s) => s.controls.visible);
 
@@ -54,24 +57,24 @@ export function ShortcutsHelp({ available }: { available: boolean }) {
     <>
       {flying && (
         <div className="fly-overlay">
-          <Group name="Fly · noclip" rows={FLY} />
+          <Group name={t('shortcuts.fly')} rows={FLY} />
         </div>
       )}
 
       <div className="shortcuts-help">
         {open && (
-          <div className="shortcuts-popover" role="dialog" aria-label="Keyboard shortcuts">
+          <div className="shortcuts-popover" role="dialog" aria-label={t('shortcuts.title')}>
             <div className="ch-groups">
-              <Group name="Orbit" rows={ORBIT} />
-              <Group name="Fly · noclip" rows={FLY} active={flying} />
+              <Group name={t('shortcuts.orbit')} rows={ORBIT} />
+              <Group name={t('shortcuts.fly')} rows={FLY} active={flying} />
             </div>
           </div>
         )}
         <button
           type="button"
           className={`shortcuts-btn${open ? ' active' : ''}`}
-          title="Keyboard shortcuts"
-          aria-label="Keyboard shortcuts"
+          title={t('shortcuts.title')}
+          aria-label={t('shortcuts.title')}
           aria-expanded={open}
           onClick={() => windowsStore.getState().setVisible('controls', !open)}
         >

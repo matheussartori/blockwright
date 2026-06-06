@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import type { AiConfig, AiProviderId } from '@/shared/ai';
+import type { LanguageInfo, LanguagePref } from '@/shared/i18n';
 import type {
   AssembleOptions,
   BlockwrightApi,
@@ -40,6 +41,12 @@ const api: BlockwrightApi = {
   previewModule: (category: ModuleCategory, id: string): Promise<StructureData> =>
     ipcRenderer.invoke(IPC_CHANNELS.previewModule, category, id),
   setThemeSource: (pref: 'system' | 'light' | 'dark') => ipcRenderer.invoke(IPC_CHANNELS.themeSet, pref),
+  getLanguage: (): Promise<LanguageInfo> => ipcRenderer.invoke(IPC_CHANNELS.languageGet),
+  setLanguage: (pref: LanguagePref): Promise<LanguageInfo> =>
+    ipcRenderer.invoke(IPC_CHANNELS.languageSet, pref),
+  onLanguageChanged: (cb: (info: LanguageInfo) => void) => {
+    ipcRenderer.on(IPC_EVENTS.languageChanged, (_e, info: LanguageInfo) => cb(info));
+  },
   openWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceOpen),
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
   getWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),

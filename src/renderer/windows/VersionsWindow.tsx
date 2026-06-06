@@ -4,10 +4,11 @@
 // version doesn't change what the next edit builds on (that always continues from
 // the latest). Rendered as a tab in the docked sidebar, or inside a FloatingWindow
 // when torn off — the chrome lives in InspectorDock / FloatingPanels.
-import { useActiveDoc } from '../hooks/useStores';
+import { useActiveDoc, useT } from '../hooks/useStores';
 import { viewVersion } from '../state/generation';
 
 export function VersionsContent() {
+  const t = useT();
   const doc = useActiveDoc();
   if (!doc) return null;
 
@@ -22,14 +23,12 @@ export function VersionsContent() {
   // Newest first — the most recent build is what you usually want; the original
   // baseline (v0) sorts to the bottom.
   const ordered = [...doc.versions].sort((a, b) => b.version - a.version);
-  const label = (v: number) => (v === 0 ? 'Original' : `v${v}`);
+  const label = (v: number) => (v === 0 ? t('versions.original') : `v${v}`);
 
   return (
     <>
       <div className="versions-head">
-        <p className="versions-note">
-          Preview an earlier build. Edits always continue from the latest version.
-        </p>
+        <p className="versions-note">{t('versions.note')}</p>
       </div>
       <ul className="versions-list">
         {ordered.map((v) => {
@@ -44,17 +43,17 @@ export function VersionsContent() {
                 aria-current={isShown}
                 title={
                   isShown
-                    ? 'Showing in the viewer'
+                    ? t('versions.showing')
                     : isOriginal
-                      ? 'View the original file (before any edits)'
-                      : `View ${label(v.version)}`
+                      ? t('versions.viewOriginal')
+                      : t('versions.view', { label: label(v.version) })
                 }
                 onClick={() => void viewVersion(doc.id, v.version)}
               >
                 <span className="version-label">{label(v.version)}</span>
-                {isLatest && <span className="chip">latest</span>}
-                {isOriginal && <span className="chip">source</span>}
-                {isShown && <span className="version-shown">● viewing</span>}
+                {isLatest && <span className="chip">{t('versions.latest')}</span>}
+                {isOriginal && <span className="chip">{t('versions.source')}</span>}
+                {isShown && <span className="version-shown">{t('versions.viewing')}</span>}
               </button>
             </li>
           );

@@ -3,6 +3,8 @@ import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { AssembleOptions, BuildSelection, ChatRecord, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { LanguagePref } from '@/shared/i18n';
+import { getLanguage, setLanguage } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
@@ -203,6 +205,13 @@ export function registerIpc(): void {
   // the renderer's prefers-color-scheme.
   ipcMain.handle(IPC_CHANNELS.themeSet, async (_e, pref: 'system' | 'light' | 'dark') => {
     nativeTheme.themeSource = pref;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.languageGet, async () => getLanguage());
+  ipcMain.handle(IPC_CHANNELS.languageSet, async (_e, pref: LanguagePref) => {
+    const info = setLanguage(pref);
+    buildAppMenu(); // the native menu is built in the new locale
+    return info;
   });
 
   ipcMain.handle(IPC_CHANNELS.chatHistoryGet, async (_e, key: string) => getChat(key));

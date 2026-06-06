@@ -4,7 +4,9 @@ import { app, BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOpti
 import path from 'node:path';
 import fs from 'node:fs';
 import type { ExportResult } from '@/shared/types';
+import type { LanguageInfo } from '@/shared/i18n';
 import { IPC_EVENTS } from '@/shared/ipc';
+import { mt } from './language';
 import { getRecents } from './recents';
 import { getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/assets/content-pack';
@@ -28,9 +30,9 @@ export function openFile(filePath: string): void {
 /** Show the native open dialog (shared by the IPC handler and the File menu). */
 export async function openFileDialog(): Promise<string | null> {
   const options: OpenDialogOptions = {
-    title: 'Open NBT structure',
+    title: mt('dialog.openTitle'),
     properties: ['openFile'],
-    filters: [{ name: 'NBT structure', extensions: ['nbt'] }],
+    filters: [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }],
   };
   const result = mainWindow
     ? await dialog.showOpenDialog(mainWindow, options)
@@ -41,7 +43,7 @@ export async function openFileDialog(): Promise<string | null> {
 /** Show the native directory picker for choosing a mod workspace. */
 export async function openDirectoryDialog(): Promise<string | null> {
   const options: OpenDialogOptions = {
-    title: 'Open mod workspace',
+    title: mt('dialog.openWorkspaceTitle'),
     properties: ['openDirectory'],
   };
   const result = mainWindow
@@ -59,9 +61,9 @@ export async function exportStructure(srcPath: string, suggestedName: string): P
     return { ok: false, error: 'The structure file no longer exists on disk.' };
   }
   const options: SaveDialogOptions = {
-    title: 'Export NBT structure',
+    title: mt('dialog.exportTitle'),
     defaultPath: suggestedName,
-    filters: [{ name: 'NBT structure', extensions: ['nbt'] }],
+    filters: [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }],
   };
   const result = mainWindow
     ? await dialog.showSaveDialog(mainWindow, options)
@@ -129,6 +131,11 @@ export function notifyOpenCatalog(): void {
 /** Ask the renderer to open the Module Gallery modal (View menu). */
 export function notifyOpenModules(): void {
   mainWindow?.webContents.send(IPC_EVENTS.openModules);
+}
+
+/** Push the new language to the renderer (it re-renders the UI in that locale). */
+export function notifyLanguageChanged(info: LanguageInfo): void {
+  mainWindow?.webContents.send(IPC_EVENTS.languageChanged, info);
 }
 
 /** Window icon (the standardized logo-dark) for Windows/Linux — macOS uses the
