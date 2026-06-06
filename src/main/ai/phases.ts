@@ -81,7 +81,14 @@ export const PHASES: Phase[] = [
     label: 'Circulation',
     mode: 'patch',
     rubric:
-      'Make the build WALKABLE. Build every floor-to-floor staircase with the "stairs" OP (from = bottom ' +
+      'Make the build WALKABLE, and CONNECT EVERY FLOOR. Trace the route from the front door to each level ' +
+      '— basement, every storey, AND the attic: each must be reachable by an UNBROKEN stair/ladder chain. The ' +
+      '#1 bug here is stranding the upper floors (a ladder/stair only on the bottom segment, the floors above ' +
+      'left with just an open hole and no way up). Use ONE mechanism per shaft (a "stairs" flight OR a wall ' +
+      'ladder, never both stacked), and if you ladder, run a SINGLE continuous "ladder" column from the bottom ' +
+      'floor up to the top floor it serves, flush on a solid interior wall, with a 1×1 hole through each floor ' +
+      'it passes — do NOT also carve the shaft with air "fill" ops (that guts the floors into an unclimbable ' +
+      'pit). Build every floor-to-floor staircase with the "stairs" OP (from = bottom ' +
       'step, to = top step), NEVER hand-placed individual steps — the op guarantees a full, same-direction ' +
       'flight that REACHES the upper floor with headroom and a stairwell hole, instead of a couple of stray ' +
       'steps that dead-end half a level short. Every staircase needs a clear LANDING at its bottom, 2 blocks ' +
@@ -156,8 +163,8 @@ export const AUDIT_CHECKS: AuditCheck[] = [
   { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney; EXACTLY ONE chimney that is a continuous column running from the hearth THROUGH the roof to ~1–3 past the ridge with its cap resting on it (no floating campfire, no chimney stopping below the roofline, no second chimney)?' },
   { id: 'facade', label: 'Facade', ask: 'Windows symmetric and centered with EQUAL end margins (not 2 one side, 3 the other), aligned across storeys; walls articulated with depth; a framed entrance (not a bare hole)?' },
   { id: 'interior', label: 'Interior', ask: 'Is EVERY habitable room both furnished and lit (no empty boxes), and any usable attic accessible + furnished (not sealed/empty)?' },
-  { id: 'circulation', label: 'Circulation', ask: 'Stairs have a clear landing at the bottom AND top (room to step on/off), headroom, REACH the floor they serve (no jump), sit at least ONE cell OFF the outer walls (not flush in a corner), and do not block any door; basement/upper access is out of the entrance bay; the cellar stair LANDS in open cellar floor (does not dead-end in the shell); doors are walkable?' },
-  { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor?' },
+  { id: 'circulation', label: 'Circulation', ask: 'Is EVERY floor — basement, each storey, AND the attic — reachable from the entrance by an UNBROKEN stair/ladder chain (NOT just the bottom segment, with upper floors left as an open hole and no rungs)? Each shaft uses ONE mechanism (stairs OR a single continuous wall-ladder column, not both, not an air-carved pit). Stairs have a clear landing at the bottom AND top, headroom, REACH the floor they serve (no jump), sit at least ONE cell OFF the outer walls, and do not block any door; the cellar stair LANDS in open cellar floor; a balcony is a walkable platform (≥2 deep beyond the door, railed), not just the door sill; doors are walkable?' },
+  { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor; the chimney flue path is clear (no bed/floor/furniture crossing it or directly above the hearth)?' },
 ];
 
 /** Audit check ids. The single source for the AI tool schema's audit `check`

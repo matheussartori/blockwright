@@ -249,7 +249,18 @@ ground or is attached to a wall/ceiling. A "ladder" needs a SOLID BLOCK BEHIND I
 "facing") and breaks in-game if freestanding — run ladders flush against a wall, never as a column in \
 open air. Use the "stairs" op (not hand-placed steps) for staircases, and make every ladder/staircase \
 actually climb to a reachable floor (cut the ceiling hole — the "stairs" op's "clear" does this), never \
-into a solid ceiling or a dead end. A lantern is a LIGHT, not a support, and it does NOT stick to the \
+into a solid ceiling or a dead end. EVERY floor — basement, each storey, AND the attic — must be \
+reachable from the entrance by an UNBROKEN stair/ladder chain; trace it floor by floor. Pick ONE \
+mechanism per vertical shaft (a "stairs" flight OR a wall ladder, never both), and if you use a ladder \
+run a SINGLE continuous "ladder" column from the bottom floor up to the top floor it serves with a 1×1 \
+hole through each floor — NEVER ladder only the bottom segment and leave the upper floors with an open \
+hole and no rungs (that strands them). Do NOT add air "fill" ops through a shaft to "clear" it — the op \
+cuts exactly the hole it needs; a stray air-fill just guts floors/walls into an unclimbable pit. \
+A BALCONY is a real standing platform: project a floor at least 2 deep beyond the door with a railing \
+(*_fence/*_wall/iron_bars) and support under it — never just the row of blocks under the doorway. \
+A CHIMNEY flue is a RESERVED vertical column: solid brick from the hearth out through the roof, with \
+NOTHING (no bed, floor, furniture, or decoration) occupying or crossing its path or sitting directly \
+above the hearth. A lantern is a LIGHT, not a support, and it does NOT stick to the \
 side of a wall: it must rest on a solid block DIRECTLY BELOW it, or hang (hanging:"true") from a solid \
 block / short chain DIRECTLY ABOVE it. A lantern floating in the middle of a wall with air above and \
 below is ALWAYS WRONG — for a wall light use a "wall_torch", or a lantern set on a small bracket \

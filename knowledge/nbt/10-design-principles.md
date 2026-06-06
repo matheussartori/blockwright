@@ -154,6 +154,21 @@ one of these before handing off:
   climb, and never list loose `*_stairs` for a flight when the op can do it. The op keeps **2 blocks of
   headroom** above each step and cuts the floor/ceiling hole to **just the footprint of the run** — no
   oversized shaft beside the stairs, solid floor at the bottom, flush landing at the top.
+- **One circulation mechanism per shaft — pick stairs OR a ladder, never both, and never carve the
+  shaft to air and leave it.** For a given vertical run, choose **one** method: a `stairs` op flight,
+  **or** a wall-backed `ladder` column. **Do not** stack a `ladder` and a `stairs` op in the same
+  shaft, and **do not** add `fill` ops of air through the shaft "to clear it" on top of a `stairs`/
+  ladder — the op already cuts exactly the hole it needs, and a stray air-`fill` just guts the floors
+  and walls, leaving an open pit with nothing to climb. A shaft must read as a deliberate stair or
+  ladder, not a hole.
+- **A ladder shaft is ONE continuous column that reaches EVERY floor it serves.** If you use a ladder
+  to connect levels, run a **single unbroken `ladder` column** from the bottom floor all the way up to
+  the top floor it serves (e.g. basement → ground → 2F → 3F → attic), flush against a solid interior
+  wall, with a 1×1 hole through each floor it passes so the climb is unbroken. **Never** ladder only
+  the bottom segment and leave the floors above with just an open hole and no rungs — that strands
+  every upper floor (the #1 "can't get upstairs" bug). Every habitable floor and the attic must be
+  reachable from the entrance by an unbroken stair/ladder chain; trace it floor by floor before you
+  finish.
 - **Walkways and rooms stay clear — don't block your own circulation.** A floor `lantern`, `torch`,
   `campfire`, pot, or any prop dropped in the middle of a corridor, doorway, or stair run blocks the
   path the player walks. Keep lights and props against walls or hang them from the ceiling so the
@@ -165,6 +180,12 @@ one of these before handing off:
   a 3-block drop, or a balcony with no stair/ladder reaching it, is a dead access — the player can't
   get in or out smoothly. Build the approach (a short stair run, a stoop, a ramp) so movement in and
   out is fluid, never a jump or a fall.
+- **A balcony is a real standing platform, not just the door sill.** A balcony/terrace/varanda must
+  project a **floor of at least 2 cells deep × 3 cells wide of walkable space beyond the doorway**
+  (more for a "large" balcony), edged on the open sides with a **railing** (`*_fence`, `*_wall`, or
+  `iron_bars`) and supported underneath (corbels/`*_stairs half:top` brackets, posts, or a continued
+  wall). The single row of blocks directly under the door is **not** a balcony — it reads as a glitch.
+  If there's room, give it minimal furnishing (a `lantern`, a potted plant, a bench of `*_stairs`).
 - **Rooms are enclosed and reachable.** Every interior space a player is meant to use needs a way
   in (a door or opening) and complete walls/floor/ceiling around it — no one-block holes leaking to
   the outside, no sealed rooms with no entrance. This applies to **basements and lower floors**: a

@@ -166,6 +166,38 @@ describe('fixPlacement — wall fixtures (auto-fix)', () => {
     );
     expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:oak_wall_sign')).toHaveLength(0);
   });
+
+  it('keeps a ladder column intact where it threads a floor (front cell is the floor)', () => {
+    // A multi-storey ladder shaft: ladders facing south (backing wall to the north at
+    // z-1). At the floor line (y=2) the cell IN FRONT (z+1) is the floor surface, so the
+    // "must face open space" test fails for that single rung — but it continues a column,
+    // so it must NOT be removed (removing it fragments the shaft and breaks the climb).
+    // Regression for the "ladders to nowhere / unreachable upper floors" bug.
+    const pal: AuthoringPaletteEntry[] = [
+      { Name: 'minecraft:ladder', Properties: { facing: 'south' } }, // 0
+      { Name: 'minecraft:stone' }, // 1 — backing wall + floor
+    ];
+    const blocks: AuthoringBlock[] = [];
+    for (let y = 0; y <= 4; y++) blocks.push({ state: 1, pos: [5, y, 0] });   // backing wall (north)
+    for (let y = 0; y <= 4; y++) blocks.push({ state: 0, pos: [5, y, 1] });   // ladder column
+    // a floor plane at y=2 in front of the ladder (z>=2) so the rung at (5,2,1) "faces" floor
+    for (let z = 2; z <= 4; z++) blocks.push({ state: 1, pos: [5, 2, z] });
+    const r = run(pal, blocks);
+    const ladderYs = r.blocks
+      .filter((b) => nameOf(r, b) === 'minecraft:ladder')
+      .map((b) => b.pos[1])
+      .sort((a, c) => a - c);
+    expect(ladderYs).toEqual([0, 1, 2, 3, 4]);
+    expect((r.fixes ?? []).join(' ')).not.toMatch(/wall fixture/);
+  });
+
+  it('still removes a lone unbacked ladder (not part of a column)', () => {
+    const r = run(
+      [{ Name: 'minecraft:ladder', Properties: { facing: 'south' } }],
+      [{ state: 0, pos: [5, 5, 5] }],
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:ladder')).toHaveLength(0);
+  });
 });
 
 describe('fixPlacement — chest lids', () => {

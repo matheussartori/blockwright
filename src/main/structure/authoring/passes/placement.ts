@@ -131,6 +131,21 @@ export const fixPlacement: Pass = (blocks, palette) => {
           continue;
         }
       }
+      // A LADDER is a vertical climbing column, not an isolated wall fixture: keep a rung
+      // that continues a column (another ladder directly above or below it) even when
+      // THIS rung's "faces open space" test fails — at a floor line the cell in front of
+      // the ladder IS the floor, and where the wall has a joist/window gap the backing
+      // lapses. Removing such a rung fragments the shaft, and `fixCirculation` then strips
+      // the floating remainder, leaving an unclimbable hole-to-nowhere. Only a genuinely
+      // isolated, unbacked ladder falls through to removal (fixCirculation drops a whole
+      // floating/too-short run).
+      if (id === 'ladder') {
+        const ladderAt = (yy: number): boolean => {
+          const n = at(x, yy, z);
+          return n !== undefined && bareId(n) === 'ladder';
+        };
+        if (ladderAt(y - 1) || ladderAt(y + 1)) { out.push(b); continue; }
+      }
       removedWall++;
       continue;
     }

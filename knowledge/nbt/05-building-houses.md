@@ -193,6 +193,13 @@ let the build's bottom be the foundation.
   incomplete chimney that doesn't pierce the roof reads as broken). Keep it **modest** — a chimney much
   wider/taller than its house, or a thin 1×1 stalk topped with an oversized 2×2 cap (a "lollipop"),
   looks wrong. Constant width, short, anchored to the build — not a tower.
+  - **The flue's vertical path is RESERVED — keep it clear, top to bottom.** The whole column from the
+    hearth up through every floor and out the roof is solid brick (or the firebox at the very bottom):
+    **nothing else may occupy or cross it.** Never run a floor slab, a **bed**, furniture, a chest, or
+    any decoration through the cells the chimney passes — and never place anything directly **above the
+    hearth** in the rising path. A bed or block sitting in the middle of the chimney is a glaring bug.
+    Route the flue up an exterior wall (away from beds and furniture) so its path stays empty, and
+    align the floor holes so each storey's floor stops at the brick rather than cutting into it.
 - **Porch**: extend the floor out past the entrance, add `oak_fence` posts holding a small
   slab/stair roof.
 - **Bay window / wing**: bump the footprint out by 1–2 blocks on one side; keep walls/roof
