@@ -9,7 +9,7 @@
 // its conversation and the SDK session can resume.
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage, FloorDef, BuildSelection } from '@/shared/types';
+import type { GenerateImage, FloorDef, BuildSelection, BuildBrief } from '@/shared/types';
 import { basename, dirname } from '../ui/path';
 
 /** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
@@ -183,19 +183,31 @@ export async function hydrateDoc(docId: string): Promise<void> {
   }
 }
 
-/** Run a generation/edit for `docId` from `prompt` + staged image data URLs.
- *  Writes all results onto the document by id (not "active"), so it completes
- *  correctly even after the user switches tabs. */
-export async function runGeneration(
-  docId: string,
-  prompt: string,
-  imageUrls: string[],
-  selection?: BuildSelection,
-): Promise<void> {
+/** Inputs to a generation/edit turn. The AI prompt is kept SEPARATE from what the chat
+ *  shows: `aiPrompt` (the user's words + the composer's plain-language brief) goes to the
+ *  model, while the chat renders only `userText` plus a presentable `build` card — so the
+ *  long "[Build details]" block never appears as a wall of text in the transcript. */
+export interface GenerationInput {
+  /** Full prompt sent to the model: the user's words plus the composer brief (if any). */
+  aiPrompt: string;
+  /** The user's raw words, shown in the chat bubble (may be '' for a details-only build). */
+  userText: string;
+  /** Structured build details for the chat card (omitted when nothing was picked). */
+  build?: BuildBrief;
+  /** Staged reference image data URLs. */
+  imageUrls: string[];
+  /** The structured module selection (drives knowledge-guide loading). */
+  selection?: BuildSelection;
+}
+
+/** Run a generation/edit for `docId`. Writes all results onto the document by id (not
+ *  "active"), so it completes correctly even after the user switches tabs. */
+export async function runGeneration(docId: string, input: GenerationInput): Promise<void> {
   const docs = documentsStore.getState();
   const doc = docs.documents.find((d) => d.id === docId);
   if (!doc || doc.busy) return;
 
+  const { aiPrompt, userText, build, imageUrls, selection } = input;
   // Reference images can't ride a string prompt; split the data-URL prefix so
   // main forwards just the base64 payload + media type to the model.
   const images: GenerateImage[] = imageUrls.map((url) => {
@@ -204,15 +216,20 @@ export async function runGeneration(
   });
   // The user's floor plan rides along as context on every turn (so a follow-up
   // like "redo the basement" knows which y range that is), but it stays out of
-  // the visible transcript — only the raw prompt is shown in the chat.
+  // the visible transcript — only the user's words + the build card are shown.
   const promptText =
-    (prompt || 'Build a Minecraft structure based on the reference image(s).') +
+    (aiPrompt || 'Build a Minecraft structure based on the reference image(s).') +
     buildFloorPlan(doc.floors);
 
   // Track the start locally: patchDoc replaces the doc object immutably, so the
   // `doc` captured above keeps its old startedAt — read the elapsed time from this.
   const startedAt = Date.now();
-  docs.appendChat(docId, { role: 'user', text: prompt, images: imageUrls.length ? imageUrls : undefined });
+  docs.appendChat(docId, {
+    role: 'user',
+    text: userText,
+    images: imageUrls.length ? imageUrls : undefined,
+    build,
+  });
   docs.patchDoc(docId, { busy: true, startedAt, progress: null });
   persistDoc(docId);
 

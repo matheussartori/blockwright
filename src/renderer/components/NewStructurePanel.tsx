@@ -16,7 +16,7 @@ import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persist
 import { useApp, useActiveDoc, useT } from '../hooks/useStores';
 import { api } from '../api';
 import type { MessageKey } from '@/shared/i18n';
-import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule, BuildSelection } from '@/shared/types';
+import type { GenerateProgress, FloorDef, GenerationCatalog, GenerationModule, BuildSelection, BuildBrief } from '@/shared/types';
 
 const PHASE_LABEL: Record<GenerateProgress['phase'], MessageKey> = {
   thinking: 'gen.phase.thinking',
@@ -80,9 +80,31 @@ interface BuildDetails {
   /** Explicit build size [W, D, H]. `null` = use the size derived from the params
    *  (so picking floors/basement/attic auto-sizes the box); set when the user edits. */
   size: { w: number; d: number; h: number } | null;
+  /** Interior room modules assigned per floor (index = floor, 0-based, bottom-up). Each
+   *  floor holds up to 2 room ids; '' marks an empty slot. Only meaningful for a storeyed
+   *  structure (one with a `floors` param). */
+  rooms: string[][];
 }
 
-const EMPTY_DETAILS: BuildDetails = { structureType: '', decoration: '', roof: '', basement: '', params: {}, size: null };
+const EMPTY_DETAILS: BuildDetails = { structureType: '', decoration: '', roof: '', basement: '', params: {}, size: null, rooms: [] };
+
+/** Max interior rooms a single floor can be assigned in the composer. */
+const ROOMS_PER_FLOOR = 2;
+
+/** The number of above-ground storeys the chosen structure + params describe (the
+ *  `floors` int param), or 0 when the structure has no such param (e.g. a tower) — i.e.
+ *  whether the per-floor room editor applies. */
+function floorCount(struct: GenerationModule | undefined, params: Record<string, string | number>): number {
+  const p = (struct?.params ?? []).find((x) => x.name === 'floors');
+  if (!p) return 0;
+  return Math.max(0, Number(params.floors ?? p.default));
+}
+
+/** The room ids assigned to floor `i` (always a 2-slot array, padded with ''). */
+function floorRooms(d: BuildDetails, i: number): string[] {
+  const row = d.rooms[i] ?? [];
+  return Array.from({ length: ROOMS_PER_FLOOR }, (_, s) => row[s] ?? '');
+}
 
 /** The full param set for the chosen structure: the user's picks merged over each
  *  param's default — so the brief always names every structural param explicitly,
@@ -144,23 +166,76 @@ function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): string 
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
     (roof ? `- Roof: a ${roof.label} roof (see its module guide).\n` : '') +
     (basement ? `- Basement: a ${basement.label} (see its module guide).\n` : '') +
+    buildRoomPlan(d, catalog) +
     `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`
   );
+}
+
+/** The per-floor interior program, in plain language for the model: one line per floor
+ *  that has rooms assigned (bottom-up), naming the room(s) for that storey. '' if the
+ *  structure isn't storeyed or no rooms were picked. Pairs with the room knowledge guides
+ *  the selection loads. */
+function buildRoomPlan(d: BuildDetails, catalog: GenerationCatalog | null): string {
+  const s = catalog?.structure.find((m) => m.id === d.structureType);
+  const n = floorCount(s, resolveDetailParams(d, s));
+  if (!n) return '';
+  const labelOf = (id: string) => catalog?.room.find((m) => m.id === id)?.label ?? id;
+  const lines: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const ids = floorRooms(d, i).filter(Boolean);
+    if (ids.length) lines.push(`  - Floor ${i + 1}: ${ids.map(labelOf).join(' + ')}`);
+  }
+  if (!lines.length) return '';
+  return (
+    `- Room plan — furnish each floor's interior with these rooms (see each room's module guide). ` +
+    `Up to two rooms share a floor; partition the storey so each is a real, separated space:\n` +
+    `${lines.join('\n')}\n`
+  );
+}
+
+/** A display-ready card summary of the picked details, shown in the chat in place of the
+ *  raw brief text. Uses human labels so the card renders with no catalog lookup. Returns
+ *  undefined when nothing was picked (then the chat just shows the user's words). */
+function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null): BuildBrief | undefined {
+  if (!d.structureType) return undefined;
+  const s = catalog?.structure.find((m) => m.id === d.structureType);
+  const lbl = (cat: keyof GenerationCatalog, id: string) =>
+    catalog?.[cat].find((m) => m.id === id)?.label ?? id;
+  const sz = effectiveSize(d, s);
+  const n = floorCount(s, resolveDetailParams(d, s));
+  const floors = Array.from({ length: n }, (_, i) => ({
+    name: `Floor ${i + 1}`,
+    rooms: floorRooms(d, i).filter(Boolean).map((id) => lbl('room', id)),
+  }));
+  return {
+    structure: s?.label ?? d.structureType,
+    decoration: d.decoration ? lbl('decoration', d.decoration) : undefined,
+    roof: d.roof ? lbl('roof', d.roof) : undefined,
+    basement: d.basement ? lbl('basement', d.basement) : undefined,
+    size: [sz.w, sz.h, sz.d],
+    floors: floors.length ? floors : undefined,
+  };
 }
 
 /** The structured selection sent alongside the prompt (drives knowledge loading: one
  *  guide per selected module, so an unused roof/basement guide is never sent). */
 function buildSelection(d: BuildDetails): BuildSelection {
+  const rooms = [...new Set(d.rooms.flat().filter(Boolean))];
   return {
     structureType: d.structureType || undefined,
     decoration: d.decoration || undefined,
     roof: d.roof || undefined,
     basement: d.basement || undefined,
+    rooms: rooms.length ? rooms : undefined,
   };
 }
 
 const hasDetails = (d: BuildDetails): boolean =>
-  d.structureType !== '' || d.decoration !== '' || d.roof !== '' || d.basement !== '';
+  d.structureType !== '' ||
+  d.decoration !== '' ||
+  d.roof !== '' ||
+  d.basement !== '' ||
+  d.rooms.some((r) => r.some(Boolean));
 
 /** Does a roof/basement module apply to the chosen structure? True when it declares no
  *  `appliesTo` (fits any structure) or its `appliesTo` includes the chosen structure id.
@@ -169,6 +244,47 @@ const hasDetails = (d: BuildDetails): boolean =>
 function moduleFits(m: GenerationModule, structureType: string): boolean {
   if (!m.appliesTo || m.appliesTo.length === 0) return true;
   return structureType !== '' && m.appliesTo.includes(structureType);
+}
+
+/** The presentable build card shown in a user message in place of the raw "[Build
+ *  details]" prompt text: the structure + its attributes as chips, and the per-floor
+ *  room plan as a small table — so the user can glance and confirm what they asked for. */
+function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => string }) {
+  const chips: { label: string; value: string }[] = [];
+  if (build.decoration) chips.push({ label: t('gen.fieldDecoration'), value: build.decoration });
+  if (build.roof) chips.push({ label: t('gen.fieldRoof'), value: build.roof });
+  if (build.basement) chips.push({ label: t('gen.fieldBasement'), value: build.basement });
+  if (build.size) chips.push({ label: t('gen.statSize'), value: build.size.join('×') });
+  return (
+    <div className="gen-build-card">
+      <div className="gen-build-card-head">
+        <span className="gen-build-card-icon" aria-hidden>🏠</span>
+        <span className="gen-build-card-title">{build.structure}</span>
+      </div>
+      {chips.length > 0 && (
+        <div className="gen-build-card-chips">
+          {chips.map((c) => (
+            <span key={c.label} className="gen-build-chip">
+              <span className="gen-build-chip-label">{c.label}</span>
+              <span className="gen-build-chip-value">{c.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      {build.floors && build.floors.some((f) => f.rooms.length > 0) && (
+        <ul className="gen-build-floors">
+          {build.floors.map((f, i) => (
+            <li key={i} className="gen-build-floor">
+              <span className="gen-build-floor-name">{f.name}</span>
+              <span className="gen-build-floor-rooms">
+                {f.rooms.length ? f.rooms.join(' · ') : t('gen.roomEmpty')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** The generate chat body. Rendered inside the dock/floating chrome (which
@@ -306,23 +422,26 @@ export function GenerateContent() {
     const ds = documentsStore.getState();
     const docId = ds.activeId ?? ds.newDoc();
     if (ds.documents.find((d) => d.id === docId)?.busy) return;
-    // Fold the chosen modules into the prompt as a structured brief, and send the
-    // selection separately so the system prompt loads only those modules' guides.
-    // They steer a fresh build, so clear them after sending (follow-up edits
-    // shouldn't keep re-sending stale hints).
-    const composed = prompt ? prompt + brief : brief ? `Generate a structure with these details:${brief}` : prompt;
+    // The model gets the user's words + the plain-language brief; the chat shows only
+    // the user's words plus a presentable build card (buildSummary), so the long brief
+    // never prints as a wall of text. Send the selection separately so the system prompt
+    // loads only the picked modules' guides. The brief steers a FRESH build, so clear it
+    // after sending (follow-up edits shouldn't keep re-sending stale hints).
+    const aiPrompt = prompt ? prompt + brief : brief ? `Generate a structure with these details:${brief}` : prompt;
     const selection = buildSelection(details);
+    const summary = buildSummary(details, catalog);
     setInput('');
     setAttachments([]);
     setDetails(EMPTY_DETAILS);
     setShowDetails(false);
     setShowFloors(false);
-    await runGeneration(
-      docId,
-      composed,
-      staged.map((a) => a.dataUrl),
+    await runGeneration(docId, {
+      aiPrompt,
+      userText: prompt,
+      build: summary,
+      imageUrls: staged.map((a) => a.dataUrl),
       selection,
-    );
+    });
   }, [input, attachments, details, catalog]);
 
   const cancel = useCallback(() => {
@@ -346,11 +465,26 @@ export function GenerateContent() {
       // cellar auto-grows the box, mirroring the old basement param.
       setDetails((d) =>
         key === 'structureType'
-          ? { ...d, structureType: value, params: {}, size: null, roof: '', basement: '' }
+          ? { ...d, structureType: value, params: {}, size: null, roof: '', basement: '', rooms: [] }
           : key === 'basement'
             ? { ...d, basement: value, size: null }
             : { ...d, [key]: value },
       ),
+    [],
+  );
+
+  // Assign (or clear, with '') a room to a floor's slot. Grows the per-floor rooms
+  // array as needed and keeps each row at two slots.
+  const setRoom = useCallback(
+    (floor: number, slot: number, value: string) =>
+      setDetails((d) => {
+        const rooms = d.rooms.map((r) => [...r]);
+        while (rooms.length <= floor) rooms.push([]);
+        const row = rooms[floor];
+        while (row.length < ROOMS_PER_FLOOR) row.push('');
+        row[slot] = value;
+        return { ...d, rooms };
+      }),
     [],
   );
 
@@ -378,6 +512,10 @@ export function GenerateContent() {
   // A structure module is OPTIONAL — a build can come from a free-form prompt alone.
   // The selected structure (if any) drives the param controls + an adaptable scaffold.
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
+  // Per-floor room editor: shown for a storeyed structure (one with a `floors` param —
+  // the house). Each floor takes up to two interior room modules that fit the structure.
+  const nFloors = floorCount(selStruct, details.params);
+  const roomOptions = (catalog?.room ?? []).filter((m) => moduleFits(m, details.structureType));
   const canSend =
     available !== false &&
     (!!input.trim() || attachments.length > 0 || !!details.structureType);
@@ -494,6 +632,7 @@ export function GenerateContent() {
               </div>
             )}
             {m.text && <div className="gen-msg-text">{m.text}</div>}
+            {m.build && <BuildCard build={m.build} t={t} />}
           </div>
         ))}
         {busy && (
@@ -650,6 +789,39 @@ export function GenerateContent() {
                     </label>
                   );
                 })}
+              </div>
+            )}
+            {nFloors > 0 && roomOptions.length > 0 && (
+              <div className="gen-rooms">
+                <div className="gen-rooms-head">
+                  <span>{t('gen.roomsTitle')}</span>
+                  <span className="gen-rooms-hint">{t('gen.roomsHint')}</span>
+                </div>
+                {Array.from({ length: nFloors }, (_, i) => (
+                  <div key={i} className="gen-room-row">
+                    <span className="gen-room-floor-label">
+                      {t('gen.roomFloor')} {i + 1}
+                    </span>
+                    <div className="gen-room-selects">
+                      {Array.from({ length: ROOMS_PER_FLOOR }, (_, slot) => (
+                        <select
+                          key={slot}
+                          className="gen-room-select"
+                          value={floorRooms(details, i)[slot]}
+                          disabled={busy}
+                          onChange={(e) => setRoom(i, slot, e.target.value)}
+                        >
+                          <option value="">{t('gen.optNoRoom')}</option>
+                          {roomOptions.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

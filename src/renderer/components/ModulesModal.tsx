@@ -19,6 +19,7 @@ const CATEGORIES: { value: ModuleCategory; label: MessageKey }[] = [
   { value: 'decoration', label: 'modules.catDecoration' },
   { value: 'basement', label: 'modules.catBasement' },
   { value: 'roof', label: 'modules.catRoof' },
+  { value: 'room', label: 'modules.catRoom' },
 ];
 
 export function ModulesModal() {

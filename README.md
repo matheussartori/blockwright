@@ -43,10 +43,11 @@ refines through an emit → render → review loop — previewed live in the vie
 - AI structure generation from a prompt or reference image, through an emit → render → review loop
   that refines the build live — with multiple provider backends to choose from (Claude
   subscription / API, OpenAI, Gemini, Codex), configured in Settings
-- Composable generation domain — pick a structure type, decoration, roof and basement module in the
-  Details composer (browse them with live 3D previews in the Module Gallery); the selection guides
-  the build and loads only the relevant knowledge, and registered structure × decoration modules also
-  cross at compile time behind the `template` op
+- Composable generation domain — pick a structure type, decoration, roof, basement and per-floor
+  interior rooms (living room, kitchen, library, bedroom, shared bedrooms, storage) in the Details
+  composer (browse them with live 3D previews in the Module Gallery); the selection guides the build
+  and loads only the relevant knowledge, and registered structure × decoration modules also cross at
+  compile time behind the `template` op
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - Namespace-aware asset resolution from an extracted Minecraft content pack
@@ -81,8 +82,11 @@ screen.
 **File ▸ New Structure** opens a chat where you describe a build (optionally attaching a reference
 image). Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer,
 iterating through a visual review loop. The optional **⚙ Details** composer lets you pick a structure
-type, decoration, roof and basement to steer the build (browse them in the **Module Gallery**), and
-**▦ Floors** lets you sketch the vertical levels. Pick an AI provider and model in **Settings ▸ AI** first.
+type, decoration, roof and basement to steer the build — and, for a multi-storey house, assign up to
+two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_).
+Your picks are shown back as a tidy build card in the chat. Browse every module with live 3D previews
+in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI provider and
+model in **Settings ▸ AI** first.
 
 ## Mod Workspaces
 

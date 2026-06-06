@@ -57,7 +57,8 @@ src/
       domain/              Composable generation: MODULES by CATEGORY (structure × decoration
                            crossed by the `template` op in the authoring compiler — the model emits
                            one op, the code produces the geometry — plus roof/basement modules that
-                           are selectable guidance but not yet geometry-wired). See "Composable
+                           are selectable guidance but not yet geometry-wired, and guidance-only
+                           interior `room` modules assigned per floor). See "Composable
                            generation domain" below.
         modules.ts         ModuleCategory + ModuleMeta (id/label/category/description/knowledge/
                            keywords/preview) shared by every module, across categories.
@@ -74,16 +75,22 @@ src/
                            contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
                            maps roles→blocks + decay + weathering.
         basements/ roofs/  Categories "basement"/"roof": one file per typology (roof: gable/hip;
-                           basement: full/half/modular) + types.ts + index.ts (registry). SELECTABLE
-                           in the composer Details (filtered by the chosen structure's `appliesTo`) +
-                           listed in the gallery. Each carries GENERIC geometry (`build()`, any host)
-                           + optional HOST-SPECIFIC extras (`integrations[host]`, e.g. house-only
-                           gable vents), run by `composeModule`/`composeModulePreview` — roofs render
-                           live in the gallery; a pick also rides into the prompt as guidance + loads
-                           only its knowledge guide. NOT yet wired into a structure type's own build
-                           (the house still emits its own roof; module delegation is the next step).
-                           Each declares `appliesTo` (the structures it pairs with, e.g. ['house']) —
-                           a growing link that drives the Details filtering + guide gating.
+                           basement: cellar/crypt/cult-temple) + types.ts + index.ts (registry).
+                           SELECTABLE in the composer Details (filtered by the chosen structure's
+                           `appliesTo`) + listed in the gallery. Each carries GENERIC geometry
+                           (`build()`, any host) + optional HOST-SPECIFIC extras (`integrations[host]`,
+                           e.g. house-only gable vents), run by `composeModule`/`composeModulePreview`
+                           — roofs + basements render live in the gallery; a pick also rides into the
+                           prompt as guidance + loads only its knowledge guide. NOT yet wired into a
+                           structure type's own build (the house still emits its own roof; module
+                           delegation is the next step). Each declares `appliesTo` (the structures it
+                           pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
+        rooms/             Category "room": one file per interior program (living/kitchen/library/
+                           bedroom/dormitory/storage) + types.ts (RoomModule = ModuleMeta, no geometry)
+                           + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`: the user
+                           assigns up to two rooms per floor in the composer Details (house), each
+                           loads only its knowledge guide and rides into the prompt as a `[Room plan]`
+                           line per floor; the AI furnishes the interior. `appliesTo` = ['house','tower'].
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -271,8 +278,8 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 ### Composable generation domain
 
 `structure/domain/` is the data-driven model behind the authoring `template` op. Everything
-is a **module** in one of four **categories** (`structure`, `decoration`, `basement`, `roof`
-— `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
+is a **module** in one of five **categories** (`structure`, `decoration`, `basement`, `roof`,
+`room` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
 knowledge/keywords/preview). The two live growth axes — **structure types** × **decorations**
 — combine without N×M code. A **StructureType** (`house`, `tower`) owns only the *massing*
 (shell, openings, structural detail) and emits ops in terms of **semantic roles** (`wall`,
@@ -302,14 +309,14 @@ decoration, and a new module is one small file.
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
   (the structure ids it pairs with — a growing link; omit = applies to all).
-- **basement/roof modules carry geometry + knowledge** (`basements/`: full/half/modular;
+- **basement/roof modules carry geometry + knowledge** (`basements/`: cellar/crypt/cult-temple;
   `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge` + optional
-  `build`/`params`/`defaults`/`integrations`), surfaced in the composer Details + the gallery. A
-  module's logic has two layers: a GENERIC `build()` (runs on any host) and HOST-SPECIFIC
+  `build`/`params`/`defaults`/`integrations`/`preview`), surfaced in the composer Details + the gallery.
+  A module's logic has two layers: a GENERIC `build()` (runs on any host) and HOST-SPECIFIC
   `integrations[host]` (extra ops layered on only for that structure — e.g. `gable.integrations.house`
   adds gable-end vents). Both run through **`composeModule`** (and **`composeModulePreview`**, which
   gives a roof a host wall box) — the same palette/param machinery as a structure type, via the
-  refactored `makePalette(defaults, …)`. This powers the **gallery 3D preview** for roofs today.
+  refactored `makePalette(defaults, …)`. This powers the **gallery 3D preview** for roofs + basements.
   A selection ALSO rides into the prompt as a plain-language `[Build details]` line and loads ONLY
   its knowledge guide (no `keywords`, so an unused roof/basement guide never bloats the prompt), gated
   by `appliesTo` (`selectedGuides` skips a roof guide that doesn't fit the chosen structure). **Not
@@ -319,6 +326,15 @@ decoration, and a new module is one small file.
   path, marked `module:'roof'|'basement'` in `ParamDef` so `paramFields` hides them from the house's
   own Details controls (no duplicate). **Add a roof/basement:** new file + register in its `index.ts`;
   give it `appliesTo` + optional `build()`/`integrations` + a `knowledge/nbt/modules/{roof,basement}/<id>.md`.
+- **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: living/kitchen/library/bedroom/dormitory/
+  storage): each is a `RoomModule` (just `ModuleMeta` — no `build`/`params`/`preview`). The user assigns
+  up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e. the house's
+  `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each loads ONLY
+  its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]` line per
+  floor (`buildRoomPlan` in `NewStructurePanel`). The AI furnishes each storey from those guides
+  (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
+  (the gallery lists them with their description + `appliesTo`). **Add a room:** new file in `rooms/` +
+  register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide. `appliesTo` = ['house','tower'].
 - **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
   `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
   (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→
@@ -425,21 +441,29 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   own palette, so those names never reach `palette`).
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with four
   registry-backed selects — **Structure** (house/tower), **Decoration** (cozy), **Roof** (gable/hip)
-  and **Basement** (full/half/modular). The picks are folded into the prompt as a plain-language
-  "[Build details]" brief (NOT a `template` op — see "House template retired"; cleared after sending),
-  AND ride along as a structured `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`) so
-  the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
-  `aiGenerate → generateStructure → systemPrompt → loadKnowledge`). Roof/Basement are enabled once a
-  structure is chosen and are FILTERED by the chosen structure's `appliesTo` (a roof that doesn't fit
-  is hidden; switching structure clears an incompatible pick) — the renderer's `moduleFits` mirrors the
-  domain's `moduleAppliesTo`. The selects are registry-backed: the composer fetches the
-  categorized module catalog once via the `generationCatalog` IPC channel (`listModuleCatalog` from
-  `structure/domain`), so they grow as the registries do. A "Modules" button (+ a link in Details)
-  opens the **Module Gallery** (`ModulesModal`): categories (Structure/Decoration/Basement/Roof) with
-  a description, the `appliesTo` link ("Applies to: House"), and a live 3D preview per module
-  (`previewModule` IPC → `catalog/module-preview.ts`) — roofs render their geometry on a host wall box
-  (`composeModulePreview`); basements have geometry too but no `preview` spec yet, so they show
-  "Preview coming soon".
+  and **Basement** (cellar/crypt/cult-temple) — plus, for a storeyed structure (the house's `floors`
+  param), a **per-floor room editor**: one row per floor with up to **two** room selects (living/
+  kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks are folded into the
+  prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per floor
+  (`buildRoomPlan`) — (NOT a `template` op — see "House template retired"; cleared after sending), AND
+  ride along as a structured `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`rooms`,
+  the rooms deduped across floors) so the system prompt loads only those modules' knowledge guides —
+  one guide per pick (threaded `aiGenerate → generateStructure → systemPrompt → loadKnowledge`).
+  Roof/Basement are enabled once a structure is chosen and are FILTERED by the chosen structure's
+  `appliesTo` (a roof that doesn't fit is hidden; switching structure clears an incompatible pick +
+  the room rows) — the renderer's `moduleFits` mirrors the domain's `moduleAppliesTo`. The selects are
+  registry-backed: the composer fetches the categorized module catalog once via the `generationCatalog`
+  IPC channel (`listModuleCatalog` from `structure/domain`), so they grow as the registries do. A
+  "Modules" button (+ a link in Details) opens the **Module Gallery** (`ModulesModal`): categories
+  (Structure/Decoration/Basement/Roof/Room) with a description, the `appliesTo` link ("Applies to:
+  House"), and a live 3D preview per module (`previewModule` IPC → `catalog/module-preview.ts`) — roofs
+  + basements render their geometry (`composeModulePreview` gives a roof a host wall box); `room` modules
+  are guidance-only (no geometry) so they show "Preview coming soon".
+- **Chat output is a build card, not raw brief text:** the long "[Build details]" block goes ONLY to
+  the model — the chat instead shows the user's words plus a presentable `BuildCard` (`ChatMessage.build`:
+  a `BuildBrief` of human LABELS — structure, decoration/roof/basement chips, size, and the per-floor
+  room table). `runGeneration` takes a `GenerationInput` that keeps `aiPrompt` (model) separate from
+  `userText` + `build` (chat), so a details-only build (empty prompt) still renders as a clean card.
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

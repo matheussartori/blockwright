@@ -1,4 +1,4 @@
-// "basement" — a sunken cellar carved to a varied footprint (rect/L/T/U/plus,
+// "cellar" — a sunken cellar carved to a varied footprint (rect/L/T/U/plus,
 // seeded, so it isn't always a square box): a SEALED stone shell with a distinct
 // floor/ceiling and a grid of lit support pillars. No built-in vertical access —
 // the ceiling stays solid so terrain can't reveal the interior; the circulation
@@ -10,16 +10,17 @@ import { mulberry32 } from '../rng';
 import { logProps } from '../structure-types/types';
 import type { BasementModule } from './types';
 
-export const basement: BasementModule = {
-  id: 'basement',
-  label: 'Modular basement',
+export const cellar: BasementModule = {
+  id: 'cellar',
+  label: 'Cellar',
   category: 'basement',
   description:
-    'A sunken stone undercroft on a varied footprint (rect/L/T/U/plus): a sealed shell with ' +
-    'a grid of lit support pillars. Designed to grow into a large multi-room complex beneath a ' +
-    'host structure. Scaffolded for an upcoming pass — not yet buildable from the composer.',
-  knowledge: 'nbt/modules/basement/modular.md',
-  appliesTo: ['house'],
+    'A sunken stone cellar on a varied footprint (rect/L/T/U/plus): a sealed shell with a ' +
+    'distinct floor and ceiling and a grid of lit support pillars. A versatile undercroft for ' +
+    'storage, a workshop, or the start of a larger complex beneath the building.',
+  knowledge: 'nbt/modules/basement/cellar.md',
+  appliesTo: ['house', 'tower'],
+  preview: { size: [11, 6, 11] },
   params: {
     decay: { kind: 'unit', default: 0.25 },
     shape: { kind: 'enum', default: 'auto', values: ['rect', 'l', 't', 'u', 'plus', 'auto'] },

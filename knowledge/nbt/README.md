@@ -81,9 +81,15 @@ never speculatively. Categories:
 | [`modules/decoration/cozy.md`](modules/decoration/cozy.md) | decoration | The `cozy` look: warm palette, lighting, soft furnishings, hearth, plants. |
 | [`modules/roof/gable.md`](modules/roof/gable.md) | roof | The `gable` roof: two slopes + a triangular gable end, ridge axis, overhang/fascia, attic void. |
 | [`modules/roof/hip.md`](modules/roof/hip.md) | roof | The `hip` roof: four sloped sides, wrap-around eave, dormers for light, no gable ends. |
-| [`modules/basement/full.md`](modules/basement/full.md) | basement | The `full` cellar: fully buried storey, barred vents (no glass into dirt), interior light. |
-| [`modules/basement/half.md`](modules/basement/half.md) | basement | The `half-buried` basement: semi-sunk with a clerestory window band for daylight. |
-| [`modules/basement/modular.md`](modules/basement/modular.md) | basement | The `modular` undercroft: large multi-room cellar direction (geometry not yet wired). |
+| [`modules/basement/cellar.md`](modules/basement/cellar.md) | basement | The `cellar` undercroft: sealed stone shell + lit pillars; furnish as storage/workshop/wine cellar. |
+| [`modules/basement/crypt.md`](modules/basement/crypt.md) | basement | The `crypt` burial vault: processional aisle, catacomb columns, bone niches, soul-lit. |
+| [`modules/basement/cult-temple.md`](modules/basement/cult-temple.md) | basement | The `cult-temple` sunken sanctum: altar focus, ritual circle, dark ceremonial dressing. |
+| [`modules/room/living.md`](modules/room/living.md) | room | The `living` room: hearth focal point, seating cluster, rug, dressing, warm light. |
+| [`modules/room/kitchen.md`](modules/room/kitchen.md) | room | The `kitchen`: counter run, cooktop/oven, sink, storage, a small dining nook. |
+| [`modules/room/library.md`](modules/room/library.md) | room | The `library`: book-lined walls, central study table, reading chair, chandelier. |
+| [`modules/room/bedroom.md`](modules/room/bedroom.md) | room | The `bedroom`: one made bed, nightstands, wardrobe, rug, curtained window. |
+| [`modules/room/dormitory.md`](modules/room/dormitory.md) | room | The `dormitory` (shared bedrooms): rows of beds with partitions, shared wardrobe, windows. |
+| [`modules/room/storage.md`](modules/room/storage.md) | room | The `storage` room: walls of barrels/chests, shelving, sacks/crates, one working lantern. |
 
 > Picking a roof/basement briefs the model in plain language and loads its guide. The modules
 > also carry their own code geometry (a generic `build()` + optional host-specific extras), used
@@ -92,6 +98,11 @@ never speculatively. Categories:
 > declares `appliesTo` (the structures it pairs with, `['house']` for now) — a growing link that
 > filters the picker and gates which guide loads, and lets a roof/basement be reused on future
 > structure types.
+
+> **Room** modules are *guidance-only* (no code geometry). The user assigns up to two rooms to
+> each floor of a storeyed structure (the house); each assigned room loads its guide and rides into
+> the prompt as a `[Room plan]` line per floor. You furnish each storey's interior yourself from
+> those guides, partitioning a floor that holds two rooms into real, separated spaces.
 
 ## Hard rules (read before generating)
 

@@ -8,6 +8,7 @@ import { composeModulePreview } from './compose';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
 import { basementModules, getBasement, listBasements } from './basements';
 import { getRoof, listRoofs, roofModules } from './roofs';
+import { getRoom, listRooms, roomModules } from './rooms';
 import type { ModuleCategory, ModuleMeta, ModuleSummary } from './modules';
 import {
   getStructureType,
@@ -45,6 +46,7 @@ export {
 } from './decorations';
 export { listBasements, getBasement, type BasementModule } from './basements';
 export { listRoofs, getRoof, type RoofModule } from './roofs';
+export { listRooms, getRoom, type RoomModule } from './rooms';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
 export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpec } from './modules';
@@ -59,6 +61,7 @@ export interface ModuleCatalog {
   decoration: ModuleSummary[];
   basement: ModuleSummary[];
   roof: ModuleSummary[];
+  room: ModuleSummary[];
 }
 
 /** List every module summary, grouped by category. */
@@ -68,12 +71,19 @@ export function listModuleCatalog(): ModuleCatalog {
     decoration: listDecorations(),
     basement: listBasements(),
     roof: listRoofs(),
+    room: listRooms(),
   };
 }
 
 /** Every module across categories (for selection→guide mapping + lookups). */
 function allModules(): ModuleMeta[] {
-  return [...structureModules(), ...decorationModules(), ...roofModules(), ...basementModules()];
+  return [
+    ...structureModules(),
+    ...decorationModules(),
+    ...roofModules(),
+    ...basementModules(),
+    ...roomModules(),
+  ];
 }
 
 /** Which modules the user picked in the composer Details: a structure type, a
@@ -85,6 +95,9 @@ export interface ModuleSelection {
   decoration?: string;
   roof?: string;
   basement?: string;
+  /** Interior room module ids assigned across the floors (deduped). Each loads its own
+   *  guide; the per-floor layout is conveyed to the model as prompt text, not here. */
+  rooms?: string[];
 }
 
 /** Does a module apply to a given host structure? True when it has no `appliesTo`
@@ -110,6 +123,12 @@ export function selectedGuides(sel: ModuleSelection): string[] {
   if (moduleAppliesTo(roof?.appliesTo, sel.structureType)) add(roof);
   const basement = sel.basement ? getBasement(sel.basement) : undefined;
   if (moduleAppliesTo(basement?.appliesTo, sel.structureType)) add(basement);
+  // One guide per selected room (deduped already), gated by appliesTo so a room that
+  // doesn't fit the chosen structure doesn't drag its guide in.
+  for (const id of sel.rooms ?? []) {
+    const room = getRoom(id);
+    if (moduleAppliesTo(room?.appliesTo, sel.structureType)) add(room);
+  }
   return out;
 }
 

@@ -44,12 +44,19 @@ describe('includedModuleGuides — explicit selection', () => {
   });
 
   it('loads a selected roof/basement guide, and ONLY the selected one', () => {
-    const set = includedModuleGuides('', { structureType: 'house', roof: 'gable', basement: 'full' });
+    const set = includedModuleGuides('', { structureType: 'house', roof: 'gable', basement: 'cellar' });
     expect(set).toContain('nbt/modules/roof/gable.md');
-    expect(set).toContain('nbt/modules/basement/full.md');
+    expect(set).toContain('nbt/modules/basement/cellar.md');
     // The roof/basement the user did NOT pick must not ride along.
     expect(set).not.toContain('nbt/modules/roof/hip.md');
-    expect(set).not.toContain('nbt/modules/basement/half.md');
+    expect(set).not.toContain('nbt/modules/basement/crypt.md');
+  });
+
+  it('loads a guide for each selected interior room, and only those', () => {
+    const set = includedModuleGuides('', { structureType: 'house', rooms: ['living', 'kitchen'] });
+    expect(set).toContain('nbt/modules/room/living.md');
+    expect(set).toContain('nbt/modules/room/kitchen.md');
+    expect(set).not.toContain('nbt/modules/room/library.md');
   });
 
   it('does not pull any roof/basement guide for a plain prompt with no selection', () => {

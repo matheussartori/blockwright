@@ -2943,6 +2943,143 @@ body.row-resizing {
   gap: 4px;
 }
 
+/* Per-floor interior room assignment (house) — sits inside .gen-details. */
+.gen-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.gen-rooms-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gen-rooms-head > span:first-child {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+.gen-rooms-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.gen-room-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gen-room-floor-label {
+  flex: 0 0 64px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.gen-room-selects {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+.gen-room-select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.gen-room-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.gen-room-select:disabled {
+  opacity: 0.5;
+}
+
+/* The presentable build-details card shown in a user chat message. */
+.gen-build-card {
+  margin-top: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gen-build-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.gen-build-card-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.gen-build-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.gen-build-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.gen-build-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.gen-build-chip-label {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.gen-build-chip-value {
+  color: var(--text);
+  font-weight: 600;
+}
+.gen-build-floors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.gen-build-floor {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+.gen-build-floor-name {
+  flex: 0 0 58px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+}
+.gen-build-floor-rooms {
+  color: var(--text);
+}
+
 /* Floor-plan editor above the textarea (mirrors .gen-details). */
 .gen-floors {
   -webkit-app-region: no-drag;

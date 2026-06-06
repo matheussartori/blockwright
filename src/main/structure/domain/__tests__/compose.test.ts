@@ -82,7 +82,7 @@ describe('compose: structure types × decorations', () => {
   it('roof + basement are their own module categories, linked to the house via appliesTo', () => {
     const cat = listModuleCatalog();
     expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip']));
-    expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['full', 'half', 'basement']));
+    expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['cellar', 'crypt', 'cult-temple']));
     // Every roof/basement module declares the structures it pairs with (house for now).
     for (const m of [...cat.roof, ...cat.basement]) {
       expect(m.appliesTo).toContain('house');
@@ -120,11 +120,12 @@ describe('composeModule: roof/basement module geometry runs through the compose 
     expect(onTower.length).toBe(generic.length);
   });
 
-  it('runs a basement module build() (sealed room: floor, ceiling, walls, light)', () => {
-    const ops = composeModule('basement', 'full', from, to, { decoration: 'cozy' }, stubIntern());
-    expect(ops.filter((o) => o.op === 'fill').length).toBeGreaterThanOrEqual(2); // floor + ceiling
-    expect(ops.some((o) => o.op === 'walls')).toBe(true);
-    expect(ops.some((o) => o.op === 'block')).toBe(true); // the light
+  it('runs a basement module build() (sealed cellar: floor/ceiling, walls, pillars, light)', () => {
+    const ops = composeModule('basement', 'cellar', from, to, { decoration: 'cozy' }, stubIntern());
+    // The cellar lays floor/ceiling per column as `block` and the walls + pillars as
+    // per-column `fill` runs, capping pillars with a `block` light.
+    expect(ops.filter((o) => o.op === 'fill').length).toBeGreaterThanOrEqual(2); // walls + pillars
+    expect(ops.some((o) => o.op === 'block')).toBe(true); // floor/ceiling + light
   });
 
   it('throws on an unknown module id', () => {
@@ -137,14 +138,19 @@ describe('composeModule: roof/basement module geometry runs through the compose 
     expect(ops.some((o) => o.op === 'roof')).toBe(true);
   });
 
-  it('buildModulePreview returns a compilable structure for a roof, null for a preview-less basement', () => {
+  it('buildModulePreview returns a compilable structure for a roof and a basement', () => {
     const roof = buildModulePreview('roof', 'gable');
     expect(roof).not.toBeNull();
     expect(roof!.palette!.length).toBeGreaterThan(0);
     expect(roof!.ops!.some((o) => o.op === 'roof')).toBe(true);
     expect(() => compileStructure(roof!)).not.toThrow(); // the pre-expanded ops + palette compile
-    // Basements ship no preview spec yet → no gallery preview.
-    expect(buildModulePreview('basement', 'full')).toBeNull();
+    // The cellar ships a preview spec → a gallery preview that compiles.
+    const cellar = buildModulePreview('basement', 'cellar');
+    expect(cellar).not.toBeNull();
+    expect(cellar!.ops!.length).toBeGreaterThan(0);
+    expect(() => compileStructure(cellar!)).not.toThrow();
+    // Rooms are guidance-only → no gallery preview.
+    expect(buildModulePreview('room', 'living')).toBeNull();
   });
 });
 

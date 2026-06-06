@@ -5,8 +5,8 @@
 // of its category-specific behaviour contract. This is what lets one UI list them,
 // one knowledge loader pull only the selected guides, and one gallery preview them.
 
-/** The four module categories. Selected at creation; surfaced in the gallery. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof';
+/** The module categories. Selected at creation; surfaced in the gallery. */
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'room';
 
 /** How to build a representative structure for the gallery's 3D preview. The IPC
  *  layer composes this (via a `template` op) and compiles it to a real `.nbt`. */

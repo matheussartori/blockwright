@@ -54,8 +54,8 @@ export interface CatalogBlock {
   texture: string | null;
 }
 
-/** The four generation module categories. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof';
+/** The generation module categories. */
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'room';
 
 /** A structure type's tunable param, projected for the composer's Details controls. */
 export type ModuleParam =
@@ -85,4 +85,6 @@ export interface GenerationCatalog {
   decoration: GenerationModule[];
   basement: GenerationModule[];
   roof: GenerationModule[];
+  /** Interior room modules (living/kitchen/library/…) assigned per floor. */
+  room: GenerationModule[];
 }

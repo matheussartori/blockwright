@@ -1,25 +1,20 @@
 // Basement registry (category "basement"). Each basement typology is one module file
-// (full, half, modular …). They are METADATA-ONLY for now: no `build()` geometry is
-// wired into `composeStructure` — a selected basement rides into generation as
-// plain-language guidance + its own knowledge guide (loaded ONLY when selected, so an
-// unused basement guide never bloats the prompt) and is documented in the gallery.
-// Each basement links to the structures it fits via `appliesTo` (a growing list —
-// start with `['house']`, add more later). The "modular" seed keeps a `build()` for
-// the upcoming geometry pass; full/half are guidance-only.
+// (cellar, crypt, cult-temple). They carry their own `build()` geometry (run via
+// `composeModule`/`composeModulePreview`) AND a knowledge guide loaded ONLY when the
+// basement is selected (so an unused basement guide never bloats the prompt). Each
+// links to the structures it fits via `appliesTo` (a growing list — start with
+// `['house','tower']`). Add a basement: new file + register below + a guide under
+// `knowledge/nbt/modules/basement/<id>.md`.
 import { toSummary, type ModuleSummary } from '../modules';
-import { basement } from './basement';
+import { cellar } from './cellar';
 import { crypt } from './crypt';
 import { cultTemple } from './cult-temple';
-import { full } from './full';
-import { half } from './half';
 import type { BasementModule } from './types';
 
 export type { BasementModule } from './types';
 
 const BASEMENTS: Record<string, BasementModule> = {
-  [full.id]: full,
-  [half.id]: half,
-  [basement.id]: basement,
+  [cellar.id]: cellar,
   [crypt.id]: crypt,
   [cultTemple.id]: cultTemple,
 };

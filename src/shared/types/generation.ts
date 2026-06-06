@@ -18,6 +18,24 @@ export interface BuildSelection {
   decoration?: string;
   roof?: string;
   basement?: string;
+  /** Interior room module ids assigned across floors (deduped) — each loads its own
+   *  knowledge guide. The per-floor layout itself rides in the prompt text. */
+  rooms?: string[];
+}
+
+/** A display-ready summary of the build details the user picked in the composer, shown
+ *  as a card in the chat in place of the raw "[Build details]" prompt text (which still
+ *  goes to the model). All fields are human LABELS, so the card renders without any
+ *  catalog lookup. Attached to the user's chat message (`ChatMessage.build`). */
+export interface BuildBrief {
+  structure: string;
+  decoration?: string;
+  roof?: string;
+  basement?: string;
+  /** Build box as [W, H, D]. */
+  size?: [number, number, number];
+  /** Per-floor room assignment (bottom-up): each floor's label + its room labels (0–2). */
+  floors?: { name: string; rooms: string[] }[];
 }
 
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
@@ -59,6 +77,9 @@ export interface ChatMessage {
   error?: boolean;
   /** Reference image data URLs shown as thumbnails (user messages only). */
   images?: string[];
+  /** Structured build details the user picked (user messages only), rendered as a
+   *  presentable card in the chat instead of the raw "[Build details]" prompt text. */
+  build?: BuildBrief;
   /** Footer stats shown under an assistant message. Present on every completed
    *  turn — success, cancel, or error — so the run's time/token cost is never
    *  hidden. Build fields (version/size/blockCount) only exist on a successful emit. */
