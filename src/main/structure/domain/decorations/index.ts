@@ -3,12 +3,14 @@
 // `template` op (no decoration param) builds a warm, intact look.
 import { toSummary, type ModuleSummary } from '../modules';
 import { cozy } from './cozy';
+import { haunted } from './haunted';
 import type { Decoration } from './types';
 
 export type { Decoration, DecorationTheme } from './types';
 
 const DECORATIONS: Record<string, Decoration> = {
   [cozy.id]: cozy,
+  [haunted.id]: haunted,
 };
 
 /** The decoration used when a `template` op doesn't name one. */

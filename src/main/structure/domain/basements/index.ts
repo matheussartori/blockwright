@@ -8,6 +8,8 @@
 // the upcoming geometry pass; full/half are guidance-only.
 import { toSummary, type ModuleSummary } from '../modules';
 import { basement } from './basement';
+import { crypt } from './crypt';
+import { cultTemple } from './cult-temple';
 import { full } from './full';
 import { half } from './half';
 import type { BasementModule } from './types';
@@ -18,6 +20,8 @@ const BASEMENTS: Record<string, BasementModule> = {
   [full.id]: full,
   [half.id]: half,
   [basement.id]: basement,
+  [crypt.id]: crypt,
+  [cultTemple.id]: cultTemple,
 };
 
 /** Look up a basement module by id (undefined if unknown). */
