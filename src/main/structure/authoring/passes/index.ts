@@ -2,19 +2,16 @@
 // list, threading the (possibly growing) palette through and accumulating the
 // fixes/warnings each pass reports.
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
-import { carveStairwells } from './carve-stairwells';
 import { fixChimney } from './chimney';
 import { connectBlocks } from './connect-blocks';
 import { fillInteriorAir } from './fill-air';
 import { fixCirculation } from './fix-circulation';
 import { fixDoors } from './fix-doors';
 import { fixPlacement } from './placement';
-import { insetStairs } from './stairs';
-import { stairsToLadder } from './stairs-to-ladder';
+import { rebuildStairwells } from './stairwells';
 import type { Pass, PassContext, PassResult } from './types';
 
 export type { Pass, PassContext, PassResult } from './types';
-export { carveStairwells } from './carve-stairwells';
 export { fixChimney } from './chimney';
 export { connectBlocks, connFamily } from './connect-blocks';
 export { computeEnvelope } from './envelope';
@@ -22,16 +19,13 @@ export { fillInteriorAir } from './fill-air';
 export { fixCirculation } from './fix-circulation';
 export { fixDoors } from './fix-doors';
 export { fixPlacement } from './placement';
-export { insetStairs } from './stairs';
-export { stairsToLadder } from './stairs-to-ladder';
+export { rebuildStairwells } from './stairwells';
 
 /** Plain-language intent for each pass, used by the AI Console play-by-play so the
  *  code-side fine-tuning reads as "what is being repaired right now". Keyed by the
  *  pass reference (robust to bundler renaming, unlike `fn.name`). */
 const PASS_LABELS = new Map<Pass, string>([
-  [insetStairs, 'Inset stairs: nudging a flight pressed against the shell into the open interior'],
-  [stairsToLadder, 'Ladder fallback: turning a flight that can\'t fit with clearance into a flush wall ladder'],
-  [carveStairwells, 'Stairwells: opening headroom above each flight and clearing the bottom landing'],
+  [rebuildStairwells, 'Stairwells: rebuilding each interior staircase/ladder as a clean, climbable run'],
   [fixDoors, 'Doors: mirroring hinges and aligning the two door halves'],
   [connectBlocks, 'Connections: deriving fence/pane/wall/bar sides from their neighbours'],
   [fixPlacement, 'Placement: repairing blocks sitting on an invalid support'],

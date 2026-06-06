@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carveStairwells, computeEnvelope, connectBlocks, fillInteriorAir, fixDoors } from '../passes';
+import { computeEnvelope, connectBlocks, fillInteriorAir, fixDoors } from '../passes';
 import { findFlights, topCeilingY } from '../passes/flights';
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
 
@@ -17,9 +17,6 @@ function sealed(W: number, H: number, D: number, stoneIdx: number): AuthoringBlo
   }
   return out;
 }
-const keysOf = (blocks: AuthoringBlock[]): string[] =>
-  blocks.map((b) => `${b.pos[0]},${b.pos[1]},${b.pos[2]}`);
-
 describe('connectBlocks', () => {
   it('leaves an isolated pane with every side false', () => {
     const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:glass_pane' }];
@@ -43,58 +40,6 @@ describe('connectBlocks', () => {
     const blocks: AuthoringBlock[] = [{ state: 0, pos: [0, 0, 0] }];
     const r = connectBlocks(blocks, palette, ctx());
     expect(r.palette).toBe(palette);
-  });
-});
-
-describe('carveStairwells', () => {
-  // index 0 = stairs facing east, index 1 = stone shell/obstruction.
-  const palette: AuthoringPaletteEntry[] = [
-    { Name: 'minecraft:oak_stairs', Properties: { facing: 'east', half: 'bottom' } },
-    { Name: 'minecraft:stone' },
-  ];
-
-  it('clears solid headroom above an interior climbing flight', () => {
-    const blocks: AuthoringBlock[] = [
-      ...sealed(7, 7, 7, 1),
-      { state: 0, pos: [2, 1, 3] }, { state: 0, pos: [3, 2, 3] }, // flight climbing +x
-      { state: 1, pos: [2, 2, 3] }, { state: 1, pos: [2, 3, 3] }, // interior ceiling jammed above the tread
-    ];
-    const keys = keysOf(carveStairwells(blocks, palette, ctx()).blocks);
-    expect(keys).not.toContain('2,2,3'); // headroom cleared
-    expect(keys).not.toContain('2,3,3');
-    expect(keys).toContain('2,1,3');     // the stairs themselves are untouched
-    expect(keys).toContain('3,2,3');
-  });
-
-  it('keeps a block above a lone decorative stair', () => {
-    const blocks: AuthoringBlock[] = [{ state: 0, pos: [3, 1, 3] }, { state: 1, pos: [3, 2, 3] }];
-    const r = carveStairwells(blocks, palette, ctx());
-    expect(r.blocks.length).toBe(2);
-  });
-
-  it('clears an interior landing in front of the bottom step', () => {
-    const blocks: AuthoringBlock[] = [
-      ...sealed(7, 7, 7, 1),
-      { state: 0, pos: [3, 1, 3] }, { state: 0, pos: [4, 2, 3] }, // flight climbing +x
-      { state: 1, pos: [2, 1, 3] }, { state: 1, pos: [2, 2, 3] }, // interior partition jammed behind the bottom step
-    ];
-    const keys = keysOf(carveStairwells(blocks, palette, ctx()).blocks);
-    expect(keys).not.toContain('2,1,3'); // landing body cleared
-    expect(keys).not.toContain('2,2,3'); // landing head cleared
-    expect(keys).toContain('3,1,3');     // the stairs themselves are untouched
-  });
-
-  it('refuses to carve the exterior shell (roof / outer wall) and warns instead', () => {
-    // A flight that climbs into the top face: its headroom cell IS the roof.
-    const blocks: AuthoringBlock[] = [
-      ...sealed(7, 7, 7, 1),
-      { state: 0, pos: [3, 4, 3] }, { state: 0, pos: [4, 5, 3] }, // flight reaching the ceiling
-    ];
-    const r = carveStairwells(blocks, palette, ctx());
-    const keys = keysOf(r.blocks);
-    expect(keys).toContain('3,6,3'); // the roof above the tread is left intact
-    expect(keys).toContain('4,6,3');
-    expect(r.warnings?.join(' ')).toMatch(/exterior shell/);
   });
 });
 

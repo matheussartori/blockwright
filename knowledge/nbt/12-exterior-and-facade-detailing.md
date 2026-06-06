@@ -74,7 +74,11 @@ cottage.
   symmetric-mansion references).
 - **Gothic/manor spire:** a very steep, near-vertical roof rising to a tall point or short
   **mansard**; cap the ridge/peak with **cresting** — a row of `iron_bars`/`*_fence`/`lightning_rod`/
-  `pointed_dripstone`/`end_rod` finials (the spiky ridge in the Gothic references).
+  `pointed_dripstone`/`end_rod` finials (the spiky ridge in the Gothic references). **Cresting must
+  SIT on the ridge** — each finial directly on top of a solid ridge block (or another finial). A row
+  of `iron_bars`/panes/fences hovering a block or two above the roof has no support and is removed in
+  finishing (the "iron bars floating over the roof" defect). The same rule holds for any railing: a
+  pane/bar/fence/wall needs a solid block below it or a solid block beside it, or it is dropped.
 
 ---
 

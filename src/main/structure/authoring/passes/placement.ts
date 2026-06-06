@@ -18,12 +18,61 @@
 import { posKey } from '../geometry';
 import { bareId, isAir, makeIntern } from '../palette';
 import type { AuthoringBlock } from '../types';
+import { connFamily } from './connect-blocks';
 import {
   FACINGS, isCandle, isFloorTorch, isLantern, isSolidSupport, needsGroundBelow, wallFixtureKind,
 } from './placement-rules';
 import type { Pass } from './types';
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+const isDoorName = (name: string): boolean => bareId(name).endsWith('_door');
+
+// 6-neighbour offsets, for the floating-connector component flood.
+const N6: [number, number, number][] = [
+  [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1],
+];
+
+/** Cells holding a pane/bar/fence/wall whose whole connected group has NO solid
+ *  anchor anywhere (no full block below or beside any member) — a railing/grille
+ *  floating in mid-air, e.g. a line of iron bars hovering above the roof. Found by
+ *  flooding each connecting group and removing the group only when nothing solid
+ *  touches it (a window pane set in a wall, or a railing resting on one, is anchored
+ *  and kept). */
+function floatingConnectors(
+  blocks: AuthoringBlock[], nameAt: (x: number, y: number, z: number) => string | undefined,
+): Set<string> {
+  const memberKeys = new Set<string>();
+  for (const b of blocks) {
+    const n = nameAt(b.pos[0], b.pos[1], b.pos[2]);
+    if (n !== undefined && connFamily(n)) memberKeys.add(posKey(...b.pos));
+  }
+  const floating = new Set<string>();
+  const seen = new Set<string>();
+  const parse = (k: string): [number, number, number] => k.split(',').map(Number) as [number, number, number];
+  for (const start of memberKeys) {
+    if (seen.has(start)) continue;
+    const group: string[] = [];
+    const stack = [start];
+    seen.add(start);
+    let anchored = false;
+    while (stack.length) {
+      const k = stack.pop() as string;
+      group.push(k);
+      const [x, y, z] = parse(k);
+      for (const [dx, dy, dz] of N6) {
+        const nk = posKey(x + dx, y + dy, z + dz);
+        if (memberKeys.has(nk)) {
+          if (!seen.has(nk)) { seen.add(nk); stack.push(nk); }
+        } else if (isSolidSupport(nameAt(x + dx, y + dy, z + dz))) {
+          anchored = true; // a real solid block touches the group → it's supported
+        }
+      }
+    }
+    if (!anchored) for (const k of group) floating.add(k);
+  }
+  return floating;
+}
 
 export const fixPlacement: Pass = (blocks, palette) => {
   // Frozen lookup of the structure as authored, for support tests.
@@ -43,6 +92,11 @@ export const fixPlacement: Pass = (blocks, palette) => {
   let removedTorches = 0, removedCandles = 0, removedGround = 0;
   let reanchoredTorches = 0, removedWall = 0;
   let clearedChestTops = 0, openedDoorways = 0, seatedSlabs = 0;
+  let removedOrphanDoors = 0, removedFloating = 0;
+
+  // Pre-compute the floating connecting blocks (railings/grilles with no solid
+  // anchor) once, against the frozen geometry — a global, order-independent test.
+  const floating = floatingConnectors(blocks, at);
   // Cells to delete after the per-block pass: decoration sitting on a chest lid, and
   // wall blocks plugging a doorway. Collected by position so order doesn't matter.
   const carve = new Set<string>();
@@ -56,6 +110,19 @@ export const fixPlacement: Pass = (blocks, palette) => {
     const [x, y, z] = b.pos;
     const below = hasBlock(x, y - 1, z);
     const above = hasBlock(x, y + 1, z);
+
+    // A pane/bar/fence/wall whose whole group floats with no solid anchor — drop it
+    // (the "iron bars hovering over the roof" defect).
+    if (floating.has(posKey(x, y, z))) { removedFloating++; continue; }
+
+    // An UPPER door half with no lower half beneath it is a "door in the middle of
+    // nowhere" — a half-panel floating where its base is missing. Drop it (the model
+    // can re-place a complete door). A lone LOWER half is left alone: it sits on the
+    // floor and reads as the start of a door, not floating debris.
+    if (isDoorName(name) && props.half === 'upper') {
+      const lower = at(x, y - 1, z);
+      if (lower === undefined || !isDoorName(lower)) { removedOrphanDoors++; continue; }
+    }
 
     if (isLantern(id)) {
       const hanging = String(props.hanging) === 'true';
@@ -193,6 +260,8 @@ export const fixPlacement: Pass = (blocks, palette) => {
   if (clearedChestTops) fixes.push(`cleared ${plural(clearedChestTops, 'block')} sitting on a chest lid (kept it openable)`);
   if (openedDoorways) fixes.push(`opened ${plural(openedDoorways, 'doorway')} that was blocked by a wall`);
   if (seatedSlabs) fixes.push(`seated ${plural(seatedSlabs, 'floating top-slab')} onto the block below (flipped to bottom)`);
+  if (removedOrphanDoors) fixes.push(`removed ${plural(removedOrphanDoors, 'orphan door half')} with no matching half (a door floating in mid-air)`);
+  if (removedFloating) fixes.push(`removed ${plural(removedFloating, 'floating pane/bar/fence/wall')} with no solid support (e.g. a railing hovering over the roof)`);
 
   const kept = carve.size ? out.filter((b) => !carve.has(posKey(...b.pos))) : out;
   return { blocks: kept, palette: outPalette, fixes };

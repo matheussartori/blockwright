@@ -1,15 +1,14 @@
 // Shared stair-flight detection. A "flight" is a climbing run of same-facing bottom
-// stairs stepping one block up the ascent diagonal — the multi-storey passes
-// (insetStairs, stairsToLadder) and the always-on carveStairwells all walk the same
-// chain, so the walk lives here once instead of being copied three times.
+// stairs stepping one block up the ascent diagonal. `rebuildStairwells` walks these
+// (and `fixCirculation` shares the helpers), so the walk lives here once.
 //
 // CRITICAL: a gable ROOF is built from stairs and looks identical to a climbing run
 // (same-facing bottom stairs stepping up the diagonal). If those count as flights the
-// stair passes wreck the build — carveStairwells punches headroom holes through the
-// roof, stairsToLadder spawns a stray ladder up in the empty attic, insetStairs tries
-// to shove the roof off the wall. So findFlights excludes any run topping out ABOVE
-// the build's ceiling plane (`topCeilingY`): a real staircase connects interior
-// storeys and never climbs past the top floor; a roof slope always does.
+// stairwell rebuild wrecks the build — it would treat the roof slope as a staircase,
+// carve headroom holes through the roof, and lay an opening into the attic void. So
+// findFlights excludes any run topping out ABOVE the build's ceiling plane
+// (`topCeilingY`): a real staircase connects interior storeys and never climbs past
+// the top floor; a roof slope always does.
 import { posKey } from '../geometry';
 import { bareId } from '../palette';
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';

@@ -6,7 +6,7 @@ import { structureFinalizers } from '../domain';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
 import {
-  carveStairwells, connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, insetStairs, runPasses, stairsToLadder, type Pass,
+  connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, rebuildStairwells, runPasses, type Pass,
 } from './passes';
 import type { AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
@@ -28,24 +28,24 @@ export interface CompileOptions {
   log?: (message: string) => void;
 }
 
-/** Build the pass pipeline for a build. The ALWAYS-ON passes repair any structure;
- *  the STRUCTURE-SCOPED ones are gated by the selected structure module's declared
- *  `finalize` list (the modular "which fix applies to which structure" mapping):
- *  `'stairs'` (multi-storey) runs BEFORE carving so the headroom carve lands on the
- *  inset flight; `'chimney'` (house) runs after the shell is settled. */
+/** Build the pass pipeline for a build. Most passes are ALWAYS-ON; the only
+ *  STRUCTURE-SCOPED one left is `'chimney'` (house), gated by the selected structure
+ *  module's declared `finalize` list.
+ *
+ *  `rebuildStairwells` now OWNS all vertical circulation: it is always-on and
+ *  self-gating (it engages only when it finds ≥2 storey floor planes and a real
+ *  climbing flight/ladder to rebuild), so it works on free-form AI builds too — no
+ *  `'stairs'` finalizer needed. It replaces the old inset/ladder/carve chain. */
 function pipelineFor(structureType?: string): Pass[] {
-  const fin = structureFinalizers(structureType);
   const passes: Pass[] = [];
-  // 'stairs': first nudge a flight off the wall (insetStairs), then convert a flight that
-  // STILL can't fit with clearance into a wall ladder (stairsToLadder) — both before carve.
-  if (fin.includes('stairs')) passes.push(insetStairs, stairsToLadder);
-  // Order matters: stairwells are carved before connections are derived; door hinges
-  // are mirrored on the as-authored leaves; placement is fixed against the real blocks;
-  // circulation cleanup (drop broken ladders / cap orphan floor holes) runs once the
-  // stairwell carving + placement have settled; the interior air-fill runs last so it
-  // doesn't interfere with neighbour/support lookups.
-  passes.push(carveStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
-  if (fin.includes('chimney')) passes.push(fixChimney);
+  // Order matters: vertical circulation is rebuilt first (so the openings/landings it
+  // cuts are in place); door hinges are mirrored on the as-authored leaves; connection
+  // sides are derived; placement is fixed against the real blocks (and drops orphan
+  // door halves / floating railings); circulation cleanup (drop stray ladders / cap
+  // orphan floor holes) runs once everything has settled; the interior air-fill runs
+  // last so it doesn't interfere with neighbour/support lookups.
+  passes.push(rebuildStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
+  if (structureFinalizers(structureType).includes('chimney')) passes.push(fixChimney);
   passes.push(fillInteriorAir);
   return passes;
 }

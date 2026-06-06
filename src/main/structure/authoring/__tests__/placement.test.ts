@@ -277,3 +277,50 @@ describe('fixPlacement — door passage', () => {
     expect(r.fixes ?? []).toHaveLength(0);
   });
 });
+
+describe('fixPlacement — orphan door halves', () => {
+  const lower = (h: string): AuthoringPaletteEntry => ({ Name: 'minecraft:oak_door', Properties: { facing: 'south', half: 'lower', hinge: h } });
+  const upper = (h: string): AuthoringPaletteEntry => ({ Name: 'minecraft:oak_door', Properties: { facing: 'south', half: 'upper', hinge: h } });
+
+  it('removes an upper door half with no lower half beneath it', () => {
+    // 0 = planks floor, 1 = upper door half sitting on the floor (its lower is missing).
+    const r = run(
+      [{ Name: 'minecraft:oak_planks' }, upper('right')],
+      [{ state: 0, pos: [5, 10, 5] }, { state: 1, pos: [5, 11, 5] }],
+    );
+    expect(r.blocks.some((b) => nameOf(r, b).endsWith('_door'))).toBe(false);
+    expect((r.fixes ?? []).join(' ')).toMatch(/orphan door/);
+  });
+
+  it('keeps a complete two-half door', () => {
+    const r = run(
+      [lower('right'), upper('right'), { Name: 'minecraft:stone' }],
+      [{ state: 2, pos: [5, 0, 5] }, { state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] }],
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b).endsWith('_door'))).toHaveLength(2);
+  });
+});
+
+describe('fixPlacement — floating connecting blocks', () => {
+  it('removes a line of iron bars hovering with no solid support (railing over a roof)', () => {
+    // A 1-cell air gap below the bars; nothing solid touches the group anywhere.
+    const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:iron_bars' }, { Name: 'minecraft:oak_stairs', Properties: { facing: 'east' } }];
+    const blocks: AuthoringBlock[] = [];
+    for (let z = 0; z < 5; z++) blocks.push({ state: 0, pos: [8, 31, z] }); // floating bar line
+    for (let z = 0; z < 5; z++) blocks.push({ state: 1, pos: [8, 29, z] }); // roof 2 blocks below (not touching)
+    const r = fixPlacement(blocks, palette, ctx);
+    expect(r.blocks.some((b) => nameOf(r, b) === 'minecraft:iron_bars')).toBe(false);
+    expect((r.fixes ?? []).join(' ')).toMatch(/floating/);
+  });
+
+  it('keeps a window pane anchored in a solid wall', () => {
+    // A pane with a solid wall block on either side (a real window) is anchored.
+    const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:glass_pane' }, { Name: 'minecraft:stone' }];
+    const blocks: AuthoringBlock[] = [
+      { state: 1, pos: [4, 2, 5] }, { state: 0, pos: [5, 2, 5] }, { state: 1, pos: [6, 2, 5] },
+      { state: 1, pos: [5, 1, 5] }, // a block below it too
+    ];
+    const r = fixPlacement(blocks, palette, ctx);
+    expect(r.blocks.some((b) => nameOf(r, b) === 'minecraft:glass_pane')).toBe(true);
+  });
+});

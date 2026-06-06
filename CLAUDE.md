@@ -120,18 +120,30 @@ src/
       passes/             Post-processing pipeline: each Pass is (blocks,palette,ctx)→
                           {blocks,palette,fixes?,warnings?}; runPasses chains them, accumulating
                           fixes/warnings. ctx carries `size` + the selected `structureType`.
-                          ALWAYS-ON: carveStairwells (open the shaft over a flight + clear a standing
-                          landing in front of the bottom step), connectBlocks (derive pane/bar/fence/
-                          wall sides from neighbours — the AI omits north/south/east/west, so an
-                          isolated pane would render as the bare `_post` column; splits palette per
-                          side combo), fixDoors, fixPlacement, fillInteriorAir (clear each column's
-                          interior without gouging terrain). STRUCTURE-SCOPED finalizers, gated by the
-                          selected structure module's declared `finalize` list (see domain): insetStairs
-                          ('stairs' — any storeyed structure: shift a flight pressed against the shell
-                          one cell into the open interior, else warn; runs before carve) and fixChimney
-                          ('chimney' — house only: campfire-anchored, complete the flue / drop a
-                          floating cap / keep one chimney). NEW always-on checks plug in here; new
-                          per-structure fixes add a `FinalizePass` id + a module `finalize` entry.
+                          ALWAYS-ON: rebuildStairwells (code OWNS vertical circulation — see below),
+                          connectBlocks (derive pane/bar/fence/wall sides from neighbours — the AI omits
+                          north/south/east/west, so an isolated pane would render as the bare `_post`
+                          column; splits palette per side combo), fixDoors, fixPlacement (also drops
+                          orphan UPPER door halves + floating pane/bar/fence/wall groups with no solid
+                          anchor — the "door in mid-air" / "iron bars over the roof" defects),
+                          fixCirculation (generic safety net: stray ladders / orphan floor holes),
+                          fillInteriorAir (clear each column's interior without gouging terrain).
+                          STRUCTURE-SCOPED finalizer, gated by the selected structure module's declared
+                          `finalize` list (see domain): fixChimney ('chimney' — house only: campfire-
+                          anchored, complete the flue / drop a floating cap / keep one chimney). NEW
+                          always-on checks plug in here; new per-structure fixes add a `FinalizePass`
+                          id + a module `finalize` entry.
+                            rebuildStairwells (passes/stairwells.ts) is the DEFINITIVE circulation pass,
+                          replacing the old fragile insetStairs→stairsToLadder→carveStairwells chain
+                          (deleted). It is always-on + self-gating: detects the storey FLOOR PLANES,
+                          collects the model's flight/ladder hints (which gap each serves), strips the
+                          broken geometry, and rebuilds ONE clean connector per gap — a straight stair
+                          when a 45° run fits in the interior (full top step reaching the upper floor,
+                          opening sized to the run, 2-block headroom, landings) else a flush wall ladder
+                          (hung on the shell OR an interior wall). Connectors reserve their cells so two
+                          can't collide; a gap it can't solve keeps the model's geometry + warns. Roof
+                          slopes (gables of stairs) are excluded via findFlights/topCeilingY. The
+                          'stairs' finalizer is now vestigial (no longer drives a pass).
       compile.ts          compileStructure / compileStructureReport / writeStructureFile
                           (validate → resolveBlocks → runPasses → encode), each taking optional
                           CompileOptions {structureType}; `pipelineFor(structureType)` assembles the
@@ -283,6 +295,8 @@ decoration, and a new module is one small file.
   that structure is the SELECTED one (`BuildSelection.structureType`, threaded to `writeStructureFile`)
   — so e.g. the single-chimney fix runs on a house but never on a tower. These run on AI free-form
   builds too (gated by the Details selection), since the model is bad at the same details code can repair.
+  (NOTE: only `'chimney'` still gates a pass. `'stairs'` is now vestigial — `rebuildStairwells` owns
+  circulation always-on + self-gating, so it works on free-form builds with no structureType too.)
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
   **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`

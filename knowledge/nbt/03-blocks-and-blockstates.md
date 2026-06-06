@@ -47,7 +47,10 @@ it. *(Backstop: the compiler seats a floating `top` slab — block below, air ab
 
 ### Doors — `facing`, `half`, `hinge`, `open`, `powered`
 A door is **two blocks** stacked: the `lower` half at `y` and `upper` at `y+1`. Both palette
-entries share `facing`/`hinge`/`open`; they differ in `half`.
+entries share `facing`/`hinge`/`open`; they differ in `half`. **Always emit BOTH halves** — a
+lone `upper` half is a panel floating in mid-air (the "door in the middle of nowhere" defect) and
+gets removed in finishing, leaving a gap. Each door also belongs in a real **doorway**: a 1-wide,
+2-tall gap in a wall (solid jambs on both sides, a lintel above), not stuck to a flat wall face.
 ```jsonc
 { "Name": "minecraft:oak_door",
   "Properties": { "facing": "south", "half": "lower", "hinge": "left", "open": "false", "powered": "false" } }

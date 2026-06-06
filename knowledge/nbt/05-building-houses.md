@@ -94,6 +94,18 @@ storeys.
 
 ## Stairs between floors
 
+> **Code owns the staircase now — you just say WHERE.** Whatever flight (or ladder column) you place
+> between two floors, a finishing pass throws it away and rebuilds ONE clean, guaranteed-correct
+> connector for that storey: a full run whose **top step always reaches the upper floor**, an opening
+> cut **exactly** to the run, 2 blocks of headroom over every tread, and a landing at both ends — or, if
+> a straight run can't fit, a tidy **wall ladder** instead. Two connectors can never collide. So you
+> **cannot** produce the classic stair defects (a missing top step, a hole punched in the ceiling that
+> nothing fills, two flights crashing into each other) — don't spend effort hand-tuning them.
+> **What still matters:** put the flight in a sensible spot (a roomy interior corner, one cell off the
+> outer walls, attic stairs under the ridge), one flight per storey, and keep furniture off it. If the
+> pass reports it *"could not fit a clean staircase or wall ladder"* for a gap, the interior there is too
+> cramped — widen it or move the stair, don't fight the geometry.
+
 **Use the `stairs` op — never hand-place a staircase from individual `*_stairs` blocks.** Hand-placed
 flights are where builds break: steps end up facing the wrong way, an upside-down `half:top` step gets
 stacked on top and blocks the climb, or the last step is simply missing. The op makes all of that
