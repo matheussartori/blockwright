@@ -3,7 +3,10 @@ import { computeEnvelope, connectBlocks, fillInteriorAir, fixDoors } from '../pa
 import { findFlights, topCeilingY } from '../passes/flights';
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
 
-const ctx = (size: [number, number, number] = [16, 16, 16]): { size: [number, number, number] } => ({ size });
+const ctx = (
+  size: [number, number, number] = [16, 16, 16],
+  grade?: number,
+): { size: [number, number, number]; grade?: number } => ({ size, grade });
 
 // A sealed solid box [0..W-1]×[0..H-1]×[0..D-1] (perimeter faces only, `stoneIdx`),
 // so the interior is hidden from the exterior flood-fill — interior cells are NOT
@@ -154,5 +157,48 @@ describe('fillInteriorAir', () => {
     const r = fillInteriorAir(blocks, palette, ctx());
     const airIdx = r.palette.findIndex((p) => p.Name === 'minecraft:air');
     expect(r.blocks.filter((b) => b.state === airIdx).length).toBe(0);
+  });
+
+  // With a grade level (from the build's labelled storeys), an exterior column's gap
+  // is split: cells below grade (the trench around the basement) stay OMITTED
+  // (= structure_void), cells at/above grade (the recessed facade / balcony) → air.
+  it('omits an exterior below-grade pocket but airs the part at/above grade', () => {
+    const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:stone' }];
+    const blocks: AuthoringBlock[] = [
+      { state: 0, pos: [0, 0, 0] }, // column floor
+      { state: 0, pos: [0, 8, 0] }, // column cap → gap is y=1..7
+    ];
+    const r = fillInteriorAir(blocks, palette, ctx([16, 16, 16], 4));
+    const airIdx = r.palette.findIndex((p) => p.Name === 'minecraft:air');
+    const air = r.blocks
+      .filter((b) => b.state === airIdx && b.pos[0] === 0 && b.pos[2] === 0)
+      .map((b) => b.pos[1])
+      .sort((a, b) => a - b);
+    expect(air).toEqual([4, 5, 6, 7]); // below grade (1..3) omitted, at/above grade aired
+  });
+
+  // A sealed (interior) gap clears to air regardless of grade — basement rooms must
+  // be hollow even though they sit below the ground floor.
+  it('fills a sealed interior gap even when it lies below grade', () => {
+    const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:stone' }];
+    const blocks = sealed(5, 5, 5, 0); // interior column (2,*,2) gap y=1..3
+    const r = fillInteriorAir(blocks, palette, ctx([16, 16, 16], 9)); // grade above the box
+    const airIdx = r.palette.findIndex((p) => p.Name === 'minecraft:air');
+    const air = r.blocks
+      .filter((b) => b.state === airIdx && b.pos[0] === 2 && b.pos[2] === 2)
+      .map((b) => b.pos[1])
+      .sort((a, b) => a - b);
+    expect(air).toEqual([1, 2, 3]); // interior fills despite being below grade (9)
+  });
+
+  // No grade declared (no floors) → nothing is treated as below grade, so even an
+  // exterior pocket fills with air (the behaviour before floor marking existed).
+  it('fills an exterior pocket when no grade is given', () => {
+    const palette: AuthoringPaletteEntry[] = [{ Name: 'minecraft:stone' }];
+    const blocks: AuthoringBlock[] = [{ state: 0, pos: [0, 0, 0] }, { state: 0, pos: [0, 3, 0] }];
+    const r = fillInteriorAir(blocks, palette, ctx()); // grade undefined
+    const airIdx = r.palette.findIndex((p) => p.Name === 'minecraft:air');
+    const air = r.blocks.filter((b) => b.state === airIdx).map((b) => b.pos[1]).sort();
+    expect(air).toEqual([1, 2]);
   });
 });

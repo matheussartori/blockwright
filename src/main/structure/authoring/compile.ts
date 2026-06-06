@@ -3,6 +3,7 @@
 // passes → encode. This is the JSON→NBT step the knowledge base describes.
 import fs from 'node:fs/promises';
 import { structureFinalizers } from '../domain';
+import { gradeFromFloors, type FloorRange } from './floors';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
 import {
@@ -23,6 +24,10 @@ export interface CompileReport {
  *  fix). Omit for a context-free build (no structure-scoped passes run). */
 export interface CompileOptions {
   structureType?: string;
+  /** The user's Floor plan (UI) for this build. When present it OVERRIDES the storeys
+   *  the model declared in `structure.floors` for grade detection (see the air-fill).
+   *  Omit to use the model's own floors. */
+  floors?: FloorRange[];
   /** Optional sink for the per-pass code-fix play-by-play (the AI Console dock).
    *  Omit for context-free compiles (catalog/module previews) so they stay quiet. */
   log?: (message: string) => void;
@@ -57,7 +62,10 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
   // Expand volumetric ops → blocks (transform/roof ops may extend the palette), then
   // run the passes (structure-scoped finalizers + connections, stairwell headroom, air).
   const resolved = resolveBlocks(s);
-  const ctx = { size, structureType: opts?.structureType, log: opts?.log };
+  // Grade (ground-floor level) for the air-fill: the user's Floor plan wins when
+  // defined, else the storeys the model labelled in the build itself.
+  const grade = gradeFromFloors(opts?.floors?.length ? opts.floors : s.floors);
+  const ctx = { size, structureType: opts?.structureType, grade, log: opts?.log };
   const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
     dataVersion: s.DataVersion ?? 3955,

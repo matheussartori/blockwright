@@ -35,7 +35,7 @@ const SUMMARY_DESC =
 const MODE_DESC =
   'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
 const STRUCTURE_DESC =
-  'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks.';
+  'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities, floors }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks. ALWAYS include "floors" on a full emit: an array of storeys, each { name?, role: basement|ground|upper|roof, from, to } over an inclusive y range covering the whole height — mark every below-ground storey "basement". The compiler reads it to keep the basement surround as terrain (structure_void) while interior + above-grade facade/balcony become air.';
 const PHASE_DESC =
   'The design pass you just completed: "massing", "roof", "facade", "interior", "circulation" or "audit" (see "Design passes"). Optional — informational only.';
 const AUDIT_DESC =
@@ -113,6 +113,26 @@ const structureJsonSchema = {
       },
     },
     entities: { type: 'array', items: {} },
+    floors: {
+      type: 'array',
+      description:
+        'The storeys of the build, each a role-tagged inclusive y range. REQUIRED on a full emit so the ' +
+        'compiler knows the ground-floor level: it keeps exterior space BELOW grade (around/under a basement) ' +
+        'as structure_void so placement preserves the surrounding terrain, while interior and at/above-grade ' +
+        'exterior (the recessed facade, a balcony) clear to air. Mark every below-ground storey as "basement". ' +
+        'Cover the whole height bottom→top; a patch inherits the previous floors if omitted.',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Optional label, e.g. "Cellar", "Ground floor".' },
+          role: { type: 'string', enum: ['basement', 'ground', 'upper', 'roof'], description: 'basement = below grade; everything else is at/above grade.' },
+          from: { type: 'integer', description: 'Lowest y of the storey (inclusive).' },
+          to: { type: 'integer', description: 'Highest y of the storey (inclusive).' },
+        },
+        required: ['role', 'from', 'to'],
+        additionalProperties: false,
+      },
+    },
   },
   additionalProperties: false,
 } as const;

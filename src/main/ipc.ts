@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BuildSelection, ChatRecord, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BuildSelection, ChatRecord, FloorDef, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -151,7 +151,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.aiRenderResult, async (_e, result: RenderResult) => {
     pendingRenders.get(result.requestId)?.(result);
   });
-  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[], selection?: BuildSelection, basePath?: string) => {
+  ipcMain.handle(IPC_CHANNELS.aiGenerate, async (e, sessionId: string, prompt: string, images?: GenerateImage[], selection?: BuildSelection, basePath?: string, floors?: FloorDef[]) => {
     const capture: CapturePreview = (path, version) =>
       new Promise((resolve) => {
         const requestId = randomUUID();
@@ -166,7 +166,7 @@ export function registerIpc(): void {
         });
         e.sender.send(IPC_EVENTS.aiRenderRequest, { requestId, sessionId, path, version });
       });
-    return generateStructure(sessionId, prompt, images, selection, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath);
+    return generateStructure(sessionId, prompt, images, selection, (p) => e.sender.send(IPC_EVENTS.aiProgress, p), capture, basePath, floors);
   });
   ipcMain.handle(IPC_CHANNELS.aiCancel, async (_e, sessionId: string) => cancelGeneration(sessionId));
   ipcMain.handle(IPC_CHANNELS.aiResetSession, async (_e, sessionId: string) => resetSession(sessionId));

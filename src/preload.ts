@@ -8,6 +8,7 @@ import type {
   BuildSelection,
   ChatRecord,
   ExportResult,
+  FloorDef,
   GenerateImage,
   GenerateProgress,
   GenerateResult,
@@ -84,8 +85,9 @@ const api: BlockwrightApi = {
     images?: GenerateImage[],
     selection?: BuildSelection,
     basePath?: string,
+    floors?: FloorDef[],
   ): Promise<GenerateResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, selection, basePath),
+    ipcRenderer.invoke(IPC_CHANNELS.aiGenerate, sessionId, prompt, images, selection, basePath, floors),
   aiCancel: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiCancel, sessionId),
   aiResetSession: (sessionId: string): Promise<void> =>

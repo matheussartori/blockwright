@@ -75,15 +75,24 @@ export interface ChatMessage {
   };
 }
 
+/** What a storey IS, used to locate the ground-floor level ("grade"): the boundary
+ *  between below-grade exterior (kept as structure_void so placement preserves the
+ *  surrounding terrain) and at/above-grade exterior (cleared to air so the facade /
+ *  balcony stay visible and walkable). `basement` is below grade; everything else is
+ *  at/above it. See `gradeFromFloors` in the authoring compiler. */
+export type FloorRole = 'basement' | 'ground' | 'upper' | 'roof';
+
 /** A named vertical level the user defined for a generated build, used as context
  *  for the AI (so "the basement" / "the top floor" map to concrete y ranges) and
  *  highlighted as a region in the viewer. The level spans the inclusive y range
- *  `from`..`to` (Minecraft is Y-up; y=0 is the lowest layer). */
+ *  `from`..`to` (Minecraft is Y-up; y=0 is the lowest layer). The optional `role`
+ *  marks below-grade storeys so the air-fill keeps the basement surround as terrain. */
 export interface FloorDef {
   id: string;
   name: string;
   from: number;
   to: number;
+  role?: FloorRole;
 }
 
 /** Persisted per-NBT chat history (main/chat-history.ts), keyed by file path (or

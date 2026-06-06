@@ -9,7 +9,7 @@
 // provider + model in Settings (see credentials.ts).
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, BuildSelection } from '@/shared/types';
+import type { GenerateResult, GenerateProgress, GeneratePhase, GenerateImage, BuildSelection, FloorDef } from '@/shared/types';
 import { systemPrompt } from './schema';
 import type { EmitArgs } from './schema';
 import { advancePhase, AUDIT_CHECKS, auditChecklistText, isLastPhase, phaseAt, PHASES, summarizeAudit } from './phases';
@@ -65,6 +65,7 @@ export async function generateStructure(
   onProgress?: (p: GenerateProgress) => void,
   capture?: CapturePreview,
   basePath?: string,
+  floors?: FloorDef[],
 ): Promise<GenerateResult> {
   const session = getSession(sessionId);
   const cred = activeCredential();
@@ -188,6 +189,9 @@ export async function generateStructure(
           ops: [...(prev.ops ?? []), ...(input.ops ?? [])],
           blocks: [...(prev.blocks ?? []), ...(input.blocks ?? [])],
           entities: input.entities ?? prev.entities,
+          // Inherit the labelled storeys so a localized patch doesn't drop the grade
+          // (and with it the basement's structure_void surround). See gradeFromFloors.
+          floors: input.floors ?? prev.floors,
         };
       } catch (err) {
         captureError = `Could not load the previous version to patch: ${errMessage(err)}`;
@@ -241,6 +245,8 @@ export async function generateStructure(
       // `log` streams each pass's play-by-play into the Console dock (fix-tagged).
       report = await writeStructureFile(authoring, nbtPath, {
         structureType: selection?.structureType,
+        // The user's Floor plan (UI) overrides the model's declared storeys for grade.
+        floors: floors?.length ? floors : undefined,
         log: fixLog,
       });
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));

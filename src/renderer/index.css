@@ -3003,7 +3003,8 @@ body.row-resizing {
   font-weight: 600;
   color: var(--text-muted);
 }
-.gen-floor-y input {
+.gen-floor-y input,
+.gen-floor-role select {
   width: 52px;
   font: inherit;
   font-size: 12px;
@@ -3013,13 +3014,18 @@ body.row-resizing {
   background: var(--bg, var(--panel));
   border: 1px solid var(--border);
 }
+.gen-floor-role select {
+  width: auto;
+}
 .gen-floor-name:focus,
-.gen-floor-y input:focus {
+.gen-floor-y input:focus,
+.gen-floor-role select:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
 .gen-floor-name:disabled,
-.gen-floor-y input:disabled {
+.gen-floor-y input:disabled,
+.gen-floor-role select:disabled {
   opacity: 0.5;
 }
 .gen-floor-remove {

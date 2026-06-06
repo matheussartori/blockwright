@@ -28,6 +28,14 @@ export interface Envelope {
   shell: Set<string>;
   /** Whether the cell at (x,y,z) is part of the protected exterior shell. */
   isShell: (x: number, y: number, z: number) => boolean;
+  /** posKey(x,y,z) of every EMPTY cell reachable from the padded border — the
+   *  "outside" the build sits in (open yard, the space in front of a facade, an
+   *  open balcony, a doorway opening). Empty cells NOT in here are sealed interior.
+   *  Only spans the 1-cell-padded bounding box (cells beyond it are outside too). */
+  outside: Set<string>;
+  /** Whether the EMPTY cell at (x,y,z) is reachable from outside (vs sealed inside).
+   *  Cells beyond the padded bounding box count as outside. */
+  isOutside: (x: number, y: number, z: number) => boolean;
 }
 
 /** Recover the exterior shell from a resolved block list (see file header). */
@@ -47,7 +55,9 @@ export function computeEnvelope(
     if (x < minX) minX = x; if (y < minY) minY = y; if (z < minZ) minZ = z;
     if (x > maxX) maxX = x; if (y > maxY) maxY = y; if (z > maxZ) maxZ = z;
   }
-  if (barrier.size === 0) return { shell: new Set(), isShell: () => false };
+  if (barrier.size === 0) {
+    return { shell: new Set(), isShell: () => false, outside: new Set(), isOutside: () => true };
+  }
 
   // Pad the box by 1 so the border is guaranteed to be outside the build.
   const lo: [number, number, number] = [minX - 1, minY - 1, minZ - 1];
@@ -81,5 +91,10 @@ export function computeEnvelope(
       if (!inPad(nx, ny, nz) || outside.has(posKey(nx, ny, nz))) { shell.add(key); break; }
     }
   }
-  return { shell, isShell: (x, y, z) => shell.has(posKey(x, y, z)) };
+  return {
+    shell,
+    isShell: (x, y, z) => shell.has(posKey(x, y, z)),
+    outside,
+    isOutside: (x, y, z) => !inPad(x, y, z) || outside.has(posKey(x, y, z)),
+  };
 }

@@ -66,7 +66,7 @@ export function persistDoc(docId: string): void {
 export function normalizeFloor(f: FloorDef & { y?: number }): FloorDef {
   const from = f.from ?? f.y ?? 0;
   const to = f.to ?? f.y ?? from;
-  return { id: f.id, name: f.name, from: Math.min(from, to), to: Math.max(from, to) };
+  return { id: f.id, name: f.name, from: Math.min(from, to), to: Math.max(from, to), role: f.role };
 }
 
 /** Build the floor-plan context block appended to every AI prompt, or '' if no
@@ -228,7 +228,11 @@ export async function runGeneration(
   // "change X" edits it rather than building anew (main ignores its own outputs).
   const basePath = doc.path ?? undefined;
   try {
-    const result = await api.aiGenerate(doc.sessionId, promptText, images, selection, basePath);
+    // The user's Floor plan rides along structured (not just as prompt text): main
+    // uses it to locate the ground-floor level for the air-fill, overriding the
+    // storeys the model declared. Normalize so legacy {y} records carry from/to.
+    const floors = doc.floors.map(normalizeFloor);
+    const result = await api.aiGenerate(doc.sessionId, promptText, images, selection, basePath, floors);
     if (result.ok) {
       docs.appendChat(docId, {
         role: 'assistant',

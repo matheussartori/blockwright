@@ -691,6 +691,19 @@ export function GenerateContent() {
                     onChange={(e) => updateFloor(f.id, { to: Math.trunc(Number(e.target.value)) || 0 })}
                   />
                 </label>
+                <label className="gen-floor-y gen-floor-role">
+                  <span>{t('gen.floorRole')}</span>
+                  <select
+                    value={f.role ?? 'ground'}
+                    disabled={busy}
+                    onChange={(e) => updateFloor(f.id, { role: e.target.value as FloorDef['role'] })}
+                  >
+                    <option value="basement">{t('gen.floorRole.basement')}</option>
+                    <option value="ground">{t('gen.floorRole.ground')}</option>
+                    <option value="upper">{t('gen.floorRole.upper')}</option>
+                    <option value="roof">{t('gen.floorRole.roof')}</option>
+                  </select>
+                </label>
                 <button
                   className="gen-floor-remove"
                   title={t('gen.removeFloor')}

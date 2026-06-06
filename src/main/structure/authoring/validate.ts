@@ -1,7 +1,10 @@
 // Validate the authoring JSON against the hard rules, throwing a human-readable
 // message on the first violation so the AI loop gets actionable feedback.
+import type { FloorRole } from '@/shared/types';
 import { isKnownStructure, knownStructureNames } from '../domain';
 import { type AuthoringOp, type AuthoringStructure, OP_NAMES } from './types';
+
+const FLOOR_ROLES: readonly FloorRole[] = ['basement', 'ground', 'upper', 'roof'];
 
 export function validateAuthoring(s: AuthoringStructure): void {
   if (!s || typeof s !== 'object') throw new Error('structure is not an object');
@@ -95,5 +98,21 @@ export function validateAuthoring(s: AuthoringStructure): void {
 
   if (ops.length === 0 && blocks.length === 0) {
     throw new Error('place at least one block via "ops" (preferred) or "blocks"');
+  }
+
+  const floors = s.floors;
+  if (floors !== undefined) {
+    if (!Array.isArray(floors)) throw new Error('floors must be an array');
+    floors.forEach((f, i) => {
+      if (!f || typeof f !== 'object') throw new Error(`floors[${i}] must be an object`);
+      if (!(FLOOR_ROLES as readonly string[]).includes(f.role)) {
+        throw new Error(`floors[${i}].role must be one of ${FLOOR_ROLES.join(', ')}`);
+      }
+      const okBound = (n: unknown): boolean => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < size[1];
+      if (!okBound(f.from) || !okBound(f.to)) {
+        throw new Error(`floors[${i}] from/to must be integers within the height (0..${size[1] - 1})`);
+      }
+      if (f.from > f.to) throw new Error(`floors[${i}].from must be <= floors[${i}].to`);
+    });
   }
 }

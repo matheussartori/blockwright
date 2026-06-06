@@ -14,6 +14,11 @@ export interface PassContext {
    *  but the gating itself is driven by the module's declared finalizers (see
    *  `compile.ts`), so a pass receives this only for its own geometry decisions. */
   structureType?: string;
+  /** The ground-floor y ("grade"), from the build's labelled storeys (see
+   *  `gradeFromFloors`). The air-fill keeps below-grade exterior as structure_void
+   *  and clears at/above-grade exterior to air. Undefined = no floors declared, so
+   *  nothing is treated as below grade (every exterior pocket fills with air). */
+  grade?: number;
   /** Optional sink for the per-pass play-by-play (the AI Console dock). When set,
    *  `runPasses` reports each pass's intent + any fixes/warnings through it. Left
    *  undefined for non-AI compiles (catalog/module previews) so they stay quiet. */

@@ -6,8 +6,10 @@ export type {
   AuthoringPaletteEntry,
   AuthoringBlock,
   AuthoringEntity,
+  AuthoringFloor,
 } from './types';
 export { OP_NAMES } from './types';
+export { gradeFromFloors, type FloorRange } from './floors';
 
 export { compileStructure, compileStructureReport, writeStructureFile, type CompileReport } from './compile';
 export { resolveBlocks } from './ops';

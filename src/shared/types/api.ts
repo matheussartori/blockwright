@@ -14,6 +14,7 @@ import type {
   RenderRequest,
   RenderResult,
   BuildSelection,
+  FloorDef,
 } from './generation';
 import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
 
@@ -73,6 +74,9 @@ export interface BlockwrightApi {
     images?: GenerateImage[],
     selection?: BuildSelection,
     basePath?: string,
+    /** The user's Floor plan for this build — overrides the model's declared storeys
+     *  when locating the ground-floor level for the air-fill. */
+    floors?: FloorDef[],
   ) => Promise<GenerateResult>;
   /** Cancel the in-flight generation for a session (resolves the pending aiGenerate as canceled). */
   aiCancel: (sessionId: string) => Promise<void>;

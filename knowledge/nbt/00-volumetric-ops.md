@@ -88,6 +88,14 @@ output tokens **and** guaranteed-correct orientation.
   with air automatically and **leaves everything outside your footprint as world terrain**, so a
   non-rectangular footprint (cross, L, wings) places cleanly without gouging a rectangular hole.
   Only place `air` where you actively want a cell *emptied*; never paint air across the exterior.
+- **Declare `floors` on every full emit.** Add a `floors` array to the structure: one entry per
+  storey, `{ name?, role: "basement"|"ground"|"upper"|"roof", from, to }` over an inclusive y range,
+  covering the whole height bottom→top. **Mark every below-ground storey `"basement"`.** This is how
+  the compiler finds the ground-floor level ("grade"): exterior empty space *below* grade (around and
+  under a basement) is preserved as the world's terrain (structure_void) so placement never digs a
+  trench in front of the basement, while the interior and at/above-grade exterior pockets (a recessed
+  facade in front of the door, an open balcony) are cleared to air so they stay visible and walkable
+  even in conflicting terrain. Omit `floors` only in a patch (it inherits the previous emit's floors).
 - **Block IDs are validated** against the real 1.21.1 block set before render — a typo or wrong
   variant (`*_planks` vs `*_wood`, `_stained_glass` vs `_stained_glass_pane`) is rejected with the
   bad ID, so use exact IDs.

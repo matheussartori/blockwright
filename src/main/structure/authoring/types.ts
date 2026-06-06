@@ -3,6 +3,7 @@
 // tree but without the NBT type rules (the compiler applies those) and with the
 // air-omission convenience. These are the type-only contracts shared across the
 // authoring compile pipeline.
+import type { FloorRole } from '@/shared/types';
 
 export interface AuthoringStructure {
   DataVersion?: number;
@@ -15,6 +16,20 @@ export interface AuthoringStructure {
   ops?: AuthoringOp[];
   blocks?: AuthoringBlock[];
   entities?: AuthoringEntity[];
+  /** The build's storeys, labelled by role. The compiler reads this (not geometry)
+   *  to find the ground-floor level ("grade") so the air-fill keeps the basement
+   *  surround as structure_void while the interior + above-grade facade/balcony
+   *  become air. Declared by the model per emit; the user's Floor plan overrides it
+   *  at compile time. See `gradeFromFloors`. */
+  floors?: AuthoringFloor[];
+}
+
+/** A storey in `AuthoringStructure.floors`: a role-tagged inclusive y range. */
+export interface AuthoringFloor {
+  name?: string;
+  role: FloorRole;
+  from: number;
+  to: number;
 }
 
 /** A volumetric build op. `fill` = solid box; `hollow` = 6-face shell; `walls` =
