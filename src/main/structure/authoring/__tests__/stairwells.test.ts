@@ -69,6 +69,23 @@ describe('rebuildStairwells', () => {
     expect(r.fixes?.join(' ')).toMatch(/ladder/);
   });
 
+  it('clears furniture from the headroom + step-off walkway so nothing blocks the climb', () => {
+    // A flight 0→5 climbing +x at z=3 in a roomy interior. The model dumped a bookshelf
+    // (state 4) in the 3rd headroom cell over a tread and in the step-off walkway — both
+    // must be cleared so the player's head doesn't hit and the path off the stair is open.
+    const pal: AuthoringPaletteEntry[] = [...palette, { Name: 'minecraft:bookshelf' }];
+    const blocks = storeyShell(11, 7, [0, 5, 10]);
+    blocks.push(
+      { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] },
+      { state: 3, pos: [4, 3, 3] }, { state: 3, pos: [5, 4, 3] },
+      { state: 4, pos: [4, 6, 3] }, // 3rd headroom cell over the tread at (4,3,3)
+      { state: 4, pos: [8, 6, 3] }, // 2nd step-off walkway cell past the top arrival
+    );
+    const r = rebuildStairwells(blocks, pal, ctx);
+    expect(at(r, 4, 6, 3)?.Name).not.toBe('minecraft:bookshelf'); // head-bonk block cleared
+    expect(at(r, 8, 6, 3)?.Name).not.toBe('minecraft:bookshelf'); // approach walkway cleared
+  });
+
   it('leaves a single-storey build (one floor plane) untouched', () => {
     const blocks: AuthoringBlock[] = [
       ...storeyShell(9, 7, [0]),

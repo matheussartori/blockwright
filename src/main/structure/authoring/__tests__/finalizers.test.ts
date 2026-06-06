@@ -36,4 +36,16 @@ describe('fixChimney: one complete chimney (house finalizer)', () => {
     const r = fixChimney(blocks, palette, ctx);
     expect(r.blocks).toBe(blocks); // no-op (same reference)
   });
+
+  it('clears a foreign block (a bed) threaded through the flue, restoring the masonry', () => {
+    // 3 = a bed shoved into the flue at y5; the rest of the column (y2..8) is cobblestone.
+    const pal: AuthoringPaletteEntry[] = [...palette, { Name: 'minecraft:white_bed', Properties: { part: 'head' } }];
+    const blocks: AuthoringBlock[] = [{ state: 1, pos: [0, 0, 0] }, { state: 1, pos: [0, 10, 0] }];
+    for (let y = 2; y <= 8; y++) blocks.push({ state: y === 5 ? 3 : 1, pos: [5, y, 5] });
+    blocks.push({ state: 2, pos: [5, 9, 5] }); // cap
+    const r = fixChimney(blocks, pal, ctx);
+    expect(has(r.blocks, 3, 5, 5, 5)).toBe(false); // the bed is gone from the flue
+    expect(has(r.blocks, 1, 5, 5, 5)).toBe(true);  // restored to flue masonry
+    expect((r.fixes ?? []).join(' ')).toMatch(/flue/);
+  });
 });

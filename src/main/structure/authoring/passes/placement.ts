@@ -115,13 +115,15 @@ export const fixPlacement: Pass = (blocks, palette) => {
     // (the "iron bars hovering over the roof" defect).
     if (floating.has(posKey(x, y, z))) { removedFloating++; continue; }
 
-    // An UPPER door half with no lower half beneath it is a "door in the middle of
-    // nowhere" — a half-panel floating where its base is missing. Drop it (the model
-    // can re-place a complete door). A lone LOWER half is left alone: it sits on the
-    // floor and reads as the start of a door, not floating debris.
-    if (isDoorName(name) && props.half === 'upper') {
-      const lower = at(x, y - 1, z);
-      if (lower === undefined || !isDoorName(lower)) { removedOrphanDoors++; continue; }
+    // A door is ALWAYS two halves. A lone half — an UPPER with no lower beneath, or a
+    // LOWER with no upper above — is debris: either a "door floating in mid-air" or the
+    // single-leaf "half door" the model drops as decoration (a row of lower-only doors
+    // standing in a room). Neither is a real, usable door, and doors as decoration just
+    // read as broken, so drop any unpaired half (the model can re-place a complete door
+    // where an entrance actually belongs).
+    if (isDoorName(name)) {
+      const mate = props.half === 'upper' ? at(x, y - 1, z) : at(x, y + 1, z);
+      if (mate === undefined || !isDoorName(mate)) { removedOrphanDoors++; continue; }
     }
 
     if (isLantern(id)) {
@@ -260,7 +262,7 @@ export const fixPlacement: Pass = (blocks, palette) => {
   if (clearedChestTops) fixes.push(`cleared ${plural(clearedChestTops, 'block')} sitting on a chest lid (kept it openable)`);
   if (openedDoorways) fixes.push(`opened ${plural(openedDoorways, 'doorway')} that was blocked by a wall`);
   if (seatedSlabs) fixes.push(`seated ${plural(seatedSlabs, 'floating top-slab')} onto the block below (flipped to bottom)`);
-  if (removedOrphanDoors) fixes.push(`removed ${plural(removedOrphanDoors, 'orphan door half')} with no matching half (a door floating in mid-air)`);
+  if (removedOrphanDoors) fixes.push(`removed ${plural(removedOrphanDoors, 'orphan door half')} with no matching half (a door floating in mid-air, or a single-leaf "half door" used as decoration)`);
   if (removedFloating) fixes.push(`removed ${plural(removedFloating, 'floating pane/bar/fence/wall')} with no solid support (e.g. a railing hovering over the roof)`);
 
   const kept = carve.size ? out.filter((b) => !carve.has(posKey(...b.pos))) : out;

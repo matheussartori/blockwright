@@ -197,6 +197,7 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     const carve: string[] = [];
     const place: AuthoringBlock[] = [];
     const occupy: string[] = []; // cells this connector claims (for collision reservation)
+    const soft: [number, number, number][] = []; // best-effort clearance (head bonk / approach furniture)
     const wantClear = (x: number, y: number, z: number): boolean => {
       if (!free(x, y, z)) return false;
       carve.push(posKey(x, y, z));
@@ -220,15 +221,27 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
         occupy.push(posKey(sx, sy, sz));
       }
       // 2 blocks of headroom over every tread (cuts the stairwell hole through the
-      // upper floor where it crosses that plane).
+      // upper floor where it crosses that plane) + a soft 3rd so the player's head
+      // never clips the ceiling/underside of the floor above while climbing.
       if (!wantClear(x, y + 1, z) || !wantClear(x, y + 2, z)) return null;
+      soft.push([x, y + 3, z]);
     }
-    // Bottom landing: one cell back of the bottom tread, body + head.
+    // Bottom landing: one cell back of the bottom tread, body + head — plus a soft 3rd
+    // of height and a 2nd cell of walkway so the approach to the foot of the stair is clear.
     if (!wantClear(h.x - fx, lowerY + 1, h.z - fz) || !wantClear(h.x - fx, lowerY + 2, h.z - fz)) return null;
-    // Top arrival: one cell forward of the top tread, body + head (you step off here).
+    soft.push(
+      [h.x - fx, lowerY + 3, h.z - fz],
+      [h.x - fx * 2, lowerY + 1, h.z - fz * 2], [h.x - fx * 2, lowerY + 2, h.z - fz * 2],
+    );
+    // Top arrival: one cell forward of the top tread, body + head (you step off here) —
+    // plus a soft 3rd of height and a 2nd walkway cell so you can actually walk away.
     const [tx, ty, tz] = treads[steps - 1];
     if (!wantClear(tx + fx, ty + 1, tz + fz) || !wantClear(tx + fx, ty + 2, tz + fz)) return null;
-    return { place, carve, occupy, kind: 'stair' as const };
+    soft.push(
+      [tx + fx, ty + 3, tz + fz],
+      [tx + fx * 2, ty + 1, tz + fz * 2], [tx + fx * 2, ty + 2, tz + fz * 2],
+    );
+    return { place, carve, occupy, soft, kind: 'stair' as const };
   };
 
   // Attempt a wall ladder rising from `lowerY` to `upperY` at the hint's column.
@@ -265,7 +278,12 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       carve.push(posKey(ex, ey, ez));
       occupy.push(posKey(ex, ey, ez));
     }
-    return { place, carve, occupy, kind: 'ladder' as const };
+    // Soft clearance at the top step-off: a 3rd block of headroom + a 2nd walkway cell.
+    const soft: [number, number, number][] = [
+      [bx + fx, upperY + 3, bz + fz],
+      [bx + fx * 2, upperY + 1, bz + fz * 2], [bx + fx * 2, upperY + 2, bz + fz * 2],
+    ];
+    return { place, carve, occupy, soft, kind: 'ladder' as const };
   };
 
   // Process gaps bottom-up so a lower flight reserves its cells before a higher one.
@@ -286,6 +304,16 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     for (const k of h.strip) stripKeys.add(k);
     for (const k of plan.carve) removeKeys.add(k);
     for (const k of plan.occupy) reserved.add(k);
+    // Best-effort: clear extra headroom + the immediate approach walkway of whatever the
+    // model dumped there (furniture, a skull-on-block, a stray bookshelf), so a decoration
+    // never blocks the climb. Never touches the outer shell or a structural floor plane
+    // (so we don't punch the building open or drop a second floor hole).
+    for (const [x, y, z] of plan.soft) {
+      const k = posKey(x, y, z);
+      if (!present(x, y, z) || isShell(x, y, z) || planeSet.has(y) || reserved.has(k)) continue;
+      removeKeys.add(k);
+      reserved.add(k);
+    }
     for (const b of plan.place) added.push(b);
     if (plan.kind === 'stair') stairs++; else ladders++;
   }

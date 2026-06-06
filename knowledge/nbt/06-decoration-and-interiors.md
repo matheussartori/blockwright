@@ -194,3 +194,19 @@ smaller purposeful rooms with partition walls. Never leave a big volume nearly b
   rooms empty; the clutter to avoid is in circulation space, not against the walls.
 - Mixing too many wood/stone types — pick 2–3 and stick to them.
 - Forgetting `facing` on stairs/chairs so they point the wrong way (catch this in preview).
+- **`*_door` blocks used as decoration.** A door is **only** for a real walkable entrance — a
+  building's front door, or the doorway between two rooms. **Never** place doors as a furniture motif:
+  no rows of doors along a wall, no door as a cabinet/wardrobe/headboard, no half-door standing in the
+  open. They just read as broken (and a single-leaf "half door" is invalid anyway). For cabinet fronts,
+  wardrobes, screens and panelling use `*_trapdoor`s, `barrel`s, `*_fence`s or framed blocks instead.
+- **A door that isn't two full halves.** Every door is TWO blocks stacked: a `half:"lower"` on the floor
+  AND a `half:"upper"` directly above it, same `facing`/`hinge`. A lone lower or lone upper is debris and
+  gets deleted. Only place a door where you actually placed both halves, in a 2-tall gap in a wall.
+- **Furniture/decoration in or beside a staircase.** A staircase needs a clear climb: the treads, **3
+  blocks of headroom over every tread**, and the landing at the top and bottom (plus one walkway cell of
+  approach) must be **air**. Doors and stairs must never share or crowd cells — a door's swing space at
+  the head of a flight blocks the climb. Keep bookshelves, skulls-on-blocks, beds, barrels, etc. out of
+  the stairwell footprint and its 1-block margin; decorate the room *away* from the stair.
+- **Anything threaded through the chimney.** The chimney flue is unbroken masonry from the hearth to the
+  cap — never run a bed, shelf, barrel or any block through the chimney column. Stand furniture clear of
+  the flue so the stack reads as one solid chimney.

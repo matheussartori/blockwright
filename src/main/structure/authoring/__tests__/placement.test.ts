@@ -258,22 +258,33 @@ describe('fixPlacement — floating top-slabs', () => {
 describe('fixPlacement — door passage', () => {
   it('opens a doorway blocked by a wall behind it', () => {
     // facing south → back is north (z-1); a stone wall plugs both door halves there.
+    // The door is COMPLETE (both halves) so it isn't dropped as a lone half first.
     const r = run(
-      [{ Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } }, { Name: 'minecraft:stone_bricks' }],
-      [{ state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 1, 4] }, { state: 1, pos: [5, 2, 4] }],
+      [
+        { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } },
+        { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'upper' } },
+        { Name: 'minecraft:stone_bricks' },
+      ],
+      [
+        { state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] },
+        { state: 2, pos: [5, 1, 4] }, { state: 2, pos: [5, 2, 4] },
+      ],
     );
     const walls = r.blocks.filter((b) => nameOf(r, b) === 'minecraft:stone_bricks');
     expect(walls).toHaveLength(0); // the plug was carved out
-    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:spruce_door')).toHaveLength(1);
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:spruce_door')).toHaveLength(2);
     expect((r.fixes ?? []).join(' ')).toMatch(/doorway/);
   });
 
-  it('leaves a door with clear passage on both sides untouched', () => {
+  it('leaves a complete door with clear passage on both sides untouched', () => {
     const r = run(
-      [{ Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } }],
-      [{ state: 0, pos: [5, 1, 5] }],
+      [
+        { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } },
+        { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'upper' } },
+      ],
+      [{ state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] }],
     );
-    expect(r.blocks).toHaveLength(1);
+    expect(r.blocks).toHaveLength(2);
     expect(r.fixes ?? []).toHaveLength(0);
   });
 });
@@ -287,6 +298,17 @@ describe('fixPlacement — orphan door halves', () => {
     const r = run(
       [{ Name: 'minecraft:oak_planks' }, upper('right')],
       [{ state: 0, pos: [5, 10, 5] }, { state: 1, pos: [5, 11, 5] }],
+    );
+    expect(r.blocks.some((b) => nameOf(r, b).endsWith('_door'))).toBe(false);
+    expect((r.fixes ?? []).join(' ')).toMatch(/orphan door/);
+  });
+
+  it('removes a lone lower door half (a single-leaf "half door" used as decoration)', () => {
+    // 0 = planks floor, 1 = a lower door half on the floor with NO upper half above it —
+    // the decorative half-door the model dumps in a row across a room.
+    const r = run(
+      [{ Name: 'minecraft:oak_planks' }, lower('left')],
+      [{ state: 0, pos: [5, 0, 5] }, { state: 1, pos: [5, 1, 5] }],
     );
     expect(r.blocks.some((b) => nameOf(r, b).endsWith('_door'))).toBe(false);
     expect((r.fixes ?? []).join(' ')).toMatch(/orphan door/);

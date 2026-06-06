@@ -113,7 +113,8 @@ B B F B B   ← firebox at floor (campfire on hearth)
   living-room references). Add a `lectern` and an armchair = a reading nook.
 - **Cabinets / dresser:** stacks of `barrel`s with `*_trapdoor` doors, or `*_trapdoor`s mounted flat
   on the wall over a counter as **upper cupboards**.
-- **Wardrobe:** a 1×2 column of `barrel`s or a pair of `*_doors` set into a wall recess.
+- **Wardrobe:** a 1×2 column of `barrel`s, or `*_trapdoor`s as cabinet fronts over a recess.
+  Do **not** use `*_door` blocks for this — see the doors rule below.
 - Storage `chest`/`barrel`: opening faced at the open room, on a solid block (never into a wall — see
   [`10`](10-design-principles.md)).
 
