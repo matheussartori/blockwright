@@ -1686,6 +1686,16 @@ body.row-resizing {
 .modal-lg {
   width: min(880px, 100%);
 }
+.modal-xl {
+  width: min(1040px, 100%);
+}
+/* The browse modals run tall and fixed so their internal panes scroll, not the page. */
+.modal.catalog {
+  height: min(660px, calc(100vh - 80px));
+}
+.modal.gallery {
+  height: min(680px, calc(100vh - 80px));
+}
 .modal-head {
   flex: none;
   display: flex;
@@ -2036,142 +2046,362 @@ body.row-resizing {
   padding: 28px 12px;
 }
 
-/* --- Module gallery (ModulesModal) --- */
-.modules-list {
+/* --- Framed preview surface (PreviewFrame) — shared by both browse modals -----
+   A real image (texture now, screenshot later) OR a CSS placeholder, always under
+   a "cohesion veil" so a vivid in-game photo is vignetted + tinted into the app's
+   palette instead of clashing with the surrounding chrome. */
+.preview-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background:
+    radial-gradient(120% 120% at 50% 0%, var(--panel-strong), transparent 70%),
+    var(--bg);
+  isolation: isolate;
+}
+.preview-frame-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Pull saturation/brightness toward the chrome so screenshots feel native. */
+  filter: saturate(0.92) contrast(1.02) brightness(0.98);
+}
+.preview-frame.pixelated .preview-frame-img {
+  object-fit: contain;
+  padding: 12%;
+  image-rendering: pixelated;
+  filter: none;
+}
+/* Block textures are already on-theme pixel art — keep only the inner frame, drop
+   the photo-cohesion fade/vignette so the icon reads cleanly. */
+.preview-frame.pixelated .preview-frame-veil {
+  background: radial-gradient(130% 90% at 50% 36%, transparent 60%, color-mix(in srgb, var(--bg) 30%, transparent));
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+/* The veil: an inner border + top sheen + bottom fade + soft vignette. It sits
+   above the image (z-index) and below the badge/caption, harmonising any photo. */
+.preview-frame-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--text) 8%, transparent), transparent 22%),
+    linear-gradient(to top, color-mix(in srgb, var(--bg) 78%, transparent), transparent 46%),
+    radial-gradient(130% 90% at 50% 38%, transparent 52%, color-mix(in srgb, var(--bg) 46%, transparent));
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    inset 0 24px 60px -34px rgba(0, 0, 0, 0.6);
+}
+.preview-frame-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--text-muted);
+  /* A faint diagonal hatch + the optional block tint → an intentional empty state. */
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--text) 4%, transparent) 0 1px,
+      transparent 1px 11px
+    ),
+    color-mix(in srgb, var(--frame-tint, transparent) 16%, transparent);
+}
+.preview-frame-glyph {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.preview-frame-hint {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.preview-frame-badge {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  z-index: 2;
+}
+.preview-frame-badge .chip {
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(5px);
+  color: var(--text-2);
+}
+.preview-frame-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  right: 12px;
+  z-index: 2;
+  font-size: 12px;
+  color: var(--text);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+/* --- Module gallery (ModulesModal) — detail-dominant: index rail + wide detail - */
+.gallery-body {
+  display: flex;
+  overflow: hidden;
+}
+.gallery-main {
+  display: flex;
   flex: 1;
+  min-height: 0;
+}
+.gallery-rail {
+  flex: none;
+  width: 296px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+.gallery-cats {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.gallery-cat {
+  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+.gallery-cat:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+.gallery-cat.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.gallery-index {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
-.modules-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  text-align: left;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  cursor: pointer;
-}
-.modules-row:hover {
-  background: var(--panel-strong);
-}
-.modules-row.selected {
-  border-color: var(--accent);
-  background: var(--panel-strong);
-}
-.modules-row-name {
-  font-weight: 600;
-}
-.modules-row-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-.modules-preview-empty,
-.modules-detail-desc {
-  color: var(--text-muted);
-}
-.modules-preview-empty {
-  position: absolute;
-  inset: 0;
+.gallery-item {
+  -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 16px;
-  font-size: 13px;
-}
-.modules-detail-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  margin: 6px 0 0;
-}
-.modules-detail-applies {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 8px 0 0;
-}
-.modules-detail-applies-label {
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
+  gap: 11px;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
-.modules-presets {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.gallery-item:hover {
+  background: var(--panel-strong);
 }
-.modules-presets-head {
+.gallery-item.selected {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.gallery-item-thumb {
+  flex: none;
+  width: 52px;
+  height: 52px;
+}
+.gallery-item-text {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 11px;
-  margin-bottom: 2px;
 }
-.modules-presets-hint {
+.gallery-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gallery-item-desc {
+  font-size: 11.5px;
   color: var(--text-muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gallery-rail-foot {
+  flex: none;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
   font-size: 11px;
-  line-height: 1.4;
+  color: var(--text-muted);
 }
-.modules-preset {
+.gallery-detail {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+.gallery-detail-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.gallery-hero {
+  height: 248px;
+  padding: 18px 18px 0;
+}
+.gallery-hero .preview-frame {
+  border-radius: var(--radius);
+}
+.gallery-hero-badge {
+  text-transform: capitalize;
+}
+.gallery-detail-body {
+  padding: 16px 22px 24px;
+}
+.gallery-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 14px;
+}
+.gallery-detail-name {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.gallery-applies {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.gallery-applies-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.gallery-detail-desc {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-width: 62ch;
+}
+.gallery-presets {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.gallery-presets-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 12px;
+}
+.gallery-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--text);
+}
+.gallery-presets-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.gallery-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 10px;
+}
+.gallery-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--panel);
-  padding: 8px 10px;
 }
-.modules-preset[open] {
-  background: var(--panel-strong);
-}
-.modules-preset-summary {
+.gallery-preset-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  list-style: none;
-  font-size: 12px;
 }
-.modules-preset-summary::-webkit-details-marker {
-  display: none;
-}
-.modules-preset-name {
+.gallery-preset-name {
+  font-size: 13px;
   font-weight: 600;
 }
-.modules-preset-scale {
+.gallery-preset-scale {
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text);
+  border-color: transparent;
 }
-.modules-preset-scale.scale-snug {
+.gallery-preset-scale.scale-snug {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.modules-preset-scale.scale-standard {
-  background: color-mix(in srgb, var(--accent) 32%, transparent);
+.gallery-preset-scale.scale-standard {
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
 }
-.modules-preset-scale.scale-grand {
-  background: color-mix(in srgb, var(--accent) 50%, transparent);
+.gallery-preset-scale.scale-grand {
+  background: color-mix(in srgb, var(--accent) 52%, transparent);
 }
-.modules-preset-desc {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-  margin: 8px 0 4px;
-}
-.modules-preset-items {
+.gallery-preset-summary {
   margin: 0;
-  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.gallery-preset-items {
+  margin: 0;
+  padding-left: 16px;
   font-size: 12px;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
-.modules-preset-items li {
+.gallery-preset-items li {
   margin: 1px 0;
 }
 .gen-details-hint {
@@ -2182,48 +2412,15 @@ body.row-resizing {
 }
 .catalog-side {
   flex: none;
-  width: 244px;
+  width: 252px;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
 }
 .catalog-preview {
-  position: relative;
-  flex: 1;
-  min-height: 200px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 34%, var(--panel-strong), transparent 62%),
-    var(--bg);
-}
-/* A soft contact shadow under the floating block, for grounding. */
-.catalog-preview::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 16%;
-  width: 56%;
-  height: 26px;
-  transform: translateX(-50%);
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.32), transparent 70%);
-  pointer-events: none;
-}
-.block-preview-canvas {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-}
-/* Namespace tag overlaid in the stage's top-left, so it never crowds the
-   block name in the detail strip below. */
-.catalog-ns-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 2;
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(4px);
+  flex: none;
+  height: 224px;
+  padding: 16px 16px 4px;
 }
 .catalog-detail {
   flex: none;

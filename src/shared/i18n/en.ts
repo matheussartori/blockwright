@@ -292,6 +292,7 @@ export const en = {
   'modules.scaleSnug': 'Snug',
   'modules.scaleStandard': 'Standard',
   'modules.scaleGrand': 'Grand',
+  'modules.count': '{count} modules',
 
   // Settings ▸ AI.
   'ai.stable': 'Stable',

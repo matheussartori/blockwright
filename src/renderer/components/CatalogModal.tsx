@@ -1,9 +1,10 @@
 // The Block Catalog: browse every placeable block in the active content (vanilla
-// pack + the active mod workspace's namespace), in a list or grid, with a live 3D
-// preview of the selected block. Built on the shared Modal + Segmented primitives
-// so it matches the rest of the app. Copying a block id (e.g. into the Generate
-// composer) is the main action; it's also the seed for future inspector ↔ block
-// links and mod-block-aware generation.
+// pack + the active mod workspace's namespace), in a list or grid, with a framed
+// preview of the selected block. Hundreds of items → GRID-DOMINANT: the browse
+// grid takes the room and a slim right rail shows the selected block enlarged (its
+// real texture, framed + veiled so it reads like the rest of the app) plus its id
+// to copy (the main action — e.g. into the Generate composer). Built on the shared
+// Modal + Segmented + PreviewFrame primitives so it matches the Module Gallery.
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
@@ -11,7 +12,7 @@ import { useApp, useT } from '../hooks/useStores';
 import type { CatalogBlock } from '@/shared/types';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
-import { BlockPreview } from './ui/BlockPreview';
+import { PreviewFrame } from './ui/PreviewFrame';
 
 type ViewMode = 'grid' | 'list';
 type NsFilter = 'all' | 'minecraft' | 'mod';
@@ -188,8 +189,13 @@ export function CatalogModal() {
 
         <aside className="catalog-side">
           <div className="catalog-preview">
-            {selected && <span className="chip catalog-ns-badge">{selected.namespace}</span>}
-            <BlockPreview blockId={selected?.id ?? null} />
+            <PreviewFrame
+              src={selected?.texture ? api.textureUrl(selected.texture) : null}
+              alt={selected?.block ?? ''}
+              pixelated
+              tint={selected ? fallbackColor(selected.id) : undefined}
+              badge={selected && <span className="chip">{selected.namespace}</span>}
+            />
           </div>
           {selected ? (
             <div className="catalog-detail">

@@ -294,6 +294,7 @@ export const ptBR: Messages = {
   'modules.scaleSnug': 'Compacto',
   'modules.scaleStandard': 'Padrão',
   'modules.scaleGrand': 'Amplo',
+  'modules.count': '{count} módulos',
 
   // Settings ▸ AI.
   'ai.stable': 'Estável',
