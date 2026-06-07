@@ -69,7 +69,15 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
           store.getState().setNotice({ text: `${data.name} — no structure blocks found`, warn: true });
           return;
         }
-        documentsStore.getState().patchDoc(docId, { structure: data, loading: false, ...(working ? { path } : {}) });
+        // Seed the floor plan from the storeys main auto-detected on load — but only
+        // when this doc has none yet (a persisted/edited plan wins) and we're showing
+        // the working build (not previewing an earlier version).
+        const cur = documentsStore.getState().documents.find((d) => d.id === docId);
+        const seedFloors =
+          working && cur && cur.floors.length === 0 && data.floors && data.floors.length > 0
+            ? { floors: data.floors }
+            : {};
+        documentsStore.getState().patchDoc(docId, { structure: data, loading: false, ...seedFloors, ...(working ? { path } : {}) });
         store.getState().setNotice(null);
         if (documentsStore.getState().activeId === docId && viewerRef.current) {
           await viewerRef.current.show(data, preserveCamera);

@@ -17,6 +17,7 @@ import { auditGateFeedback } from './audit-gate';
 import { maxRoundsFor } from './rounds';
 import { beginRun, endRun, getSession } from './session';
 import { mirrorToLibrary } from './output-dir';
+import { buildMetadata, librarySidecarPath, removeTempMetadata, writeMetadataJson } from '../structure/metadata';
 import { mergePatch } from './patch';
 import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
@@ -251,7 +252,31 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     if (session.library.dir) run.attach(session.library.dir);
 
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
-    const blockCount = resolveBlocks(authoring).blocks.length;
+    const resolved = resolveBlocks(authoring);
+    const blockCount = resolved.blocks.length;
+
+    // Write/refresh the `.bw.json` sidecar beside the library build, so a later edit
+    // has the size, dominant palette and recognised storeys to work from. The user's
+    // Floor plan (if any) wins over auto-detection. Opening a file from outside the
+    // library left a temp sidecar; the build now has its own folder, so promote here by
+    // writing beside it and removing the temp copy.
+    if (session.library.latest) {
+      const counts = new Map<string, number>();
+      for (const b of resolved.blocks) {
+        const nm = resolved.palette[b.state]?.Name ?? '';
+        if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
+      }
+      const meta = buildMetadata({
+        name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
+        source: session.library.latest,
+        size,
+        solids: resolved.blocks.map((b) => b.pos),
+        paletteCounts: counts,
+        floors: floors?.length ? floors : undefined,
+      });
+      await writeMetadataJson(librarySidecarPath(session.library.latest), meta);
+      if (basePath) await removeTempMetadata(basePath);
+    }
     captured = {
       ok: true,
       path: nbtPath,

@@ -64,7 +64,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
   const { Content } = PANELS[active];
 
   return (
-    <aside className={`inspector-dock${active === 'generate' ? ' wide' : ''}`}>
+    <aside className="inspector-dock">
       <div className="dock-head">
         <div className="dock-tabs" role="tablist">
           {tabs.map((id) => (

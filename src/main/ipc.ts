@@ -7,6 +7,7 @@ import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
+import { metadataFromStructure, writeLoadMetadata } from './structure/metadata';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
@@ -46,7 +47,13 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.openDialog, async () => openFileDialog());
 
   ipcMain.handle(IPC_CHANNELS.loadStructure, async (_e, filePath: string) => {
-    return loadStructure(filePath);
+    const data = await loadStructure(filePath);
+    // Recognise the storeys + write the `.bw.json` sidecar (temp for a file opened
+    // from outside the library, beside it when inside). Best-effort, fire-and-forget;
+    // the detected floors ride back on the structure to seed the Floors panel + bands.
+    const meta = metadataFromStructure(data);
+    void writeLoadMetadata(meta);
+    return { ...data, floors: meta.floors };
   });
 
   ipcMain.handle(IPC_CHANNELS.hasTexture, async (_e, key: string) => {

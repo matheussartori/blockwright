@@ -1,6 +1,6 @@
-// Settings ▸ Viewer: scene toggles (grid, block-texture icons, floor highlighting)
-// and fly-mode controls (mouse sensitivity, invert Y). Mutates settingsStore; the
-// viewer reads these via App's settings→viewer effect.
+// Settings ▸ Viewer: scene toggles (grid, block-texture icons) and fly-mode controls
+// (mouse sensitivity, invert Y). Mutates settingsStore; the viewer reads these via
+// App's settings→viewer effect. (Floor bands are auto-detected, not a setting.)
 import { useSettings, useT } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
 
@@ -25,15 +25,6 @@ export function ViewerTab() {
           />
         </label>
         <p className="setting-note">{t('viewer.blockTexturesNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.floorsOnlyEditing')}</span>
-          <input
-            type="checkbox"
-            checked={settings.floorsOnlyWhenEditing}
-            onChange={(e) => set('floorsOnlyWhenEditing', e.target.checked)}
-          />
-        </label>
-        <p className="setting-note">{t('viewer.floorsOnlyEditingNote')}</p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.flyMode')}</div>

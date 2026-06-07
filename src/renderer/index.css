@@ -680,7 +680,9 @@ body {
    Holds the Info / Jigsaw / Generate panels as tabs. */
 .inspector-dock {
   flex: none;
-  width: 288px;
+  /* All tabs share one width (the roomier size the generate chat needs), so the
+     dock doesn't jump when switching between Info / Jigsaw / Generate. */
+  width: 360px;
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
@@ -691,10 +693,6 @@ body {
 .inspector-dock.collapsed {
   width: 38px;
   align-items: center;
-}
-/* The generate chat needs more room than the static panels. */
-.inspector-dock.wide {
-  width: 360px;
 }
 .dock-rail-btn {
   -webkit-app-region: no-drag;
@@ -2733,16 +2731,6 @@ body.row-resizing {
   flex-direction: column;
 }
 
-/* Slim toolbar the content owns (the host chrome supplies title/detach/minimize). */
-.gen-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 8px 8px 8px 12px;
-  border-bottom: 1px solid var(--border);
-}
-
 .gen-warn {
   margin: 12px;
   padding: 10px 12px;
@@ -3224,16 +3212,13 @@ body.row-resizing {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   background: var(--accent-soft);
 }
+/* Floors are numbered, not named — this is a plain "Floor N" label, not an input. */
 .gen-floor-name {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
+  flex: none;
   font-size: 12px;
+  font-weight: 600;
   color: var(--text);
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
+  white-space: nowrap;
 }
 .gen-floor-y {
   display: flex;
@@ -3257,13 +3242,11 @@ body.row-resizing {
 .gen-floor-role select {
   width: auto;
 }
-.gen-floor-name:focus,
 .gen-floor-y input:focus,
 .gen-floor-role select:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 }
-.gen-floor-name:disabled,
 .gen-floor-y input:disabled,
 .gen-floor-role select:disabled {
   opacity: 0.5;

@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { documentsStore } from '../state/documents';
-import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
+import { runGeneration, cancelGeneration, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc, useT } from '../hooks/useStores';
 import { api } from '../api';
 import { dirname } from '../ui/path';
@@ -185,13 +185,16 @@ export function GenerateContent() {
     return () => clearInterval(id);
   }, [busy]);
 
-  // Tell the viewer (via the app store) when the Floors section is open, so it
-  // can scope the floor-plan highlight if "only while editing" is enabled. The
-  // highlight itself is driven from App against the active doc's floor plan.
+  // The Floors panel is for inspecting/correcting the AUTO-DETECTED storeys of an
+  // EXISTING `.nbt`. It's hidden while generating a brand-new build (no file yet) —
+  // there's nothing to detect until something is built and saved. Once a doc adopts a
+  // file (an opened `.nbt` or a finished build), the panel becomes available.
+  const isExisting = !!doc?.filePath;
+  // Collapse + forget the Floors section when it doesn't apply (e.g. switching to a
+  // fresh generate tab), so it can't linger open on a doc that shouldn't show it.
   useEffect(() => {
-    store.getState().setFloorsEditing(showFloors);
-    return () => store.getState().setFloorsEditing(false);
-  }, [showFloors]);
+    if (!isExisting) setShowFloors(false);
+  }, [isExisting]);
 
   // Details (structure/decoration) is an optional convenience, not a required first
   // step — start every conversation with it collapsed so a build can come from a
@@ -206,7 +209,10 @@ export function GenerateContent() {
   const setFloors = useCallback(
     (next: FloorDef[]) => {
       if (!doc) return;
-      documentsStore.getState().setFloors(doc.id, next);
+      // Floors are NUMBERED, not named: label each "Floor N" by its position so the
+      // plan always reads Floor 1..x (matching the viewer bands) — no name field.
+      const numbered = next.map((f, i) => ({ ...f, name: `Floor ${i + 1}` }));
+      documentsStore.getState().setFloors(doc.id, numbered);
       persistDoc(doc.id);
     },
     [doc],
@@ -218,10 +224,9 @@ export function GenerateContent() {
     // of floors lands at sensible, non-overlapping ranges out of the box.
     const top = floors.reduce((m, f) => Math.max(m, f.to), -1);
     const from = floors.length ? top + 1 : 0;
-    const f: FloorDef = { id: crypto.randomUUID(), name: '', from, to: from + 4 };
-    documentsStore.getState().setFloors(doc.id, [...floors, f]);
-    persistDoc(doc.id);
-  }, [doc, floors]);
+    const f: FloorDef = { id: crypto.randomUUID(), name: '', from, to: from + 4, role: 'upper' };
+    setFloors([...floors, f]);
+  }, [doc, floors, setFloors]);
 
   const updateFloor = useCallback(
     (id: string, patch: Partial<FloorDef>) =>
@@ -290,15 +295,6 @@ export function GenerateContent() {
     if (doc) cancelGeneration(doc.id);
   }, [doc]);
 
-  const reset = useCallback(() => {
-    if (doc) resetDocChat(doc.id);
-    setInput('');
-    setAttachments([]);
-    setDetails(EMPTY_DETAILS);
-    setShowDetails(false);
-    setShowFloors(false);
-  }, [doc]);
-
   const setField = useCallback(
     (key: 'structureType' | 'decoration' | 'roof' | 'basement', value: string) =>
       // Switching structure drops the old type's params + size (they don't carry over)
@@ -343,14 +339,6 @@ export function GenerateContent() {
     [],
   );
 
-  // Number of generated builds (v0/source excluded) — there's only something to
-  // flatten once at least one version exists.
-  const generatedCount = doc?.versions.filter((v) => v.version >= 1).length ?? 0;
-
-  const clearVersions = useCallback(() => {
-    if (doc) clearVersioning(doc.id);
-  }, [doc]);
-
   // A structure module is OPTIONAL — a build can come from a free-form prompt alone.
   // The selected structure (if any) drives the param controls + an adaptable scaffold.
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
@@ -364,34 +352,6 @@ export function GenerateContent() {
 
   return (
     <div className="gen-content" role="dialog" aria-label={t('gen.dialogLabel')}>
-      <div className="gen-bar">
-        <button className="btn sm" onClick={reset} disabled={busy || chat.length === 0}>
-          {t('gen.new')}
-        </button>
-        <button
-          className="btn sm"
-          title={t('gen.clearVersionsTitle')}
-          onClick={clearVersions}
-          disabled={busy || generatedCount === 0}
-        >
-          {t('gen.clearVersions')}
-        </button>
-        <button
-          className="btn sm"
-          title={t('gen.blocksTitle')}
-          onClick={() => store.getState().setCatalogOpen(true)}
-        >
-          {t('gen.blocks')}
-        </button>
-        <button
-          className="btn sm"
-          title={t('gen.modulesTitle')}
-          onClick={() => store.getState().setModulesOpen(true)}
-        >
-          {t('gen.modules')}
-        </button>
-      </div>
-
       {available === false && (
         <div className="gen-warn">
           {t('gen.noKeyPre')}
@@ -677,16 +637,9 @@ export function GenerateContent() {
             {floors.length === 0 && (
               <p className="gen-floors-empty">{t('gen.floorsEmpty')}</p>
             )}
-            {floors.map((f) => (
+            {floors.map((f, i) => (
               <div key={f.id} className="gen-floor-row">
-                <input
-                  className="gen-floor-name"
-                  type="text"
-                  placeholder={t('gen.floorNamePlaceholder')}
-                  value={f.name}
-                  disabled={busy}
-                  onChange={(e) => updateFloor(f.id, { name: e.target.value })}
-                />
+                <span className="gen-floor-name">{`Floor ${i + 1}`}</span>
                 <label className="gen-floor-y">
                   <span>{t('gen.floorFrom')}</span>
                   <input
@@ -785,21 +738,23 @@ export function GenerateContent() {
           >
             {t('gen.detailsBtn')}{hasDetails(details) ? ' •' : ''}
           </button>
-          <button
-            className={`btn sm gen-details-toggle${floors.length > 0 ? ' has-details' : ''}`}
-            title={t('gen.floorsBtnTitle')}
-            aria-pressed={showFloors}
-            disabled={busy}
-            onClick={() =>
-              setShowFloors((v) => {
-                const next = !v;
-                if (next) setShowDetails(false);
-                return next;
-              })
-            }
-          >
-            {t('gen.floorsBtn')}{floors.length > 0 ? ` (${floors.length})` : ''}
-          </button>
+          {isExisting && (
+            <button
+              className={`btn sm gen-details-toggle${floors.length > 0 ? ' has-details' : ''}`}
+              title={t('gen.floorsBtnTitle')}
+              aria-pressed={showFloors}
+              disabled={busy}
+              onClick={() =>
+                setShowFloors((v) => {
+                  const next = !v;
+                  if (next) setShowDetails(false);
+                  return next;
+                })
+              }
+            >
+              {t('gen.floorsBtn')}{floors.length > 0 ? ` (${floors.length})` : ''}
+            </button>
+          )}
           {busy ? (
             <button className="btn gen-send gen-cancel" onClick={cancel}>
               {t('gen.cancel')}

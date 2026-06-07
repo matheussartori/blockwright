@@ -26,9 +26,6 @@ export interface Settings {
   /** Show each block's actual texture (not a flat color swatch) as its icon in
    *  the Info block list. On by default — textures are easier to recognize. */
   blockTextureIcons: boolean;
-  /** Only highlight floor-plan regions in the viewer while the Generate floors
-   *  panel is open. Off by default, so the plan stays visible as you build. */
-  floorsOnlyWhenEditing: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -39,7 +36,6 @@ export const SETTINGS_DEFAULTS: Settings = {
   showJigsaw: false,
   hideShell: false,
   blockTextureIcons: true,
-  floorsOnlyWhenEditing: false,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -78,7 +74,6 @@ function snapshot(s: SettingsState): Settings {
     showJigsaw: s.showJigsaw,
     hideShell: s.hideShell,
     blockTextureIcons: s.blockTextureIcons,
-    floorsOnlyWhenEditing: s.floorsOnlyWhenEditing,
   };
 }
 

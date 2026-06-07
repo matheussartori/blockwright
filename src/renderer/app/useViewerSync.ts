@@ -3,7 +3,6 @@
 // highlighted bands. Each subscribes to the relevant store(s) and re-applies on
 // change; all are gated on the viewer existing (it's created once, after mount).
 import { useEffect } from 'react';
-import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
 import { documentsStore, activeDocument } from '../state/documents';
 import type { Viewer } from '../viewer/viewer';
@@ -44,26 +43,18 @@ export function useViewerSync(viewer: Viewer | null): void {
     return settingsStore.subscribe(apply);
   }, [viewer]);
 
-  // Drive the floor-plan highlight from the active doc's floor plan. Shown whenever
-  // floors are defined; the "only while editing" setting scopes it to when the
-  // Generate floors section is open (store.floorsEditing).
+  // Drive the floor-plan highlight from the active doc's floor plan. The plan is now
+  // auto-detected on load (and editable for opened files), so the bands simply show
+  // whenever floors are present — no visibility setting.
   useEffect(() => {
     if (!viewer) return;
     const apply = () => {
       const doc = activeDocument(documentsStore.getState());
       const floors = doc?.floors ?? [];
-      const onlyEditing = settingsStore.getState().floorsOnlyWhenEditing;
-      const show = floors.length > 0 && (!onlyEditing || store.getState().floorsEditing);
-      viewer.setFloorRegions(
-        show ? floors.map((f) => ({ name: f.name, from: f.from, to: f.to })) : [],
-      );
+      viewer.setFloorRegions(floors.map((f) => ({ name: f.name, from: f.from, to: f.to })));
     };
     apply();
-    const subs = [
-      documentsStore.subscribe(apply),
-      settingsStore.subscribe(apply),
-      store.subscribe(apply),
-    ];
-    return () => subs.forEach((u) => u());
+    const unsub = documentsStore.subscribe(apply);
+    return () => unsub();
   }, [viewer]);
 }

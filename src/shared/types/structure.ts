@@ -1,6 +1,7 @@
 // The structure data model: a parsed `.nbt` resolved into renderable models +
 // blocks, shared between the loader (main) and the Three.js viewer (renderer).
 // Type-only — no runtime code, so both Vite bundles can import it safely.
+import type { FloorDef } from './generation';
 
 export type FaceDir = 'down' | 'up' | 'north' | 'south' | 'east' | 'west';
 
@@ -97,4 +98,8 @@ export interface StructureData {
   blockCount: number;
   /** Jigsaw connection points found in this structure (empty when none). */
   jigsaws: JigsawConnector[];
+  /** Storeys recognised from the geometry on load (see `detectFloors`) — the app no
+   *  longer asks the user to define the floor plan by hand. Seeds the (editable) Floors
+   *  panel + the viewer bands; absent for structures with no clear floor plane. */
+  floors?: FloorDef[];
 }
