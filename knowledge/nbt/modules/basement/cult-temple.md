@@ -35,8 +35,11 @@ the place a cult would never let a guest see.
 2. **Candle circle.** Run `candle`s of one colour around the summoning ring on the floor, and
    cluster them at the cardinal points — the lit circle is the signature of the rite.
 3. **Skulls on the pillars.** Cap or shelf each corner pillar with a `skeleton_skull`/
-   `wither_skeleton_skull` (skulls **render** — see [`04`](../../04-block-entities.md));
-   string `chain` between the pillars overhead.
+   `wither_skeleton_skull` (skulls **render** — see [`04`](../../04-block-entities.md)). A
+   floor skull (`skeleton_skull`) MUST sit on top of a solid block — never leave one floating
+   in the air against a wall (it pops off on spawn). To mount one ON a wall, use the
+   `_wall_skull` variant with a `facing`; otherwise set the plain skull on a pillar cap, a
+   shelf block, or a fence post. String `chain` between the pillars overhead.
 4. **Profane materials.** Patch the floor around the altar with `soul_sand`/`soul_soil`, set
    `crying_obsidian`, `magma_block`, or `gilded_blackstone` accents into the dais, and let
    `sculk`/`sculk_vein`/`sculk_sensor` creep out from under the altar.

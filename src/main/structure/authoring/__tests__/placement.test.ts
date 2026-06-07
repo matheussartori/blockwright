@@ -41,6 +41,43 @@ describe('fixPlacement — lanterns', () => {
     expect(r.blocks.length).toBe(0);
     expect((r.fixes ?? []).join(' ')).toMatch(/removed .*lantern/);
   });
+
+  it('removes the lower of two stacked hanging lanterns (a lantern is not valid support)', () => {
+    // Ceiling block at y=2; a valid hanging lantern at y=1 below it; a second lantern at
+    // y=0 trying to hang from the first. In-game the y=0 one pops off, so it must go.
+    const r = run(
+      [{ Name: 'minecraft:stone' }, { Name: 'minecraft:soul_lantern', Properties: { hanging: 'true' } }],
+      [{ state: 0, pos: [0, 2, 0] }, { state: 1, pos: [0, 1, 0] }, { state: 1, pos: [0, 0, 0] }],
+    );
+    const lanterns = r.blocks.filter((b) => nameOf(r, b) === 'minecraft:soul_lantern');
+    expect(lanterns).toHaveLength(1);
+    expect(lanterns[0].pos).toEqual([0, 1, 0]); // the one hanging from the solid block survives
+    expect((r.fixes ?? []).join(' ')).toMatch(/removed .*lantern/);
+  });
+});
+
+describe('fixPlacement — skulls/heads', () => {
+  it('removes a floating floor skull but keeps one resting on a block', () => {
+    const r = run(
+      [{ Name: 'minecraft:stone' }, { Name: 'minecraft:skeleton_skull' }],
+      [
+        { state: 0, pos: [0, 0, 0] }, { state: 1, pos: [0, 1, 0] }, // seated on stone — kept
+        { state: 1, pos: [5, 5, 5] },                               // floating — removed
+      ],
+    );
+    const skulls = r.blocks.filter((b) => nameOf(r, b) === 'minecraft:skeleton_skull');
+    expect(skulls).toHaveLength(1);
+    expect(skulls[0].pos).toEqual([0, 1, 0]);
+    expect((r.fixes ?? []).join(' ')).toMatch(/skull\/head/);
+  });
+
+  it('leaves a wall skull alone (it attaches to a wall, not the floor)', () => {
+    const r = run(
+      [{ Name: 'minecraft:skeleton_wall_skull', Properties: { facing: 'north' } }],
+      [{ state: 0, pos: [5, 5, 5] }],
+    );
+    expect(r.blocks).toHaveLength(1); // not treated as a floor head
+  });
 });
 
 describe('fixPlacement — torches, candles, ground blocks', () => {

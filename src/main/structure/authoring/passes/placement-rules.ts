@@ -17,6 +17,13 @@ export const isFloorTorch = (id: string): boolean =>
  *  (`*_candle_cake` ends in `_cake`, so it's correctly excluded.) */
 export const isCandle = (id: string): boolean => id === 'candle' || id.endsWith('_candle');
 
+/** A FLOOR skull/head (`skeleton_skull`, `zombie_head`, …) — the ground variant that
+ *  rests ON TOP of a block below. The `*_wall_skull`/`*_wall_head` variants attach to a
+ *  wall instead and are excluded here. A floor head with nothing beneath it pops off on
+ *  spawn (the "floating skull" defect). */
+export const isFloorHead = (id: string): boolean =>
+  (id.endsWith('_skull') || id.endsWith('_head')) && !id.includes('_wall_');
+
 // Blocks that need a solid block directly beneath them (carpets, plates, rails,
 // small plants). Removed when left floating — a low-risk auto-fix.
 const GROUND_SUFFIX = ['_carpet', '_pressure_plate', '_sapling'];

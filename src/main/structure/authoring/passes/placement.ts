@@ -20,7 +20,7 @@ import { bareId, isAir, makeIntern } from '../palette';
 import type { AuthoringBlock } from '../types';
 import { connFamily } from './connect-blocks';
 import {
-  FACINGS, isCandle, isFloorTorch, isLantern, isSolidSupport, needsGroundBelow, wallFixtureKind,
+  FACINGS, isCandle, isFloorHead, isFloorTorch, isLantern, isSolidSupport, needsGroundBelow, wallFixtureKind,
 } from './placement-rules';
 import type { Pass } from './types';
 
@@ -89,7 +89,7 @@ export const fixPlacement: Pass = (blocks, palette) => {
   const intern = makeIntern(outPalette);
 
   let loweredLanterns = 0, raisedLanterns = 0, removedLanterns = 0;
-  let removedTorches = 0, removedCandles = 0, removedGround = 0;
+  let removedTorches = 0, removedCandles = 0, removedGround = 0, removedHeads = 0;
   let reanchoredTorches = 0, removedWall = 0;
   let clearedChestTops = 0, openedDoorways = 0, seatedSlabs = 0;
   let removedOrphanDoors = 0, removedFloating = 0;
@@ -128,18 +128,21 @@ export const fixPlacement: Pass = (blocks, palette) => {
 
     if (isLantern(id)) {
       const hanging = String(props.hanging) === 'true';
-      if (hanging && !above) {
-        if (below) { out.push({ ...b, state: intern({ Name: name, Properties: { ...props, hanging: 'false' } }) }); loweredLanterns++; }
-        else removedLanterns++;
-        continue;
+      // A HANGING lantern attaches to the bottom face of the block above — a solid block
+      // or a chain. It CANNOT hang from another lantern (the lower one pops off when the
+      // structure spawns — the "stacked lanterns" defect). A FLOOR lantern rests on the
+      // block below, which likewise can't be another lantern.
+      const aboveName = at(x, y + 1, z), belowName = at(x, y - 1, z);
+      const hangSupport = isSolidSupport(aboveName) || (aboveName !== undefined && bareId(aboveName) === 'chain');
+      const restSupport = below && !(belowName !== undefined && isLantern(bareId(belowName)));
+      if (hanging) {
+        if (hangSupport) { out.push(b); continue; }                 // valid hang
+        if (restSupport) { out.push({ ...b, state: intern({ Name: name, Properties: { ...props, hanging: 'false' } }) }); loweredLanterns++; continue; }
+        removedLanterns++; continue;                                // hanging from nothing / from a lantern
       }
-      if (!hanging && !below) {
-        if (above) { out.push({ ...b, state: intern({ Name: name, Properties: { ...props, hanging: 'true' } }) }); raisedLanterns++; }
-        else removedLanterns++;
-        continue;
-      }
-      out.push(b);
-      continue;
+      if (restSupport) { out.push(b); continue; }                   // valid floor lantern
+      if (hangSupport) { out.push({ ...b, state: intern({ Name: name, Properties: { ...props, hanging: 'true' } }) }); raisedLanterns++; continue; }
+      removedLanterns++; continue;
     }
 
     if (isFloorTorch(id)) {
@@ -152,6 +155,14 @@ export const fixPlacement: Pass = (blocks, palette) => {
       const belowName = at(x, y - 1, z);
       const onCandle = belowName !== undefined && isCandle(bareId(belowName));
       if (!below || onCandle) { removedCandles++; continue; }
+      out.push(b);
+      continue;
+    }
+
+    // A floor skull/head needs a solid block directly beneath it (the cult-temple
+    // basement likes to float them). Remove a floating one — it pops off on spawn.
+    if (isFloorHead(id)) {
+      if (!solidBelow(x, y, z)) { removedHeads++; continue; }
       out.push(b);
       continue;
     }
@@ -256,6 +267,7 @@ export const fixPlacement: Pass = (blocks, palette) => {
   if (removedLanterns) fixes.push(`removed ${plural(removedLanterns, 'unsupported lantern')}`);
   if (removedTorches) fixes.push(`removed ${plural(removedTorches, 'floating floor torch')}`);
   if (removedCandles) fixes.push(`removed ${plural(removedCandles, 'floating or stacked candle')}`);
+  if (removedHeads) fixes.push(`removed ${plural(removedHeads, 'floating skull/head')} with nothing beneath it`);
   if (removedGround) fixes.push(`removed ${plural(removedGround, 'unsupported carpet/plant/rail/plate')}`);
   if (reanchoredTorches) fixes.push(`re-anchored ${plural(reanchoredTorches, 'wall torch')} onto a solid wall`);
   if (removedWall) fixes.push(`removed ${plural(removedWall, 'wall fixture')} with no solid backing (e.g. stuck to glass or floating)`);

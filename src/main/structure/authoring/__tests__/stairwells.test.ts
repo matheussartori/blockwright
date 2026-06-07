@@ -69,21 +69,40 @@ describe('rebuildStairwells', () => {
     expect(r.fixes?.join(' ')).toMatch(/ladder/);
   });
 
-  it('clears furniture from the headroom + step-off walkway so nothing blocks the climb', () => {
-    // A flight 0→5 climbing +x at z=3 in a roomy interior. The model dumped a bookshelf
-    // (state 4) in the 3rd headroom cell over a tread and in the step-off walkway — both
-    // must be cleared so the player's head doesn't hit and the path off the stair is open.
-    const pal: AuthoringPaletteEntry[] = [...palette, { Name: 'minecraft:bookshelf' }];
-    const blocks = storeyShell(11, 7, [0, 5, 10]);
+  it('opens 3 blocks of headroom over the run so a climber never bumps their head', () => {
+    // Floors at y=0,5,10. A flight climbing +x at z=3 in the 0→5 gap. The stairwell
+    // opening must clear THREE blocks above each tread where the run pierces the upper
+    // floor (the in-game "bate a cabeça" fix), not just two — so the floor cell two above
+    // a lower tread is carved out.
+    const blocks = storeyShell(9, 7, [0, 5, 10]);
     blocks.push(
       { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] },
       { state: 3, pos: [4, 3, 3] }, { state: 3, pos: [5, 4, 3] },
-      { state: 4, pos: [4, 6, 3] }, // 3rd headroom cell over the tread at (4,3,3)
-      { state: 4, pos: [8, 6, 3] }, // 2nd step-off walkway cell past the top arrival
     );
-    const r = rebuildStairwells(blocks, pal, ctx);
-    expect(at(r, 4, 6, 3)?.Name).not.toBe('minecraft:bookshelf'); // head-bonk block cleared
-    expect(at(r, 8, 6, 3)?.Name).not.toBe('minecraft:bookshelf'); // approach walkway cleared
+    const r = rebuildStairwells(blocks, palette, ctx);
+    // The tread at y=2 (x=3): the cell 3 above is the upper floor (y=5) — it must be
+    // opened, not left as a solid plank ceiling the player walks into.
+    expect(at(r, 3, 3, 3)).toBeUndefined();              // +1 air
+    expect(at(r, 3, 4, 3)).toBeUndefined();              // +2 air
+    expect(at(r, 3, 5, 3)?.Name).not.toBe('minecraft:oak_planks'); // +3 opened (was floor)
+  });
+
+  it('never breaks a STRUCTURE block to fit a stair — a wall in the path forces a ladder', () => {
+    // A flight 0→5 climbing +x at z=3, but a stone PILLAR (state 1, structural) blocks the
+    // headroom over a middle tread. Every straight-run direction from that column runs into
+    // a wall or the pillar, so a clean stair can't fit. The pass must NOT gouge the wall to
+    // make room (the recurring "stairs destroying the structure" defect) — it falls back to
+    // a continuous ladder, and the blocking wall survives untouched.
+    const blocks = storeyShell(9, 7, [0, 5, 10]);
+    blocks.push(
+      { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] },
+      { state: 3, pos: [4, 3, 3] }, { state: 3, pos: [5, 4, 3] },
+      { state: 1, pos: [4, 4, 3] }, // a wall in the headroom over the tread at (4,3,3)
+    );
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(at(r, 4, 4, 3)?.Name).toBe('minecraft:stone'); // the wall was never carved
+    expect(r.blocks.some((b) => r.palette[b.state]?.Name === 'minecraft:ladder')).toBe(true);
+    expect(r.fixes?.join(' ')).toMatch(/ladder/);
   });
 
   it('leaves a single-storey build (one floor plane) untouched', () => {
