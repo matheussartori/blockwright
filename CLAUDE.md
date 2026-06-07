@@ -114,10 +114,12 @@ src/
                             active-provider/model prefs + env precedence
       session.ts            Per-chat session state (provider session id + version counter + hidden
                             scratch dir `<userData>/generated/<sessionId>/vN.nbt`) + AbortControllers
-      output-dir.ts         The user's browsable structure LIBRARY: configurable folder (default
-                            `~/Documents/Blockwright`, `BW_OUTPUT_DIR` overrides) where each session's
-                            current build is mirrored as one clean `<slug-from-prompt>.nbt` file
-                            (`mirrorToLibrary` — best-effort copy, reserves the slug once per session)
+      output-dir.ts         The user's browsable structure LIBRARY: configurable root (default
+                            `~/Documents/Blockwright`, `BW_OUTPUT_DIR` overrides) where each session
+                            gets ONE descriptively-named FOLDER (`<slug-from-prompt>/`), reserved once
+                            per session (`reserveLibraryDir`/`mirrorToLibrary` — best-effort copy):
+                            the latest clean `<slug>.nbt`, every kept `versions/vN.nbt`, and the build's
+                            `generation.log` (the AI/fix play-by-play, see gen-log.ts `RunLog`)
       providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
@@ -381,8 +383,9 @@ decoration, and a new module is one small file.
 File ▸ New Structure opens a chat (`NewStructurePanel`) that generates `.nbt`s. Generation is
 **provider-agnostic** (`src/main/ai/`): `generate.ts` owns everything backend-neutral — sessions, the
 `emit_structure` handler that validates + compiles the authoring JSON (`structure/authoring/`) to a
-versioned scratch `.nbt` (hidden under `<userData>/generated/`, `session.ts`) that is also mirrored to
-a clean `<slug>.nbt` in the user's browsable library (`output-dir.ts`), the emit→render→**review** loop (screenshots fed back so the model refines
+versioned scratch `.nbt` (hidden under `<userData>/generated/`, `session.ts`) that is also mirrored into
+the user's browsable library as one per-build FOLDER (`<slug>/` with the latest `<slug>.nbt` + kept
+`versions/vN.nbt` + a `generation.log`, `output-dir.ts`), the emit→render→**review** loop (screenshots fed back so the model refines
 against the prompt/reference, not blind), the round budget, and the live token/phase progress — then
 dispatches the LLM transport to a **provider driver** (`providers/`). The shared contract lives in
 `providers/types.ts` (`Driver` + `onEmit` + `DriverProgress`); the shared system prompt + tool schema
@@ -494,10 +497,16 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   + basements render their geometry (`composeModulePreview` gives a roof a host wall box); `room` modules
   are guidance-only (no geometry) so they show "Preview coming soon".
 - **Chat output is a build card, not raw brief text:** the long "[Build details]" block goes ONLY to
-  the model — the chat instead shows the user's words plus a presentable `BuildCard` (`ChatMessage.build`:
-  a `BuildBrief` of human LABELS — structure, decoration/roof/basement chips, size, and the per-floor
-  room table). `runGeneration` takes a `GenerationInput` that keeps `aiPrompt` (model) separate from
-  `userText` + `build` (chat), so a details-only build (empty prompt) still renders as a clean card.
+  the model — the chat instead shows the user's words plus a presentable `BuildCard` (`ChatMessage.build`,
+  a `BuildBrief` of human LABELS). Two cards share that component: the USER message gets a PREVIEW card of
+  the picked modules (structure, decoration/roof/basement chips, size, per-floor room table); the ASSISTANT
+  message of a finished build gets the COMPLETE result card — the same module summary PLUS the prompt,
+  version, block count, and **Open/Reveal actions** for the saved library file (`build.libraryPath`, threaded
+  out of `generateStructure` → `GenerateResult.libraryPath`). The complete card shows even for a plain prompt
+  with no Details. `openLibraryFile` (wired by App via `setFileOpener` → `useDocumentFlow.openFile`) opens the
+  library `.nbt` as a normal document; Reveal calls `revealPath` on its folder. `runGeneration` takes a
+  `GenerationInput` that keeps `aiPrompt` (model) separate from `userText` + `build` (chat). The assistant
+  `meta` footer keeps only the run cost (time + tokens) — version/size/blocks live on the card now.
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the

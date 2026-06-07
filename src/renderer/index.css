@@ -3035,6 +3035,29 @@ body.row-resizing {
   color: var(--text);
   letter-spacing: 0.01em;
 }
+.gen-build-card-version {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.gen-build-card-prompt {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.gen-build-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 1px;
+}
 .gen-build-card-chips {
   display: flex;
   flex-wrap: wrap;

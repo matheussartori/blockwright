@@ -50,6 +50,8 @@ refines through an emit → render → review loop — previewed live in the vie
   compile time behind the `template` op
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
+- A browsable structure library — each generated build is saved to its own folder (the latest clean
+  `.nbt`, every kept version, and a generation log), with Open / Reveal actions on the chat's build card
 - Namespace-aware asset resolution from an extracted Minecraft content pack
 - Mod workspace support — render modded structures with their own textures and models, with the
   workspace's target Minecraft version auto-detected
@@ -87,6 +89,11 @@ two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2:
 Your picks are shown back as a tidy build card in the chat. Browse every module with live 3D previews
 in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI provider and
 model in **Settings ▸ AI** first.
+
+Every finished build is saved to a browsable library — one folder per build, holding the latest clean
+`.nbt`, every kept version, and a `generation.log` of how it was made. The chat's build card has
+**Open** (load it in the viewer) and **Reveal** (show the folder in your file manager) actions; the
+library root is configurable in **Settings ▸ AI**.
 
 ## Mod Workspaces
 

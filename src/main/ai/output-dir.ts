@@ -1,10 +1,18 @@
 // The user's browsable structure library. The emit→render→review loop writes
 // churny `vN.nbt` versions to a hidden scratch dir (see session.ts); on top of
-// that we mirror each session's current build to ONE nicely-named file here
-// (`<slug-from-prompt>.nbt`), so opening the folder shows a real library —
-// `cozy-cottage.nbt`, not `v7.nbt`. The folder is user-configurable in
-// Settings ▸ AI; default is `Blockwright` under the OS Documents dir. Persisted
-// as a tiny JSON in userData (cf. recents.ts); `BW_OUTPUT_DIR` overrides.
+// that we mirror each session's build into ONE nicely-named FOLDER here, so the
+// library reads as a project per build, not a soup of files:
+//
+//   <outputDir>/
+//     cozy-oak-cottage/
+//       cozy-oak-cottage.nbt   ← the latest clean build (folder basename)
+//       generation.log         ← that build's AI play-by-play (see gen-log.ts)
+//       versions/
+//         v1.nbt  v2.nbt  …    ← every emitted version, kept
+//
+// The root folder is user-configurable in Settings ▸ AI; default is `Blockwright`
+// under the OS Documents dir. Persisted as a tiny JSON in userData (cf. recents.ts);
+// `BW_OUTPUT_DIR` overrides.
 import { app } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -64,45 +72,60 @@ export function slugify(prompt: string): string {
   return slug || 'structure';
 }
 
-/** Pick a free `<slug>.nbt` (then `-2`, `-3`, …) in the library folder, creating
- *  the folder if needed. Stable per session: the caller stores the result and
- *  reuses it so later versions overwrite the same file. Returns null if the
- *  folder can't be created. */
-export function reserveLibraryPath(slug: string): string | null {
-  const dir = getOutputDir();
+/** A session's reserved library folder: the per-build dir (`<outputDir>/<slug>/`)
+ *  and the latest clean file inside it (`<dir>/<slug>.nbt`). Both `null` when the
+ *  folder couldn't be created (so the session doesn't keep retrying). */
+export interface LibraryMirror {
+  /** The per-build folder, or null if it couldn't be created. */
+  dir: string | null;
+  /** The latest clean `<slug>.nbt` inside `dir`, or null. */
+  latest: string | null;
+}
+
+/** Pick a free `<slug>/` folder (then `-2`, `-3`, …) in the library root, creating
+ *  it and its `versions/` subdir. Stable per session: the caller stores the result
+ *  and reuses it so later versions add to the same folder. Returns `{dir:null}` if
+ *  the folder can't be created. */
+export function reserveLibraryDir(slug: string): LibraryMirror {
+  const root = getOutputDir();
+  let name = slug;
   try {
-    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(root, { recursive: true });
+    for (let n = 2; fs.existsSync(path.join(root, name)); n++) name = `${slug}-${n}`;
+    const dir = path.join(root, name);
+    fs.mkdirSync(path.join(dir, 'versions'), { recursive: true });
+    return { dir, latest: path.join(dir, `${name}.nbt`) };
   } catch {
-    return null;
+    return { dir: null, latest: null };
   }
-  let candidate = path.join(dir, `${slug}.nbt`);
-  for (let n = 2; fs.existsSync(candidate); n++) candidate = path.join(dir, `${slug}-${n}.nbt`);
-  return candidate;
 }
 
 /**
- * Best-effort mirror of a freshly-compiled version into the user's library as one
- * clean `<slug>.nbt` file. The scratch `vN.nbt` stays the source of truth, so a
- * failed copy never aborts generation.
+ * Best-effort mirror of a freshly-compiled version into the user's library folder:
+ * copies the scratch `vN.nbt` to `<dir>/versions/vN.nbt` (kept) AND overwrites the
+ * latest clean `<dir>/<slug>.nbt`. The scratch `vN.nbt` stays the source of truth,
+ * so a failed copy never aborts generation.
  *
- * @param libraryPath - The session's current library path: `undefined` to reserve one
- *   from the prompt slug on this first call, a string to overwrite, or `null` when a
- *   prior reservation failed (don't retry).
- * @param prompt - The user's prompt, slugified into the library filename on first use.
+ * @param mirror - The session's reserved folder: `undefined` to reserve one from the
+ *   prompt slug on this first call, otherwise the stored {@link LibraryMirror} to add to
+ *   (a `dir:null` mirror means a prior reservation failed — don't retry).
+ * @param prompt - The user's prompt, slugified into the folder name on first use.
  * @param nbtPath - The scratch `vN.nbt` to copy into the library.
- * @returns The library path to persist back on the session (a string once reserved, or
- *   `null` if the folder couldn't be created) — never `undefined`, so the slug is
- *   reserved at most once per session.
+ * @param version - The version number (names the kept `versions/vN.nbt`).
+ * @returns The {@link LibraryMirror} to persist back on the session — never `undefined`,
+ *   so the folder is reserved at most once per session.
  */
 export async function mirrorToLibrary(
-  libraryPath: string | null | undefined,
+  mirror: LibraryMirror | undefined,
   prompt: string,
   nbtPath: string,
-): Promise<string | null> {
-  const target = libraryPath === undefined ? reserveLibraryPath(slugify(prompt)) : libraryPath;
-  if (target) {
+  version: number,
+): Promise<LibraryMirror> {
+  const target = mirror === undefined ? reserveLibraryDir(slugify(prompt)) : mirror;
+  if (target.dir && target.latest) {
     try {
-      await fsp.copyFile(nbtPath, target);
+      await fsp.copyFile(nbtPath, path.join(target.dir, 'versions', `v${version}.nbt`));
+      await fsp.copyFile(nbtPath, target.latest);
     } catch {
       /* library mirror failed — keep going on the scratch version */
     }

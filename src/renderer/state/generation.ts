@@ -31,6 +31,17 @@ export function setDocLoader(fn: DocLoader): void {
   docLoader = fn;
 }
 
+/** Open a saved `.nbt` as a document/tab and render it — same path as File ▸ Open.
+ *  Provided by App (which owns the document flow); used by the chat build card's
+ *  "Open" action to load a finished build's library file into the viewer. */
+let fileOpener: ((path: string) => void) | null = null;
+export function setFileOpener(fn: (path: string) => void): void {
+  fileOpener = fn;
+}
+export function openLibraryFile(path: string): void {
+  fileOpener?.(path);
+}
+
 /** Persistent chat key: the file path for a saved `.nbt`, else the session id. */
 function chatKey(doc: Document): string {
   return doc.filePath ?? doc.sessionId;
@@ -234,15 +245,23 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
     const floors = doc.floors.map(normalizeFloor);
     const result = await api.aiGenerate(doc.sessionId, promptText, images, selection, basePath, floors);
     if (result.ok) {
+      // The COMPLETE build card: the user's request (the picked module summary, if
+      // any) plus the finished result (version/size/blocks) and the saved library
+      // file for the Open/Reveal actions. Shown even for a plain prompt (no Details).
+      const resultBuild: BuildBrief = {
+        ...(build ?? {}),
+        prompt: userText || undefined,
+        version: result.version,
+        size: result.size,
+        blockCount: result.blockCount,
+        libraryPath: result.libraryPath ?? undefined,
+      };
       docs.appendChat(docId, {
         role: 'assistant',
         text: result.summary || 'Structure generated.',
-        meta: {
-          version: result.version,
-          size: result.size,
-          blockCount: result.blockCount,
-          ...stats(result),
-        },
+        build: resultBuild,
+        // The card carries version/size/blocks now; meta keeps just the run cost.
+        meta: stats(result),
       });
       docs.patchDoc(docId, { sdkSessionId: result.sdkSessionId, version: result.version });
       // Record the final version (live renders already recorded intermediate ones)

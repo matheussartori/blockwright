@@ -22,7 +22,7 @@ import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
-import { aiLog, fixLog } from './gen-log';
+import { RunLog } from './gen-log';
 import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
 import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 
@@ -85,6 +85,9 @@ export interface GenerateStructureOptions {
 export async function generateStructure(opts: GenerateStructureOptions): Promise<GenerateResult> {
   const { sessionId, prompt, images, selection, onProgress, capture, basePath, floors } = opts;
   const session = getSession(sessionId);
+  // Tees the AI/fix play-by-play to the Console dock AND (once the library folder is
+  // reserved on the first emit) to that build's `generation.log`.
+  const run = new RunLog();
   const cred = activeCredential();
   const resumable = RESUMABLE_PROVIDERS.has(cred.id);
   // Independent critic for the audit gate (null on providers without one → the gate
@@ -94,7 +97,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   const seed = await buildSeed(resumable, session, basePath);
   const effectivePrompt = seed + prompt;
 
-  aiLog(
+  run.ai(
     `Starting generation with the “${cred.id}” provider (${cred.model})` +
       `${critic ? ', independent critic enabled' : ''}. ` +
       `The model will plan, emit geometry, then refine over the design passes.`,
@@ -147,7 +150,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       currentThinking = 0;
       turns += 1;
       phase = 'thinking';
-      aiLog(`Turn ${turns}: the model is thinking through the geometry…`);
+      run.ai(`Turn ${turns}: the model is thinking through the geometry…`);
       emitProgress();
     },
     addInput(tokens) {
@@ -160,7 +163,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     },
     toolStarted() {
       phase = 'building';
-      aiLog('The model is writing the structure (emitting volumetric ops & blocks)…');
+      run.ai('The model is writing the structure (emitting volumetric ops & blocks)…');
       emitProgress(true);
     },
     outputChars(totalChars) {
@@ -185,7 +188,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     const text = (t: string, isError = false): EmitToolResult => ({ content: [{ type: 'text', text: t }], isError, stop: false });
     phase = 'compiling';
     emitProgress(true);
-    aiLog(
+    run.ai(
       `The model emitted a ${args.mode === 'patch' ? 'patch' : 'full'} structure for the ` +
         `“${phaseAt(phaseIndex).label}” pass — validating and compiling it.`,
     );
@@ -216,7 +219,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
     let report: CompileReport;
     try {
-      fixLog('Compiling to .nbt and running the code fix-up passes over the build:');
+      run.fix('Compiling to .nbt and running the code fix-up passes over the build:');
       // Thread the selected structure type so the compile runs that structure's
       // declared finalize passes (e.g. the house's single-chimney + stair-inset fixes).
       // `log` streams each pass's play-by-play into the Console dock (fix-tagged).
@@ -224,7 +227,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
         structureType: selection?.structureType,
         // The user's Floor plan (UI) overrides the model's declared storeys for grade.
         floors: floors?.length ? floors : undefined,
-        log: fixLog,
+        log: run.fix,
       });
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     } catch (err) {
@@ -234,22 +237,25 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
 
     session.version = version;
 
-    fixLog(
+    run.fix(
       report.fixes.length || report.warnings.length
         ? `Fine-tuning complete: ${report.fixes.length} auto-fix(es), ${report.warnings.length} warning(s) left for the model.`
         : 'Fine-tuning complete: the build needed no code corrections.',
     );
 
-    // Mirror this version to the user's library as one clean, browsable file
-    // (`<slug>.nbt`) — reserved once per session from the first prompt, then
-    // overwritten each version (best-effort; the scratch `vN.nbt` is the source).
-    session.libraryPath = await mirrorToLibrary(session.libraryPath, prompt, nbtPath);
+    // Mirror this version into the user's library FOLDER (`<slug>/`) — reserved once
+    // per session from the first prompt: the kept `versions/vN.nbt` plus the latest
+    // clean `<slug>.nbt` (best-effort; the scratch `vN.nbt` is the source). Once the
+    // folder exists, tee the AI/fix log into its `generation.log`.
+    session.library = await mirrorToLibrary(session.library, prompt, nbtPath, version);
+    if (session.library.dir) run.attach(session.library.dir);
 
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     const blockCount = resolveBlocks(authoring).blocks.length;
     captured = {
       ok: true,
       path: nbtPath,
+      libraryPath: session.library.latest,
       version,
       summary: [(args.summary ?? '').trim(), report.fixes.length ? `(auto-fixed placement: ${report.fixes.join('; ')})` : '']
         .filter(Boolean)
@@ -267,7 +273,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       maxRounds = maxRoundsFor(size[0] * size[1] * size[2], null);
     }
     // Per-round telemetry (Console dock + dev terminal) to profile time/token cost.
-    aiLog(
+    run.ai(
       `Built v${version} (${size.join('×')}, ${blockCount} blocks) on round ${rounds}/${maxRounds} · ` +
         `pass “${phaseAt(phaseIndex).label}” · ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ` +
         `in=${inputTokens} out=${displayedOutput()} tokens.`,
@@ -275,7 +281,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
 
     // Render this version and feed screenshots back so the model can review.
     phase = 'rendering';
-    aiLog('Rendering the build and capturing multi-angle screenshots for review…');
+    run.ai('Rendering the build and capturing multi-angle screenshots for review…');
     emitProgress(true);
     let shot: { images?: GenerateImage[]; error?: string } = {};
     if (capture) {
@@ -286,7 +292,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       }
     }
     phase = 'reviewing';
-    aiLog('Sending the screenshots back to the model to review against the prompt and refine…');
+    run.ai('Sending the screenshots back to the model to review against the prompt and refine…');
     emitProgress(true);
 
     const atCap = rounds >= maxRounds;
@@ -362,7 +368,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     if (onAudit && !atCap) {
       if (critic && shot.images && shot.images.length > 0) {
         phase = 'reviewing';
-        aiLog('Audit pass: an independent critic (fresh context) is judging the build against the checklist…');
+        run.ai('Audit pass: an independent critic (fresh context) is judging the build against the checklist…');
         emitProgress(true);
         try {
           const c = await critic({
@@ -374,7 +380,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
           auditReported = true;
           bySelf = false;
           auditFailed = c.failed.map((f) => ({ label: labelFor(f.check), note: f.note }));
-          aiLog(
+          run.ai(
             c.failed.length
               ? `Critic verdict: ${c.failed.length} check(s) need more work — ${c.failed.map((f) => labelFor(f.check)).join(', ')}.`
               : 'Critic verdict: every audit check passed.',
@@ -401,7 +407,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     content.push({ type: 'text', text: gate.text });
     phaseIndex = nextIdx; // advance the pointer for the next emit (clamped at audit)
 
-    aiLog(
+    run.ai(
       gate.stop
         ? (atCap ? 'Reached the round budget — finishing with the current build.' : 'Audit passed — the build is accepted, finishing.')
         : `Moving on to the “${phaseAt(nextIdx).label}” pass for the next revision.`,
@@ -446,7 +452,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   }
 
   // Run summary (Console dock + dev terminal): the before/after baseline for efficiency work.
-  aiLog(
+  run.ai(
     `Generation finished in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${rounds} rounds · ${turns} turns · ` +
       `in=${inputTokens} out=${displayedOutput()} tokens.`,
   );

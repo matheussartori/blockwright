@@ -23,12 +23,14 @@ export interface BuildSelection {
   rooms?: string[];
 }
 
-/** A display-ready summary of the build details the user picked in the composer, shown
- *  as a card in the chat in place of the raw "[Build details]" prompt text (which still
- *  goes to the model). All fields are human LABELS, so the card renders without any
- *  catalog lookup. Attached to the user's chat message (`ChatMessage.build`). */
+/** A display-ready build card shown in the chat. On the USER message it summarises
+ *  the details the user picked (a preview of the request); on the ASSISTANT message
+ *  of a finished build it's the COMPLETE card — the request plus the result (version,
+ *  block count) and Open/Reveal actions for the saved library file. All module fields
+ *  are human LABELS, so the card renders without any catalog lookup. */
 export interface BuildBrief {
-  structure: string;
+  /** Structure-type label, or undefined for a plain free-form prompt with no Details. */
+  structure?: string;
   decoration?: string;
   roof?: string;
   basement?: string;
@@ -36,6 +38,16 @@ export interface BuildBrief {
   size?: [number, number, number];
   /** Per-floor room assignment (bottom-up): each floor's label + its room labels (0–2). */
   floors?: { name: string; rooms: string[] }[];
+  /** The user's request text (assistant result card) — shown so the card is
+   *  self-contained even for a details-only build with an empty chat bubble. */
+  prompt?: string;
+  /** Compiled version number of the finished build (assistant result card). */
+  version?: number;
+  /** Block count of the finished build (assistant result card). */
+  blockCount?: number;
+  /** Absolute path to the saved library `.nbt` (the build's latest), driving the
+   *  card's Open-in-viewer / Reveal-in-folder actions (assistant result card). */
+  libraryPath?: string;
 }
 
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
@@ -45,6 +57,9 @@ export type GenerateResult =
       ok: true;
       /** Absolute path to the compiled `.nbt` version, ready to load in the viewer. */
       path: string;
+      /** Absolute path to the saved library file (`<dir>/<slug>.nbt`, the build's
+       *  latest), for the chat card's Open action. Null if the mirror failed. */
+      libraryPath: string | null;
       /** Monotonic version number within the session (1, 2, …). */
       version: number;
       /** The model's short note about the build (palette, features, assumptions). */

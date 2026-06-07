@@ -6,6 +6,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { VersionInfo } from '@/shared/types';
+import type { LibraryMirror } from './output-dir';
 
 export interface Session {
   /** The provider conversation id to resume (Claude SDK / Codex thread); null until
@@ -15,11 +16,11 @@ export interface Session {
   version: number;
   /** Per-session scratch dir under the generated root. */
   dir: string;
-  /** Clean library file this session mirrors its current build to (`<slug>.nbt`
-   *  under the user's output dir — see output-dir.ts). Reserved once on the first
-   *  emit, then overwritten each version. `undefined` until the first emit;
-   *  `null` once reserved if the folder couldn't be created (don't retry). */
-  libraryPath?: string | null;
+  /** Library FOLDER this session mirrors its build into (`<slug>/` under the user's
+   *  output dir — see output-dir.ts): the latest clean `<slug>.nbt` plus every kept
+   *  `versions/vN.nbt`. Reserved once on the first emit. `undefined` until then; a
+   *  `dir:null` mirror means the folder couldn't be created (don't retry). */
+  library?: LibraryMirror;
 }
 
 const sessions = new Map<string, Session>();

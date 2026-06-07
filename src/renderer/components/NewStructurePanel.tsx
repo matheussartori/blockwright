@@ -12,9 +12,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { documentsStore } from '../state/documents';
-import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
+import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc, openLibraryFile } from '../state/generation';
 import { useApp, useActiveDoc, useT } from '../hooks/useStores';
 import { api } from '../api';
+import { dirname } from '../ui/path';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import {
   type BuildDetails,
@@ -68,21 +69,27 @@ function readImages(files: Iterable<File>): Promise<Attachment[]> {
 
 const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
-/** The presentable build card shown in a user message in place of the raw "[Build
- *  details]" prompt text: the structure + its attributes as chips, and the per-floor
- *  room plan as a small table — so the user can glance and confirm what they asked for. */
+/** The presentable build card shown in the chat in place of the raw "[Build details]"
+ *  prompt text. On a USER message it previews what was requested (structure + chips +
+ *  per-floor rooms). On the ASSISTANT message of a finished build it's the COMPLETE
+ *  card: the request PLUS the result (version/size/blocks) and Open/Reveal actions for
+ *  the saved library file — so the user can jump straight to the build on disk. */
 function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => string }) {
   const chips: { label: string; value: string }[] = [];
   if (build.decoration) chips.push({ label: t('gen.fieldDecoration'), value: build.decoration });
   if (build.roof) chips.push({ label: t('gen.fieldRoof'), value: build.roof });
   if (build.basement) chips.push({ label: t('gen.fieldBasement'), value: build.basement });
   if (build.size) chips.push({ label: t('gen.statSize'), value: build.size.join('×') });
+  if (build.blockCount != null) chips.push({ label: t('gen.statBlocks'), value: build.blockCount.toLocaleString() });
+  const title = build.structure ?? t('gen.cardStructure');
   return (
     <div className="gen-build-card">
       <div className="gen-build-card-head">
         <span className="gen-build-card-icon" aria-hidden>🏠</span>
-        <span className="gen-build-card-title">{build.structure}</span>
+        <span className="gen-build-card-title">{title}</span>
+        {build.version != null && <span className="gen-build-card-version">v{build.version}</span>}
       </div>
+      {build.prompt && <div className="gen-build-card-prompt">{build.prompt}</div>}
       {chips.length > 0 && (
         <div className="gen-build-card-chips">
           {chips.map((c) => (
@@ -104,6 +111,24 @@ function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => st
             </li>
           ))}
         </ul>
+      )}
+      {build.libraryPath && (
+        <div className="gen-build-card-actions">
+          <button
+            className="btn sm no-drag"
+            onClick={() => openLibraryFile(build.libraryPath!)}
+            title={t('gen.openBuildTitle')}
+          >
+            {t('gen.openBuild')}
+          </button>
+          <button
+            className="btn sm ghost no-drag"
+            onClick={() => void api.revealPath(dirname(build.libraryPath!))}
+            title={t('gen.revealBuildTitle')}
+          >
+            {t('gen.revealBuild')}
+          </button>
+        </div>
       )}
     </div>
   );
