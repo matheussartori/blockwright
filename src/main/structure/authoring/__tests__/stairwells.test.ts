@@ -105,6 +105,30 @@ describe('rebuildStairwells', () => {
     expect(r.fixes?.join(' ')).toMatch(/ladder/);
   });
 
+  it('floors over the orphan hole left where an abandoned climb (and its floor opening) was stripped', () => {
+    // The model placed TWO climbs for the SAME 0→5 gap — flight A at z=3 and flight B at
+    // z=5 — and cut a floor opening over each. The rebuild consolidates to ONE clean flight
+    // (A) and strips B; B's old floor opening then survives as a "buraco misterioso" beside
+    // the real stairwell. After the rebuild that orphan opening must be floored back, while
+    // the kept stairwell's opening stays open.
+    const blocks = storeyShell(9, 7, [0, 5, 10]).filter(
+      (b) => posKey(...b.pos) !== posKey(4, 5, 5) && posKey(...b.pos) !== posKey(5, 5, 5),
+    );
+    blocks.push(
+      { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] }, // flight A (kept)
+      { state: 3, pos: [4, 3, 3] }, { state: 3, pos: [5, 4, 3] },
+      { state: 3, pos: [2, 1, 5] }, { state: 3, pos: [3, 2, 5] }, // flight B (abandoned)
+      { state: 3, pos: [4, 3, 5] }, { state: 3, pos: [5, 4, 5] },
+    );
+    const r = rebuildStairwells(blocks, palette, ctx);
+    // B's orphan opening (over the stripped flight, not part of the rebuilt stair) is floored.
+    expect(at(r, 4, 5, 5)?.Name).toBe('minecraft:oak_planks');
+    expect(at(r, 5, 5, 5)?.Name).toBe('minecraft:oak_planks');
+    expect(r.fixes?.join(' ')).toMatch(/orphan stairwell-remnant/);
+    // The kept stairwell's opening over flight A stays OPEN (not re-floored).
+    expect(at(r, 5, 5, 3)?.Name).not.toBe('minecraft:oak_planks');
+  });
+
   it('leaves a single-storey build (one floor plane) untouched', () => {
     const blocks: AuthoringBlock[] = [
       ...storeyShell(9, 7, [0]),

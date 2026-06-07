@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { store } from '../state/store';
 import { documentsStore } from '../state/documents';
-import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc, openLibraryFile } from '../state/generation';
+import { runGeneration, cancelGeneration, resetDocChat, clearVersioning, persistDoc } from '../state/generation';
 import { useApp, useActiveDoc, useT } from '../hooks/useStores';
 import { api } from '../api';
 import { dirname } from '../ui/path';
@@ -114,13 +114,8 @@ function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => st
       )}
       {build.libraryPath && (
         <div className="gen-build-card-actions">
-          <button
-            className="btn sm no-drag"
-            onClick={() => openLibraryFile(build.libraryPath!)}
-            title={t('gen.openBuildTitle')}
-          >
-            {t('gen.openBuild')}
-          </button>
+          {/* This tab IS the saved build now (the project file is open here), so there's
+              no "Open" — only Reveal, to find the folder + its versions/generation.log. */}
           <button
             className="btn sm ghost no-drag"
             onClick={() => void api.revealPath(dirname(build.libraryPath!))}

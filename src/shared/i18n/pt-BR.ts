@@ -185,8 +185,6 @@ export const ptBR: Messages = {
   'gen.roomFloor': 'Andar',
   'gen.roomEmpty': 'Livre / sem cômodo',
   'gen.cardStructure': 'Estrutura',
-  'gen.openBuild': 'Abrir',
-  'gen.openBuildTitle': 'Abrir esta construção no visualizador',
   'gen.revealBuild': 'Mostrar',
   'gen.revealBuildTitle': 'Mostrar a pasta da construção no gerenciador de arquivos',
   'gen.width': 'Largura',

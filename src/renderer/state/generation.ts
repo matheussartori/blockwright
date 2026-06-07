@@ -31,17 +31,6 @@ export function setDocLoader(fn: DocLoader): void {
   docLoader = fn;
 }
 
-/** Open a saved `.nbt` as a document/tab and render it — same path as File ▸ Open.
- *  Provided by App (which owns the document flow); used by the chat build card's
- *  "Open" action to load a finished build's library file into the viewer. */
-let fileOpener: ((path: string) => void) | null = null;
-export function setFileOpener(fn: (path: string) => void): void {
-  fileOpener = fn;
-}
-export function openLibraryFile(path: string): void {
-  fileOpener?.(path);
-}
-
 /** Persistent chat key: the file path for a saved `.nbt`, else the session id. */
 function chatKey(doc: Document): string {
   return doc.filePath ?? doc.sessionId;
@@ -72,6 +61,7 @@ export function persistDoc(docId: string): void {
     messages: doc.chat,
     baselinePath: doc.baselinePath,
     floors: doc.floors,
+    generated: doc.generated,
   });
 }
 
@@ -87,8 +77,10 @@ export function recordVersion(docId: string, version: number, path: string): voi
   // creation) keep the original as a baseline "v0" the user can flip back to.
   // That baseline is the untouched on-disk file by default, or — after "Clear
   // versions" flattened the build — the iterated build it pinned (baselinePath).
-  // Untitled (created) docs have no original, so they get none.
-  const baseline = doc.baselinePath ?? doc.filePath;
+  // Untitled (created) docs have no original, so they get none — and a `generated`
+  // doc's `filePath` IS its own latest build (the adopted library file), not an
+  // original, so it gets none either.
+  const baseline = doc.generated ? doc.baselinePath : (doc.baselinePath ?? doc.filePath);
   if (baseline && !entries.some((v) => v.version === 0)) {
     entries.push({ version: 0, path: baseline });
   }
@@ -147,7 +139,9 @@ export async function hydrateDoc(docId: string): Promise<void> {
     // and surface its compiled versions (read from disk) in the Versions panel.
     // For a file-backed doc, prepend the untouched original as the "v0" baseline.
     const versions = await api.aiListVersions(rec.sessionId);
-    const baseline = rec.baselinePath ?? (dropFilePath ? null : doc.filePath);
+    // A `generated` doc's `filePath` is its own latest build (the adopted library
+    // file), so it gets no v0 baseline — only a real opened file does.
+    const baseline = rec.generated ? rec.baselinePath : (rec.baselinePath ?? (dropFilePath ? null : doc.filePath));
     if (baseline && versions.length > 0 && !versions.some((v) => v.version === 0)) {
       versions.unshift({ version: 0, path: baseline });
     }
@@ -160,6 +154,7 @@ export async function hydrateDoc(docId: string): Promise<void> {
       chat: rec.messages,
       baselinePath: rec.baselinePath ?? null,
       floors: (rec.floors ?? []).map(normalizeFloor),
+      generated: rec.generated ?? false,
       hydrated: true,
       ...(dropFilePath ? { filePath: null } : {}),
     });
@@ -268,6 +263,20 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
       // and always show the latest. First version frames the build; later versions
       // keep the camera so the user sees exactly what changed.
       recordVersion(docId, result.version, result.path);
+      // A from-scratch build ADOPTS its saved library file: the tab stops being
+      // "Untitled" and becomes the project — named after the library file and keyed
+      // by its path — so closing it and reopening that `.nbt` (with its sibling
+      // generation.log + versions/) restores this whole conversation. We only adopt
+      // once (when there's no filePath yet); an edit of an opened file is untouched.
+      if (!doc.filePath && result.libraryPath) {
+        docs.patchDoc(docId, {
+          filePath: result.libraryPath,
+          title: basename(result.libraryPath),
+          generated: true,
+        });
+        // It's a real saved project now — surface it in Open Recent / the welcome list.
+        api.addRecent(result.libraryPath);
+      }
       await docLoader?.(docId, result.path, { preserveCamera: result.version > 1, recent: false });
     } else if (result.canceled) {
       docs.appendChat(docId, { role: 'assistant', text: 'Canceled.', meta: stats(result) });
@@ -295,6 +304,10 @@ export function resetDocChat(docId: string): void {
   if (!doc) return;
   void api.aiResetSession(doc.sessionId);
   const sessionId = crypto.randomUUID();
+  // An adopted generate tab DETACHES from its library file on "New" — it goes back
+  // to a fresh Untitled so the next build reserves its own library folder rather
+  // than re-binding to (and overwriting the chat of) the previous build's file.
+  const detach = doc.generated;
   docs.patchDoc(docId, {
     sessionId,
     sdkSessionId: null,
@@ -304,10 +317,11 @@ export function resetDocChat(docId: string): void {
     chat: [],
     baselinePath: null, // back to the on-disk file as the source
     floors: [], // a fresh build starts with no floor plan
+    ...(detach ? { filePath: null, title: 'Untitled', generated: false } : {}),
   });
-  // For a file-backed doc the chat key (its path) is unchanged, so overwrite its
-  // record empty; an Untitled doc's key just moves to the new session id.
-  void api.chatHistorySave(doc.filePath ?? sessionId, {
+  // For a real file-backed doc the chat key (its path) is unchanged, so overwrite
+  // its record empty; an Untitled / detached doc's key moves to the new session id.
+  void api.chatHistorySave(detach ? sessionId : (doc.filePath ?? sessionId), {
     sessionId,
     sdkSessionId: null,
     version: 0,

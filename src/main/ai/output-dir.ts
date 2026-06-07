@@ -14,6 +14,7 @@
 // under the OS Documents dir. Persisted as a tiny JSON in userData (cf. recents.ts);
 // `BW_OUTPUT_DIR` overrides.
 import { app } from 'electron';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -82,16 +83,19 @@ export interface LibraryMirror {
   latest: string | null;
 }
 
-/** Pick a free `<slug>/` folder (then `-2`, `-3`, …) in the library root, creating
- *  it and its `versions/` subdir. Stable per session: the caller stores the result
- *  and reuses it so later versions add to the same folder. Returns `{dir:null}` if
- *  the folder can't be created. */
+/** Pick a `<slug>-<id>/` folder in the library root (the prompt slug plus a short
+ *  random id, so the folder is unique-by-construction and reads like a project name
+ *  — `haunted-house-4-floors-a3f9c1`), creating it and its `versions/` subdir.
+ *  Stable per session: the caller stores the result and reuses it so later versions
+ *  add to the same folder. Returns `{dir:null}` if the folder can't be created. */
 export function reserveLibraryDir(slug: string): LibraryMirror {
   const root = getOutputDir();
-  let name = slug;
   try {
     fs.mkdirSync(root, { recursive: true });
-    for (let n = 2; fs.existsSync(path.join(root, name)); n++) name = `${slug}-${n}`;
+    // Append a 6-char random id for a collision-free, readable folder name; loop
+    // only on the astronomically unlikely clash.
+    let name = `${slug}-${randomBytes(3).toString('hex')}`;
+    while (fs.existsSync(path.join(root, name))) name = `${slug}-${randomBytes(3).toString('hex')}`;
     const dir = path.join(root, name);
     fs.mkdirSync(path.join(dir, 'versions'), { recursive: true });
     return { dir, latest: path.join(dir, `${name}.nbt`) };

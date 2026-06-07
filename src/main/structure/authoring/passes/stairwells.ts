@@ -405,11 +405,100 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     if (placedAt.has(k)) return false;
     return !stripKeys.has(k) && !removeKeys.has(k);
   });
+  let result = kept.concat(added);
+
+  // ── Refill orphaned stairwell-remnant holes (rule 4, the FLOOR side) ─────────
+  // Stripping the model's old climb removes its treads, but the opening it had cut
+  // through the floor ABOVE was already air, so it survives as a bare interior hole
+  // sitting beside the clean rebuilt connector — the "buraco misterioso" the user
+  // kept finding on every storey but the attic. Find each interior floor-plane hole
+  // that (a) no connector passes through and (b) still sits over geometry we stripped,
+  // and floor it back with that plane's own material.
+  const patched = patchOrphanHoles(result, outPalette, planes, mats, reserved, stripKeys, minX, maxX, minZ, maxZ);
+  result = patched.blocks;
+
   const fixes: string[] = [];
   if (stairs) fixes.push(`rebuilt ${stairs} staircase(s) as a clean climbable flight (full top step, headroom, landings, sized stairwell opening)`);
   if (ladders) fixes.push(`rebuilt ${ladders} cramped staircase(s)/ladder(s) as a continuous flush wall ladder`);
-  return { blocks: kept.concat(added), palette: outPalette, fixes, warnings: warnings.length ? warnings : undefined };
+  if (patched.filled) fixes.push(`floored over ${patched.filled} orphan stairwell-remnant hole(s) left where the old climb was removed`);
+  return { blocks: result, palette: outPalette, fixes, warnings: warnings.length ? warnings : undefined };
 };
+
+/** Refill the floor-plane holes left behind when an old climb is stripped. For each
+ *  storey plane, flood the footprint from its border through non-floor cells; any open
+ *  cell the flood can't reach is an INTERIOR hole. A hole CLUSTER is kept open only when
+ *  the rebuilt connector cut it (any cell is in `reserved` — its precise opening). A
+ *  cluster the connector never claimed but that still sits over geometry we stripped is
+ *  an orphan remnant → floored with the plane's dominant material. (Deliberate voids — an
+ *  atrium the model never built a climb into — were never stripped, so they're left.) */
+function patchOrphanHoles(
+  blocks: AuthoringBlock[],
+  palette: AuthoringPaletteEntry[],
+  planes: number[],
+  mats: Map<number, number>,
+  reserved: Set<string>,
+  stripKeys: Set<string>,
+  minX: number, maxX: number, minZ: number, maxZ: number,
+): { blocks: AuthoringBlock[]; filled: number } {
+  if (stripKeys.size === 0) return { blocks, filled: 0 };
+  const finalAt = new Map<string, AuthoringBlock>();
+  for (const b of blocks) finalAt.set(posKey(...b.pos), b);
+  const solidPlane = (x: number, y: number, z: number): boolean => {
+    const b = finalAt.get(posKey(x, y, z));
+    return !!b && isStructuralFull(palette, b.state);
+  };
+  const fill: AuthoringBlock[] = [];
+  for (let pi = 0; pi < planes.length; pi++) {
+    const py = planes[pi];
+    const mat = mats.get(py);
+    if (mat === undefined) continue;
+    const prev = pi > 0 ? planes[pi - 1] : py - 1; // scan the column down to (not incl.) the plane beneath
+    const open = (x: number, z: number): boolean => !solidPlane(x, py, z);
+    // Flood from the bounding-box border; unreached open cells are interior holes.
+    const seen = new Set<string>();
+    const stack: [number, number][] = [];
+    for (let x = minX - 1; x <= maxX + 1; x++) { stack.push([x, minZ - 1]); stack.push([x, maxZ + 1]); }
+    for (let z = minZ - 1; z <= maxZ + 1; z++) { stack.push([minX - 1, z]); stack.push([maxX + 1, z]); }
+    while (stack.length) {
+      const [x, z] = stack.pop() as [number, number];
+      if (x < minX - 1 || x > maxX + 1 || z < minZ - 1 || z > maxZ + 1) continue;
+      const k = `${x},${z}`;
+      if (seen.has(k) || !open(x, z)) continue;
+      seen.add(k);
+      stack.push([x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]);
+    }
+    // Cluster the unreached open cells.
+    const hset = new Set<string>();
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      if (open(x, z) && !seen.has(`${x},${z}`)) hset.add(`${x},${z}`);
+    }
+    const done = new Set<string>();
+    for (const cell of hset) {
+      if (done.has(cell)) continue;
+      const cluster: [number, number][] = [];
+      const st: [number, number][] = [cell.split(',').map(Number) as [number, number]];
+      while (st.length) {
+        const [x, z] = st.pop() as [number, number];
+        const k = `${x},${z}`;
+        if (done.has(k) || !hset.has(k)) continue;
+        done.add(k);
+        cluster.push([x, z]);
+        st.push([x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]);
+      }
+      let hasConnector = false, overStrip = false;
+      for (const [x, z] of cluster) {
+        if (reserved.has(posKey(x, py, z))) hasConnector = true;
+        for (let y = py; y > prev; y--) if (stripKeys.has(posKey(x, y, z))) overStrip = true;
+      }
+      if (hasConnector || !overStrip) continue; // active stairwell, or a deliberate void
+      for (const [x, z] of cluster) {
+        if (reserved.has(posKey(x, py, z))) continue;
+        fill.push({ state: mat, pos: [x, py, z] });
+      }
+    }
+  }
+  return fill.length ? { blocks: blocks.concat(fill), filled: fill.length } : { blocks, filled: 0 };
+}
 
 /** The `facing` a stair ascends toward, from its ascent unit (dx,dz). */
 function ascentFacing(fx: number, fz: number): string {

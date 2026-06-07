@@ -38,7 +38,10 @@ export const PHASES: Phase[] = [
     mode: 'patch',
     rubric:
       'Add a real ROOF with the "roof" op: pitched or edged, with an OVERHANG past the walls, and NO holes ' +
-      'or gaps along the ridge and eaves. No flat lid. Match the roof pitch and material to the style; give ' +
+      'or gaps along the ridge and eaves. The two slopes must MEET and CLOSE at the apex — looking straight ' +
+      'down from above you must NOT see an open slot along the top into the attic (the classic open-ridge bug ' +
+      'where the slopes stop one row short of meeting). Cap the ridge so the roof surface is continuous. ' +
+      'No flat lid. Match the roof pitch and material to the style; give ' +
       'distinct wings/sections their own roofs rather than one giant span. Do NOT hand-place a slab ridge-cap ' +
       'or a slab "shelf" cantilevered off the ridge/chimney with air beneath it (the classic floating-slab bug) ' +
       '— let the roof op cap the ridge. Give the house EXACTLY ONE chimney (a normal home has a single flue; ' +
@@ -57,6 +60,10 @@ export const PHASES: Phase[] = [
     rubric:
       'Give the EXTERIOR walls depth and articulation: framed window reveals, a string course / trim band, ' +
       'slight offsets or pilasters so walls are not flat, a grounded base course, and a FRAMED ENTRANCE ' +
+      'A base course / string course / plinth / trim band follows the WALL LINE ONLY: it must BREAK at every ' +
+      'door, gateway and interior opening, and must never run as a solid band across an open passage or where ' +
+      'there is no wall behind it — that walls off the room and blocks the walkway (the "cobblestone barrier ' +
+      'across the doorway" bug). Put trim only on the face of an actual wall. ' +
       '(porch, portal or recessed doorway — not a bare hole). Use 3-5 cohesive materials. Believable, not noisy. ' +
       'WINDOWS must read as deliberate and symmetric: even spacing, aligned across storeys, and CENTERED on ' +
       'the face with EQUAL END MARGINS — the wall left of the first window must equal the wall right of the ' +
@@ -160,10 +167,10 @@ export interface AuditCheck {
 
 export const AUDIT_CHECKS: AuditCheck[] = [
   { id: 'massing', label: 'Massing', ask: 'Is the silhouette articulated (NOT a plain cube), with the front different from the back?' },
-  { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney; EXACTLY ONE chimney that is a continuous column running from the hearth THROUGH the roof to ~1–3 past the ridge with its cap resting on it (no floating campfire, no chimney stopping below the roofline, no second chimney)?' },
+  { id: 'roof', label: 'Roof', ask: 'Pitched/edged roof with an overhang and NO holes; the apex/ridge CLOSED so looking straight down you do NOT see an open slot into the attic (slopes meet at the top, not one row short); gable-end triangles CLOSED (not open into the attic); NO slabs perched/floating off the ridge or chimney; EXACTLY ONE chimney that is a continuous column running from the hearth THROUGH the roof to ~1–3 past the ridge with its cap resting on it (no floating campfire, no chimney stopping below the roofline, no second chimney)?' },
   { id: 'facade', label: 'Facade', ask: 'Windows symmetric and centered with EQUAL end margins (not 2 one side, 3 the other), aligned across storeys; walls articulated with depth; a framed entrance (not a bare hole)?' },
   { id: 'interior', label: 'Interior', ask: 'Is EVERY habitable room both furnished and lit (no empty boxes), and any usable attic accessible + furnished (not sealed/empty)?' },
-  { id: 'circulation', label: 'Circulation', ask: 'Is EVERY floor — basement, each storey, AND the attic — reachable from the entrance by an UNBROKEN stair/ladder chain (NOT just the bottom segment, with upper floors left as an open hole and no rungs)? Each shaft uses ONE mechanism (stairs OR a single continuous wall-ladder column, not both, not an air-carved pit). Stairs have a clear landing at the bottom AND top, headroom, REACH the floor they serve (no jump), sit at least ONE cell OFF the outer walls, and do not block any door; the cellar stair LANDS in open cellar floor; a balcony is a walkable platform (≥2 deep beyond the door, railed), not just the door sill; doors are walkable?' },
+  { id: 'circulation', label: 'Circulation', ask: 'Is EVERY floor — basement, each storey, AND the attic — reachable from the entrance by an UNBROKEN stair/ladder chain (NOT just the bottom segment, with upper floors left as an open hole and no rungs)? Each shaft uses ONE mechanism (stairs OR a single continuous wall-ladder column, not both, not an air-carved pit). Stairs have a clear landing at the bottom AND top, headroom, REACH the floor they serve (no jump), sit at least ONE cell OFF the outer walls, and do not block any door; the cellar stair LANDS in open cellar floor; a balcony is a walkable platform (≥2 deep beyond the door, railed), not just the door sill; doors are walkable? No trim band / plinth / decorative strip runs across an open doorway or passage to wall it off — every interior opening is clear to walk through?' },
   { id: 'physical', label: 'Physical validity', ask: 'Nothing floating; interactive blocks (chests/furnaces) face the room; chest tops are clear; the basement is sunk below the ground floor; the chimney flue path is clear (no bed/floor/furniture crossing it or directly above the hearth)?' },
 ];
 

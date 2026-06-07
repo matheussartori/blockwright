@@ -10,7 +10,7 @@ import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
-import { setDocLoader, setFileOpener, bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
+import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
 import type { Viewer } from '../viewer/viewer';
 
 export interface LoadOpts {
@@ -193,9 +193,8 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   // the single global progress listener (routes to the right tab).
   useEffect(() => {
     setDocLoader((docId, path, o) => load(docId, path, o));
-    setFileOpener((path) => void openFile(path));
     bindGenerationProgress();
-  }, [load, openFile]);
+  }, [load]);
 
   return { load, openFile, open, newDoc, close, closeDocById, exportActive, acceptSuggest, onWorkspaceChanged };
 }

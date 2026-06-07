@@ -46,7 +46,8 @@ export interface BuildBrief {
   /** Block count of the finished build (assistant result card). */
   blockCount?: number;
   /** Absolute path to the saved library `.nbt` (the build's latest), driving the
-   *  card's Open-in-viewer / Reveal-in-folder actions (assistant result card). */
+   *  card's Reveal-in-folder action (assistant result card). The build's own tab is
+   *  already this file, so there is no "Open". */
   libraryPath?: string;
 }
 
@@ -146,6 +147,10 @@ export interface ChatRecord {
   /** Named vertical levels the user defined for this build (the "floor plan");
    *  folded into every AI prompt as context. Absent = none defined. */
   floors?: FloorDef[];
+  /** True when this record belongs to a from-scratch AI build whose `filePath` is
+   *  its own saved library `.nbt` (the generated output, not an "Original"), so the
+   *  version chain skips the v0 baseline on reopen. Absent = a normal opened file. */
+  generated?: boolean;
   updatedAt?: number;
 }
 

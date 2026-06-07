@@ -183,8 +183,6 @@ export const en = {
   'gen.roomFloor': 'Floor',
   'gen.roomEmpty': 'Open / unassigned',
   'gen.cardStructure': 'Structure',
-  'gen.openBuild': 'Open',
-  'gen.openBuildTitle': 'Open this build in the viewer',
   'gen.revealBuild': 'Reveal',
   'gen.revealBuildTitle': 'Show the build folder in your file manager',
   'gen.width': 'Width',

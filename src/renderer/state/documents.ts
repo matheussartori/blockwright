@@ -60,6 +60,11 @@ export interface Document {
   floors: FloorDef[];
   /** True once persisted chat history (if any) has been loaded for this doc. */
   hydrated: boolean;
+  /** True for a from-scratch AI build that has ADOPTED its saved library `.nbt` as
+   *  `filePath` (so the tab is the project, named after it, and reopening that file
+   *  restores this conversation). Unlike a real opened file, its `filePath` is the
+   *  generated output itself — not an "Original" — so the version chain gets no v0. */
+  generated: boolean;
 }
 
 export interface DocumentsState {
@@ -104,6 +109,7 @@ function freshDoc(over: Partial<Document> = {}): Document {
     baselinePath: null,
     floors: [],
     hydrated: false,
+    generated: false,
     ...over,
   };
 }
