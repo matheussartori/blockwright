@@ -4,6 +4,7 @@
 // (label, description, the knowledge guide it owns, and how to preview it) on top
 // of its category-specific behaviour contract. This is what lets one UI list them,
 // one knowledge loader pull only the selected guides, and one gallery preview them.
+import type { FurnishingPreset } from '@/shared/domain/furnishing';
 
 /** The module categories. Selected at creation; surfaced in the gallery. */
 export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'room';
@@ -68,9 +69,13 @@ export interface ModuleSummary {
   appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
+  /** Furnishing presets, tiered by floor space (room modules only) → the gallery's
+   *  expandable per-room preset list + the composer brief's preset selection. */
+  presets?: FurnishingPreset[];
 }
 
-/** Project a module to the renderer-facing summary. */
+/** Project a module to the renderer-facing summary. Room modules carry furnishing
+ *  `presets`, attached here when present so the catalog surfaces them to the gallery. */
 export function toSummary(m: ModuleMeta): ModuleSummary {
   return {
     id: m.id,
@@ -79,5 +84,6 @@ export function toSummary(m: ModuleMeta): ModuleSummary {
     description: m.description,
     hasPreview: m.preview !== undefined,
     appliesTo: m.appliesTo,
+    presets: 'presets' in m ? (m as { presets?: FurnishingPreset[] }).presets : undefined,
   };
 }

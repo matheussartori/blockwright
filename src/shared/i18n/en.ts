@@ -298,6 +298,11 @@ export const en = {
   'modules.previewSoon': 'Preview coming soon.',
   'modules.selectModule': 'Select a module.',
   'modules.appliesTo': 'Applies to',
+  'modules.presets': 'Furnishing presets',
+  'modules.presetsHint': 'A base layout per room size — the house decoration re-skins it.',
+  'modules.scaleSnug': 'Snug',
+  'modules.scaleStandard': 'Standard',
+  'modules.scaleGrand': 'Grand',
 
   // Settings ▸ AI.
   'ai.stable': 'Stable',

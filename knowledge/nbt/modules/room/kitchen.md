@@ -4,6 +4,11 @@
 > furnishing yourself with ordinary ops inside the floor's interior (the "[Room plan]"
 > lines give the floor's y range). Share the storey with the other assigned room if there
 > are two.
+>
+> **Scale to the floor:** match the furniture to the room's size — the "[Room plan]" line
+> names the space tier (snug / standard / grand) and a furnishing **preset** to base the
+> layout on; build that preset in the house decoration's materials. Never leave a large
+> room half-empty (see `14-furnishing-by-space.md`).
 
 A kitchen is a working room: a counter run along one or two walls, appliances, storage,
 and a place to eat. Keep a clear floor strip to move through.

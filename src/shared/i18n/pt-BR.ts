@@ -300,6 +300,11 @@ export const ptBR: Messages = {
   'modules.previewSoon': 'Prévia em breve.',
   'modules.selectModule': 'Selecione um módulo.',
   'modules.appliesTo': 'Aplica-se a',
+  'modules.presets': 'Presets de mobília',
+  'modules.presetsHint': 'Um layout base por tamanho de cômodo — a decoração da casa o reveste.',
+  'modules.scaleSnug': 'Compacto',
+  'modules.scaleStandard': 'Padrão',
+  'modules.scaleGrand': 'Amplo',
 
   // Settings ▸ AI.
   'ai.stable': 'Estável',

@@ -47,7 +47,9 @@ refines through an emit → render → review loop — previewed live in the vie
   interior rooms (living room, kitchen, library, bedroom, shared bedrooms, storage) in the Details
   composer (browse them with live 3D previews in the Module Gallery); the selection guides the build
   and loads only the relevant knowledge, and registered structure × decoration modules also cross at
-  compile time behind the `template` op
+  compile time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
+  **furnishing presets** (snug / standard / grand) that the chosen decoration re-skins — so a big room
+  is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - A browsable structure library — each generated build is saved to its own folder (the latest clean

@@ -65,6 +65,7 @@ authoring format.
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |
 | [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md) | Block-by-block facade grammar & style archetypes: timber framing, dormers, balconies, porches, towers, chimneys, mansion massing & grounds. |
 | [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`house`/`tower`) × decoration (`cozy`), then layer your own ops on top. |
+| [`14-furnishing-by-space.md`](14-furnishing-by-space.md) | Match furnishing density to floor space: the snug/standard/grand tiers, room presets as a decoration-agnostic base, and how the `[Room plan]` brief drives it — so a big room never reads empty. |
 
 ### Module guides (loaded only when selected / relevant)
 
@@ -102,7 +103,11 @@ never speculatively. Categories:
 > **Room** modules are *guidance-only* (no code geometry). The user assigns up to two rooms to
 > each floor of a storeyed structure (the house); each assigned room loads its guide and rides into
 > the prompt as a `[Room plan]` line per floor. You furnish each storey's interior yourself from
-> those guides, partitioning a floor that holds two rooms into real, separated spaces.
+> those guides, partitioning a floor that holds two rooms into real, separated spaces. Each room
+> ships **furnishing presets** tiered by floor space (snug / standard / grand) — a decoration-agnostic
+> base layout the `[Room plan]` line picks by the room's computed area and asks you to re-skin in the
+> chosen decoration, so a large room is furnished to its size, not left empty (see
+> [`14-furnishing-by-space.md`](14-furnishing-by-space.md)).
 
 ## Hard rules (read before generating)
 

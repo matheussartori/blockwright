@@ -90,11 +90,15 @@ src/
                            the single source of that geometry. Each declares `appliesTo` (the structures it
                            pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
         rooms/             Category "room": one file per interior program (living/kitchen/library/
-                           bedroom/dormitory/storage) + types.ts (RoomModule = ModuleMeta, no geometry)
-                           + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`: the user
-                           assigns up to two rooms per floor in the composer Details (house), each
-                           loads only its knowledge guide and rides into the prompt as a `[Room plan]`
-                           line per floor; the AI furnishes the interior. `appliesTo` = ['house'].
+                           bedroom/dormitory/storage) + types.ts (RoomModule = ModuleMeta + `presets`,
+                           no geometry) + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`:
+                           the user assigns up to two rooms per floor in the composer Details (house),
+                           each loads only its knowledge guide and rides into the prompt as a `[Room
+                           plan]` line per floor; the AI furnishes the interior. `appliesTo` = ['house'].
+                           Each room also ships FURNISHING PRESETS tiered by floor SPACE (snug/standard/
+                           grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
+                           a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
+                           computed area + the gallery lists. So a big floor never comes out empty.
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -213,7 +217,10 @@ src/
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
                           two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
-                          Details filtering and the main guide gating call the SAME function).
+                          Details filtering and the main guide gating call the SAME function) +
+                          furnishing.ts (the SPACE × DECORATION model: RoomScale tiers + scaleForArea
+                          + FurnishingPreset + presetForScale — the room-plan brief picks a preset by
+                          area, the gallery lists them; the scale thresholds live here once).
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
     i18n/                 Tiny framework-free i18n shared by both processes: en.ts (canonical key
                           space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
@@ -362,14 +369,29 @@ decoration, and a new module is one small file.
   register in its `index.ts`; give it `appliesTo` + optional `build()`/`integrations` + a
   `knowledge/nbt/modules/{roof,basement}/<id>.md`.
 - **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: living/kitchen/library/bedroom/dormitory/
-  storage): each is a `RoomModule` (just `ModuleMeta` — no `build`/`params`/`preview`). The user assigns
+  storage): each is a `RoomModule` (`ModuleMeta` + `presets` — no `build`/`preview`). The user assigns
   up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e. the house's
   `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each loads ONLY
   its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]` line per
   floor (`buildRoomPlan` in `renderer/generation/brief.ts`). The AI furnishes each storey from those guides
   (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
-  (the gallery lists them with their description + `appliesTo`). **Add a room:** new file in `rooms/` +
-  register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide. `appliesTo` = ['house'].
+  (the gallery lists them with their description + `appliesTo` + their FURNISHING PRESETS). **Add a room:**
+  new file in `rooms/` + register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide +
+  `presets` (one per scale tier). `appliesTo` = ['house'].
+- **SPACE × DECORATION — furnishing presets scale the interior to the floor** (`shared/domain/
+  furnishing.ts` + each room's `presets`): the fix for the "big room comes out empty" defect (a huge
+  shared bedroom with two beds adrift). Every room carries a small library of FURNISHING PRESETS, one per
+  space tier (`RoomScale` = snug / standard / grand, banded by interior floor area in `SCALE_TIERS`). A
+  preset is a decoration-AGNOSTIC base layout — it names furniture semantically (a hearth, a seating
+  cluster, a wardrobe run) and the house's decoration master (cozy/haunted) re-skins it into blocks + mood,
+  so no N×M data. `buildRoomPlan` computes each room's area (the build's interior footprint split by the
+  rooms sharing the floor), picks the matching tier (`scaleForArea`) + preset (`presetForScale`), and folds
+  the tier's density steer + the preset's furniture zones into the `[Room plan]` brief — telling the model
+  to build that layout, scaled to the room, in the chosen decoration. The model-facing principle lives in
+  the always-on core guide `knowledge/nbt/14-furnishing-by-space.md`; the gallery (`ModulesModal`) lists a
+  room's presets as an expandable, scale-chipped list (surfaced via `ModuleSummary.presets`). The scale
+  thresholds + the `FurnishingPreset` shape live in `shared/domain/furnishing.ts` ONCE, so the renderer
+  brief and the main domain can't drift.
 - **Consumers** (all via the `domain/` barrel): `authoring/ops/index.ts` (`composeStructure`),
   `authoring/validate.ts` (`isKnownStructure`/`knownStructureNames`), `ai/generate.ts`
   (`composeBlockNames`), `ai/knowledge-select.ts` (`selectedGuides`/`promptGuides` — selection→

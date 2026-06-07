@@ -127,14 +127,44 @@ describe('buildBrief', () => {
 });
 
 describe('buildRoomPlan', () => {
-  it('lists only floors that have rooms assigned', () => {
+  it('lists only floors that have rooms assigned, one line per room', () => {
     const d = details({ structureType: 'house', params: { floors: 2 }, rooms: [['living', 'kitchen'], []] });
     const out = buildRoomPlan(d, catalog);
-    expect(out).toContain('Floor 1: Living Room + Kitchen');
+    expect(out).toContain('Floor 1 · Living Room');
+    expect(out).toContain('Floor 1 · Kitchen');
     expect(out).not.toContain('Floor 2');
   });
   it('is empty for a non-storeyed structure', () => {
     expect(buildRoomPlan(details({ structureType: 'monument' }), catalog)).toBe('');
+  });
+  it('scales the tier + preset to the room area', () => {
+    // A room with snug + grand presets; pick by the build size.
+    const withPresets: GenerationCatalog = {
+      ...catalog,
+      room: [
+        {
+          id: 'living', label: 'Living Room', category: 'room', description: '', hasPreview: false,
+          presets: [
+            { id: 'living-snug', label: 'Sitting nook', scale: 'snug', summary: 'small', furnishings: ['a small hearth'] },
+            { id: 'living-grand', label: 'Great room', scale: 'grand', summary: 'big', furnishings: ['two zones'] },
+          ],
+        },
+      ],
+    };
+    const big = buildRoomPlan(
+      details({ structureType: 'house', size: { w: 16, d: 16, h: 12 }, rooms: [['living']] }),
+      withPresets,
+    );
+    expect(big).toContain('grand space');
+    expect(big).toContain('Great room');
+    expect(big).toContain('two zones');
+
+    const small = buildRoomPlan(
+      details({ structureType: 'house', size: { w: 6, d: 6, h: 10 }, rooms: [['living']] }),
+      withPresets,
+    );
+    expect(small).toContain('snug space');
+    expect(small).toContain('Sitting nook');
   });
 });
 

@@ -1,9 +1,11 @@
 // The Module Gallery: browse the generation modules grouped by category (Structure /
-// Decoration / Basement / Roof), read what each one builds, and see a live 3D preview
-// composed from a ready structure. It mirrors the Block Catalog (shared Modal +
+// Decoration / Basement / Roof / Room), read what each one builds, and see a live 3D
+// preview composed from a ready structure. It mirrors the Block Catalog (shared Modal +
 // Segmented + the StructurePreview scene) so it matches the rest of the app. This is
 // the "explain the module types" screen — selection in the composer Details is the
-// same set of modules.
+// same set of modules. Room modules have no geometry preview but list their FURNISHING
+// PRESETS (tiered by floor space) as an expandable, scale-chipped list — the SPACE ×
+// DECORATION organism (see `@/shared/domain/furnishing`).
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
@@ -21,6 +23,13 @@ const CATEGORIES: { value: ModuleCategory; label: MessageKey }[] = [
   { value: 'roof', label: 'modules.catRoof' },
   { value: 'room', label: 'modules.catRoom' },
 ];
+
+/** i18n key for a furnishing-preset space tier chip. */
+const SCALE_LABEL: Record<string, MessageKey> = {
+  snug: 'modules.scaleSnug',
+  standard: 'modules.scaleStandard',
+  grand: 'modules.scaleGrand',
+};
 
 export function ModulesModal() {
   const t = useT();
@@ -130,6 +139,30 @@ export function ModulesModal() {
                     .map((id) => catalog?.structure.find((s) => s.id === id)?.label ?? id)
                     .join(', ')}
                 </p>
+              )}
+              {selected.presets && selected.presets.length > 0 && (
+                <div className="modules-presets">
+                  <div className="modules-presets-head">
+                    <span className="modules-detail-applies-label">{t('modules.presets')}</span>
+                    <span className="modules-presets-hint">{t('modules.presetsHint')}</span>
+                  </div>
+                  {selected.presets.map((p, i) => (
+                    <details key={p.id} className="modules-preset" open={i === 0}>
+                      <summary className="modules-preset-summary">
+                        <span className={`chip modules-preset-scale scale-${p.scale}`}>
+                          {SCALE_LABEL[p.scale] ? t(SCALE_LABEL[p.scale]) : p.scale}
+                        </span>
+                        <span className="modules-preset-name">{p.label}</span>
+                      </summary>
+                      <p className="modules-preset-desc">{p.summary}</p>
+                      <ul className="modules-preset-items">
+                        {p.furnishings.map((f, j) => (
+                          <li key={j}>{f}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ))}
+                </div>
               )}
             </div>
           )}

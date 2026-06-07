@@ -5,6 +5,7 @@
 // `BuildBrief` card shown in the chat. Extracted from NewStructurePanel so they're
 // unit-testable in isolation and the component stays a thin view. No React, no IO.
 import type { BuildBrief, BuildSelection, GenerationCatalog, GenerationModule } from '@/shared/types';
+import { presetForScale, scaleForArea } from '@/shared/domain/furnishing';
 
 /** Max interior rooms a single floor can be assigned in the composer. */
 export const ROOMS_PER_FLOOR = 2;
@@ -129,27 +130,62 @@ export function effectiveSize(
   return d.size ?? derivedSize(struct, params);
 }
 
+/** The interior floor area (cells) one room gets on a storey: the build's interior
+ *  footprint (W−2)×(D−2), split between the rooms that share the floor. This is what
+ *  tiers the furnishing density (`scaleForArea`), so a big floor reads "grand" and a
+ *  small one "snug".
+ *  @param size - The build box `{ w, d, h }`.
+ *  @param roomsOnFloor - How many rooms share this storey (≥ 1).
+ *  @returns The interior area in cells available to each room. */
+export function roomArea(size: { w: number; d: number; h: number }, roomsOnFloor: number): number {
+  const interior = Math.max(1, size.w - 2) * Math.max(1, size.d - 2);
+  return Math.round(interior / Math.max(1, roomsOnFloor));
+}
+
 /** The per-floor interior program, in plain language for the model: one line per floor
- *  that has rooms assigned (bottom-up), naming the room(s) for that storey. '' if the
- *  structure isn't storeyed or no rooms were picked. Pairs with the room knowledge guides
- *  the selection loads.
+ *  that has rooms assigned (bottom-up), naming each room AND — the SPACE × DECORATION
+ *  organism — its computed space tier and the matching furnishing PRESET (a decoration-
+ *  agnostic base layout the chosen decoration re-skins). This is what stops a big floor
+ *  coming out empty: the area is computed from the build size, a tier is picked, and the
+ *  preset's furniture zones are spelled out so the model furnishes to the room, not below
+ *  it. '' if the structure isn't storeyed or no rooms were picked.
  *  @param d - The current Details state.
- *  @param catalog - The module catalog (for room id → label), or null.
+ *  @param catalog - The module catalog (for room id → label/presets), or null.
  *  @returns A "Room plan" brief fragment, or '' when there are no per-floor rooms. */
 export function buildRoomPlan(d: BuildDetails, catalog: GenerationCatalog | null): string {
   const s = catalog?.structure.find((m) => m.id === d.structureType);
   const n = floorCount(s, resolveDetailParams(d, s));
   if (!n) return '';
-  const labelOf = (id: string) => catalog?.room.find((m) => m.id === id)?.label ?? id;
+  const size = effectiveSize(d, s);
+  const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
+  const roomOf = (id: string) => catalog?.room.find((m) => m.id === id);
   const lines: string[] = [];
   for (let i = 0; i < n; i++) {
     const ids = floorRooms(d, i).filter(Boolean);
-    if (ids.length) lines.push(`  - Floor ${i + 1}: ${ids.map(labelOf).join(' + ')}`);
+    if (!ids.length) continue;
+    const area = roomArea(size, ids.length);
+    const tier = scaleForArea(area);
+    for (const id of ids) {
+      const room = roomOf(id);
+      const label = room?.label ?? id;
+      const preset = presetForScale(room?.presets, tier.scale);
+      const head = `  - Floor ${i + 1} · ${label} — ${tier.label.toLowerCase()} space (~${area} cells): ${tier.density}`;
+      if (!preset) {
+        lines.push(head);
+        continue;
+      }
+      const items = preset.furnishings.map((f) => `      · ${f}`).join('\n');
+      lines.push(`${head}\n    Base it on the "${preset.label}" preset — ${preset.summary}\n${items}`);
+    }
   }
   if (!lines.length) return '';
+  const skin = deco
+    ? `The presets are a BASE layout only — re-skin every piece in the "${deco.label}" decoration's materials and mood. `
+    : `The presets are a BASE layout only — re-skin every piece in the chosen decoration's materials and mood. `;
   return (
-    `- Room plan — furnish each floor's interior with these rooms (see each room's module guide). ` +
-    `Up to two rooms share a floor; partition the storey so each is a real, separated space:\n` +
+    `- Room plan — furnish each floor to its SPACE (see each room's module guide). ` +
+    `Up to two rooms share a floor; partition the storey so each is a real, separated space. ` +
+    `${skin}Match the furnishing density to the space — never leave a large room half-empty, and never cram a small one:\n` +
     `${lines.join('\n')}\n`
   );
 }

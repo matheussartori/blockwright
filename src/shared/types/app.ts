@@ -1,6 +1,7 @@
 // App/UI contracts that don't belong to a single data domain: file export, the
 // floating-window menu state, the Block Catalog, and the composable-generation
 // registry surfaced to the composer's preset picker.
+import type { FurnishingPreset } from '../domain/furnishing';
 
 /** Result of exporting (copying) the current build's `.nbt` to a user-chosen
  *  location via the native Save dialog. */
@@ -77,6 +78,9 @@ export interface GenerationModule {
   appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
+  /** Furnishing presets, tiered by floor space (room modules only) → the gallery's
+   *  expandable per-room preset list. */
+  presets?: FurnishingPreset[];
 }
 
 /** The generation module registry, grouped by category. */
