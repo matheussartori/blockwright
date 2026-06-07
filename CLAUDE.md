@@ -90,7 +90,9 @@ src/
                            the single source of that geometry. Each declares `appliesTo` (the structures it
                            pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
         rooms/             Category "room": one file per interior program (living/kitchen/library/
-                           bedroom/dormitory/storage) + types.ts (RoomModule = ModuleMeta + `presets`,
+                           bedroom/dormitory/storage), each a `defineRoom({...})` of PURE DATA +
+                           define.ts (the factory: fills category/knowledge-path/preset-ids + default
+                           hosts) + types.ts (RoomModule = ModuleMeta + required `knowledge` + `presets`,
                            no geometry) + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`:
                            the user assigns up to two rooms per floor in the composer Details (house),
                            each loads only its knowledge guide and rides into the prompt as a `[Room
@@ -107,6 +109,12 @@ src/
       generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→
                             review handler, round budget + progress; dispatches to a provider driver.
                             `generateStructure(GenerateStructureOptions)` takes an options object.
+      review-content.ts     buildReviewContent(...) — pure: assembles the content blocks (status +
+                            fix/warning notes + reference target + screenshots) returned to the model
+                            after each emit so it can review its own build. Tested in __tests__/.
+      token-meter.ts        TokenMeter — the live token accounting (input across turns + the committed/
+                            running-estimate output blend), extracted from the orchestrator so the blend
+                            math is unit-tested; generate.ts keeps phase/turn/logging around it.
       patch.ts              mergePatch(prev,input) — pure: append a `patch`-mode emit's palette/ops/
                             blocks onto the previous version (size/floors/etc. inherited).
       emit-validate.ts      validateEmit(authoring) — the pre-compile gates (structural validity →
@@ -187,7 +195,13 @@ src/
                           components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
                           (Module Gallery: structure/decoration/basement/roof modules + 3D preview —
-                          store.modulesOpen), ConsoleDock (the full-width bottom log dock — see below)
+                          store.modulesOpen), ConsoleDock (the full-width bottom log dock — see below).
+                          NewStructurePanel (the Generate chat) is a thin ORCHESTRATOR — it owns the
+                          composer's transient state + effects and composes the view from focused parts
+                          in components/generate/: ChatTranscript (empty state + messages + result stats +
+                          live progress), Composer (attachments + section slots + textarea + action
+                          toolbar), DetailsSection (the ⚙ Details selects/params/size/per-floor rooms),
+                          FloorsSection (the ▦ Floors editor), BuildCard (the chat build card).
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
@@ -195,7 +209,9 @@ src/
     generation/           Pure (no-React, no-IO) helpers behind the Generate composer, extracted from
                           NewStructurePanel/state so they're unit-testable: brief.ts (BuildDetails →
                           the model's "[Build details]" brief + BuildSelection + the BuildBrief chat
-                          card + size/floor helpers) and floors.ts (normalizeFloor + buildFloorPlan).
+                          card + size/floor helpers), details.ts (pure reducers over BuildDetails — the
+                          Details field/room/param/size edits), attachments.ts (reference-image intake)
+                          and floors.ts (normalizeFloor + buildFloorPlan).
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
@@ -369,22 +385,28 @@ decoration, and a new module is one small file.
   register in its `index.ts`; give it `appliesTo` + optional `build()`/`integrations` + a
   `knowledge/nbt/modules/{roof,basement}/<id>.md`.
 - **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: living/kitchen/library/bedroom/dormitory/
-  storage): each is a `RoomModule` (`ModuleMeta` + `presets` — no `build`/`preview`). The user assigns
-  up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e. the house's
-  `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each loads ONLY
-  its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]` line per
-  floor (`buildRoomPlan` in `renderer/generation/brief.ts`). The AI furnishes each storey from those guides
-  (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
-  (the gallery lists them with their description + `appliesTo` + their FURNISHING PRESETS). **Add a room:**
-  new file in `rooms/` + register in its `index.ts` + a `knowledge/nbt/modules/room/<id>.md` guide +
-  `presets` (one per scale tier). `appliesTo` = ['house'].
+  storage): each is a `RoomModule` (`ModuleMeta` + required `knowledge` + `presets` — no `build`/`preview`),
+  authored via the **`defineRoom` factory** (`rooms/define.ts`) so a room file is PURE DATA (id/label/
+  description/presets) and the factory fills the boilerplate ONCE: `category:'room'`, the knowledge path
+  (`nbt/modules/room/<id>.md`, derived from id so it can't drift), each preset's id (`<id>-<scale>`,
+  derived from its tier), and the default host link (`['house']`, override to reuse on more structures).
+  The user assigns up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e.
+  the house's `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each
+  loads ONLY its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]`
+  line per floor (`buildRoomPlan` in `renderer/generation/brief.ts`). The AI furnishes each storey from those
+  guides (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
+  (the gallery lists them with their description + `appliesTo` + their FURNISHING PRESETS). Each room guide is
+  HOST-AGNOSTIC and carries ONLY this room's furniture vocabulary — the scale/preset/decoration mechanics live
+  in the always-on core guide `14-furnishing-by-space.md`, so a room guide never repeats it (no wasted tokens).
+  **Add a room:** new `defineRoom({...})` file in `rooms/` + register in its `index.ts` + a
+  `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
 - **SPACE × DECORATION — furnishing presets scale the interior to the floor** (`shared/domain/
   furnishing.ts` + each room's `presets`): the fix for the "big room comes out empty" defect (a huge
   shared bedroom with two beds adrift). Every room carries a small library of FURNISHING PRESETS, one per
   space tier (`RoomScale` = snug / standard / grand, banded by interior floor area in `SCALE_TIERS`). A
-  preset is a decoration-AGNOSTIC base layout — it names furniture semantically (a hearth, a seating
-  cluster, a wardrobe run) and the house's decoration master (cozy/haunted) re-skins it into blocks + mood,
-  so no N×M data. `buildRoomPlan` computes each room's area (the build's interior footprint split by the
+  preset is a decoration-AGNOSTIC and host-AGNOSTIC base layout — it names furniture semantically (a hearth,
+  a seating cluster, a wardrobe run) and the host structure's decoration (cozy/haunted) re-skins it into
+  blocks + mood, so no N×M data (and the same room reuses across structures — house today, tower/… later). `buildRoomPlan` computes each room's area (the build's interior footprint split by the
   rooms sharing the floor), picks the matching tier (`scaleForArea`) + preset (`presetForScale`), and folds
   the tier's density steer + the preset's furniture zones into the `[Room plan]` brief — telling the model
   to build that layout, scaled to the room, in the chosen decoration. The model-facing principle lives in
@@ -477,7 +499,7 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   screenshots + checklist and returns the failing items — it has no stake in the build, so it catches
   what the builder rationalizes. Claude paths only; other providers fall back to the self-report.
   `BW_AI_CRITIC_MODEL` can point the critic at a cheaper model. **Extended thinking is on by default** (`BW_AI_THINKING_BUDGET`,
-  default 8000 tokens, `0` disables) so it can plan geometry, and the system prompt tells it to plan
+  default 5000 tokens, `0` disables) so it can plan geometry, and the system prompt tells it to plan
   → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
   callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +
   `Viewer.capture()` (synchronous multi-angle PNGs, downscaled) → replies on

@@ -33,7 +33,7 @@ Rules of thumb for a grand room so it never echoes:
 Each room module ships **furnishing presets**, one per space tier (e.g. a bedroom's *Cot
 corner* / *Bedroom* / *Master suite*). A preset is a **decoration-agnostic base layout** —
 it names furniture in semantic terms (a hearth, a seating cluster, a wardrobe run). The
-house's **decoration master** (cozy, haunted, …) decides the *materials and mood*: the same
+structure's **decoration** (cozy, haunted, …) decides the *materials and mood*: the same
 "seating cluster" is honey spruce and wool under **cozy** and dark, cobwebbed, candle-lit
 under **haunted**. Build the preset's layout, then realise each piece in the active
 decoration's palette.

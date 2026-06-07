@@ -1,16 +1,7 @@
 # Room module — Living room
 
-> Loads **only when the user assigns a Living room to a floor**. Guidance-only: there is
-> no geometry to stamp — build the furnishing yourself with ordinary ops inside the floor's
-> interior. The user tells you WHICH floor (the "[Room plan]" lines give a y range per
-> floor); fit the room into that storey, sharing the floor with the other assigned room if
-> there are two.
->
-> **Scale to the floor:** match the furniture to the room's size — the "[Room plan]" line
-> names the space tier (snug / standard / grand) and a furnishing **preset** to base the
-> layout on; build that preset in the house decoration's materials. A grand living room is
-> two zones (lounge + a second cluster), never one corner of furniture (see
-> `14-furnishing-by-space.md`).
+> Furniture vocabulary for this room. Scale, preset, and decoration come from the
+> `[Room plan]` brief + `14-furnishing-by-space.md`; here is just WHAT to build.
 
 The living room is the social heart of the home — the first room a guest sees. Build it
 around a focal point and leave real walking space (never a furniture-packed cube).

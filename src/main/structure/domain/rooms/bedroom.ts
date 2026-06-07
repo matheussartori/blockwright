@@ -3,23 +3,19 @@
 // curtains, and maybe a desk. Guidance-only; the AI furnishes it from the guide.
 // Its furnishing PRESETS scale the layout to the floor (snug → grand) so a big
 // bedroom isn't left echoing-empty.
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const bedroom: RoomModule = {
+export const bedroom = defineRoom({
   id: 'bedroom',
   label: 'Bedroom',
-  category: 'room',
   description:
     'A single private bedroom: a made bed against a wall with a headboard, a nightstand and ' +
     'lantern, a wardrobe and chest, a small rug, a curtained window, and an optional writing ' +
     'desk. Cozy and personal.',
-  knowledge: 'nbt/modules/room/bedroom.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'bedroom-snug',
-      label: 'Cot corner',
       scale: 'snug',
+      label: 'Cot corner',
       summary: 'A single bed tucked in a corner with the essentials — nothing more.',
       furnishings: [
         'one bed in a corner against the wall, with a simple headboard above',
@@ -29,9 +25,8 @@ export const bedroom: RoomModule = {
       ],
     },
     {
-      id: 'bedroom-standard',
-      label: 'Bedroom',
       scale: 'standard',
+      label: 'Bedroom',
       summary: 'A balanced bedroom: bed, matching nightstands, a wardrobe, a rug and a window.',
       furnishings: [
         'a made bed against the centre of a wall with a headboard',
@@ -43,9 +38,8 @@ export const bedroom: RoomModule = {
       ],
     },
     {
-      id: 'bedroom-grand',
-      label: 'Master suite',
       scale: 'grand',
+      label: 'Master suite',
       summary:
         'A large suite split into zones: a four-poster bed feature wall, a wardrobe run, ' +
         'and a separate sitting/dressing nook so the floor never reads empty.',
@@ -61,4 +55,4 @@ export const bedroom: RoomModule = {
       ],
     },
   ],
-};
+});

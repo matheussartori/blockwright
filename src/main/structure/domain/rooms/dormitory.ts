@@ -4,23 +4,19 @@
 // inn floor, or barracks. Guidance-only; the AI furnishes it from the guide. Its
 // PRESETS scale the bed count + zoning to the floor (the big empty shared bedroom that
 // prompted this is a "grand" dormitory).
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const dormitory: RoomModule = {
+export const dormitory = defineRoom({
   id: 'dormitory',
   label: 'Bedrooms (shared)',
-  category: 'room',
   description:
     'A shared sleeping room with several beds: a row or two facing rows of beds, each with its ' +
     'own nightstand and lantern, divided by low partitions or rugs, a common wardrobe wall, and ' +
     'windows down the long side. An inn floor, barracks, or kids’ room.',
-  knowledge: 'nbt/modules/room/dormitory.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'dormitory-snug',
-      label: 'Twin room',
       scale: 'snug',
+      label: 'Twin room',
       summary: 'Two beds sharing a nightstand — a small shared room.',
       furnishings: [
         'two beds along one wall with a shared nightstand and lantern between them',
@@ -29,9 +25,8 @@ export const dormitory: RoomModule = {
       ],
     },
     {
-      id: 'dormitory-standard',
-      label: 'Bunk row',
       scale: 'standard',
+      label: 'Bunk row',
       summary: 'A row of three or four beds, each with its own nightstand, down one wall.',
       furnishings: [
         'a row of 3–4 beds along the long wall, each with a nightstand and lantern',
@@ -41,9 +36,8 @@ export const dormitory: RoomModule = {
       ],
     },
     {
-      id: 'dormitory-grand',
-      label: 'Dormitory hall',
       scale: 'grand',
+      label: 'Dormitory hall',
       summary:
         'Two facing rows of beds down a central aisle, zoned with partitions — fills a ' +
         'large hall instead of leaving it empty.',
@@ -58,4 +52,4 @@ export const dormitory: RoomModule = {
       ],
     },
   ],
-};
+});

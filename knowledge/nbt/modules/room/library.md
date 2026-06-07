@@ -1,14 +1,7 @@
 # Room module — Library
 
-> Loads **only when the user assigns a Library to a floor**. Guidance-only: build the
-> furnishing yourself with ordinary ops inside the floor's interior (the "[Room plan]"
-> lines give the floor's y range). Share the storey with the other assigned room if there
-> are two.
->
-> **Scale to the floor:** match the furniture to the room's size — the "[Room plan]" line
-> names the space tier (snug / standard / grand) and a furnishing **preset** to base the
-> layout on; build that preset in the house decoration's materials. Never leave a large
-> room half-empty (see `14-furnishing-by-space.md`).
+> Furniture vocabulary for this room. Scale, preset, and decoration come from the
+> `[Room plan]` brief + `14-furnishing-by-space.md`; here is just WHAT to build.
 
 A library is a quiet, book-lined reading room. The defining move is **walls of shelving**;
 fill the perimeter and let a reading setup sit in the middle.

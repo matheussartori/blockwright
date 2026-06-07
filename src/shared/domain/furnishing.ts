@@ -4,9 +4,10 @@
 // by the available floor SPACE. Each room declares a small library of FURNISHING
 // PRESETS, one per scale tier (snug / standard / grand). A preset is a decoration-
 // AGNOSTIC base: it names furniture in semantic terms (a hearth, a seating cluster,
-// shelving), and the house's decoration master (cozy, haunted, …) re-skins those into
+// shelving), and the host structure's decoration (cozy, haunted, …) re-skins those into
 // concrete blocks and mood. So one preset reads warm under "cozy" and grim under
-// "haunted" without N×M data.
+// "haunted" without N×M data — and the same room reuses across structures (house today,
+// tower/… later) since nothing here names a host.
 //
 // The renderer (the composer brief + the module gallery) and main (the domain rooms +
 // the knowledge loader) both import this, so the scale thresholds and the preset shape

@@ -24,7 +24,9 @@ import { buildSeed } from './seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import { RunLog } from './gen-log';
-import type { DriverProgress, EmitToolResult, NeutralBlock } from './providers/types';
+import { buildReviewContent } from './review-content';
+import { TokenMeter, type TokenTotals } from './token-meter';
+import type { DriverProgress, EmitToolResult } from './providers/types';
 import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),
@@ -104,8 +106,13 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       `The model will plan, emit geometry, then refine over the design passes.`,
   );
 
-  // Captured by the emit handler as the model emits the structure.
-  let captured: Extract<GenerateResult, { ok: true }> | null = null;
+  // The successful result, captured by the emit handler as the model emits the
+  // structure. BOXED (a mutable holder) rather than a bare `let`: it's assigned only
+  // inside the onEmit/setSessionId closures, which the main body's flow analysis can't
+  // see — a bare `let` would still be typed `null` below (narrowing the truthy branch
+  // to `never`). Reading `emitted.value` keeps the proper `CapturedOk | null` type.
+  type CapturedOk = Extract<GenerateResult, { ok: true }>;
+  const emitted: { value: CapturedOk | null } = { value: null };
   let captureError: string | null = null;
   const startedAt = Date.now();
   let rounds = 0;
@@ -117,29 +124,24 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // the terminal audit pass) regardless of provider.
   let phaseIndex = 0;
 
-  // Live progress accounting (see emitProgress). Input tokens accumulate across
-  // turns (including cached context). Output is the committed total from finished
-  // turns plus the current turn's running count, which during extended thinking
-  // comes from the thinking-token estimate.
-  let inputTokens = 0;
-  let committedOutput = 0;
-  let currentOutput = 0;
-  let currentThinking = 0;
+  // Live progress accounting. The TokenMeter owns the token math (input across turns,
+  // the committed + running-estimate output blend); the orchestrator keeps the phase,
+  // turn count and emit cadence here.
+  const meter = new TokenMeter();
   let turns = 0;
   let phase: GeneratePhase = 'thinking';
   let lastEmit = 0;
   let lastSnapshot = '';
-  const displayedOutput = (): number => committedOutput + Math.max(currentOutput, currentThinking);
   const emitProgress = (force = false): void => {
     if (!onProgress) return;
-    const snapshot = `${phase}:${phaseIndex}:${inputTokens}:${displayedOutput()}:${turns}`;
+    const snapshot = `${phase}:${phaseIndex}:${meter.inputTokens}:${meter.displayedOutput()}:${turns}`;
     const now = Date.now();
     if (!force && (snapshot === lastSnapshot || now - lastEmit < 150)) return;
     lastSnapshot = snapshot;
     lastEmit = now;
     const dp = phaseAt(phaseIndex);
     onProgress({
-      sessionId, phase, inputTokens, outputTokens: displayedOutput(), turns,
+      sessionId, phase, inputTokens: meter.inputTokens, outputTokens: meter.displayedOutput(), turns,
       designPhase: dp.label, designStep: phaseIndex + 1, designSteps: PHASES.length,
     });
   };
@@ -147,19 +149,18 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
 
   const progress: DriverProgress = {
     startTurn() {
-      currentOutput = 0;
-      currentThinking = 0;
+      meter.startTurn();
       turns += 1;
       phase = 'thinking';
       run.ai(`Turn ${turns}: the model is thinking through the geometry…`);
       emitProgress();
     },
     addInput(tokens) {
-      inputTokens += tokens;
+      meter.addInput(tokens);
       emitProgress();
     },
     thinkingTokens(tokens) {
-      currentThinking = tokens;
+      meter.setThinking(tokens);
       emitProgress();
     },
     toolStarted() {
@@ -168,17 +169,15 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       emitProgress(true);
     },
     outputChars(totalChars) {
-      currentOutput = Math.max(currentOutput, Math.round(totalChars / 4));
+      meter.addOutputChars(totalChars);
       emitProgress();
     },
     outputTokens(tokens) {
-      currentOutput = Math.max(currentOutput, tokens);
+      meter.setOutputTokens(tokens);
       emitProgress();
     },
     endTurn() {
-      committedOutput += Math.max(currentOutput, currentThinking);
-      currentOutput = 0;
-      currentThinking = 0;
+      meter.endTurn();
     },
   };
 
@@ -277,7 +276,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       await writeMetadataJson(librarySidecarPath(session.library.latest), meta);
       if (basePath) await removeTempMetadata(basePath);
     }
-    captured = {
+    emitted.value = {
       ok: true,
       path: nbtPath,
       libraryPath: session.library.latest,
@@ -301,7 +300,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     run.ai(
       `Built v${version} (${size.join('×')}, ${blockCount} blocks) on round ${rounds}/${maxRounds} · ` +
         `pass “${phaseAt(phaseIndex).label}” · ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ` +
-        `in=${inputTokens} out=${displayedOutput()} tokens.`,
+        `in=${meter.inputTokens} out=${meter.displayedOutput()} tokens.`,
     );
 
     // Render this version and feed screenshots back so the model can review.
@@ -321,60 +320,19 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     emitProgress(true);
 
     const atCap = rounds >= maxRounds;
-    const paletteLen = authoring.palette?.length ?? 0;
-    const haveShots = !!shot.images && shot.images.length > 0;
-    const haveRef = !!images && images.length > 0;
 
-    const content: NeutralBlock[] = [
-      {
-        type: 'text',
-        text:
-          `Compiled and rendered as v${version} (${size.join('×')}, ${blockCount} blocks). ` +
-          `Palette has ${paletteLen} entries (indices 0..${Math.max(paletteLen - 1, 0)}); ` +
-          `in a patch, new palette entries you add start at index ${paletteLen}.`,
-      },
-    ];
-
-    if (report.fixes.length) {
-      content.push({
-        type: 'text',
-        text:
-          `The compiler auto-corrected unsupported block placements: ${report.fixes.join('; ')}. ` +
-          'Place these blocks on a valid support in future emits so they no longer need fixing.',
-      });
-    }
-    if (report.warnings.length) {
-      content.push({
-        type: 'text',
-        text: `PLACEMENT WARNINGS (not auto-fixed — you must correct these): ${report.warnings.join(' ')}`,
-      });
-    }
-
-    if (haveRef && haveShots) {
-      content.push({
-        type: 'text',
-        text: 'TARGET — the reference image(s) you were given. This is the goal; compare every facet of your build against it:',
-      });
-      for (const img of images!) content.push({ type: 'image', data: img.data, mediaType: img.mediaType });
-    }
-
-    if (haveShots) {
-      content.push({
-        type: 'text',
-        text:
-          `YOUR build v${version} follows: first the orbited EXTERIOR angles, then a VERTICAL ` +
-          'CROSS-SECTION (front half clipped away, viewed straight on) showing storey heights and how floors ' +
-          'stack, then top-down FLOOR-PLAN cutaways (the roof clipped away) so you can review each INTERIOR — ' +
-          'room layout, faux furniture, lighting, and circulation. Review them against the focused goal for ' +
-          'this design pass below.',
-      });
-      for (const img of shot.images!) content.push({ type: 'image', data: img.data, mediaType: img.mediaType });
-    } else {
-      content.push({
-        type: 'text',
-        text: shot.error ? `(Preview render unavailable: ${shot.error})` : '(No preview available.)',
-      });
-    }
+    // The review framing: a status line, fix/warning notes, the reference (target),
+    // and this version's screenshots. The design-pass gate text is appended below.
+    const content = buildReviewContent({
+      version,
+      size,
+      blockCount,
+      paletteLen: authoring.palette?.length ?? 0,
+      fixes: report.fixes,
+      warnings: report.warnings,
+      referenceImages: images,
+      shot,
+    });
 
     // Drive the model through the design passes (massing → roof → facade → interior
     // → circulation → audit), one per emit. The final Audit pass is GATED by the
@@ -400,8 +358,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
             credential: cred, images: shot.images, buildPrompt: prompt,
             checklist: auditChecklistText(), dir: session.dir, abort: ac,
           });
-          inputTokens += c.tokensIn ?? 0;
-          committedOutput += c.tokensOut ?? 0;
+          meter.addExternal(c.tokensIn ?? 0, c.tokensOut ?? 0);
           auditReported = true;
           bySelf = false;
           auditFailed = c.failed.map((f) => ({ label: labelFor(f.check), note: f.note }));
@@ -443,10 +400,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
 
   // Snapshot the running token totals — attached to EVERY result branch
   // (success, cancel, error) so the chat footer can always report the cost.
-  const tokens = (): { tokensIn: number; tokensOut: number } => ({
-    tokensIn: inputTokens,
-    tokensOut: displayedOutput(),
-  });
+  const tokens = (): TokenTotals => meter.totals();
 
   const ac = beginRun(sessionId);
 
@@ -463,7 +417,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       resume: session.sdkSessionId,
       setSessionId: (id) => {
         session.sdkSessionId = id;
-        if (captured) captured.sdkSessionId = id;
+        if (emitted.value) emitted.value.sdkSessionId = id;
       },
       dir: session.dir,
       progress,
@@ -479,14 +433,12 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // Run summary (Console dock + dev terminal): the before/after baseline for efficiency work.
   run.ai(
     `Generation finished in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${rounds} rounds · ${turns} turns · ` +
-      `in=${inputTokens} out=${displayedOutput()} tokens.`,
+      `in=${meter.inputTokens} out=${meter.displayedOutput()} tokens.`,
   );
 
-  // `captured` is only ever assigned inside the onEmit/setSessionId closures, so
-  // TS's main-body flow analysis treats it as still null here (the truthy branch
-  // narrows to `never`). It IS the emitted result at runtime — stamp the final
-  // token totals onto it via Object.assign (which tolerates the `never` type).
-  if (captured) return Object.assign(captured, tokens());
+  // Stamp the final token totals onto the emitted result (the box read keeps its
+  // proper type, so this is a plain spread — see the `emitted` declaration above).
+  if (emitted.value) return { ...emitted.value, ...tokens() };
   if (captureError) return { ok: false, error: captureError, ...tokens() };
   if (ac.signal.aborted) return { ok: false, error: 'Canceled.', canceled: true, ...tokens() };
   const subtype = driverResult.resultSubtype;

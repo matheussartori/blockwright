@@ -2,23 +2,19 @@
 // central reading table with lecterns and candles, a comfortable reading chair by a
 // window, ladders or stairs to upper shelves, and a chandelier. Guidance-only; the AI
 // furnishes it from the knowledge guide.
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const library: RoomModule = {
+export const library = defineRoom({
   id: 'library',
   label: 'Library',
-  category: 'room',
   description:
     'A quiet reading room: walls lined floor-to-ceiling with bookshelves (broken by the odd ' +
     'glassed cabinet), a central study table with lecterns and candles, a reading chair by a ' +
     'window, and a chandelier. Studious and warm.',
-  knowledge: 'nbt/modules/room/library.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'library-snug',
-      label: 'Reading nook',
       scale: 'snug',
+      label: 'Reading nook',
       summary: 'One bookshelf wall, a reading chair by a window, a lectern.',
       furnishings: [
         'one wall lined with bookshelves',
@@ -28,9 +24,8 @@ export const library: RoomModule = {
       ],
     },
     {
-      id: 'library-standard',
-      label: 'Library',
       scale: 'standard',
+      label: 'Library',
       summary: 'Bookshelf walls, a central study table with lecterns, a reading chair.',
       furnishings: [
         'two or three walls lined floor-to-ceiling with bookshelves (broken by a glassed cabinet)',
@@ -40,9 +35,8 @@ export const library: RoomModule = {
       ],
     },
     {
-      id: 'library-grand',
-      label: 'Great library',
       scale: 'grand',
+      label: 'Great library',
       summary:
         'A two-storey-feel hall: full bookshelf walls with a gallery/ladder, reading ' +
         'tables, and a fireplace study corner.',
@@ -56,4 +50,4 @@ export const library: RoomModule = {
       ],
     },
   ],
-};
+});

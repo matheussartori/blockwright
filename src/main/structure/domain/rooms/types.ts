@@ -7,12 +7,18 @@
 // as a plain-language "[Room plan]" line per floor.
 //
 // `category` is always `'room'`. Rooms declare `appliesTo` to link them to the
-// structures they fit (house for now); they have no `build`, `params`, or `preview`.
+// structures they fit (a growing list — house today, tower/… later); they have no
+// `build`, `params`, or `preview`. Author a room with `defineRoom` (see define.ts),
+// which fills in the category, the knowledge path, and the preset ids from this data.
 import type { FurnishingPreset } from '@/shared/domain/furnishing';
 import type { ModuleMeta } from '../modules';
 
 export interface RoomModule extends ModuleMeta {
   category: 'room';
+  /** Path to this room's knowledge guide — REQUIRED (narrows ModuleMeta's optional
+   *  `knowledge`): a room is GUIDANCE-ONLY, so it always owns a guide. `defineRoom`
+   *  derives it as `nbt/modules/room/<id>.md`. */
+  knowledge: string;
   /** The structure-type ids this room pairs with — REQUIRED (narrows ModuleMeta's optional
    *  `appliesTo`): a room must explicitly say which structures it fits, never silently apply
    *  to all. A growing list — start with `['house']`, add more (e.g. `'tower'`) later. */

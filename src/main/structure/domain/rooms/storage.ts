@@ -2,23 +2,19 @@
 // shelves, sacks (composters/cauldrons), crates (barrels), hanging tools, and a
 // single working lantern. A utilitarian back room. Guidance-only; the AI furnishes it
 // from the knowledge guide.
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const storage: RoomModule = {
+export const storage = defineRoom({
   id: 'storage',
   label: 'Storage room',
-  category: 'room',
   description:
     'A utilitarian storeroom: walls of stacked barrels and chests, shelving, sacks and crates, ' +
     'hanging tools, and a single working lantern. The pantry / back room where the household keeps ' +
     'its supplies.',
-  knowledge: 'nbt/modules/room/storage.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'storage-snug',
-      label: 'Pantry closet',
       scale: 'snug',
+      label: 'Pantry closet',
       summary: 'A small closet of shelves and barrels.',
       furnishings: [
         'shelving and stacked barrels along one or two walls',
@@ -27,9 +23,8 @@ export const storage: RoomModule = {
       ],
     },
     {
-      id: 'storage-standard',
-      label: 'Storeroom',
       scale: 'standard',
+      label: 'Storeroom',
       summary: 'Walls of barrels and chests, labelled shelving, sacks and crates.',
       furnishings: [
         'walls of stacked barrels and chests',
@@ -39,9 +34,8 @@ export const storage: RoomModule = {
       ],
     },
     {
-      id: 'storage-grand',
-      label: 'Warehouse',
       scale: 'grand',
+      label: 'Warehouse',
       summary:
         'A stockroom with shelving rows / aisles, a central worktable, and crates stacked ' +
         'high — a big room kept busy, not empty.',
@@ -55,4 +49,4 @@ export const storage: RoomModule = {
       ],
     },
   ],
-};
+});

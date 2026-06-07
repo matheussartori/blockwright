@@ -4,8 +4,9 @@
 // generation as a plain-language "[Room plan]" line per floor + its own knowledge
 // guide (loaded ONLY when selected, so an unused room guide never bloats the prompt),
 // and is documented in the gallery. Each links to the structures it fits via
-// `appliesTo`. Add a room: new file here + register below + a knowledge guide under
-// `knowledge/nbt/modules/room/<id>.md`.
+// `appliesTo`. Author a room with `defineRoom` (define.ts) so the category/guide-path/
+// preset-ids are filled in for you. Add a room: new file (a `defineRoom({...})` export)
+// here + register below + a knowledge guide under `knowledge/nbt/modules/room/<id>.md`.
 import type { ModuleSummary } from '../modules';
 import { createRegistry } from '../registry';
 import { bedroom } from './bedroom';

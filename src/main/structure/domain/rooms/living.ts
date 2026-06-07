@@ -2,23 +2,19 @@
 // fireplace wall, seating clustered around it (stair "sofas", a carpet rug), a low
 // table, shelves and pictures, soft lighting. Guidance-only; the AI furnishes it from
 // the knowledge guide.
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const living: RoomModule = {
+export const living = defineRoom({
   id: 'living',
   label: 'Living room',
-  category: 'room',
   description:
     'A social sitting room built around a hearth: a fireplace or chimney wall, a seating ' +
     'cluster of stair "sofas" on a wool rug, a low table, shelves and wall pictures, and warm ' +
     'ambient light. The welcoming centre of the home.',
-  knowledge: 'nbt/modules/room/living.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'living-snug',
-      label: 'Sitting nook',
       scale: 'snug',
+      label: 'Sitting nook',
       summary: 'A small sitting corner: a couple of seats facing a single focal point.',
       furnishings: [
         'a single focal point — a small hearth or a window — on one wall',
@@ -28,9 +24,8 @@ export const living: RoomModule = {
       ],
     },
     {
-      id: 'living-standard',
-      label: 'Living room',
       scale: 'standard',
+      label: 'Living room',
       summary: 'A hearth, a seating cluster on a rug, a coffee table and shelving.',
       furnishings: [
         'a fireplace or feature wall as the focal point',
@@ -41,9 +36,8 @@ export const living: RoomModule = {
       ],
     },
     {
-      id: 'living-grand',
-      label: 'Great room',
       scale: 'grand',
+      label: 'Great room',
       summary:
         'A two-zone great room: a fireplace lounge plus a second cluster (reading or ' +
         'games), columns and rugs dividing a large floor.',
@@ -57,4 +51,4 @@ export const living: RoomModule = {
       ],
     },
   ],
-};
+});

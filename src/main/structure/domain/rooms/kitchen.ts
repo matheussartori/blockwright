@@ -2,23 +2,19 @@
 // blast furnaces/smokers as a cooktop and oven), a sink, overhead shelving, a pantry
 // of barrels/composters, and a dining nook (table + stair chairs). Guidance-only; the
 // AI furnishes it from the knowledge guide.
-import type { RoomModule } from './types';
+import { defineRoom } from './define';
 
-export const kitchen: RoomModule = {
+export const kitchen = defineRoom({
   id: 'kitchen',
   label: 'Kitchen',
-  category: 'room',
   description:
     'A working kitchen: a counter run (slabs/stairs over barrels with a smoker/blast-furnace ' +
     'cooktop and a cauldron sink), overhead and base storage of barrels and composters, a ' +
     'pantry, and a small dining nook. Functional, lit, and tidy.',
-  knowledge: 'nbt/modules/room/kitchen.md',
-  appliesTo: ['house'],
   presets: [
     {
-      id: 'kitchen-snug',
-      label: 'Kitchenette',
       scale: 'snug',
+      label: 'Kitchenette',
       summary: 'A short counter run with a cooktop, sink and a little storage.',
       furnishings: [
         'a short L of counters (slabs/stairs over barrels) along one corner',
@@ -28,9 +24,8 @@ export const kitchen: RoomModule = {
       ],
     },
     {
-      id: 'kitchen-standard',
-      label: 'Kitchen',
       scale: 'standard',
+      label: 'Kitchen',
       summary: 'A full counter run, a pantry, overhead storage and a small dining nook.',
       furnishings: [
         'a counter run along a wall — cooktop (smoker/blast furnace), prep space, cauldron sink',
@@ -41,9 +36,8 @@ export const kitchen: RoomModule = {
       ],
     },
     {
-      id: 'kitchen-grand',
-      label: 'Farmhouse kitchen',
       scale: 'grand',
+      label: 'Farmhouse kitchen',
       summary:
         'A big working kitchen with a central island and a full dining table — counters ' +
         'on two walls, a walk-in pantry, no empty floor.',
@@ -57,4 +51,4 @@ export const kitchen: RoomModule = {
       ],
     },
   ],
-};
+});
