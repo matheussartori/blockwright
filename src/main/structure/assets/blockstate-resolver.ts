@@ -37,6 +37,26 @@ type MultipartWhen = Record<string, string> & {
   AND?: Record<string, string>[];
 };
 
+// Some multipart blocks gate EVERY part on a property (e.g. chiseled_bookshelf
+// gates on `facing`, and its front is supplied only by the per-slot models keyed
+// on `slot_N_occupied`). A real Minecraft structure file always carries those
+// properties, but an AI/authored placement emits a bare `minecraft:chiseled_bookshelf`
+// — so without defaults no part matches and the block renders as a fallback cube
+// (no props) or an open-front box (facing only, no slots). These defaults fill in
+// the missing keys; explicit incoming properties always win (merged under, below).
+// Slots default to occupied so a placed bookshelf reads as a stocked library.
+const DEFAULT_PROPS: Record<string, Record<string, string>> = {
+  'minecraft:chiseled_bookshelf': {
+    facing: 'north',
+    slot_0_occupied: 'true',
+    slot_1_occupied: 'true',
+    slot_2_occupied: 'true',
+    slot_3_occupied: 'true',
+    slot_4_occupied: 'true',
+    slot_5_occupied: 'true',
+  },
+};
+
 function whenMatches(when: MultipartWhen | undefined, props: Record<string, string>): boolean {
   if (!when) return true;
   if (when.OR) return when.OR.some((w) => whenMatches(w, props));
@@ -58,6 +78,11 @@ export function resolveBlock(
   if (fluid) return fluid;
   const entity = resolveBlockEntity(name, properties);
   if (entity) return entity;
+
+  // Fill any default blockstate props this block needs to match its parts,
+  // without overriding values the caller actually provided.
+  const defaults = DEFAULT_PROPS[name];
+  if (defaults) properties = { ...defaults, ...properties };
 
   const { namespace, path: key } = parseRef(name);
   const file = path.join(assetsDir(namespace), 'blockstates', `${key}.json`);

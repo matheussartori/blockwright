@@ -2841,6 +2841,7 @@ body.row-resizing {
 }
 
 .gen-composer {
+  flex: none; /* keep its natural height; .gen-messages yields the space instead */
   padding: 10px 12px 12px;
   border-top: 1px solid var(--border);
   display: flex;
@@ -2891,12 +2892,16 @@ body.row-resizing {
   color: var(--accent);
 }
 
-/* Optional build-details form above the textarea. */
+/* Optional build-details form above the textarea. Capped + scrollable so a tall
+   form (many params + per-floor rooms) can't push the textarea / Send button
+   past the bottom of the panel — the composer below stays reachable. */
 .gen-details {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
   padding: 10px;
+  max-height: 38vh;
+  overflow-y: auto;
 }
 .gen-details-grid {
   display: grid;
@@ -3080,7 +3085,8 @@ body.row-resizing {
   color: var(--text);
 }
 
-/* Floor-plan editor above the textarea (mirrors .gen-details). */
+/* Floor-plan editor above the textarea (mirrors .gen-details — same height cap
+   + internal scroll so a long floor list keeps the textarea / Send reachable). */
 .gen-floors {
   -webkit-app-region: no-drag;
   border: 1px solid var(--border);
@@ -3090,6 +3096,8 @@ body.row-resizing {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 38vh;
+  overflow-y: auto;
 }
 .gen-floors-head {
   display: flex;
