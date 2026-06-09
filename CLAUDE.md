@@ -255,7 +255,10 @@ src/
                           bridge) + mesh/geometry/texture building. Focused concerns split out of the
                           Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
                           navigation + framing), capture.ts (the AI-review screenshot paths: orbit/
-                          cutaway/section), floor-regions.ts (FloorRegionsOverlay — the floor-plan
+                          cutaway/section — encoded via the shared `REVIEW_SNAP` = JPEG@512 to keep the
+                          re-sent/accumulating review images cheap; cutaways scale ~1/storey and yield 0
+                          for a shallow single-volume build the section already reveals), floor-regions.ts
+                          (FloorRegionsOverlay — the floor-plan
                           bands), highlight.ts (FocusHighlight — the inspector focus box).
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
@@ -594,7 +597,7 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   `0` disables; default OFF under the Saver preset) — when on it plans geometry, and the system prompt
   tells it to plan → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
   callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +
-  `Viewer.capture()` (synchronous multi-angle PNGs, downscaled) → replies on
+  `Viewer.capture()` (synchronous multi-angle JPEGs, downscaled to 512 via `REVIEW_SNAP`) → replies on
   `IPC_CHANNELS.aiRenderResult`, which resolves the matching pending promise in `ipc.ts`
   (`pendingRenders`, with a timeout so a stuck render doesn't hang generation). The user watches the
   build evolve live since each version loads into the viewer.

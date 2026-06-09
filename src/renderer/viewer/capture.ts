@@ -15,9 +15,26 @@ export interface CaptureContext {
   current: THREE.Group;
 }
 
-/** Downscale the current framebuffer to a PNG data URL (max edge `maxSize`).
- *  Assumes the caller already rendered the frame; shared by the capture paths. */
-export function snapshot(renderer: THREE.WebGLRenderer, maxSize: number): string {
+/** How to encode a review screenshot: max edge plus image format/quality. */
+export interface SnapOpts {
+  /** Longest-edge cap in px; the frame is downscaled to fit. */
+  maxSize: number;
+  /** MIME type for `toDataURL` (defaults to PNG). JPEG shrinks these 3D shots a lot. */
+  format?: string;
+  /** JPEG quality 0..1 (ignored for PNG). */
+  quality?: number;
+}
+
+/** Encoding for the AI self-review screenshots: a smaller edge + JPEG. The model only
+ *  judges massing/layout (not pixel detail), and these images are RE-SENT every review
+ *  round and accumulate in the conversation (uncached), so each kept byte is paid many
+ *  times over — JPEG@512 cuts the per-image token cost to a fraction of a PNG@720. */
+export const REVIEW_SNAP: SnapOpts = { maxSize: 512, format: 'image/jpeg', quality: 0.8 };
+
+/** Downscale the current framebuffer to a data URL per `opts` (max edge, format,
+ *  quality). Assumes the caller already rendered the frame; shared by the capture paths. */
+export function snapshot(renderer: THREE.WebGLRenderer, opts: SnapOpts): string {
+  const { maxSize, format = 'image/png', quality } = opts;
   const src = renderer.domElement;
   const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
   const w = Math.max(1, Math.round(src.width * scale));
@@ -26,14 +43,14 @@ export function snapshot(renderer: THREE.WebGLRenderer, maxSize: number): string
   off.width = w;
   off.height = h;
   const ctx = off.getContext('2d');
-  if (!ctx) return src.toDataURL('image/png');
+  if (!ctx) return src.toDataURL(format, quality);
   ctx.drawImage(src, 0, 0, w, h);
-  return off.toDataURL('image/png');
+  return off.toDataURL(format, quality);
 }
 
 /** Screenshot the current build from `angles` viewpoints orbited evenly around the
  *  framed target (angle 0 = the current camera), returning PNG data URLs. */
-export function captureOrbit(ctx: CaptureContext, angles: number, maxSize: number): string[] {
+export function captureOrbit(ctx: CaptureContext, angles: number, opts: SnapOpts): string[] {
   const { renderer, camera, controls, scene } = ctx;
   const target = controls.target.clone();
   const saved = camera.position.clone();
@@ -52,7 +69,7 @@ export function captureOrbit(ctx: CaptureContext, angles: number, maxSize: numbe
     );
     camera.lookAt(target);
     renderer.render(scene, camera);
-    shots.push(snapshot(renderer, maxSize));
+    shots.push(snapshot(renderer, opts));
   }
 
   // Restore the user's viewpoint.
@@ -68,16 +85,19 @@ export function captureOrbit(ctx: CaptureContext, angles: number, maxSize: numbe
  *  — which the exterior orbits in captureOrbit() never reveal, leaving the model
  *  building interiors blind. One cut per ~storey, capped so capture time and token
  *  cost stay bounded. */
-export function captureCutaways(ctx: CaptureContext, maxSize: number): string[] {
+export function captureCutaways(ctx: CaptureContext, opts: SnapOpts): string[] {
   const { renderer, camera, controls, scene, current } = ctx;
   const box = new THREE.Box3().setFromObject(current);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const height = Math.max(size.y, 1);
-  // ~5 blocks ≈ one storey; cap at 3 so the cutaways cover a deep build (cellar +
-  // storeys + attic) — the critic/review can't judge a level it never sees — without
-  // flooding the result on a very tall build.
-  const floors = THREE.MathUtils.clamp(Math.round(height / 5), 1, 3);
+  // ~1 cutaway per storey, capped at 3 so a deep build (cellar + storeys + attic) is
+  // covered — the review can't judge a level it never sees — without flooding a very
+  // tall build. Discount a roof's worth of height (~3) first so a SHALLOW single-volume
+  // build (a shed, a 1-storey hut) gets 0 cutaways: its interior is already revealed by
+  // the vertical cross-section, so a top-down plan adds an image the review doesn't need.
+  const floors = THREE.MathUtils.clamp(Math.round((height - 3) / 5), 0, 3);
+  if (floors === 0) return [];
 
   // Save everything we mutate so the user's live view is untouched afterward.
   const savedPos = camera.position.clone();
@@ -106,7 +126,7 @@ export function captureCutaways(ctx: CaptureContext, maxSize: number): string[] 
     camera.position.set(center.x, cutY + dist, center.z);
     camera.lookAt(center.x, box.min.y, center.z);
     renderer.render(scene, camera);
-    shots.push(snapshot(renderer, maxSize));
+    shots.push(snapshot(renderer, opts));
   }
 
   // Restore the user's viewpoint and clear the clip.
@@ -126,7 +146,7 @@ export function captureCutaways(ctx: CaptureContext, maxSize: number): string[] 
  *  panel — lets the AI self-review loop verify storey heights, vertical alignment
  *  between floors, and hanging detail (chains/lanterns/basement), which the top-down
  *  cutaways flatten away. One cut through the middle along z. */
-export function captureSection(ctx: CaptureContext, maxSize: number): string[] {
+export function captureSection(ctx: CaptureContext, opts: SnapOpts): string[] {
   const { renderer, camera, controls, scene, current } = ctx;
   const box = new THREE.Box3().setFromObject(current);
   const size = box.getSize(new THREE.Vector3());
@@ -154,7 +174,7 @@ export function captureSection(ctx: CaptureContext, maxSize: number): string[] {
   camera.position.set(center.x, center.y, box.min.z - dist);
   camera.lookAt(center.x, center.y, center.z);
   renderer.render(scene, camera);
-  const shot = snapshot(renderer, maxSize);
+  const shot = snapshot(renderer, opts);
 
   // Restore the user's viewpoint and clear the clip.
   renderer.clippingPlanes = savedClip;

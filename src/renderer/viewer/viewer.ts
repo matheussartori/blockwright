@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import type { StructureData } from '@/shared/types';
 import { CameraController, type NavMode } from './camera-controller';
-import { type CaptureContext, captureCutaways, captureOrbit, captureSection } from './capture';
+import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REVIEW_SNAP, type SnapOpts } from './capture';
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
@@ -242,26 +242,26 @@ export class Viewer {
   }
 
   /** Orbited exterior screenshots (angle 0 = the current camera) for the AI review. */
-  capture(angles = 2, maxSize = 720): string[] {
+  capture(angles = 2, opts: SnapOpts = REVIEW_SNAP): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
-    return captureOrbit(this.captureContext(), angles, maxSize);
+    return captureOrbit(this.captureContext(), angles, opts);
   }
 
   /** Top-down floor-plan cutaways (interior layout) for the AI review. */
-  captureCutaways(maxSize = 720): string[] {
+  captureCutaways(opts: SnapOpts = REVIEW_SNAP): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
-    return captureCutaways(this.captureContext(), maxSize);
+    return captureCutaways(this.captureContext(), opts);
   }
 
   /** A vertical cross-section screenshot (storey heights / hanging detail) for review. */
-  captureSection(maxSize = 720): string[] {
+  captureSection(opts: SnapOpts = REVIEW_SNAP): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
-    return captureSection(this.captureContext(), maxSize);
+    return captureSection(this.captureContext(), opts);
   }
 }
