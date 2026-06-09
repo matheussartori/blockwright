@@ -18,8 +18,8 @@ export const hip: RoofModule = {
     'square plan), so there are no vertical gable ends. Reads as more solid and formal than a ' +
     'gable, and wraps an overhanging eave evenly on every side.',
   knowledge: 'nbt/modules/roof/hip.md',
-  // The classic house offers a hip alternative; cabin/l-shaped are gable-identity, modern flat.
-  appliesTo: ['classic'],
+  // The classic + farmhouse houses offer a hip alternative; cabin/l-shaped are gable-identity, modern flat.
+  appliesTo: ['classic', 'farmhouse'],
   preview: { size: [9, 9, 7] },
   defaults: { roof: 'minecraft:oak_stairs', wall: 'minecraft:oak_planks' },
   // GENERIC: one hip roof op over the wall box (slopes on all four sides).

@@ -1,9 +1,10 @@
 // The code-built STARTING SHELL seed. Some archetypes have a silhouette the model can't
 // reliably invent from prose alone (the modern villa: flat roofs, stacked offset volumes,
-// glass curtain walls, a pool). For those, a FRESH build is seeded with the structure
-// type's OWN compiled geometry — the model then keeps that exterior and only furnishes /
-// details it (see `shellPreamble`). Gated by the structure type's `seedShell` flag, so the
-// house stays free-form and only an opted-in type stamps a starting shell.
+// glass curtain walls, a pool; the farmhouse: an L plan + cross-gable + wraparound veranda).
+// For those, a FRESH build is seeded with the structure type's OWN compiled geometry — the
+// model then keeps that exterior and only furnishes / details it (see `shellPreamble`).
+// Gated by the structure type's `seedShell` flag, so a plain house stays free-form and only
+// an opted-in type stamps a starting shell.
 import fs from 'node:fs';
 import path from 'node:path';
 import { getStructureType } from '../structure/domain';
@@ -14,26 +15,32 @@ import { shellPreamble } from './seed';
 /** A sensible default shell box when the user didn't pick an explicit size. */
 const DEFAULT_SIZE: [number, number, number] = [15, 13, 13];
 
+/** Options for {@link buildShellSeed} — the structured Details picks that shape the
+ *  code-built starting shell. */
+export interface ShellSeedOptions {
+  /** The selected structure-type id (undefined → no structure, no seed). */
+  structureType?: string;
+  /** The selected decoration id (the shell's materials); defaults to the type's own kit. */
+  decoration?: string;
+  /** The build box [W, H, D]; defaults to {@link DEFAULT_SIZE}. */
+  size?: [number, number, number];
+  /** The selected roof-module id (gable/hip/flat), threaded so the shell honours it. */
+  roof?: string;
+  /** The selected exterior-style id, threaded into the template so a seeded shell also
+   *  carries the chosen finish's skin. (It does NOT force a seed — that's `seedShell`.) */
+  exterior?: string;
+}
+
 /**
  * Build the starting-shell seed preamble for a fresh build, or '' when the selected
  * structure type doesn't opt into shell-seeding (so the caller falls back to free-form).
  *
- * @param structureType - The selected structure-type id (undefined → no seed).
- * @param decoration - The selected decoration id (the shell's materials); defaults to the
- *   type's own kit when omitted.
- * @param size - The build box [W, H, D] (defaults to {@link DEFAULT_SIZE} when omitted).
+ * @param opts - The {@link ShellSeedOptions} (structure/decoration/size/roof/exterior).
  * @param dir - A scratch dir to compile the shell into (the session dir).
- * @param roof - The selected roof-module id (e.g. `'flat'`), threaded into the shell so the
- *   seeded silhouette honours the Details roof pick. Omit → the type's default roof.
  * @returns The {@link shellPreamble} wrapping the compiled shell's authoring JSON, or ''.
  */
-export async function buildShellSeed(
-  structureType: string | undefined,
-  decoration: string | undefined,
-  size: [number, number, number] | undefined,
-  dir: string,
-  roof?: string,
-): Promise<string> {
+export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<string> {
+  const { structureType, decoration, size, roof, exterior } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return '';
 
@@ -43,6 +50,7 @@ export async function buildShellSeed(
   // The roof-module id doubles as the structure's `roof` param value (gable/hip/flat), so
   // a Details roof pick (e.g. flat) flows straight into the seeded shell's massing.
   if (roof) params.roof = roof;
+  if (exterior) params.exterior = exterior;
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size: [W, H, D],

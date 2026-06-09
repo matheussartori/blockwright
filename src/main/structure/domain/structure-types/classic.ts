@@ -292,7 +292,7 @@ export const classic: StructureType = {
     // flight's `clear` carves the stairwell hole through the slab above. ----------
     const ladderW = hasAttic ? palette.get('ladder', { facing: 'west' }) : 0;
     const ladderN = hasAttic ? palette.get('ladder', { facing: 'north' }) : 0;
-    addStairCore(ops, { x0, y0, z0, x1, y1, z1, W, D, H }, slabYs, storeyH, hasAttic, wallTop, stair, floorIdx, air, ladderW, ladderN);
+    addStairCore(ops, { x0, y0, z0, x1, y1, z1, W, D, H }, slabYs, storeyH, hasAttic, wallTop, stair, floorIdx, air, ladderW, ladderN, () => palette.get('ladder', { facing: 'west' }));
 
     // --- Decay (cozy keeps this at 0): punch holes + weather, sparing frame ------
     // Reuses the seeded `rnd` stream from the variety choices above (still per-seed
@@ -336,8 +336,11 @@ function symmetricBand(lo: number, hi: number, center: number): number[] {
  *  that blocked the turn). `clear` carves the stairwell hole + headroom through
  *  the slab each flight passes. When `hasAttic`, a ladder climbs from the top
  *  floor through a hole in the attic floor — so no flight ever pierces the roof.
- *  Falls back to a carved vertical shaft when the footprint is too small. */
-function addStairCore(
+ *  Falls back to a carved vertical shaft when the footprint is too small.
+ *  Exported so other code-built houses (e.g. the farmhouse's main wing) reuse the
+ *  same proven circulation instead of relying on the stairwell pass, which only
+ *  REBUILDS broken flights and does not invent one for a hint-less shell. */
+export function addStairCore(
   ops: AuthoringOp[],
   box: Box,
   slabYs: number[],
@@ -349,6 +352,10 @@ function addStairCore(
   air: number,
   ladderW: number,
   ladderN: number,
+  /** Lazily intern a WEST-facing ladder (backed by the x1 wall) — used only for the
+   *  no-space fallback so the rule "prefer a stair; if it can't fit, a ladder" holds
+   *  even on a footprint too tight for a 45° flight. Omit → the legacy bare shaft. */
+  makeLadder?: () => number,
 ): void {
   const { x0, z0, x1, z1 } = box;
   const run = storeyH - 1; // horizontal cells = vertical rise (45° flight)
@@ -357,8 +364,20 @@ function addStairCore(
   const fitZ = !fitX && run <= z1 - z0 - 1 && x1 - x0 >= 3;
 
   if (!fitX && !fitZ) {
-    for (let i = 1; i < slabYs.length; i++) {
-      ops.push({ op: 'fill', from: [x1 - 1, slabYs[i] - 1, z1 - 1], to: [x1 - 1, slabYs[i], z1 - 1], state: air });
+    // No room for a stair → a CONTINUOUS wall ladder (rule: stair if it fits, else a
+    // ladder — never a bare fall-through shaft). Hung on the x1 wall (faces west), it runs
+    // unbroken from the lowest floor to the top, punching the floor opening at each storey;
+    // the stairwell pass then refines it. Legacy callers (no `makeLadder`) keep the shaft.
+    const lx = x1 - 1, lz = z1 - 1;
+    const topY = slabYs[slabYs.length - 1];
+    if (makeLadder) {
+      const ladder = makeLadder();
+      for (let y = slabYs[0] + 1; y <= topY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
+      ops.push({ op: 'fill', from: [lx - 1, topY, lz], to: [lx - 1, topY + 1, lz], state: air }); // step-off + headroom
+    } else {
+      for (let i = 1; i < slabYs.length; i++) {
+        ops.push({ op: 'fill', from: [lx, slabYs[i] - 1, lz], to: [lx, slabYs[i], lz], state: air });
+      }
     }
     return;
   }

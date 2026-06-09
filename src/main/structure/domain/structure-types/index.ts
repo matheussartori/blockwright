@@ -8,13 +8,14 @@ import { paramFields } from '../params';
 import { createRegistry } from '../registry';
 import { cabin } from './cabin';
 import { classic } from './classic';
+import { farmhouse } from './farmhouse';
 import { lShaped } from './l-shaped';
 import { modern } from './modern';
 import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-const registry = createRegistry<StructureType>([classic, modern, cabin, lShaped]);
+const registry = createRegistry<StructureType>([classic, modern, cabin, lShaped, farmhouse]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {

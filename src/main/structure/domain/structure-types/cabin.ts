@@ -7,7 +7,8 @@
 // cobblestone kit so it reads rustic even under a sparse decoration. A fresh build is SEEDED
 // with this shell (`seedShell`) so the model finishes a guaranteed cabin, not a plain box.
 import type { AuthoringOp } from '../../authoring/types';
-import { logProps, type StructureType } from './types';
+import { addStairCore } from './classic';
+import { box as mkBox, logProps, type StructureType } from './types';
 
 export const cabin: StructureType = {
   id: 'cabin',
@@ -147,7 +148,14 @@ export const cabin: StructureType = {
       const ceil = f + 1 < floors ? floorY + (f + 1) * storeyH : wallTop;
       if (ceil - 1 > floorY + f * storeyH) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
     }
-    void air;
+
+    // --- Stair core (behind the porch) — a code-built shell must lay its own climb; the
+    // stairwell pass only REPAIRS the model's. Stairs if a 45° run fits, else a ladder. --
+    if (floors >= 2) {
+      const slabYs: number[] = [];
+      for (let f = 0; f < floors; f++) slabYs.push(floorY + f * storeyH);
+      addStairCore(ops, mkBox([x0, floorY, hz0], [x1, y1, z1]), slabYs, storeyH, false, wallTop, palette.get('roof'), floorIdx, air, 0, 0, () => palette.get('ladder', { facing: 'west' }));
+    }
     return ops;
   },
 };

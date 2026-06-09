@@ -28,19 +28,25 @@ export function editPreamble(json: string): string {
 }
 
 /** Wrap a code-built STARTING SHELL as a preamble: the model must KEEP the exterior
- *  massing and only furnish/detail it (used for shell-seeded archetypes like the modern
- *  villa, whose silhouette the model can't reliably invent on its own). */
+ *  massing and only furnish/detail it. Used for shell-seeded archetypes whose silhouette
+ *  the model can't reliably invent on its own (the modern villa; any build with a
+ *  geometry-bearing exterior style like the farmhouse veranda). The text is GENERIC —
+ *  "keep whatever this shell is" — so it fits a flat-roofed villa and a porched farmhouse
+ *  alike, instead of naming modern-only features. */
 export function shellPreamble(json: string): string {
   return (
     'You are FINISHING a structure whose EXTERIOR has already been built for you by code, below as ' +
     'Blockwright authoring JSON (air omitted; geometry is a flat "blocks" list). This shell is the ' +
-    'CORRECT exterior for what the user asked — KEEP its overall massing: the stacked/offset volumes, ' +
-    'the FLAT roofs, the glass curtain walls, the roof terrace, and the railings. Do NOT turn ' +
-    'it into a pitched-roof or solid box, and do NOT re-clad it in rustic wood. Your job is to: furnish ' +
-    'the interior room-by-room, add finishing exterior detail (greenery/hedges/planters, outdoor steps, ' +
-    'lighting), fix anything unsound, and otherwise REFINE — not replace — this shell. Then ' +
-    'call emit_structure with the COMPLETE structure (mode "full"). Keep the same size unless the request ' +
-    'clearly needs more room.\n\n' +
+    'CORRECT exterior for what the user asked — KEEP its overall massing exactly as given: the ' +
+    'footprint and silhouette, the ROOF FORM, the walls and cladding, and every signature exterior ' +
+    'volume it already has (porches/verandas on their posts, balconies and upper galleries, exposed ' +
+    'framing, projecting entry porticos, dormers, railings, the stone plinth, the stairs). Do NOT ' +
+    'flatten it back into a plain box, do NOT re-roof it, and do NOT re-clad or strip those volumes — ' +
+    'they ARE the requested style. Your job is to: furnish the interior room-by-room, connect the rooms ' +
+    'to any porch/gallery doors, add finishing exterior detail (greenery/hedges/planters/flower boxes, ' +
+    'outdoor steps, porch furniture, lighting), fix anything unsound, and otherwise REFINE — not ' +
+    'replace — this shell. Then call emit_structure with the COMPLETE structure (mode "full"). Keep the ' +
+    'same size unless the request clearly needs more room.\n\n' +
     'STARTING SHELL:\n```json\n' +
     json +
     '\n```\n\nUSER REQUEST:\n'

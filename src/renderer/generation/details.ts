@@ -9,10 +9,11 @@
 import { type BuildDetails, EMPTY_SLOTS, ROOMS_PER_FLOOR } from './brief';
 import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 
-/** The modern house structure + its paired decoration (auto-selected together): the
- *  modern villa is a white-and-glass archetype, so picking it defaults the look to Modern. */
-const MODERN_STRUCTURE = 'modern';
-const MODERN_DECORATION = 'modern';
+/** Structures whose look is part of their identity, auto-paired with a decoration when
+ *  picked: the modern villa is white-and-glass; the farmhouse is warm oak + a dark slate
+ *  roof. Picking the structure defaults the decoration so the materials + guide come along
+ *  (the user can still change it after). */
+const PAIRED_DECORATION: Record<string, string> = { modern: 'modern', farmhouse: 'farmhouse' };
 
 /** The single-value Details selects driven by `setDetailField`: the structure pill plus
  *  every single-select module slot (decoration/roof/basement/attic/exterior). */
@@ -45,9 +46,9 @@ export const SIZE_MAX = 64;
 export function setDetailField(d: BuildDetails, key: DetailField, value: string): BuildDetails {
   if (key === 'structureType') {
     // Switching structure clears every slot (the compatible set is structure-specific) +
-    // the params/size/rooms. The modern house is a white-and-glass archetype — pair it with
-    // the Modern decoration by default so its materials + guide come along.
-    const decoration = value === MODERN_STRUCTURE ? MODERN_DECORATION : '';
+    // the params/size/rooms. A structure with an identity look (modern, farmhouse) pairs its
+    // decoration by default so its materials + guide come along.
+    const decoration = PAIRED_DECORATION[value] ?? '';
     return { ...d, ...EMPTY_SLOTS, decoration, structureType: value, params: {}, size: null, rooms: [] };
   }
   const slot = MODULE_SLOTS.find((s) => s.key === key);

@@ -29,7 +29,7 @@ describe('compose: structure types × decorations', () => {
     expect(isKnownStructure('basement')).toBe(false); // basement is its own category, not a structure type
     expect(isKnownStructure('abandoned_house')).toBe(false); // alias retired
     expect(isKnownStructure('castle')).toBe(false);
-    expect(knownStructureNames()).toEqual(['classic', 'modern', 'cabin', 'l-shaped']);
+    expect(knownStructureNames()).toEqual(['classic', 'modern', 'cabin', 'l-shaped', 'farmhouse']);
   });
 
   it('builds with the default (cozy) decoration and is deterministic for a seed', () => {

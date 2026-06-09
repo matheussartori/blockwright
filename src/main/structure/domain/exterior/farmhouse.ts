@@ -1,22 +1,25 @@
-// "farmhouse" — the rustic country-home exterior: warm oak boarding with EXPOSED
-// timber framing (corner posts + a belt course of beams), a dark slate roof, a deep
-// stone plinth, and generous window bands. The look in the reference: honey-toned walls
-// crossed by darker stripped-log framing, a near-black tiled roof, a grounded stone base.
+// "farmhouse" — the rustic country FINISH (an exterior skin) for the pitched houses:
+// honey-toned oak boarding crossed by darker stripped-log timber framing, a dark slate
+// roof, a stone plinth and big banded windows. A finishing layer, NOT a massing change —
+// the casco it sits on stays whatever the structure type built.
 //
-// Skin-led (it re-clads the host's walls/roof/trim) with a light additive layer: the
-// timber framing battens + the stone water-table course, both drawn over the host's
-// envelope and kept within bounds. Pairs with the pitched houses, never modern.
+// For the full "casa de sítio" SHAPE (L plan, cross-gable roof, wraparound veranda, upper
+// gallery), pick the **Farmhouse STRUCTURE TYPE** instead — that owns the non-rectangular
+// massing in code (this finish can't reshape a host's footprint, only re-clad it).
+//
+// Two layers, like every exterior: a `skin` re-clad + a light additive `build()` (the stone
+// water-table + the exposed framing). Pairs with the pitched houses, never modern.
 import type { AuthoringOp } from '../../authoring/types';
 import type { ExteriorModule } from './types';
 
 export const farmhouse: ExteriorModule = {
   id: 'farmhouse',
-  label: 'Farmhouse',
+  label: 'Farmhouse finish',
   category: 'exterior',
   description:
-    'A rustic country-home finish: warm oak boarding crossed by exposed stripped-log ' +
-    'timber framing, a dark slate-tiled roof, a deep stone plinth, and big banded windows. ' +
-    'Cosy and grounded — the classic storybook farmhouse exterior.',
+    'A rustic country FINISH: warm oak boarding crossed by exposed dark-log timber framing, ' +
+    'a dark slate-tiled roof, a deep stone plinth and big banded windows. A re-clad + framing ' +
+    'layer over the chosen casco — for the full sítio SHAPE, pick the Farmhouse structure type.',
   knowledge: 'nbt/modules/exterior/farmhouse.md',
   appliesTo: ['classic', 'cabin', 'l-shaped'],
   preview: { size: [13, 13, 11], params: { floors: 2 } },
@@ -32,6 +35,7 @@ export const farmhouse: ExteriorModule = {
     window: 'minecraft:glass_pane',
     door: 'minecraft:oak_door',
     fence: 'minecraft:oak_fence',
+    plant: 'minecraft:oak_leaves',
     light: 'minecraft:lantern',
   },
   // Additive: a stone water-table course at the base + a belt course of beams at mid-wall
@@ -46,17 +50,14 @@ export const farmhouse: ExteriorModule = {
     // Stone plinth: a 2-course water table at the base, so the timber meets stone not soil.
     ops.push({ op: 'walls', from: [x0, y0, z0], to: [x1, Math.min(y0 + 1, y1), z1], state: found });
 
-    // Belt course: a horizontal beam band wrapping the walls at roughly mid-height,
-    // splitting the facade into a framed lower + upper register.
+    // Belt course: a horizontal beam band wrapping the walls at roughly mid-height.
     const beltY = y0 + Math.max(2, Math.floor(H * 0.42));
     if (beltY < y1 - 1) ops.push({ op: 'walls', from: [x0, beltY, z0], to: [x1, beltY, z1], state: beam });
 
-    // Vertical framing battens at the quarter points of each wall (skipping the corners,
-    // which the host already posts), from the plinth up to the belt course.
+    // Vertical framing battens at the quarter points of each wall, plinth → belt.
     const cols = (lo: number, hi: number): number[] => {
       const span = hi - lo;
-      if (span < 4) return [];
-      return [lo + Math.floor(span / 3), hi - Math.floor(span / 3)];
+      return span < 4 ? [] : [lo + Math.floor(span / 3), hi - Math.floor(span / 3)];
     };
     const top = beltY - 1;
     for (const x of cols(x0, x1)) {

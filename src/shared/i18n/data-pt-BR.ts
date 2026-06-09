@@ -22,6 +22,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.structure.l-shaped.label': 'Casa em L',
   'mod.structure.l-shaped.desc':
     'Uma casa com planta em L: uma ala principal comprida e uma ala traseira perpendicular que se encontram em ângulo reto, deixando um terraço abrigado no canto interno. Dois telhados inclinados e um pátio com guarda-corpo lhe dão uma silhueta dividida e cheia de personalidade, em vez de uma única caixa.',
+  'mod.structure.farmhouse.label': 'Fazenda',
+  'mod.structure.farmhouse.desc':
+    'Uma rústica casa de sítio: uma silhueta em L com telhado de duas águas cruzadas — nunca uma caixa — com uma varanda coberta e profunda sobre pilares de madeira e uma galeria superior na frente, um alpendre abrigado no canto, estrutura aparente de troncos escuros sobre uma base de pedra, um telhado escuro e íngreme de ardósia e uma chamine alta na empena. Espraiada, habitada, enraizada.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',
@@ -33,6 +36,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.decoration.modern.label': 'Moderna',
   'mod.decoration.modern.desc':
     'Um visual contemporâneo e elegante: concreto branco e quartzo liso, colunas de destaque em blackstone polido escuro, preenchimento de madeira de carvalho escuro aconchegante, grandes paredes de vidro e a luz nítida das lanternas-do-mar. Sem deterioração — bordas limpas e definidas. Combine com a forma Moderna para uma vila de quartzo e vidro em vez de uma caixa de madeira.',
+  'mod.decoration.farmhouse.label': 'Fazenda',
+  'mod.decoration.farmhouse.desc':
+    'A paleta rústica do campo: tábuas de carvalho quentes cruzadas por uma estrutura aparente de troncos escuros, uma base de pedregulho e um telhado escuro e íngreme de ardósia. O visual cor de mel e escuro de uma fazenda dos livros de histórias — combine com a estrutura Fazenda para a casa de sítio completa.',
 
   // --- basements ------------------------------------------------------------
   'mod.basement.cellar.label': 'Adega',
@@ -65,9 +71,9 @@ export const dataPtBR: Record<string, string> = {
     'Um sótão-quarto acabado no vão do telhado: o espaço da empena assoalhado com tábuas de verdade como um aconchegante quarto no andar de cima — uma cama sob a inclinação, um tapete e uma mesa de apoio — acessado por uma escada de mão do último andar. Precisa de um telhado inclinado (fica no vão por baixo).',
 
   // --- exterior styles ------------------------------------------------------
-  'mod.exterior.farmhouse.label': 'Fazenda',
+  'mod.exterior.farmhouse.label': 'Acabamento fazenda',
   'mod.exterior.farmhouse.desc':
-    'Um acabamento rústico de casa de campo: tábuas de carvalho aconchegantes cruzadas por uma estrutura aparente de troncos descascados, um telhado escuro de ardósia, uma base profunda de pedra e grandes janelas em faixa. Aconchegante e enraizado — o clássico exterior de fazenda dos livros de histórias.',
+    'Um acabamento rústico de campo: tábuas de carvalho quentes cruzadas por uma estrutura aparente de troncos escuros, um telhado escuro de ardósia, uma base profunda de pedra e grandes janelas em faixa. Uma camada de revestimento + estrutura sobre o casco escolhido — para a forma de sítio completa, escolha a estrutura Fazenda.',
   'mod.exterior.sakura.label': 'Casa Sakura',
   'mod.exterior.sakura.desc':
     'Um acabamento de chalé das cerejeiras: revestimento de madeira de cerejeira em rosa suave sobre uma base de pedra, um telhado escuro de ardósia e cascatas de flores rosadas escorrendo pelos beirais e pelos cantos frontais. Frondoso, romântico, primaveril — uma casa aninhada em um bosque de cerejeiras.',

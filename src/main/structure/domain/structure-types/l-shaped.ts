@@ -6,7 +6,8 @@
 // Geometry is in semantic roles (the decoration supplies blocks). A fresh build is SEEDED
 // with this shell (`seedShell`) so the model finishes a guaranteed L-plan, not a rectangle.
 import type { AuthoringOp } from '../../authoring/types';
-import { logProps, type StructureType } from './types';
+import { addStairCore } from './classic';
+import { box as mkBox, logProps, type StructureType } from './types';
 
 export const lShaped: StructureType = {
   id: 'l-shaped',
@@ -134,6 +135,15 @@ export const lShaped: StructureType = {
     for (let f = 0; f < floors; f++) {
       const ceil = f + 1 < floors ? y0 + (f + 1) * storeyH : wallTop;
       if (ceil - 1 > y0 + f * storeyH) ops.push({ op: 'block', pos: [dx, ceil - 1, cz], state: lantern });
+    }
+
+    // --- Stair core in the MAIN wing (the stairwell pass only REPAIRS the model's climbs;
+    // a code-built shell must lay its own, or the upper floor is unreachable). Stairs where
+    // a 45° run fits, else a flush wall ladder. ---------------------------------------
+    if (floors >= 2) {
+      const slabYs: number[] = [];
+      for (let f = 0; f < floors; f++) slabYs.push(y0 + f * storeyH);
+      addStairCore(ops, mkBox([x0, y0, z0], [mainX1, y1, z1]), slabYs, storeyH, false, wallTop, palette.get('roof'), floorIdx, palette.air(), 0, 0, () => palette.get('ladder', { facing: 'west' }));
     }
     return ops;
   },

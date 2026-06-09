@@ -109,7 +109,13 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // to the normal edit/free-form seed for every other case.
   let seed = await buildSeed(resumable, session, basePath);
   if (!seed && session.version === 0) {
-    seed = await buildShellSeed(selection?.structureType, selection?.decoration, selection?.size, session.dir, selection?.roof);
+    seed = await buildShellSeed({
+      structureType: selection?.structureType,
+      decoration: selection?.decoration,
+      size: selection?.size,
+      roof: selection?.roof,
+      exterior: selection?.exterior,
+    }, session.dir);
   }
   const effectivePrompt = seed + prompt;
 
