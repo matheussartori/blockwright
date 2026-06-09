@@ -15,6 +15,7 @@ import { api } from '../api';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
+import { modulesConflict } from '@/shared/domain/conflicts';
 import type { GenerationCatalog, GenerationModule, ModuleCategory } from '@/shared/types';
 import type { MessageKey } from '@/shared/i18n';
 import { Modal } from './ui/Modal';
@@ -34,6 +35,7 @@ const SCALE_LABEL: Record<string, MessageKey> = {
  *  The decoration carries no `appliesTo`, so it's UNIVERSAL (fits any structure). */
 const STAGES: { category: ModuleCategory; label: MessageKey; role: MessageKey; universal?: boolean }[] = [
   { category: 'roof', label: 'modules.catRoof', role: 'modules.roleRoof' },
+  { category: 'attic', label: 'modules.catAttic', role: 'modules.roleAttic' },
   { category: 'basement', label: 'modules.catBasement', role: 'modules.roleBasement' },
   { category: 'room', label: 'modules.catRoom', role: 'modules.roleRoom' },
   { category: 'decoration', label: 'modules.catDecoration', role: 'modules.roleDecoration', universal: true },
@@ -98,6 +100,15 @@ export function ModulesModal() {
   }, [catalog, structure]);
 
   const partsCount = catalog && structure ? linkedParts(catalog, structure) : 0;
+
+  // The part the user is focused on (its detail expanded). When it declares a conflict
+  // (e.g. the flat roof vs an attic), sibling parts in other stages that clash with it are
+  // dimmed with a reason note — so the gallery SHOWS incompatibility, not just compatibility.
+  const focusedModule = useMemo(() => {
+    if (!openKey) return null;
+    for (const s of stages) for (const m of s.modules) if (`${s.category}:${m.id}` === openKey) return m;
+    return null;
+  }, [openKey, stages]);
 
   // Structures bucketed by their family (group), so the rail headers each group and
   // any ungrouped types fall into a trailing label-less section.
@@ -196,20 +207,27 @@ export function ModulesModal() {
                           {stage.modules.map((m) => {
                             const key = `${stage.category}:${m.id}`;
                             const isOpen = openKey === key;
+                            const conflict = !!focusedModule && focusedModule.id !== m.id && modulesConflict(focusedModule, m);
                             return (
                               <button
                                 key={m.id}
                                 type="button"
-                                className={`gallery-part${isOpen ? ' open' : ''}`}
+                                className={`gallery-part${isOpen ? ' open' : ''}${conflict ? ' conflict' : ''}`}
                                 aria-expanded={isOpen}
                                 onClick={() => setOpenKey(isOpen ? null : key)}
                               >
                                 <span className="gallery-part-name">{m.label}</span>
                                 <span className="gallery-part-desc">{m.description}</span>
-                                {m.presets && m.presets.length > 0 && (
-                                  <span className="gallery-part-tag">
-                                    {t('modules.presetsCount', { count: m.presets.length })}
+                                {conflict ? (
+                                  <span className="gallery-part-conflict">
+                                    {t('modules.conflictWith', { label: focusedModule.label })}
                                   </span>
+                                ) : (
+                                  m.presets && m.presets.length > 0 && (
+                                    <span className="gallery-part-tag">
+                                      {t('modules.presetsCount', { count: m.presets.length })}
+                                    </span>
+                                  )
                                 )}
                               </button>
                             );

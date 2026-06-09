@@ -172,6 +172,8 @@ export const en = {
   'gen.fieldDecoration': 'Decoration',
   'gen.fieldRoof': 'Roof',
   'gen.fieldBasement': 'Basement',
+  'gen.fieldAttic': 'Attic',
+  'gen.conflictPitchedRoof': 'Needs a pitched roof',
   'gen.optNone': 'None',
   'gen.optDefault': 'Default',
   'gen.optAuto': 'Auto',
@@ -299,6 +301,7 @@ export const en = {
   'modules.catDecoration': 'Decoration',
   'modules.catBasement': 'Basement',
   'modules.catRoof': 'Roof',
+  'modules.catAttic': 'Attic',
   'modules.catRoom': 'Room',
   'modules.loading': 'Loading modules…',
   'modules.noneYet': 'No {category} modules yet — coming soon.',
@@ -319,9 +322,11 @@ export const en = {
   'modules.universal': 'Universal',
   'modules.stageEmpty': 'Nothing links to {structure} yet.',
   'modules.roleRoof': 'Caps the structure',
+  'modules.roleAttic': 'In-roof loft',
   'modules.roleBasement': 'Below-grade level',
   'modules.roleRoom': 'Interior programs, per floor',
   'modules.roleDecoration': 'Material & mood — fits any structure',
+  'modules.conflictWith': "Can't combine with {label}",
 
   // Settings ▸ AI.
   'ai.stable': 'Stable',

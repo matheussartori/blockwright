@@ -174,6 +174,8 @@ export const ptBR: Messages = {
   'gen.fieldDecoration': 'Decoração',
   'gen.fieldRoof': 'Telhado',
   'gen.fieldBasement': 'Porão',
+  'gen.fieldAttic': 'Sótão',
+  'gen.conflictPitchedRoof': 'Precisa de telhado inclinado',
   'gen.optNone': 'Nenhum',
   'gen.optDefault': 'Padrão',
   'gen.optAuto': 'Automático',
@@ -301,6 +303,7 @@ export const ptBR: Messages = {
   'modules.catDecoration': 'Decoração',
   'modules.catBasement': 'Porão',
   'modules.catRoof': 'Telhado',
+  'modules.catAttic': 'Sótão',
   'modules.catRoom': 'Cômodo',
   'modules.loading': 'Carregando módulos…',
   'modules.noneYet': 'Nenhum módulo de {category} ainda — em breve.',
@@ -321,9 +324,11 @@ export const ptBR: Messages = {
   'modules.universal': 'Universal',
   'modules.stageEmpty': 'Nada se vincula a {structure} ainda.',
   'modules.roleRoof': 'Cobre a estrutura',
+  'modules.roleAttic': 'Loft no telhado',
   'modules.roleBasement': 'Nível subterrâneo',
   'modules.roleRoom': 'Ambientes internos, por andar',
   'modules.roleDecoration': 'Material e atmosfera — combina com qualquer estrutura',
+  'modules.conflictWith': 'Não combina com {label}',
 
   // Settings ▸ AI.
   'ai.stable': 'Estável',

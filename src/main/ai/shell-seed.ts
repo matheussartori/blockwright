@@ -23,6 +23,8 @@ const DEFAULT_SIZE: [number, number, number] = [15, 13, 13];
  *   type's own kit when omitted.
  * @param size - The build box [W, H, D] (defaults to {@link DEFAULT_SIZE} when omitted).
  * @param dir - A scratch dir to compile the shell into (the session dir).
+ * @param roof - The selected roof-module id (e.g. `'flat'`), threaded into the shell so the
+ *   seeded silhouette honours the Details roof pick. Omit → the type's default roof.
  * @returns The {@link shellPreamble} wrapping the compiled shell's authoring JSON, or ''.
  */
 export async function buildShellSeed(
@@ -30,6 +32,7 @@ export async function buildShellSeed(
   decoration: string | undefined,
   size: [number, number, number] | undefined,
   dir: string,
+  roof?: string,
 ): Promise<string> {
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return '';
@@ -37,6 +40,9 @@ export async function buildShellSeed(
   const [W, H, D] = size ?? DEFAULT_SIZE;
   const params: Record<string, unknown> = {};
   if (decoration) params.decoration = decoration;
+  // The roof-module id doubles as the structure's `roof` param value (gable/hip/flat), so
+  // a Details roof pick (e.g. flat) flows straight into the seeded shell's massing.
+  if (roof) params.roof = roof;
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size: [W, H, D],

@@ -145,6 +145,19 @@ export async function removeTempMetadata(source: string): Promise<void> {
   }
 }
 
+/** Read an existing `.bw.json` sidecar, or null when it's missing/unreadable/malformed.
+ *  Used on open to PREFER a generated build's stored (authoritative) storeys over
+ *  re-detecting them from geometry. Tolerant: any parse/shape problem yields null so the
+ *  caller falls back to detection. */
+export async function readMetadata(jsonPath: string): Promise<StructureMetadata | null> {
+  try {
+    const data = JSON.parse(await fsp.readFile(jsonPath, 'utf8')) as StructureMetadata;
+    return data && typeof data === 'object' && Array.isArray(data.floors) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Write the load-time sidecar for a just-opened structure: beside it when it lives in
  *  the library, else in the temp dir (don't pollute the user's folder).
  *  @returns The path written, or null on failure. */

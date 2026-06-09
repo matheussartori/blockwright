@@ -1,5 +1,5 @@
 // The module model that unifies the generation domain. Every buildable piece —
-// a STRUCTURE (house), a DECORATION (cozy), a BASEMENT, a ROOF, a ROOM —
+// a STRUCTURE (house), a DECORATION (cozy), a BASEMENT, a ROOF, an ATTIC, a ROOM —
 // is a "module" belonging to one CATEGORY. A module carries shared metadata
 // (label, description, the knowledge guide it owns, and how to preview it) on top
 // of its category-specific behaviour contract. This is what lets one UI list them,
@@ -7,7 +7,7 @@
 import type { FurnishingPreset } from '@/shared/domain/furnishing';
 
 /** The module categories. Selected at creation; surfaced in the gallery. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'room';
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room';
 
 /** How to build a representative structure for the gallery's 3D preview. The IPC
  *  layer composes this (via a `template` op) and compiles it to a real `.nbt`. */
@@ -47,6 +47,10 @@ export interface ModuleMeta {
    *  The roof/basement/room contracts narrow this to REQUIRED, so those always declare
    *  their links explicitly rather than silently applying to all. */
   appliesTo?: string[];
+  /** Module ids this one cannot combine with (e.g. an attic vs the `flat` roof, which
+   *  leaves no roof void). Symmetric in meaning (see `shared/domain/conflicts.ts`); the
+   *  gallery dims and Details clears the conflicting pick. Omit → conflicts with nothing. */
+  incompatibleWith?: string[];
   /** How to render this module in the gallery (omit → no preview). */
   preview?: PreviewSpec;
 }
@@ -72,6 +76,9 @@ export interface ModuleSummary {
    *  `appliesTo` link); a group id shares it across the whole family. Omit → applies
    *  to every structure. */
   appliesTo?: string[];
+  /** Module ids this one cannot combine with (e.g. attic vs the `flat` roof) → the
+   *  gallery dims + Details clears the conflicting pick. Omit → conflicts with nothing. */
+  incompatibleWith?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
   /** Max interior rooms a single floor accepts (structure types only) → the planner's
@@ -92,6 +99,7 @@ export function toSummary(m: ModuleMeta): ModuleSummary {
     description: m.description,
     hasPreview: m.preview !== undefined,
     appliesTo: m.appliesTo,
+    incompatibleWith: m.incompatibleWith,
     presets: 'presets' in m ? (m as { presets?: FurnishingPreset[] }).presets : undefined,
   };
 }

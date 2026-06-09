@@ -37,6 +37,7 @@ const catalog: GenerationCatalog = {
   decoration: [{ id: 'cozy', label: 'Cozy', category: 'decoration', description: '', hasPreview: true }],
   roof: [{ id: 'gable', label: 'Gable', category: 'roof', description: '', hasPreview: true, appliesTo: ['house'] }],
   basement: [{ id: 'cellar', label: 'Cellar', category: 'basement', description: '', hasPreview: true }],
+  attic: [{ id: 'loft', label: 'Loft', category: 'attic', description: '', hasPreview: false, appliesTo: ['house'], incompatibleWith: ['flat'] }],
   room: [
     { id: 'living', label: 'Living Room', category: 'room', description: '', hasPreview: false },
     { id: 'kitchen', label: 'Kitchen', category: 'room', description: '', hasPreview: false },

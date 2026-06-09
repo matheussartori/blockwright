@@ -18,6 +18,7 @@ import { maxRoundsFor } from './rounds';
 import { beginRun, endRun, getSession } from './session';
 import { mirrorToLibrary } from './output-dir';
 import { buildMetadata, librarySidecarPath, removeTempMetadata, writeMetadataJson } from '../structure/metadata';
+import { structureFloorPlan } from '../structure/domain';
 import { mergePatch } from './patch';
 import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
@@ -104,7 +105,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // to the normal edit/free-form seed for every other case.
   let seed = await buildSeed(resumable, session, basePath);
   if (!seed && session.version === 0) {
-    seed = await buildShellSeed(selection?.structureType, selection?.decoration, selection?.size, session.dir);
+    seed = await buildShellSeed(selection?.structureType, selection?.decoration, selection?.size, session.dir, selection?.roof);
   }
   const effectivePrompt = seed + prompt;
 
@@ -263,8 +264,10 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     const blockCount = resolved.blocks.length;
 
     // Write/refresh the `.bw.json` sidecar beside the library build, so a later edit
-    // has the size, dominant palette and recognised storeys to work from. The user's
-    // Floor plan (if any) wins over auto-detection. Opening a file from outside the
+    // has the size, dominant palette and recognised storeys to work from. Storeys come
+    // from (in priority): the user's Floor plan > the AUTHORITATIVE plan of the code-built
+    // structure type (tied to the shell, so a flat-roofed modern villa is labelled exactly)
+    // > geometric detection (the fallback in buildMetadata). Opening a file from outside the
     // library left a temp sidecar; the build now has its own folder, so promote here by
     // writing beside it and removing the temp copy.
     if (session.library.latest) {
@@ -273,13 +276,16 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
         const nm = resolved.palette[b.state]?.Name ?? '';
         if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
       }
+      const authoritative = !floors?.length && selection?.structureType
+        ? structureFloorPlan(selection.structureType, size, { roof: selection.roof })
+        : [];
       const meta = buildMetadata({
         name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
         source: session.library.latest,
         size,
         solids: resolved.blocks.map((b) => b.pos),
         paletteCounts: counts,
-        floors: floors?.length ? floors : undefined,
+        floors: floors?.length ? floors : authoritative.length ? authoritative : undefined,
       });
       await writeMetadataJson(librarySidecarPath(session.library.latest), meta);
       if (basePath) await removeTempMetadata(basePath);

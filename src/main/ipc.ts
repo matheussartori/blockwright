@@ -7,7 +7,7 @@ import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
-import { metadataFromStructure, writeLoadMetadata } from './structure/metadata';
+import { isInsideLibrary, librarySidecarPath, metadataFromStructure, readMetadata, writeLoadMetadata } from './structure/metadata';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
@@ -48,9 +48,16 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.loadStructure, async (_e, filePath: string) => {
     const data = await loadStructure(filePath);
-    // Recognise the storeys + write the `.bw.json` sidecar (temp for a file opened
-    // from outside the library, beside it when inside). Best-effort, fire-and-forget;
-    // the detected floors ride back on the structure to seed the Floors panel + bands.
+    // A build inside the library has an AUTHORITATIVE sidecar written at generation time
+    // (the code-built structure's exact storeys); prefer it over re-detecting, so a
+    // flat-roofed villa's floors are labelled exactly instead of guessed.
+    if (isInsideLibrary(filePath)) {
+      const existing = await readMetadata(librarySidecarPath(filePath));
+      if (existing?.floors?.length) return { ...data, floors: existing.floors };
+    }
+    // Otherwise recognise the storeys + write the `.bw.json` sidecar (temp for a file
+    // opened from outside the library, beside it when inside). Best-effort, fire-and-
+    // forget; the detected floors ride back on the structure to seed the panel + bands.
     const meta = metadataFromStructure(data);
     void writeLoadMetadata(meta);
     return { ...data, floors: meta.floors };

@@ -2452,6 +2452,22 @@ body.row-resizing {
   font-size: 10px;
   color: var(--accent);
 }
+/* A part that clashes with the currently-focused one (e.g. an attic while the flat roof is
+   open): dimmed + non-interactive, with a reason note in place of its usual tag. */
+.gallery-part.conflict {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.gallery-part.conflict:hover {
+  background: var(--panel);
+  border-color: var(--border);
+}
+.gallery-part-conflict {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--warn, #d08a3a);
+}
 
 /* The expanded part detail (sits below its stage's grid). */
 .gallery-partdetail {
@@ -3454,6 +3470,9 @@ body.row-resizing {
   font-weight: 600;
 }
 .gen-chip:disabled { opacity: 0.5; cursor: default; }
+/* An option blocked by a conflict (e.g. an attic while the flat roof is picked): greyed +
+   struck through, with the reason in its title tooltip. */
+.gen-chip.disabled { text-decoration: line-through; cursor: not-allowed; }
 
 /* Integer param — a compact number field with its allowed range alongside. */
 .gen-stepper {

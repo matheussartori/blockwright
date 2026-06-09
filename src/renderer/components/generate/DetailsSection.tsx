@@ -9,6 +9,7 @@
 // `BuildDetails` and passes the reducers in (generation/details.ts).
 import { store } from '../../state/store';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
+import { modulesConflict } from '@/shared/domain/conflicts';
 import {
   type BuildDetails,
   effectiveSize,
@@ -91,7 +92,17 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
   const roomOptions: ChipOption[] = (catalog?.room ?? []).filter(fits).map((m) => ({ id: m.id, label: m.label }));
   const roofs = (catalog?.roof ?? []).filter(fits);
   const basements = (catalog?.basement ?? []).filter(fits);
+  const attics = (catalog?.attic ?? []).filter(fits);
   const decorations = catalog?.decoration ?? [];
+
+  // An attic lives in the roof void, so it clashes with the flat roof: grey the conflicting
+  // attic options when the picked roof can't host one (the SAME `modulesConflict` the
+  // gallery uses). The chosen roof module drives the reason note.
+  const roofMod = (catalog?.roof ?? []).find((m) => m.id === details.roof);
+  const atticReason = (atticId: string): string | undefined => {
+    const atticMod = attics.find((m) => m.id === atticId);
+    return roofMod && atticMod && modulesConflict(roofMod, atticMod) ? t('gen.conflictPitchedRoof') : undefined;
+  };
 
   const opts = (modules: GenerationModule[]): ChipOption[] =>
     modules.map((m) => ({ id: m.id, label: m.label }));
@@ -135,6 +146,15 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
         options={opts(basements)}
         busy={busy}
         onPick={(id) => onField('basement', id)}
+      />
+      <ChipSelect
+        label={t('gen.fieldAttic')}
+        value={details.attic}
+        neutral={{ id: '', label: t('gen.optNone') }}
+        options={opts(attics)}
+        busy={busy}
+        onPick={(id) => onField('attic', id)}
+        disabledFor={atticReason}
       />
 
       {(selStruct?.params ?? []).map((p) =>

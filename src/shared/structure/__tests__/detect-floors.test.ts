@@ -79,6 +79,21 @@ describe('detectFloors', () => {
     expect(floors[1]).toMatchObject({ from: 4, role: 'roof' });
   });
 
+  it('does not count a flat ROOF DECK over an enclosed storey as a floor', () => {
+    // A modern-style stack: enclosed ground + enclosed upper, capped by a FLAT roof deck
+    // with a thin parapet. The deck must NOT register as a third storey (the "Floor 1 is
+    // half of Floor 2" defect) — exactly two floors, the top one running to the build top.
+    const solids = [
+      ...slab(0), ...windowed(1), ...windowed(2), ...windowed(3),
+      ...slab(4), ...windowed(5), ...windowed(6), ...windowed(7),
+      ...slab(8), ...walls(9), // flat roof deck + a 1-high parapet
+    ];
+    const floors = detectFloors({ size: [X, 11, Z], solids });
+    expect(floors).toHaveLength(2);
+    expect(floors[0]).toMatchObject({ from: 0, to: 3, role: 'ground' });
+    expect(floors[1]).toMatchObject({ from: 4, to: 10, role: 'upper' });
+  });
+
   it('labels a sealed bottom storey under an open one as a basement', () => {
     // Buried bottom (full walls, no openings), windowed ground + upper above it.
     const solids = [

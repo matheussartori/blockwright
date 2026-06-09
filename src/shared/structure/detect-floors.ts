@@ -106,6 +106,40 @@ export function detectFloors(input: FloorDetectInput): FloorDef[] {
   }
   if (planes.length === 0) return [];
 
+  // Drop a TOP plane that is actually a flat ROOF DECK, not a walkable storey. A flat roof
+  // / terrace deck is a THIN cap (≤1 wall layer above it — just its parapet) that does NOT
+  // taper. Without this, the stacked flat decks of a modern villa each register as a storey
+  // and the real floors get mislabeled (the "Floor 1 is half of Floor 2" defect). Two
+  // guards keep legitimate top storeys: a PITCHED roof tapers (kept + later labelled
+  // 'roof'); and we only prune while ≥3 planes remain — a flat-roofed building always has a
+  // floor-slab plane AND a separate roof-deck plane, so dropping the cap still leaves every
+  // real storey, while a plain 2-plane box (no roof slab) is never reduced. (A modern villa's
+  // set-back upper volume defeats a full-footprint "is the storey below enclosed?" probe, so
+  // the plane-count guard is what makes this robust to stacked, offset massing.)
+  if (inset) {
+    const ring = perimeterRing(X, Z);
+    const wallLayers = (from: number, to: number): number => {
+      let layers = 0;
+      for (let y = from + 1; y <= to; y++) {
+        let solid = 0;
+        for (const [x, z] of ring) if (occ.has(`${x},${y},${z}`)) solid += 1;
+        if (solid >= ring.length * WALL_MIN) layers += 1;
+      }
+      return layers;
+    };
+    const tapers = (from: number, to: number): boolean => {
+      let steps = 0;
+      for (let y = from + 2; y <= to; y++) if (fullFrac(y) > 0 && fullFrac(y) < fullFrac(y - 1)) steps += 1;
+      return steps >= ROOF_SLOPE_STEPS;
+    };
+    while (planes.length >= 3) {
+      const top = planes[planes.length - 1];
+      const isFlatCap = wallLayers(top, Y - 1) < 2 && !tapers(top, Y - 1);
+      if (isFlatCap) planes.pop();
+      else break;
+    }
+  }
+
   // Turn consecutive planes into storeys: each spans from its plane up to just below
   // the next (the top storey runs to the top of the build).
   const n = planes.length;
@@ -119,6 +153,15 @@ export function detectFloors(input: FloorDetectInput): FloorDef[] {
     to: s.to,
     role: roles[i],
   }));
+}
+
+/** The perimeter ring (x,z) cells of a `X`×`Z` footprint — the wall column positions, used
+ *  both to drop a top roof-deck plane and to probe a storey's openness for role assignment. */
+function perimeterRing(X: number, Z: number): [number, number][] {
+  const ring: [number, number][] = [];
+  for (let x = 0; x < X; x++) ring.push([x, 0], [x, Z - 1]);
+  for (let z = 1; z < Z - 1; z++) ring.push([0, z], [X - 1, z]);
+  return ring;
 }
 
 interface RoleCtx {
@@ -139,15 +182,7 @@ function assignRoles(storeys: { from: number; to: number }[], ctx: RoleCtx): Flo
 
   // Perimeter ring cells of a layer (the wall footprint). Openings in it (air) are
   // windows/doors — an above-grade storey has some; a buried one has none.
-  const ring: [number, number][] = [];
-  if (ctx.inset) {
-    for (let x = 0; x < ctx.X; x++) {
-      ring.push([x, 0], [x, ctx.Z - 1]);
-    }
-    for (let z = 1; z < ctx.Z - 1; z++) {
-      ring.push([0, z], [ctx.X - 1, z]);
-    }
-  }
+  const ring: [number, number][] = ctx.inset ? perimeterRing(ctx.X, ctx.Z) : [];
   // A storey's "openness" = the fraction of its WALL cells that are punched out
   // (windows/doors). Only layers whose perimeter is mostly solid count as walls — an
   // open attic or the open top of a box has no wall there, so it can't make the storey

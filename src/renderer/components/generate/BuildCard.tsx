@@ -13,6 +13,7 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
   if (build.decoration) chips.push({ label: t('gen.fieldDecoration'), value: build.decoration });
   if (build.roof) chips.push({ label: t('gen.fieldRoof'), value: build.roof });
   if (build.basement) chips.push({ label: t('gen.fieldBasement'), value: build.basement });
+  if (build.attic) chips.push({ label: t('gen.fieldAttic'), value: build.attic });
   if (build.size) chips.push({ label: t('gen.statSize'), value: build.size.join('×') });
   if (build.blockCount != null) chips.push({ label: t('gen.statBlocks'), value: build.blockCount.toLocaleString() });
   const title = build.structure ?? t('gen.cardStructure');

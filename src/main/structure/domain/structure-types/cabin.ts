@@ -23,7 +23,12 @@ export const cabin: StructureType = {
   finalize: ['stairs', 'chimney'],
   seedShell: true,
   params: {
-    floors: { kind: 'int', default: 1, min: 1, max: 2, label: 'Floors' },
+    floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' },
+    // A cabin is gable-identity; a flat cap is offered as the modern alternative.
+    roof: {
+      kind: 'enum', default: 'gable', values: ['gable', 'flat'], label: 'Roof',
+      labels: { gable: 'Gable', flat: 'Flat' }, module: 'roof',
+    },
     decay: { kind: 'unit', default: 0 },
   },
   defaults: {
@@ -72,7 +77,10 @@ export const cabin: StructureType = {
     ops.push({ op: 'fill', from: [x0, floorY, hz0], to: [x1, floorY, z1], state: floorIdx }); // cabin floor
 
     // --- Storeys + shell ------------------------------------------------------------
-    const roofRings = Math.max(2, Math.floor(Math.min(W, D) / 2)); // a STEEP gable
+    const roofShape = (params.roof as string) ?? 'gable';
+    const isFlat = roofShape === 'flat';
+    // A flat roof just needs a deck + parapet (2); a steep gable needs its rings.
+    const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(W, D) / 2)); // a STEEP gable
     let storeyH = Math.max(4, Math.floor((y1 - floorY - roofRings) / floors));
     let wallTop = floorY + storeyH * floors;
     while (wallTop + 2 > y1 && storeyH > 3) { storeyH--; wallTop = floorY + storeyH * floors; }
@@ -82,15 +90,19 @@ export const cabin: StructureType = {
     for (const [px, pz] of [[x0, hz0], [x0, z1], [x1, hz0], [x1, z1]] as [number, number][]) {
       ops.push({ op: 'fill', from: [px, floorY, pz], to: [px, wallTop, pz], state: corner });
     }
-    // Mid floor slab for a two-storey cabin.
-    if (floors >= 2) {
-      const midY = floorY + storeyH;
+    // A floor slab for each storey above the ground (up to 4 storeys).
+    for (let f = 1; f < floors; f++) {
+      const midY = floorY + f * storeyH;
       if (midY < wallTop) ops.push({ op: 'fill', from: [x0 + 1, midY, hz0 + 1], to: [x1 - 1, midY, z1 - 1], state: floorIdx });
     }
 
-    // --- Steep gable roof (delegated to the roof module — the single source) ---------
-    const ridge: 'x' | 'z' = W <= D ? 'z' : 'x';
-    ops.push(...composeModule('roof', 'gable', [x0, wallTop + 1, hz0], [x1, y1, z1], { ridge }));
+    // --- Roof: a steep gable, or a flat cap (both delegated to the roof module) -------
+    if (isFlat) {
+      ops.push(...composeModule('roof', 'flat', [x0, wallTop + 1, hz0], [x1, y1, z1]));
+    } else {
+      const ridge: 'x' | 'z' = W <= D ? 'z' : 'x';
+      ops.push(...composeModule('roof', 'gable', [x0, wallTop + 1, hz0], [x1, y1, z1], { ridge }));
+    }
 
     // --- Entrance + windows ---------------------------------------------------------
     ops.push({ op: 'block', pos: [cx, floorY + 1, hz0], state: palette.get('door', { facing: 'north', half: 'lower', hinge: 'left', open: 'false', powered: 'false' }) });

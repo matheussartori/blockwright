@@ -56,7 +56,7 @@ export interface CatalogBlock {
 }
 
 /** The generation module categories. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'room';
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room';
 
 /** A structure type's tunable param, projected for the composer's Details controls. */
 export type ModuleParam =
@@ -81,6 +81,10 @@ export interface GenerationModule {
    *  family; the renderer filters the composer's roof/basement/room selects on it.
    *  Omit → applies to all. */
   appliesTo?: string[];
+  /** Module ids this one cannot combine with (e.g. an attic vs the `flat` roof). The
+   *  link is symmetric in meaning; the gallery/Details dim or clear the conflicting pick.
+   *  See `shared/domain/conflicts.ts` `modulesConflict`. Omit → conflicts with nothing. */
+  incompatibleWith?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
   /** Max interior rooms a single floor of this structure accepts (structure types
@@ -105,6 +109,8 @@ export interface GenerationCatalog {
   decoration: GenerationModule[];
   basement: GenerationModule[];
   roof: GenerationModule[];
+  /** Attic modules (storage/bedroom) — an in-roof loft, only on pitched-roof houses. */
+  attic: GenerationModule[];
   /** Interior room modules (living/kitchen/library/…) assigned per floor. */
   room: GenerationModule[];
   /** Structure families, for the gallery rail headers + Details optgroups. */

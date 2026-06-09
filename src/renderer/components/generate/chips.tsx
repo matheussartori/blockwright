@@ -15,14 +15,26 @@ export function Chip({
   busy,
   onPick,
   children,
+  disabled,
+  title,
 }: {
   on: boolean;
   busy: boolean;
   onPick: () => void;
   children: ReactNode;
+  /** Greys + blocks the chip independently of `busy` (e.g. an incompatible option). */
+  disabled?: boolean;
+  /** Tooltip shown on hover (e.g. the reason an option is disabled). */
+  title?: string;
 }) {
   return (
-    <button type="button" className={`gen-chip${on ? ' on' : ''}`} disabled={busy} onClick={onPick}>
+    <button
+      type="button"
+      className={`gen-chip${on ? ' on' : ''}${disabled ? ' disabled' : ''}`}
+      disabled={busy || disabled}
+      title={title}
+      onClick={onPick}
+    >
       {children}
     </button>
   );
@@ -47,6 +59,7 @@ export function ChipSelect({
   neutral,
   busy,
   onPick,
+  disabledFor,
 }: {
   label: string;
   value: string;
@@ -54,6 +67,9 @@ export function ChipSelect({
   neutral?: ChipOption;
   busy: boolean;
   onPick: (id: string) => void;
+  /** Per-option gate: return a reason string to GREY + block that option (shown as its
+   *  tooltip, e.g. "Needs a pitched roof"), or undefined to leave it selectable. */
+  disabledFor?: (id: string) => string | undefined;
 }) {
   if (options.length === 0) return null;
   const all = neutral ? [neutral, ...options] : options;
@@ -61,11 +77,21 @@ export function ChipSelect({
     <div className="gen-chip-group">
       <span className="gen-chip-label">{label}</span>
       <div className="gen-chips">
-        {all.map((o) => (
-          <Chip key={o.id || '_neutral'} on={value === o.id} busy={busy} onPick={() => onPick(o.id)}>
-            {o.label}
-          </Chip>
-        ))}
+        {all.map((o) => {
+          const reason = o.id ? disabledFor?.(o.id) : undefined;
+          return (
+            <Chip
+              key={o.id || '_neutral'}
+              on={value === o.id}
+              busy={busy}
+              disabled={!!reason}
+              title={reason}
+              onPick={() => onPick(o.id)}
+            >
+              {o.label}
+            </Chip>
+          );
+        })}
       </div>
     </div>
   );

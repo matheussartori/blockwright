@@ -35,10 +35,10 @@ export function shellPreamble(json: string): string {
     'You are FINISHING a structure whose EXTERIOR has already been built for you by code, below as ' +
     'Blockwright authoring JSON (air omitted; geometry is a flat "blocks" list). This shell is the ' +
     'CORRECT exterior for what the user asked — KEEP its overall massing: the stacked/offset volumes, ' +
-    'the FLAT roofs, the glass curtain walls, the roof terrace, the railings, and the pool. Do NOT turn ' +
+    'the FLAT roofs, the glass curtain walls, the roof terrace, and the railings. Do NOT turn ' +
     'it into a pitched-roof or solid box, and do NOT re-clad it in rustic wood. Your job is to: furnish ' +
     'the interior room-by-room, add finishing exterior detail (greenery/hedges/planters, outdoor steps, ' +
-    'pool deck, lighting), fix anything unsound, and otherwise REFINE — not replace — this shell. Then ' +
+    'lighting), fix anything unsound, and otherwise REFINE — not replace — this shell. Then ' +
     'call emit_structure with the COMPLETE structure (mode "full"). Keep the same size unless the request ' +
     'clearly needs more room.\n\n' +
     'STARTING SHELL:\n```json\n' +

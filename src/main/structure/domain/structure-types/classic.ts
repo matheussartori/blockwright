@@ -41,9 +41,13 @@ export const classic: StructureType = {
       kind: 'enum', default: 'none', values: ['none', 'full', 'half'], label: 'Basement',
       labels: { none: 'None', full: 'Full cellar', half: 'Half-buried' }, module: 'basement',
     },
+    // Surfaced in Details as the separate "Attic" module select (category 'attic'), so it's
+    // omitted from the house's own param controls — but kept here so the legacy
+    // `template name:'classic'` build path still resolves it. The value is the attic-module
+    // id (storage/bedroom); the house delegates the loft geometry to that module.
     attic: {
-      kind: 'enum', default: 'none', values: ['none', 'storage', 'finished'], label: 'Attic',
-      labels: { none: 'None', storage: 'Storage', finished: 'Finished room' },
+      kind: 'enum', default: 'none', values: ['none', 'storage', 'bedroom'], label: 'Attic',
+      labels: { none: 'None', storage: 'Storage', bedroom: 'Bedroom' }, module: 'attic',
     },
     balcony: {
       kind: 'enum', default: 'none', values: ['none', 'front', 'side'], label: 'Balcony',
@@ -53,8 +57,8 @@ export const classic: StructureType = {
     // it's omitted from the house's own param controls — but kept here so the legacy
     // `template name:'classic'` build path still resolves it.
     roof: {
-      kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip'], label: 'Roof',
-      labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip' }, module: 'roof',
+      kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip', 'flat'], label: 'Roof',
+      labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip', flat: 'Flat' }, module: 'roof',
     },
     decay: { kind: 'unit', default: 0.2 },
   },
@@ -101,6 +105,7 @@ export const classic: StructureType = {
     // 'gable'/'hip' force it. A forced gable runs its ridge along the long axis.
     const seededRoof = squareish ? (['gx', 'gz', 'hip'] as const)[Math.floor(rnd() * 3)] : 'glong';
     const roofShape = params.roof as string;
+    const isFlat = roofShape === 'flat';
     const roofPick = roofShape === 'gable' ? (W <= D ? 'gz' : 'gx') : roofShape === 'hip' ? 'hip' : seededRoof;
     const chimX = rnd() < 0.5 ? x0 : x1; // which side wall carries the chimney
 
@@ -119,17 +124,22 @@ export const classic: StructureType = {
     const belowLevels = hasBasement ? 1 : 0;
     const storeyCount = belowLevels + floors;
 
-    const canRoof = palette.idOf('roof').endsWith('_stairs');
+    const wantsPitched = !isFlat && palette.idOf('roof').endsWith('_stairs');
     const roofRings = Math.max(1, Math.floor(Math.min(W, D) / 2));
+    // Reserve headroom at the top for the roof: a pitch needs the gable rings; a FLAT
+    // roof just a deck + parapet (2); a bare ceiling needs 1. A flat roof keeps the walls
+    // tall (no pitch void), which is also why it can't host an attic.
+    const roofReserve = wantsPitched ? roofRings : isFlat ? 2 : 1;
     // Pick a storey height that fills the box, leaving room for the roof on top.
-    let storeyH = Math.max(4, Math.floor((H - (canRoof ? roofRings : 1)) / storeyCount));
+    let storeyH = Math.max(4, Math.floor((H - roofReserve) / storeyCount));
     let wallTop = y0 + storeyCount * storeyH;
     while (wallTop + 2 > y1 && storeyH > 3) {
       storeyH--;
       wallTop = y0 + storeyCount * storeyH;
     }
     if (wallTop > y1) wallTop = y1;
-    const doRoof = canRoof && wallTop >= y0 + 3 && y1 - wallTop >= 3;
+    const doRoof = wantsPitched && wallTop >= y0 + 3 && y1 - wallTop >= 3;
+    const doFlat = isFlat && y1 - wallTop >= 1;
     const hasAttic = attic !== 'none' && doRoof && y1 - wallTop >= 3;
 
     // Floor-slab Y of each storey (bottom→top); index `groundIdx` is the ground floor.
@@ -167,9 +177,11 @@ export const classic: StructureType = {
     for (let i = 1; i < storeyCount; i++) {
       ops.push({ op: 'fill', from: [x0 + 1, slabYs[i], z0 + 1], to: [x1 - 1, slabYs[i], z1 - 1], state: floorIdx });
     }
-    // Cap the top: attic floor in the gable, or a flat ceiling when there's no roof.
-    if (hasAttic) ops.push({ op: 'fill', from: [x0 + 1, wallTop, z0 + 1], to: [x1 - 1, wallTop, z1 - 1], state: floorIdx });
-    else if (!doRoof) ops.push({ op: 'fill', from: [x0, wallTop, z0], to: [x1, wallTop, z1], state: floorIdx });
+    // Cap the top: the attic loft (DELEGATED to the attic module — the single source of
+    // attic geometry: it floors the void at the wall top + lights it), or a flat ceiling
+    // when there's no roof. The box's y0 is the wall top = the attic floor plane.
+    if (hasAttic) ops.push(...composeModule('attic', attic, [x0, wallTop, z0], [x1, y1, z1]));
+    else if (!doRoof && !doFlat) ops.push({ op: 'fill', from: [x0, wallTop, z0], to: [x1, wallTop, z1], state: floorIdx });
 
     // --- Roof (emitted ONCE — the model must never add another) ----------------
     // DELEGATED to the roof module (the single source of roof geometry): the house owns
@@ -186,6 +198,10 @@ export const classic: StructureType = {
         const ridge = roofPick === 'gx' ? 'x' : roofPick === 'gz' ? 'z' : W <= D ? 'z' : 'x';
         ops.push(...composeModule('roof', 'gable', roofBoxFrom, roofBoxTo, { ridge }));
       }
+    } else if (doFlat) {
+      // A flat cap (walkable deck + parapet lip) over the wall top — delegated to the
+      // flat roof module. No roof void → the attic is suppressed (hasAttic is false).
+      ops.push(...composeModule('roof', 'flat', [x0, wallTop + 1, z0], [x1, y1, z1]));
     }
 
     // --- Openings --------------------------------------------------------------
@@ -268,9 +284,7 @@ export const classic: StructureType = {
       const ceil = i + 1 < storeyCount ? slabYs[i + 1] : wallTop;
       if (ceil - 1 > slabYs[i]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
     }
-    // Attic light: a standing lantern on the attic floor (the roof void above has no
-    // ceiling to hang from), seated so the placement pass keeps it.
-    if (hasAttic) ops.push({ op: 'block', pos: [cx, wallTop + 1, cz], state: palette.get('light') });
+    // (The attic loft's own floor + light come from the delegated attic module above.)
 
     // --- Stair core: a 2-wide switchback in the back-right corner linking every
     // WALKABLE storey (basement→ground→upper floors). The attic is reached by a

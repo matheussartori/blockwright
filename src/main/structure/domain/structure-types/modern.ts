@@ -1,15 +1,30 @@
 // "modern" — a contemporary flat-roofed villa, the deliberate opposite of `house`. Where
 // the house is a single pitched-roof box, the modern type owns a MODERN MASSING: two
 // stacked, OFFSET cuboid volumes (the upper one set back to leave a roof terrace), FLAT
-// roofs with slim parapets, big GLASS curtain walls broken by dark accent mullions, glass
-// terrace railings, and an optional ground-level POOL. It reads as white concrete + dark
-// accent + glass — pair it with the `modern` decoration for the right materials.
+// roofs with slim parapets, big GLASS curtain walls broken by dark accent mullions, and
+// glass terrace railings. It reads as white concrete + dark accent + glass — pair it with
+// the `modern` decoration for the right materials.
 //
 // All geometry is in semantic roles (the decoration supplies the blocks); the type ships a
 // white/quartz `defaults` kit so it still reads modern under a sparse decoration. The model
 // never rebuilds this shell — it furnishes the open, glass-walled rooms it hands over.
 import type { AuthoringOp } from '../../authoring/types';
-import type { StructureType } from './types';
+import type { ParamValues } from '../params';
+import type { Box, FloorPlanEntry, StructureType } from './types';
+
+/** The modern villa's vertical levels for a box + floor count — the single source of its
+ *  storey math, shared by `build()` (which needs the deck Ys) and `floors()` (which needs
+ *  the walkable storeys). `gTop` is the lower roof/upper-floor deck; `uTop` the upper roof. */
+function modernLevels(y0: number, y1: number, H: number, floors: number): {
+  gTop: number; twoStorey: boolean; uH: number; uTop: number;
+} {
+  const gH = Math.max(4, Math.min(6, Math.floor((H - 1) / (floors >= 2 ? 2 : 1))));
+  const gTop = y0 + gH;
+  const twoStorey = floors >= 2 && y1 - gTop >= 5;
+  const uH = twoStorey ? Math.max(4, Math.min(6, y1 - gTop - 1)) : 0;
+  const uTop = twoStorey ? gTop + uH : gTop;
+  return { gTop, twoStorey, uH, uTop };
+}
 
 /** Lay a glass CURTAIN WALL along one face: glass fill between full-height dark accent
  *  mullions every few columns, so the facade reads as window bands, not punched holes. */
@@ -50,7 +65,7 @@ export const modern: StructureType = {
   description:
     'A contemporary flat-roofed villa: stacked, offset white-concrete volumes with a set-back ' +
     'upper floor and roof terrace, floor-to-ceiling glass curtain walls broken by dark accent ' +
-    'columns, glass railings, and a ground-level pool. The modern alternative to the pitched ' +
+    'columns, and glass railings. The modern alternative to the pitched ' +
     'House — pair it with the Modern decoration for white-and-glass materials.',
   knowledge: 'nbt/modules/structure/modern.md',
   // Previewed (and seeded) under the modern decoration so the white/glass palette reads.
@@ -62,10 +77,6 @@ export const modern: StructureType = {
   seedShell: true,
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
-    pool: {
-      kind: 'enum', default: 'yes', values: ['yes', 'no'], label: 'Pool',
-      labels: { yes: 'Pool', no: 'No pool' },
-    },
     decay: { kind: 'unit', default: 0 }, // modern is always crisp
   },
   // A white-concrete / quartz / dark-accent / glass kit (used when the decoration is sparse;
@@ -89,9 +100,8 @@ export const modern: StructureType = {
     light: 'minecraft:sea_lantern',
   },
   build({ box, params, palette }) {
-    const { x0, y0, z0, x1, y1, z1, W, H, D } = box;
+    const { x0, y0, z0, x1, y1, z1, W, H } = box;
     const floors = params.floors as number;
-    const wantPool = (params.pool as string) !== 'no';
 
     const air = palette.air();
     const white = palette.get('wall');
@@ -101,32 +111,17 @@ export const modern: StructureType = {
     const dark = palette.get('pillar');
     const glass = palette.get('glass');
     const rail = palette.get('window');
-    const water = palette.get('water');
     const sea = palette.get('light');
 
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
 
-    // --- Front pool yard (optional) -------------------------------------------------
-    // A modern house faces a pool. When the plot is deep enough, reserve a shallow FRONT
-    // strip as an outdoor terrace with a sunken pool; the house volume starts behind it.
-    const yardD = wantPool && D >= 12 ? 4 : 0;
-    const hz0 = z0 + yardD;       // the house's front wall
-    if (yardD > 0) {
-      ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, hz0 - 1], state: found }); // paved yard
-      // A pool sunk into the paving, framed by a quartz-slab rim.
-      const px0 = x0 + 1, px1 = x1 - 1, pz0 = z0 + 1, pz1 = hz0 - 1;
-      if (px1 - px0 >= 1 && pz1 - pz0 >= 0) {
-        ops.push({ op: 'fill', from: [px0, y0, pz0], to: [px1, y0, pz1], state: water });
-      }
-    }
+    // The house volume fills the whole footprint (the front pool yard was removed — a
+    // water feature will return later as a separate, opt-in element).
+    const hz0 = z0; // the house's front wall
 
-    // --- Storey heights -------------------------------------------------------------
-    const gH = Math.max(4, Math.min(6, Math.floor((H - 1) / (floors >= 2 ? 2 : 1))));
-    const gTop = y0 + gH;                                   // lower roof / terrace deck level
-    const twoStorey = floors >= 2 && y1 - gTop >= 5;
-    const uH = twoStorey ? Math.max(4, Math.min(6, y1 - gTop - 1)) : 0;
-    const uTop = twoStorey ? gTop + uH : gTop;              // upper roof level
+    // --- Storey heights (shared with floors() via modernLevels) ---------------------
+    const { gTop, twoStorey, uTop } = modernLevels(y0, y1, H, floors);
 
     // --- Lower volume (full house footprint) ----------------------------------------
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: found });   // floor base
@@ -187,5 +182,18 @@ export const modern: StructureType = {
     if (twoStorey) ops.push({ op: 'block', pos: [cx, uTop - 1, Math.floor((hz0 + z1) / 2)], state: sea });
 
     return ops;
+  },
+  // Authoritative storeys (the SAME level math `build()` uses) so the viewer labels the
+  // flat-roofed villa's floors exactly, instead of the geometric detector mistaking its
+  // stacked flat decks for extra storeys.
+  floors(box: Box, params: ParamValues): FloorPlanEntry[] {
+    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number);
+    if (twoStorey) {
+      return [
+        { from: box.y0, to: gTop - 1, role: 'ground' },
+        { from: gTop, to: box.y1, role: 'upper' },
+      ];
+    }
+    return [{ from: box.y0, to: box.y1, role: 'ground' }];
   },
 };

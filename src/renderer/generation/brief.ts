@@ -22,6 +22,9 @@ export interface BuildDetails {
   roof: string;
   /** Selected basement module id (category 'basement'), or '' for none. */
   basement: string;
+  /** Selected attic module id (category 'attic'), or '' for none. Only meaningful on a
+   *  pitched-roof house; cleared when the roof is set to flat (no roof void). */
+  attic: string;
   /** Structure-type param values, keyed by param name. Missing keys fall back to
    *  the param's default when the brief is built. */
   params: Record<string, string | number>;
@@ -40,6 +43,7 @@ export const EMPTY_DETAILS: BuildDetails = {
   decoration: '',
   roof: '',
   basement: '',
+  attic: '',
   params: {},
   size: null,
   rooms: [],
@@ -145,7 +149,7 @@ export function effectiveSize(
   d: BuildDetails,
   struct: GenerationModule | undefined,
 ): { w: number; d: number; h: number } {
-  const params = { ...resolveDetailParams(d, struct), basement: d.basement || 'none' };
+  const params = { ...resolveDetailParams(d, struct), basement: d.basement || 'none', attic: d.attic || 'none' };
   return d.size ?? derivedSize(struct, params);
 }
 
@@ -224,6 +228,7 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
   const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
   const roof = d.roof ? catalog?.roof.find((m) => m.id === d.roof) : undefined;
   const basement = d.basement ? catalog?.basement.find((m) => m.id === d.basement) : undefined;
+  const attic = d.attic ? catalog?.attic.find((m) => m.id === d.attic) : undefined;
   const sz = effectiveSize(d, s);
   const label = s?.label ?? d.structureType;
   const decoClause = deco ? ` with the "${deco.label}" decoration (its materials and mood)` : '';
@@ -239,6 +244,7 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
     (roof ? `- Roof: a ${roof.label} roof (see its module guide).\n` : '') +
     (basement ? `- Basement: a ${basement.label} (see its module guide).\n` : '') +
+    (attic ? `- Attic: a ${attic.label} in the roof void (see its module guide).\n` : '') +
     buildRoomPlan(d, catalog) +
     `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`
   );
@@ -265,6 +271,7 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
     decoration: d.decoration ? lbl('decoration', d.decoration) : undefined,
     roof: d.roof ? lbl('roof', d.roof) : undefined,
     basement: d.basement ? lbl('basement', d.basement) : undefined,
+    attic: d.attic ? lbl('attic', d.attic) : undefined,
     size: [sz.w, sz.h, sz.d],
     floors: floors.length ? floors : undefined,
   };
@@ -285,6 +292,7 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
     decoration: d.decoration || undefined,
     roof: d.roof || undefined,
     basement: d.basement || undefined,
+    attic: d.attic || undefined,
     rooms: rooms.length ? rooms : undefined,
     size: sz ? [sz.w, sz.h, sz.d] : undefined,
   };
@@ -299,6 +307,7 @@ export function hasDetails(d: BuildDetails): boolean {
     d.decoration !== '' ||
     d.roof !== '' ||
     d.basement !== '' ||
+    d.attic !== '' ||
     d.rooms.some((r) => r.some(Boolean))
   );
 }

@@ -4,9 +4,18 @@
 // `defaults` kit (sensible block per role) so it looks right even under a sparse
 // theme, and a `params` spec declaring its shape/behaviour knobs.
 import type { AuthoringOp } from '../../authoring/types';
+import type { FloorRole } from '@/shared/types';
 import type { ModuleMeta } from '../modules';
 import type { ParamSpec, ParamValues } from '../params';
 import type { Role } from '../roles';
+
+/** One walkable storey a structure type lays for a box+params: an inclusive y range
+ *  (floor slab → just below the next) with its grade role. Returned bottom-up. */
+export interface FloorPlanEntry {
+  from: number;
+  to: number;
+  role: FloorRole;
+}
 
 /** A normalized, inclusive build box (corners sorted) plus its span per axis. */
 export interface Box {
@@ -69,8 +78,8 @@ export interface BuildArgs {
    * structure's kit + decoration and its host-specific integration (e.g. gable-end
    * vents) is included. Injected by the compose layer (see `composeStructure`).
    *
-   * @param category - 'roof' or 'basement' (which module registry to resolve `id` in).
-   * @param id - The module id (e.g. 'gable', 'cellar').
+   * @param category - 'roof', 'basement' or 'attic' (which module registry to resolve `id`).
+   * @param id - The module id (e.g. 'gable', 'cellar', 'bedroom').
    * @param from - One corner of the box the module builds into [x, y, z].
    * @param to - The opposite corner of that box [x, y, z].
    * @param extra - Params layered over the build's params for the module (e.g. a roof's
@@ -79,7 +88,7 @@ export interface BuildArgs {
    *   is unknown / has no geometry.
    */
   composeModule(
-    category: 'roof' | 'basement',
+    category: 'roof' | 'basement' | 'attic',
     id: string,
     from: [number, number, number],
     to: [number, number, number],
@@ -113,6 +122,11 @@ export interface StructureType extends ModuleMeta {
   defaults: Partial<Record<Role, string>>;
   /** Emit the massing as volumetric ops in terms of roles. */
   build(args: BuildArgs): AuthoringOp[];
+  /** The EXACT walkable storeys this type lays for a box+params, bottom-up — the
+   *  AUTHORITATIVE floor planes, so a code-built shell never has to be GUESSED by the
+   *  geometric detector (whose stacked-flat-deck heuristic is fallible). Shares the storey
+   *  math with `build()`. Omit → the app falls back to `detectFloors`. */
+  floors?(box: Box, params: ParamValues): FloorPlanEntry[];
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['stairs','chimney']`. */

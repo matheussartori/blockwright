@@ -8,20 +8,20 @@
 
 A sleek contemporary villa: **stacked, offset white-concrete/quartz volumes** with **FLAT
 roofs** and slim parapets, **floor-to-ceiling glass curtain walls** broken by dark accent
-columns, a **set-back upper floor with a railed roof terrace**, warm-wood accents, and a
-**ground-level pool** in a paved front yard. Low, wide, horizontal, bright. **No pitched
-roof, no chimney, no rustic timber walls.** Think the white "easy modern house" builds.
+columns, a **set-back upper floor with a railed roof terrace**, and warm-wood accents. Low,
+wide, horizontal, bright. **No pitched roof, no chimney, no rustic timber walls.** Think the
+white "easy modern house" builds.
 
 ## Finishing the seeded shell
 
-The shell already gives you the massing, flat roofs, glass walls, terrace, railings and
-pool. KEEP all of that. Add:
+The shell already gives you the massing, flat roofs, glass walls, terrace and railings.
+KEEP all of that. Add:
 
 1. **Furnish the interiors** behind the glass — open-plan living/kitchen/dining on the
    ground floor, bedrooms/bath above — in the modern material story (see the Modern
    decoration guide): white/quartz, dark accents, warm wood, sea-lantern/​end-rod light.
-2. **Pool deck + yard:** frame the pool with a quartz/stone deck, add sun-lounger blocks,
-   low **hedges/azalea** borders, and a paved path to the door.
+2. **Entrance + yard:** a paved quartz/stone path and steps up to the door, low
+   **hedges/azalea** borders framing the approach.
 3. **Greenery + detail:** potted plants and leaf hedges along the facade and on the
    terrace, slim wood-deck accents under overhangs, recessed/strip lighting.
 4. **Circulation:** an open interior stair (or a clean flush ladder) linking the floors,

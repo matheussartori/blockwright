@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { composeStructure, composeModule, composeModulePreview, isKnownStructure, knownStructureNames, type Intern } from '../compose';
-import { buildModulePreview, listModuleCatalog, selectedGuides, structureFinalizers } from '../index';
+import { buildModulePreview, listModuleCatalog, selectedGuides, structureFinalizers, structureFloorPlan } from '../index';
+import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { compileStructure } from '../../authoring';
 
 /** A throwaway intern that just hands out incrementing indices per distinct key. */
@@ -37,6 +38,44 @@ describe('compose: structure types × decorations', () => {
     expect(a.length).toBeGreaterThan(0);
   });
 
+  it('classic with a flat roof caps flat (no pitched roof op) and compiles', () => {
+    const size: [number, number, number] = [12, 16, 12];
+    const corner: [number, number, number] = [11, 15, 11];
+    const ops = composeStructure('classic', from, corner, { roof: 'flat', attic: 'bedroom' }, stubIntern());
+    expect(ops.filter((o) => o.op === 'roof')).toHaveLength(0); // a flat cap is fills/walls, not a `roof` op
+    // Compile via a self-interning `template` op (the composed `ops` above reference the
+    // stub palette, so they're checked for shape only, not compiled directly).
+    expect(() =>
+      compileStructure({
+        DataVersion: 3955,
+        size,
+        palette: [{ Name: 'minecraft:air' }],
+        ops: [{ op: 'template', name: 'classic', from, to: corner, params: { roof: 'flat', attic: 'bedroom' } }],
+      }),
+    ).not.toThrow();
+  });
+
+  it('classic delegates a pitched-roof attic to the attic module (an extra floored loft)', () => {
+    const big: [number, number, number] = [11, 17, 11];
+    const withAttic = composeStructure('classic', from, big, { floors: 1, attic: 'bedroom' }, stubIntern());
+    const without = composeStructure('classic', from, big, { floors: 1, attic: 'none' }, stubIntern());
+    expect(withAttic.filter((o) => o.op === 'roof')).toHaveLength(1); // still one (pitched) roof
+    expect(withAttic.length).toBeGreaterThan(without.length); // the attic adds floor + light ops
+  });
+
+  it('structureFloorPlan gives the modern villa storeys authoritatively, bottom-up', () => {
+    const plan = structureFloorPlan('modern', [36, 15, 20], {});
+    expect(plan.map((f) => f.role)).toEqual(['ground', 'upper']);
+    expect(plan.map((f) => f.name)).toEqual(['Floor 1', 'Floor 2']);
+    // The ranges stack without overlap and the top runs to the build top.
+    expect(plan[0].to + 1).toBe(plan[1].from);
+    expect(plan[1].to).toBe(14);
+  });
+
+  it('structureFloorPlan is empty for a type with no authoritative plan (classic)', () => {
+    expect(structureFloorPlan('classic', [11, 13, 9], {})).toEqual([]);
+  });
+
   it('accepts both `decoration` and the legacy `theme` param key', () => {
     const viaDecoration = composeStructure('classic', from, house, { decoration: 'cozy' }, stubIntern());
     const viaTheme = composeStructure('classic', from, house, { theme: 'cozy' }, stubIntern());
@@ -69,27 +108,29 @@ describe('compose: structure types × decorations', () => {
     const cat = listModuleCatalog();
     const classic = cat.structure.find((m) => m.id === 'classic');
     const names = (classic?.params ?? []).map((p) => p.name);
-    expect(names).toEqual(expect.arrayContaining(['floors', 'attic', 'balcony']));
+    expect(names).toEqual(expect.arrayContaining(['floors', 'balcony']));
     expect(names).not.toContain('decay'); // unit params belong to the decoration, not the UI
-    // roof + basement are promoted to their own module-category selects, so they no
+    // roof + basement + attic are promoted to their own module-category selects, so they no
     // longer appear as the house's own param controls (they stay in the build spec).
     expect(names).not.toContain('roof');
     expect(names).not.toContain('basement');
+    expect(names).not.toContain('attic');
     const floors = classic?.params?.find((p) => p.name === 'floors');
     expect(floors).toMatchObject({ kind: 'int', label: 'Floors', min: 1, max: 4 });
   });
 
-  it('every roof/basement/room module is linked to the house via appliesTo', () => {
+  it('every roof/basement/attic/room module is linked to a House member via appliesTo', () => {
     const cat = listModuleCatalog();
-    expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip']));
+    expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip', 'flat']));
     expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['cellar', 'crypt', 'cult-temple']));
+    expect(cat.attic.map((m) => m.id)).toEqual(expect.arrayContaining(['storage', 'bedroom']));
     expect(cat.room.map((m) => m.id)).toEqual(expect.arrayContaining(['living', 'kitchen', 'library']));
-    // Every roof/basement/room module declares the structures it pairs with, and all
-    // of them currently include the house (more structure ids can be added later, e.g. a
-    // crypt basement gaining 'tower' → ['house','tower']).
-    for (const m of [...cat.roof, ...cat.basement, ...cat.room]) {
+    // Every roof/basement/attic/room module declares the structures it pairs with, and all
+    // resolve to the House family — whether tagged by the group id ('house') or by specific
+    // members (e.g. a gable applies to classic/cabin/l-shaped, but NOT the flat-roofed modern).
+    for (const m of [...cat.roof, ...cat.basement, ...cat.attic, ...cat.room]) {
       expect(m.appliesTo, `${m.id} must declare appliesTo`).toBeTruthy();
-      expect(m.appliesTo, `${m.id} must apply to house`).toContain('house');
+      expect(moduleAppliesTo(m.appliesTo, 'classic', 'house'), `${m.id} must apply to a house`).toBe(true);
     }
   });
 
@@ -175,13 +216,21 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
     for (const m of cat.structure) expect(m.group, `${m.id} must be in the house group`).toBe('house');
   });
 
-  it('a group-tagged roof is shared across every House member', () => {
-    // gable.appliesTo = ['house'] (the GROUP), so it loads for any house-family structure,
-    // not just classic — that's the sharing the group buys.
-    for (const structureType of ['classic', 'modern', 'cabin', 'l-shaped']) {
+  it('a roof guide loads only for the structures it fits', () => {
+    // gable applies to the PITCHED houses (classic/cabin/l-shaped) — it loads for those,
+    // but NOT for the flat-roofed modern (which excludes it).
+    for (const structureType of ['classic', 'cabin', 'l-shaped']) {
       const guides = selectedGuides({ structureType, roof: 'gable' });
       expect(guides, structureType).toContain('nbt/modules/roof/gable.md');
     }
+    expect(selectedGuides({ structureType: 'modern', roof: 'gable' })).not.toContain('nbt/modules/roof/gable.md');
+    // The flat roof applies to the whole house group, including modern.
+    expect(selectedGuides({ structureType: 'modern', roof: 'flat' })).toContain('nbt/modules/roof/flat.md');
+  });
+
+  it('an attic guide loads for the house and rides the conflict with the flat roof', () => {
+    expect(selectedGuides({ structureType: 'classic', attic: 'bedroom' })).toContain('nbt/modules/attic/bedroom.md');
+    expect(selectedGuides({ structureType: 'classic', attic: 'storage' })).toContain('nbt/modules/attic/storage.md');
   });
 
   it('the seeded archetypes (modern/cabin/l-shaped) compile from their preview', () => {

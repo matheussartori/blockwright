@@ -502,15 +502,28 @@ function patchOrphanHoles(
         cluster.push([x, z]);
         st.push([x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]);
       }
-      let hasConnector = false, overStrip = false;
+      // Classify EACH cell of the cluster: is its column an orphan remnant (the old
+      // climb was stripped beneath it) and does the rebuilt connector claim its plane
+      // cell? A connector's own opening (`reserved`) stays open; every OTHER cell that
+      // sits over stripped geometry is floored back. This is what keeps the stairwell
+      // opening matched to the CONNECTOR's width: when a 1-wide stair replaces a wider
+      // old climb, the extra floor cells beside it (over the stripped old treads) get
+      // floored instead of surviving as a fall-through gap next to the stairs.
+      let hasConnector = false, anyOverStrip = false;
+      const cells: { x: number; z: number; over: boolean }[] = [];
       for (const [x, z] of cluster) {
         if (reserved.has(posKey(x, py, z))) hasConnector = true;
-        for (let y = py; y > prev; y--) if (stripKeys.has(posKey(x, y, z))) overStrip = true;
+        let over = false;
+        for (let y = py; y > prev; y--) if (stripKeys.has(posKey(x, y, z))) { over = true; break; }
+        if (over) anyOverStrip = true;
+        cells.push({ x, z, over });
       }
-      if (hasConnector || !overStrip) continue; // active stairwell, or a deliberate void
-      for (const [x, z] of cluster) {
-        if (reserved.has(posKey(x, py, z))) continue;
-        fill.push({ state: mat, pos: [x, py, z] });
+      // No connector AND nothing stripped beneath it → a deliberate void (an atrium the
+      // model never built a climb into): leave it open.
+      if (!hasConnector && !anyOverStrip) continue;
+      for (const { x, z, over } of cells) {
+        if (reserved.has(posKey(x, py, z))) continue; // the active connector opening stays open
+        if (over) fill.push({ state: mat, pos: [x, py, z] }); // orphan remnant beside/within the climb
       }
     }
   }

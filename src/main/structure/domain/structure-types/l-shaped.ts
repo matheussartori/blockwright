@@ -22,7 +22,12 @@ export const lShaped: StructureType = {
   finalize: ['stairs', 'chimney'],
   seedShell: true,
   params: {
-    floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
+    floors: { kind: 'int', default: 2, min: 1, max: 4, label: 'Floors' },
+    // Two pitched wings by identity; a flat cap is offered as the modern alternative.
+    roof: {
+      kind: 'enum', default: 'gable', values: ['gable', 'flat'], label: 'Roof',
+      labels: { gable: 'Gable', flat: 'Flat' }, module: 'roof',
+    },
     decay: { kind: 'unit', default: 0 },
   },
   defaults: {
@@ -64,7 +69,9 @@ export const lShaped: StructureType = {
     const mainX1 = xn - 1;                            // main wing's east column
 
     // --- Storeys --------------------------------------------------------------------
-    const roofRings = Math.max(2, Math.floor(Math.min(mainX1 - x0 + 1, D) / 2));
+    const roofShape = (params.roof as string) ?? 'gable';
+    const isFlat = roofShape === 'flat';
+    const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(mainX1 - x0 + 1, D) / 2));
     let storeyH = Math.max(4, Math.floor((y1 - y0 - roofRings) / floors));
     let wallTop = y0 + storeyH * floors;
     while (wallTop + 2 > y1 && storeyH > 3) { storeyH--; wallTop = y0 + storeyH * floors; }
@@ -94,9 +101,14 @@ export const lShaped: StructureType = {
       ops.push({ op: 'fill', from: [px, y0, pz], to: [px, wallTop, pz], state: corner });
     }
 
-    // --- Per-wing gable roofs (delegated to the roof module) ------------------------
-    ops.push(...composeModule('roof', 'gable', [x0, wallTop + 1, z0], [mainX1, y1, z1], { ridge: 'z' }));
-    ops.push(...composeModule('roof', 'gable', [xn, wallTop + 1, zn], [x1, y1, z1], { ridge: 'x' }));
+    // --- Per-wing roofs (gable by identity, or a flat cap — delegated to the module) -
+    if (isFlat) {
+      ops.push(...composeModule('roof', 'flat', [x0, wallTop + 1, z0], [mainX1, y1, z1]));
+      ops.push(...composeModule('roof', 'flat', [xn, wallTop + 1, zn], [x1, y1, z1]));
+    } else {
+      ops.push(...composeModule('roof', 'gable', [x0, wallTop + 1, z0], [mainX1, y1, z1], { ridge: 'z' }));
+      ops.push(...composeModule('roof', 'gable', [xn, wallTop + 1, zn], [x1, y1, z1], { ridge: 'x' }));
+    }
 
     // --- Entrance (main wing front) + windows ---------------------------------------
     const dx = Math.floor((x0 + mainX1) / 2);

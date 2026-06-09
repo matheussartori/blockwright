@@ -14,7 +14,11 @@ const MODERN_STRUCTURE = 'modern';
 const MODERN_DECORATION = 'modern';
 
 /** The single-value Details selects driven by `setDetailField`. */
-export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement';
+export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement' | 'attic';
+
+/** The roof id that leaves no roof void, so it cannot host an attic (see the `flat` roof
+ *  module's `incompatibleWith`). Picking it clears any attic selection. */
+const FLAT_ROOF = 'flat';
 
 /** A build size box, in cells. */
 export interface SizeBox {
@@ -41,10 +45,19 @@ export function setDetailField(d: BuildDetails, key: DetailField, value: string)
     // The modern house is a white-and-glass archetype — pair it with the Modern decoration
     // by default so its materials + guide come along (the user can still change it).
     const decoration = value === MODERN_STRUCTURE ? MODERN_DECORATION : '';
-    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', rooms: [] };
+    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', attic: '', rooms: [] };
   }
   if (key === 'basement') {
     return { ...d, basement: value, size: null };
+  }
+  if (key === 'roof') {
+    // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
+    // two can't be selected together (mirrors the gallery dimming + the modules' conflict).
+    const attic = value === FLAT_ROOF ? '' : d.attic;
+    return { ...d, roof: value, attic };
+  }
+  if (key === 'attic') {
+    return { ...d, attic: value, size: null };
   }
   return { ...d, [key]: value };
 }

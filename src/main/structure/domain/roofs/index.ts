@@ -9,11 +9,12 @@ import type { ModuleSummary } from '../modules';
 import { createRegistry } from '../registry';
 import { gable } from './gable';
 import { hip } from './hip';
+import { flat } from './flat';
 import type { RoofModule } from './types';
 
 export type { RoofModule } from './types';
 
-const registry = createRegistry<RoofModule>([gable, hip]);
+const registry = createRegistry<RoofModule>([gable, hip, flat]);
 
 /** Look up a roof module by id (undefined if unknown). */
 export function getRoof(id: string): RoofModule | undefined {

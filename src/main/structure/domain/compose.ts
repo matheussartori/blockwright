@@ -14,6 +14,7 @@ import {
   type Decoration,
 } from './decorations';
 import { getBasement } from './basements';
+import { getAttic } from './attics';
 import { resolveParams } from './params';
 import { getRoof } from './roofs';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
@@ -133,8 +134,9 @@ function runModuleGeometry(module: GeometryModule, host: string | undefined, arg
  *  host-specific integration is included.
  *
  *  Palette strategy differs by category, by design:
- *  - **roof** reuses the caller's `hostPalette` — a roof is part of the host's exterior
- *    material story (the house's roof should match its own trim, not the module's kit).
+ *  - **roof** + **attic** reuse the caller's `hostPalette` — both are part of the host's
+ *    material story (the house's roof should match its trim; the attic floor should match
+ *    the house, since it's reached from inside it).
  *  - **basement** gets its OWN palette from the module's `defaults` (over the decoration) —
  *    a cellar is a self-contained stone space, independent of the host's (e.g. timber) walls.
  *  `rawParams`/`deco`/`intern` let the module resolve its param spec + palette consistently. */
@@ -148,14 +150,14 @@ function makeModuleComposer(
 ): BuildArgs['composeModule'] {
   // A const arrow that references itself, so a delegated module can delegate again.
   const delegate: BuildArgs['composeModule'] = (category, id, from, to, extra = {}) => {
-    const module = category === 'roof' ? getRoof(id) : getBasement(id);
+    const module = category === 'roof' ? getRoof(id) : category === 'attic' ? getAttic(id) : getBasement(id);
     if (!module) throw new Error(`unknown ${category} module "${id}"`);
     const subBox = box(from, to);
     const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
     if (deco.decay !== undefined && extra.decay === undefined && rawParams.decay === undefined && 'decay' in subParams) {
       subParams.decay = deco.decay;
     }
-    const palette = category === 'roof'
+    const palette = category === 'roof' || category === 'attic'
       ? hostPalette
       : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern);
     return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, composeModule: delegate });

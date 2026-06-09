@@ -4,11 +4,15 @@
 // `composeModule`/`composeModulePreview`), the catalog the UI lists, and the
 // selection→knowledge-guide mapping the system prompt uses.
 import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
+import type { FloorDef } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { composeModulePreview } from './compose';
+import { resolveParams } from './params';
+import { box } from './structure-types/types';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
 import { basementModules, getBasement, listBasements } from './basements';
 import { getRoof, listRoofs, roofModules } from './roofs';
+import { atticModules, getAttic, listAttics } from './attics';
 import { getRoom, listRooms, roomModules } from './rooms';
 import type { ModuleCategory, ModuleMeta, ModuleSummary } from './modules';
 import {
@@ -51,6 +55,7 @@ export {
 } from './decorations';
 export { listBasements, getBasement, type BasementModule } from './basements';
 export { listRoofs, getRoof, type RoofModule } from './roofs';
+export { listAttics, getAttic, type AtticModule } from './attics';
 export { listRooms, getRoom, type RoomModule } from './rooms';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
@@ -67,6 +72,7 @@ export interface ModuleCatalog {
   decoration: ModuleSummary[];
   basement: ModuleSummary[];
   roof: ModuleSummary[];
+  attic: ModuleSummary[];
   room: ModuleSummary[];
   /** Structure families (e.g. "House"), for the gallery rail + Details optgroups. */
   groups: StructureGroup[];
@@ -79,9 +85,40 @@ export function listModuleCatalog(): ModuleCatalog {
     decoration: listDecorations(),
     basement: listBasements(),
     roof: listRoofs(),
+    attic: listAttics(),
     room: listRooms(),
     groups: STRUCTURE_GROUPS,
   };
+}
+
+/**
+ * The AUTHORITATIVE storeys a code-built structure lays for a size + params — so the app
+ * uses the exact floor planes the shell was built with instead of GUESSING them from the
+ * geometry (the geometric `detectFloors` is the fallback for free-form builds). Threaded
+ * into the generated build's metadata sidecar.
+ *
+ * @param id - The structure-type id (e.g. 'modern').
+ * @param size - The build size [X, Y, Z].
+ * @param rawParams - The build's loose params (floors, roof, …); defaults applied.
+ * @returns The numbered storeys bottom-up (`FloorDef[]`), or `[]` when the type doesn't
+ *   declare an authoritative plan (so the caller falls back to detection).
+ */
+export function structureFloorPlan(
+  id: string,
+  size: [number, number, number],
+  rawParams: Record<string, unknown> = {},
+): FloorDef[] {
+  const type = getStructureType(id);
+  if (!type?.floors) return [];
+  const b = box([0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]);
+  const params = resolveParams(type.params, rawParams);
+  return type.floors(b, params).map((f, i) => ({
+    id: `floor-${i + 1}`,
+    name: `Floor ${i + 1}`,
+    from: f.from,
+    to: f.to,
+    role: f.role,
+  }));
 }
 
 /** Every module across categories (for selection→guide mapping + lookups). */
@@ -91,6 +128,7 @@ function allModules(): ModuleMeta[] {
     ...decorationModules(),
     ...roofModules(),
     ...basementModules(),
+    ...atticModules(),
     ...roomModules(),
   ];
 }
@@ -104,6 +142,9 @@ export interface ModuleSelection {
   decoration?: string;
   roof?: string;
   basement?: string;
+  /** The in-roof attic module id (storage/bedroom), if picked. Loads its own guide; only
+   *  applies to pitched-roof houses (and clashes with the flat roof). */
+  attic?: string;
   /** Interior room module ids assigned across the floors (deduped). Each loads its own
    *  guide; the per-floor layout is conveyed to the model as prompt text, not here. */
   rooms?: string[];
@@ -130,6 +171,8 @@ export function selectedGuides(sel: ModuleSelection): string[] {
   if (moduleAppliesTo(roof?.appliesTo, sel.structureType, hostGroup)) add(roof);
   const basement = sel.basement ? getBasement(sel.basement) : undefined;
   if (moduleAppliesTo(basement?.appliesTo, sel.structureType, hostGroup)) add(basement);
+  const attic = sel.attic ? getAttic(sel.attic) : undefined;
+  if (moduleAppliesTo(attic?.appliesTo, sel.structureType, hostGroup)) add(attic);
   // One guide per selected room (deduped already), gated by appliesTo so a room that
   // doesn't fit the chosen structure doesn't drag its guide in.
   for (const id of sel.rooms ?? []) {
@@ -169,8 +212,9 @@ function localIntern(palette: AuthoringPaletteEntry[]): (name: string, props?: R
  *  geometry (`composeModulePreview`) and ships the pre-expanded ops + palette. Pure — the
  *  caller compiles. */
 export function buildModulePreview(category: ModuleCategory, id: string): AuthoringStructure | null {
-  // Guidance-only categories carry no geometry, so there's nothing to preview.
-  if (category === 'room') return null;
+  // Guidance-only / interior categories carry no standalone preview (an attic only reads
+  // inside its host roof void, so the gallery shows a placeholder for it like rooms).
+  if (category === 'room' || category === 'attic') return null;
   if (category === 'roof' || category === 'basement') {
     const meta = category === 'roof' ? getRoof(id) : getBasement(id);
     if (!meta?.preview) return null;
