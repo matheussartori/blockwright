@@ -21,6 +21,7 @@ import { buildMetadata, librarySidecarPath, removeTempMetadata, writeMetadataJso
 import { mergePatch } from './patch';
 import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
+import { buildShellSeed } from './shell-seed';
 import { activeCredential, aiAvailable } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import { RunLog } from './gen-log';
@@ -97,7 +98,14 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // falls back to the model's self-reported audit).
   const critic = await getCritic(cred.id);
 
-  const seed = await buildSeed(resumable, session, basePath);
+  // A fresh build of a shell-seeded archetype (the modern villa) starts from its
+  // code-built exterior shell, so the model finishes a guaranteed-modern silhouette
+  // instead of inventing one (and reliably reverting to a pitched box). Falls through
+  // to the normal edit/free-form seed for every other case.
+  let seed = await buildSeed(resumable, session, basePath);
+  if (!seed && session.version === 0) {
+    seed = await buildShellSeed(selection?.structureType, selection?.decoration, selection?.size, session.dir);
+  }
   const effectivePrompt = seed + prompt;
 
   run.ai(

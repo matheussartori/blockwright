@@ -6,12 +6,15 @@
 import { toSummary, type ModuleSummary } from '../modules';
 import { paramFields } from '../params';
 import { createRegistry } from '../registry';
+import { cabin } from './cabin';
 import { house } from './house';
+import { lShaped } from './l-shaped';
+import { modern } from './modern';
 import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-const registry = createRegistry<StructureType>([house]);
+const registry = createRegistry<StructureType>([house, modern, cabin, lShaped]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {

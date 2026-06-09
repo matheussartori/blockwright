@@ -105,6 +105,30 @@ describe('rebuildStairwells', () => {
     expect(r.fixes?.join(' ')).toMatch(/ladder/);
   });
 
+  it('never carves a WALL that passes through the upper floor — the stairwell opening only eats true floor', () => {
+    // The recurring "stairs destroyed the external wall" defect. A wall column crosses the
+    // upper floor plane (y=5) at a cell that lies in the stair's opening path, continuing
+    // ABOVE the floor (y=6,7) — so it's a real wall, not floor. The pass must classify it as
+    // a wall and refuse to carve it as part of the stairwell opening; it climbs another way.
+    const blocks = storeyShell(9, 7, [0, 5, 10])
+      // The wall replaces the floor plank where it crosses the plane (one block per cell).
+      .filter((b) => posKey(...b.pos) !== posKey(3, 5, 3));
+    // A flight climbing +x at z=3 from x=1 (treads at x=1..4, none at x=3,y=5).
+    blocks.push(
+      { state: 3, pos: [1, 1, 3] }, { state: 3, pos: [2, 2, 3] },
+      { state: 3, pos: [3, 3, 3] }, { state: 3, pos: [4, 4, 3] },
+    );
+    // A wall column AT and ABOVE the upper floor at (3,*,3) — a structural block sitting on
+    // the floor plane (y=5) with more solid directly above (y=6,7): a wall, not a floor.
+    // It sits in the +x flight's opening path (the cell over the tread at (3,3,3)).
+    blocks.push({ state: 1, pos: [3, 5, 3] }, { state: 1, pos: [3, 6, 3] }, { state: 1, pos: [3, 7, 3] });
+    const r = rebuildStairwells(blocks, palette, ctx);
+    // The wall at the floor-plane level (3,5,3) — and the block above it — survive intact:
+    // the opening must reroute (a ladder / another direction), never gouge the wall.
+    expect(at(r, 3, 5, 3)?.Name).toBe('minecraft:stone');
+    expect(at(r, 3, 6, 3)?.Name).toBe('minecraft:stone');
+  });
+
   it('floors over the orphan hole left where an abandoned climb (and its floor opening) was stripped', () => {
     // The model placed TWO climbs for the SAME 0→5 gap — flight A at z=3 and flight B at
     // z=5 — and cut a floor opening over each. The rebuild consolidates to ONE clean flight

@@ -21,6 +21,10 @@ export interface BuildSelection {
   /** Interior room module ids assigned across floors (deduped) — each loads its own
    *  knowledge guide. The per-floor layout itself rides in the prompt text. */
   rooms?: string[];
+  /** The build box [W, H, D] the user picked in Details. Threaded so a structure type
+   *  that ships a code-built starting SHELL (e.g. the modern house) can compile that
+   *  shell at the right size and seed the model with it. */
+  size?: [number, number, number];
 }
 
 /** A display-ready build card shown in the chat. On the USER message it summarises

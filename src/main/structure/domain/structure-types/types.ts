@@ -112,6 +112,12 @@ export interface StructureType extends ModuleMeta {
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['stairs','chimney']`. */
   finalize?: FinalizePass[];
+  /** When true, a FRESH AI build of this type is SEEDED with this type's code-built shell
+   *  (compiled via `build()` at the requested size + decoration) instead of being left
+   *  fully free-form — the model keeps the exterior massing and only furnishes/details it.
+   *  Used for archetypes the model can't reliably invent (the modern villa: flat roofs,
+   *  stacked volumes, glass, pool). The house stays free-form (omit → no shell seed). */
+  seedShell?: boolean;
   /** Optional system-prompt fragment (wired into the generator prompt later). */
   prompt?: string;
 }

@@ -71,9 +71,12 @@ src/
                            (decoration param accepts `decoration` or legacy `theme`)
         index.ts           barrel + catalog (listModuleCatalog), selection→guide mapping
                            (selectedGuides/promptGuides), buildModulePreview (gallery)
-        structure-types/   Category "structure": one file per archetype (house; add more here) +
-                           types.ts (contract + Box/logProps) + index.ts (registry). A type emits ops
-                           in terms of roles; never names blocks, and delegates roof/basement to modules.
+        structure-types/   Category "structure": one file per archetype — house (pitched storeyed home,
+                           free-form) + three SEEDED archetypes with code-built shells (modern = flat-roofed
+                           glass villa + pool; cabin = rustic log+stone with porch + steep roof; l-shaped =
+                           two-wing L plan with a terrace) + types.ts (contract + Box/logProps + `seedShell`)
+                           + index.ts (registry). A type emits ops in terms of roles; never names blocks, and
+                           delegates roof/basement to modules. See "Seeded archetypes" below.
         decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
                            contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
                            maps roles→blocks + decay + weathering.
@@ -101,6 +104,9 @@ src/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
+                           (A short-lived guidance-only "form" category — cube/l-shaped/cabin/modern as
+                           advisory silhouette TEXT — was RETIRED: advisory text couldn't override the
+                           model's pitched-box prior, so each became a code-built structure type instead.)
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -400,6 +406,29 @@ decoration, and a new module is one small file.
   in the always-on core guide `14-furnishing-by-space.md`, so a room guide never repeats it (no wasted tokens).
   **Add a room:** new `defineRoom({...})` file in `rooms/` + register in its `index.ts` + a
   `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
+- **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: modern, cabin,
+  l-shaped): the fix for "the style keeps coming out as a wooden pitched box." A fresh AI build invents
+  100% of the geometry, and the model's strong rectangular-house prior overrides any advisory guide text —
+  so styles the model can't reliably invent are NOT guidance; they're STRUCTURE TYPES that OWN their massing
+  in code. (A short-lived guidance-only "form" category — cube/l-shaped/cabin/modern as advisory silhouette
+  TEXT — was tried first and RETIRED for exactly this reason; each option became a real structure type, or,
+  for `cube`, just the default `house`.) Each archetype's `build()` emits its silhouette: **modern** =
+  stacked offset white-concrete volumes, FLAT roofs, glass curtain walls with dark mullions, set-back upper
+  floor + railed roof terrace, ground-level pool; **cabin** = stone plinth, log-framed walls, steep gable
+  roof, covered porch, stone chimney; **l-shaped** = two perpendicular wings + a railed terrace in the
+  crook, per-wing gable roofs. (The pool needs the new `water` role, `roles.ts`.) `modern` auto-pairs the
+  `modern` decoration in Details (`details.ts`); cabin/l-shaped default to cozy.
+  - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
+    shell instead of leaving it free-form: `ai/shell-seed.ts` compiles the shell (a `template` op at the
+    requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
+    (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
+    `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
+    model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety).
+  - **Verify a shell visually with `BW_CAPTURE`** (compile a `template name:'<id>'` to `.nbt`, open it) —
+    the geometry is real code, so screenshot it BEFORE relying on an AI run (which can't be verified
+    locally). `domain/__tests__/compose.test.ts` also guards that each archetype compiles from its preview.
+  - **Add a seeded archetype:** new structure type with `build()` + `seedShell: true` + register in
+    `structure-types/index.ts` + a `knowledge/nbt/modules/structure/<id>.md` guide.
 - **SPACE × DECORATION — furnishing presets scale the interior to the floor** (`shared/domain/
   furnishing.ts` + each room's `presets`): the fix for the "big room comes out empty" defect (a huge
   shared bedroom with two beds adrift). Every room carries a small library of FURNISHING PRESETS, one per
@@ -520,26 +549,28 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with four
-  registry-backed selects — **Structure** (house), **Decoration** (cozy), **Roof** (gable/hip)
-  and **Basement** (cellar/crypt/cult-temple) — plus, for a storeyed structure (the house's `floors`
-  param), a **per-floor room editor**: one row per floor with up to **two** room selects (living/
-  kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks are folded into the
-  prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per floor
-  (`buildRoomPlan`) — (NOT a `template` op — see "House template retired"; cleared after sending), AND
-  ride along as a structured `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`rooms`,
-  the rooms deduped across floors) so the system prompt loads only those modules' knowledge guides —
-  one guide per pick (threaded `aiGenerate → generateStructure → systemPrompt → loadKnowledge`).
-  Roof/Basement are enabled once a structure is chosen and are FILTERED by the chosen structure's
-  `appliesTo` (a roof that doesn't fit is hidden; switching structure clears an incompatible pick +
-  the room rows) — both the renderer's Details filtering and the main guide gating call the SAME pure
-  `moduleAppliesTo` (`shared/domain/applies-to.ts`), so the two can't drift. The selects are
+  registry-backed selects — **Structure** (house, modern, cabin, l-shaped), **Decoration**
+  (cozy/haunted/modern), **Roof** (gable/hip) and **Basement** (cellar/crypt/cult-temple) — plus, for a
+  storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
+  room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
+  are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per
+  floor (`buildRoomPlan`) — (NOT a `template` op for the FREE-FORM house; a seeded archetype instead seeds
+  its shell, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
+  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`rooms`/`size`, the rooms deduped across
+  floors) so the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
+  `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype
+  compile its shell at the right box. Roof/Basement are enabled once a structure is chosen and are FILTERED
+  by the chosen structure's `appliesTo` (a module that doesn't fit is hidden; switching structure clears an
+  incompatible pick + the room rows, and auto-pairs the Modern decoration for the modern house) — both the
+  renderer's Details filtering and the main guide gating call the SAME pure `moduleAppliesTo`
+  (`shared/domain/applies-to.ts`), so the two can't drift. The selects are
   registry-backed: the composer fetches the categorized module catalog once via the `generationCatalog`
   IPC channel (`listModuleCatalog` from `structure/domain`), so they grow as the registries do. A
   "Modules" button (+ a link in Details) opens the **Module Gallery** (`ModulesModal`): categories
   (Structure/Decoration/Basement/Roof/Room) with a description, the `appliesTo` link ("Applies to:
   House"), and a live 3D preview per module (`previewModule` IPC → `catalog/module-preview.ts`) — roofs
-  + basements render their geometry (`composeModulePreview` gives a roof a host wall box); `room` modules
-  are guidance-only (no geometry) so they show "Preview coming soon".
+  + basements render their geometry (`composeModulePreview` gives a roof a host wall box); `room`
+  modules are guidance-only (no geometry) so they show "Preview coming soon".
 - **Chat output is a build card, not raw brief text:** the long "[Build details]" block goes ONLY to
   the model — the chat instead shows the user's words plus a presentable `BuildCard` (`ChatMessage.build`,
   a `BuildBrief` of human LABELS). Two cards share that component: the USER message gets a PREVIEW card of

@@ -32,6 +32,11 @@ describe('setDetailField', () => {
     });
   });
 
+  it('pairs the Modern decoration when the modern house is chosen', () => {
+    const next = setDetailField(details({ structureType: 'house' }), 'structureType', 'modern');
+    expect(next).toMatchObject({ structureType: 'modern', decoration: 'modern' });
+  });
+
   it('choosing a basement re-derives the size (clears manual override)', () => {
     const d = details({ structureType: 'house', size: { w: 9, d: 9, h: 9 } });
     const next = setDetailField(d, 'basement', 'cellar');

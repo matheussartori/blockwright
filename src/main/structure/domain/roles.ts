@@ -23,12 +23,13 @@ export type Role =
   | 'door'
   | 'fence' // a *_fence block (balcony/landing rails; the connect pass joins its sides)
   | 'ladder' // vertical access (e.g. into an attic) — a wall fixture, needs solid backing
+  | 'water' // a fluid for pools/ponds (modern houses); decorations rarely remap it
   | 'light';
 
 /** Every role, as a runtime set — the single source for `isRole`. */
 export const ROLES: readonly Role[] = [
   'air', 'wall', 'floor', 'ceiling', 'foundation', 'corner', 'accent', 'trim',
-  'beam', 'pillar', 'roof', 'window', 'glass', 'door', 'fence', 'ladder', 'light',
+  'beam', 'pillar', 'roof', 'window', 'glass', 'door', 'fence', 'ladder', 'water', 'light',
 ];
 
 const ROLE_SET = new Set<string>(ROLES);
@@ -60,5 +61,6 @@ export const BASE_BLOCKS: Record<Role, string> = {
   door: 'minecraft:oak_door',
   fence: 'minecraft:oak_fence',
   ladder: 'minecraft:ladder',
+  water: 'minecraft:water',
   light: 'minecraft:lantern',
 };

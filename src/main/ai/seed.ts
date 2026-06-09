@@ -27,6 +27,26 @@ export function editPreamble(json: string): string {
   );
 }
 
+/** Wrap a code-built STARTING SHELL as a preamble: the model must KEEP the exterior
+ *  massing and only furnish/detail it (used for shell-seeded archetypes like the modern
+ *  villa, whose silhouette the model can't reliably invent on its own). */
+export function shellPreamble(json: string): string {
+  return (
+    'You are FINISHING a structure whose EXTERIOR has already been built for you by code, below as ' +
+    'Blockwright authoring JSON (air omitted; geometry is a flat "blocks" list). This shell is the ' +
+    'CORRECT exterior for what the user asked — KEEP its overall massing: the stacked/offset volumes, ' +
+    'the FLAT roofs, the glass curtain walls, the roof terrace, the railings, and the pool. Do NOT turn ' +
+    'it into a pitched-roof or solid box, and do NOT re-clad it in rustic wood. Your job is to: furnish ' +
+    'the interior room-by-room, add finishing exterior detail (greenery/hedges/planters, outdoor steps, ' +
+    'pool deck, lighting), fix anything unsound, and otherwise REFINE — not replace — this shell. Then ' +
+    'call emit_structure with the COMPLETE structure (mode "full"). Keep the same size unless the request ' +
+    'clearly needs more room.\n\n' +
+    'STARTING SHELL:\n```json\n' +
+    json +
+    '\n```\n\nUSER REQUEST:\n'
+  );
+}
+
 /** Read an existing `.nbt` and wrap it as an edit preamble, or '' if unreadable. */
 async function seedFromFile(basePath: string): Promise<string> {
   try {

@@ -160,6 +160,8 @@ function localIntern(palette: AuthoringPaletteEntry[]): (name: string, props?: R
  *  geometry (`composeModulePreview`) and ships the pre-expanded ops + palette. Pure — the
  *  caller compiles. */
 export function buildModulePreview(category: ModuleCategory, id: string): AuthoringStructure | null {
+  // Guidance-only categories carry no geometry, so there's nothing to preview.
+  if (category === 'room') return null;
   if (category === 'roof' || category === 'basement') {
     const meta = category === 'roof' ? getRoof(id) : getBasement(id);
     if (!meta?.preview) return null;

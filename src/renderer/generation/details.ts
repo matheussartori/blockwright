@@ -8,6 +8,11 @@
 // `brief.ts`; this module only mutates the model.
 import { type BuildDetails, ROOMS_PER_FLOOR } from './brief';
 
+/** The modern house structure + its paired decoration (auto-selected together): the
+ *  modern villa is a white-and-glass archetype, so picking it defaults the look to Modern. */
+const MODERN_STRUCTURE = 'modern';
+const MODERN_DECORATION = 'modern';
+
 /** The single-value Details selects driven by `setDetailField`. */
 export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement';
 
@@ -23,16 +28,20 @@ export const SIZE_MIN = 3;
 export const SIZE_MAX = 64;
 
 /** Set one of the single-value Details selects, applying the dependent-field rules:
- *  switching STRUCTURE drops the old type's params + size and clears roof/basement/
- *  rooms (the compatible set is structure-specific); choosing a BASEMENT re-derives
- *  the size (clears any manual override) so a cellar auto-grows the box.
+ *  switching STRUCTURE drops the old type's params + size and clears roof/basement/rooms
+ *  (the compatible set is structure-specific) — and pairs the Modern decoration with the
+ *  modern house; choosing a BASEMENT re-derives the size (clears any manual override) so a
+ *  cellar auto-grows the box.
  *  @param d - The current Details state.
  *  @param key - Which select changed.
  *  @param value - The new id ('' = none/auto).
  *  @returns The next Details state (a new object). */
 export function setDetailField(d: BuildDetails, key: DetailField, value: string): BuildDetails {
   if (key === 'structureType') {
-    return { ...d, structureType: value, params: {}, size: null, roof: '', basement: '', rooms: [] };
+    // The modern house is a white-and-glass archetype — pair it with the Modern decoration
+    // by default so its materials + guide come along (the user can still change it).
+    const decoration = value === MODERN_STRUCTURE ? MODERN_DECORATION : '';
+    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', rooms: [] };
   }
   if (key === 'basement') {
     return { ...d, basement: value, size: null };

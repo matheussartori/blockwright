@@ -147,6 +147,12 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     const b = at.get(posKey(x, y, z));
     return b ? palette[b.state]?.Name : undefined;
   };
+  // Is there a solid, structural-full block at this exact cell? (Used to tell a real
+  // floor surface from a WALL column that merely passes through the floor level.)
+  const structuralAt = (x: number, y: number, z: number): boolean => {
+    const b = at.get(posKey(x, y, z));
+    return !!b && !isAir(palette[b.state]?.Name ?? '') && isStructuralFull(palette, b.state);
+  };
   const mats = planeMaterials(blocks, palette, planeSet);
   // A stair material to reuse for a DERIVED stair (one the model gave only a ladder
   // for): the build's own stairs if it has any, else plain oak.
@@ -205,16 +211,27 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   // What a cell is, from the connector's point of view. A connector may freely occupy
   // or carve anything that is NOT a wall and NOT already claimed by another connector:
   //   air   — empty
-  //   plane — a floor-plane block (carving it IS the stairwell opening / top step)
+  //   plane — a floor-plane SURFACE block (carving it IS the stairwell opening / top step)
   //   thin  — a non-structural block (decoration / the model's own old stairs+ladders)
-  //   wall  — a structural full block NOT on a floor plane → must never be broken
+  //   wall  — a structural full block off a floor plane, OR a wall column passing THROUGH a
+  //           floor plane (solid above it) → must never be broken
   const cellKind = (x: number, y: number, z: number): 'air' | 'plane' | 'thin' | 'wall' | 'reserved' => {
     const k = posKey(x, y, z);
     if (reserved.has(k)) return 'reserved';
     const b = at.get(k);
     if (!b) return 'air';
     if (isAir(palette[b.state]?.Name ?? '')) return 'air';
-    if (planeSet.has(y)) return 'plane';
+    if (planeSet.has(y)) {
+      // On a floor plane a structural-full block is the walkable FLOOR — carving it IS the
+      // stairwell opening — BUT the exterior shell and interior partition WALLS also cross
+      // the floor level as structural blocks, and those must NEVER be broken (the recurring
+      // "stairs destroyed the external wall" defect). Tell them apart by what sits directly
+      // above: open room space → a real floor surface ('plane', carvable); another solid
+      // block → a WALL column passing through this level ('wall', protected). A non-structural
+      // block on the plane (a carpet/rug) stays carvable.
+      if (isStructuralFull(palette, b.state) && structuralAt(x, y + 1, z)) return 'wall';
+      return 'plane';
+    }
     if (!isStructuralFull(palette, b.state)) return 'thin';
     return 'wall';
   };

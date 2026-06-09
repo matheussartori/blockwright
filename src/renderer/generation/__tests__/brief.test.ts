@@ -187,10 +187,17 @@ describe('buildSummary', () => {
 describe('buildSelection', () => {
   it('omits empty fields and dedupes rooms across floors', () => {
     const d = details({ structureType: 'house', rooms: [['living', ''], ['living', 'kitchen']] });
-    expect(buildSelection(d)).toEqual({ structureType: 'house', rooms: ['living', 'kitchen'] });
+    // The effective build size is threaded along (for shell-seeded structures).
+    expect(buildSelection(d, catalog)).toMatchObject({ structureType: 'house', rooms: ['living', 'kitchen'] });
+    expect(buildSelection(d, catalog).size).toHaveLength(3);
   });
   it('omits rooms entirely when none are set', () => {
-    expect(buildSelection(details({ structureType: 'house' })).rooms).toBeUndefined();
+    expect(buildSelection(details({ structureType: 'house' }), catalog).rooms).toBeUndefined();
+  });
+  it('sends the build size only alongside a structure', () => {
+    expect(buildSelection(details({ structureType: 'house' }), catalog).size).toHaveLength(3);
+    // No structure picked → size is moot and must not drag a shell into a free-form build.
+    expect(buildSelection(details({ structureType: '' }), catalog).size).toBeUndefined();
   });
 });
 

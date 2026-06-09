@@ -178,7 +178,7 @@ export function GenerateContent() {
     // loads only the picked modules' guides. The brief steers a FRESH build, so clear it
     // after sending (follow-up edits shouldn't keep re-sending stale hints).
     const aiPrompt = prompt ? prompt + brief : brief ? `Generate a structure with these details:${brief}` : prompt;
-    const selection = buildSelection(details);
+    const selection = buildSelection(details, catalog);
     const summary = buildSummary(details, catalog);
     setInput('');
     setAttachments([]);

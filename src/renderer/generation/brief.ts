@@ -252,17 +252,22 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
 }
 
 /** The structured selection sent alongside the prompt (drives knowledge loading: one
- *  guide per selected module, so an unused roof/basement guide is never sent).
+ *  guide per selected module, so an unused roof/basement guide is never sent; plus the
+ *  build size, so a shell-seeded structure compiles its starting shell at the right size).
  *  @param d - The current Details state.
+ *  @param catalog - The module catalog (to resolve the effective size), or null.
  *  @returns A {@link BuildSelection} with only the fields the user actually picked. */
-export function buildSelection(d: BuildDetails): BuildSelection {
+export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | null): BuildSelection {
   const rooms = [...new Set(d.rooms.flat().filter(Boolean))];
+  const s = d.structureType ? catalog?.structure.find((m) => m.id === d.structureType) : undefined;
+  const sz = d.structureType ? effectiveSize(d, s) : undefined;
   return {
     structureType: d.structureType || undefined,
     decoration: d.decoration || undefined,
     roof: d.roof || undefined,
     basement: d.basement || undefined,
     rooms: rooms.length ? rooms : undefined,
+    size: sz ? [sz.w, sz.h, sz.d] : undefined,
   };
 }
 

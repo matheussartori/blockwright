@@ -19,10 +19,14 @@ const house: [number, number, number] = [10, 7, 8];
 describe('compose: structure types × decorations', () => {
   it('recognises the registered structure types, rejects unknowns and retired names', () => {
     expect(isKnownStructure('house')).toBe(true);
+    // The modern villa, cabin and L-shaped house are all code-built structure types now.
+    expect(isKnownStructure('modern')).toBe(true);
+    expect(isKnownStructure('cabin')).toBe(true);
+    expect(isKnownStructure('l-shaped')).toBe(true);
     expect(isKnownStructure('basement')).toBe(false); // basement is its own category, not a structure type
     expect(isKnownStructure('abandoned_house')).toBe(false); // alias retired
     expect(isKnownStructure('castle')).toBe(false);
-    expect(knownStructureNames()).toEqual(['house']);
+    expect(knownStructureNames()).toEqual(['house', 'modern', 'cabin', 'l-shaped']);
   });
 
   it('builds with the default (cozy) decoration and is deterministic for a seed', () => {
@@ -79,8 +83,8 @@ describe('compose: structure types × decorations', () => {
     expect(cat.roof.map((m) => m.id)).toEqual(expect.arrayContaining(['gable', 'hip']));
     expect(cat.basement.map((m) => m.id)).toEqual(expect.arrayContaining(['cellar', 'crypt', 'cult-temple']));
     expect(cat.room.map((m) => m.id)).toEqual(expect.arrayContaining(['living', 'kitchen', 'library']));
-    // Every roof/basement/room module declares the structures it pairs with, and all of
-    // them currently include the house (more structure ids can be added later, e.g. a
+    // Every roof/basement/room module declares the structures it pairs with, and all
+    // of them currently include the house (more structure ids can be added later, e.g. a
     // crypt basement gaining 'tower' → ['house','tower']).
     for (const m of [...cat.roof, ...cat.basement, ...cat.room]) {
       expect(m.appliesTo, `${m.id} must declare appliesTo`).toBeTruthy();
@@ -160,6 +164,20 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
     // gable applies to ['house']; for any other structure its guide must not ride along.
     const guides = selectedGuides({ structureType: 'barn', roof: 'gable' });
     expect(guides).not.toContain('nbt/modules/roof/gable.md');
+  });
+
+  it('lists the code-built archetypes as structure types', () => {
+    const cat = listModuleCatalog();
+    expect(cat.structure.map((m) => m.id)).toEqual(expect.arrayContaining(['house', 'modern', 'cabin', 'l-shaped']));
+  });
+
+  it('the seeded archetypes (modern/cabin/l-shaped) compile from their preview', () => {
+    // Their geometry is real code — guard that each composes + compiles without throwing.
+    for (const id of ['modern', 'cabin', 'l-shaped']) {
+      const a = buildModulePreview('structure', id);
+      expect(a, id).not.toBeNull();
+      expect(() => compileStructure(a!), id).not.toThrow();
+    }
   });
 });
 
