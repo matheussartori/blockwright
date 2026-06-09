@@ -414,20 +414,3 @@ These appear in worldgen/reference files; you usually don't generate them, but r
 - **`minecraft:spawner`** (`SpawnData`/`SpawnPotentials`), **`trial_spawner`**, **command
   blocks** (`auto`,`Command`), **`vault`** — gameplay block entities. Copy their NBT as-is from a
   reference; don't invent it.
-
-## Advanced gotchas recap
-
-- **Never renumber palette indices** after blocks reference them — append only.
-- **One palette entry per distinct state**; don't mutate a shared entry to change a subset.
-- **Re-derive `size`** after any dimensional edit; it must be `maxPos+1` on every axis.
-- **Rotate/mirror also rewrites `facing`/`axis`/`shape`/`hinge`** — not just positions.
-- **Waterlog partial blocks** for submerged builds instead of stacking separate water cells.
-- **Never light with `minecraft:light`** — it's invisible, command-only, doesn't render in the
-  preview, and often fails to light a placed structure. Use visible fixtures (lanterns, candles,
-  glowstone, sea lanterns, redstone torches…).
-- **Multi-floor stairwells need headroom holes** cut in the floor above.
-- **A basement is the lowest layers, not negative `y`** — pick a "ground line", build up from
-  `y=0`, and report the ground line so the build is placed buried.
-- **Merging two files shifts the second's `state` indices** by the first palette's length.
-- **Preview only validates geometry** — items, sign text, banner patterns, and entities are
-  invisible (fidelity table above). Validate those by data check, not by eye.

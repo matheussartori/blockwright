@@ -156,10 +156,14 @@ src/
                             `generation.log` (the AI/fix play-by-play, see gen-log.ts `RunLog`)
       providers/            One Driver per backend (claude-sdk, codex — the only two) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
-      knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
-                            all CORE guides always, plus a MODULE guide (knowledge/nbt/modules/**)
-                            only when its module is selected or the prompt's keywords match it
-                            (`knowledge-select.ts` + the domain's selectedGuides/promptGuides), to cut tokens
+      knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt in THREE
+                            tiers (knowledge-select.ts): always-on CORE guides; CONDITIONAL core guides
+                            gated on build characteristics (`CONDITIONAL_CORE` — e.g. 08-complex-structures
+                            rides along only when `isComplexBuild`: a basement / ≥2 rooms / l-shaped / a
+                            scale-or-rooms keyword in the prompt — conservative, errs toward INCLUDING);
+                            and a MODULE guide (knowledge/nbt/modules/**) only when its module is selected
+                            or the prompt's keywords match it (the domain's selectedGuides/promptGuides).
+                            All to cut the per-turn (re-sent every round) system-prompt token cost.
     structure/authoring/    Validate + compile authoring JSON → gzipped .nbt (the JSON↔NBT
                           pipeline). Decomposed by responsibility, with a unit-test suite in
                           __tests__/ (run `npm run test`). Public API via the barrel `index.ts`.

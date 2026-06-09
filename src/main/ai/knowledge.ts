@@ -7,9 +7,9 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { includedModuleGuides, isModuleGuide, type ModuleSelection } from './knowledge-select';
+import { coreGuideIncluded, includedModuleGuides, isModuleGuide, type ModuleSelection } from './knowledge-select';
 
-export { includedModuleGuides, isModuleGuide } from './knowledge-select';
+export { coreGuideIncluded, includedModuleGuides, isConditionalCore, isModuleGuide } from './knowledge-select';
 export type { ModuleSelection } from './knowledge-select';
 
 /** Locate the knowledge folder: explicit override, bundled resource, or repo root. */
@@ -61,17 +61,18 @@ function loadFiles(): { path: string; body: string }[] {
   return fileCache;
 }
 
-/** The knowledge guides for `prompt` + `selection`, concatenated: every CORE guide
- *  always, plus each selected/keyword-matched MODULE guide. Each file is fenced with
- *  its path so the model can cite specific guides; reading order follows the path sort
- *  (core `nbt/00..` first, then `nbt/modules/…`). The README is excluded (it's an index
- *  for humans, not generation guidance). */
+/** The knowledge guides for `prompt` + `selection`, concatenated: every always-on CORE
+ *  guide, each CONDITIONAL core guide whose build-characteristic gate passes, plus each
+ *  selected/keyword-matched MODULE guide. Each file is fenced with its path so the model
+ *  can cite specific guides; reading order follows the path sort (core `nbt/00..` first,
+ *  then `nbt/modules/…`). The README is excluded (it's an index for humans, not
+ *  generation guidance). */
 export function loadKnowledge(prompt = '', selection?: ModuleSelection): string {
   const files = loadFiles();
   const included = includedModuleGuides(prompt, selection);
   return files
     .filter((f) => f.path.toLowerCase() !== 'nbt/readme.md')
-    .filter((f) => !isModuleGuide(f.path) || included.has(f.path))
+    .filter((f) => (isModuleGuide(f.path) ? included.has(f.path) : coreGuideIncluded(f.path, prompt, selection)))
     .map((f) => `===== knowledge/${f.path} =====\n${f.body}`)
     .join('\n\n');
 }

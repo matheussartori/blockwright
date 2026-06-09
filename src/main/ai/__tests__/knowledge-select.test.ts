@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { includedModuleGuides, isModuleGuide } from '../knowledge-select';
+import { coreGuideIncluded, includedModuleGuides, isComplexBuild, isConditionalCore, isModuleGuide } from '../knowledge-select';
+
+const COMPLEX = 'nbt/08-complex-structures.md';
 
 const HOUSE = 'nbt/modules/structure/classic.md';
 const COZY = 'nbt/modules/decoration/cozy.md';
@@ -53,5 +55,38 @@ describe('includedModuleGuides — explicit selection', () => {
     const set = includedModuleGuides('a cozy stone house with a porch');
     expect([...set].some((p) => p.startsWith('nbt/modules/roof/'))).toBe(false);
     expect([...set].some((p) => p.startsWith('nbt/modules/basement/'))).toBe(false);
+  });
+});
+
+describe('conditional core — complex-structures gate', () => {
+  it('marks 08-complex-structures as a conditional core guide (others are always-on)', () => {
+    expect(isConditionalCore(COMPLEX)).toBe(true);
+    expect(isConditionalCore('nbt/10-design-principles.md')).toBe(false);
+    expect(isConditionalCore('nbt/00-volumetric-ops.md')).toBe(false);
+  });
+
+  it('always includes always-on core guides regardless of build', () => {
+    expect(coreGuideIncluded('nbt/00-volumetric-ops.md', '', undefined)).toBe(true);
+    expect(coreGuideIncluded('nbt/10-design-principles.md', 'a tiny hut', undefined)).toBe(true);
+  });
+
+  it('drops complex-structures for a clearly simple build', () => {
+    expect(isComplexBuild('a small cozy hut', undefined)).toBe(false);
+    expect(coreGuideIncluded(COMPLEX, 'a small cozy hut', undefined)).toBe(false);
+    expect(isComplexBuild('', { structureType: 'classic', decoration: 'cozy' })).toBe(false);
+  });
+
+  it('keeps complex-structures when the selection signals complexity', () => {
+    expect(isComplexBuild('', { structureType: 'classic', basement: 'cellar' })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'classic', rooms: ['living', 'kitchen'] })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'l-shaped' })).toBe(true);
+    expect(coreGuideIncluded(COMPLEX, '', { basement: 'cellar' })).toBe(true);
+  });
+
+  it('keeps complex-structures when the prompt implies scale / rooms / below-grade', () => {
+    expect(isComplexBuild('a large stone mansion', undefined)).toBe(true);
+    expect(isComplexBuild('a house with a basement', undefined)).toBe(true);
+    expect(isComplexBuild('a keep with several rooms and two floors', undefined)).toBe(true);
+    expect(isComplexBuild('an L-shaped manor with a wing', undefined)).toBe(true);
   });
 });
