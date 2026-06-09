@@ -14,7 +14,6 @@ import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations }
 import { basementModules, getBasement, listBasements } from './basements';
 import { getRoof, listRoofs, roofModules } from './roofs';
 import { atticModules, getAttic, listAttics } from './attics';
-import { exteriorModules, getExterior, listExteriors } from './exterior';
 import { getRoom, listRooms, roomModules } from './rooms';
 import type { ModuleCategory, ModuleMeta } from './modules';
 import {
@@ -58,7 +57,6 @@ export {
 export { listBasements, getBasement, type BasementModule } from './basements';
 export { listRoofs, getRoof, type RoofModule } from './roofs';
 export { listAttics, getAttic, type AtticModule } from './attics';
-export { listExteriors, getExterior, type ExteriorModule } from './exterior';
 export { listRooms, getRoom, type RoomModule } from './rooms';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
@@ -82,7 +80,6 @@ export function listModuleCatalog(): ModuleCatalog {
     roof: listRoofs(),
     attic: listAttics(),
     room: listRooms(),
-    exterior: listExteriors(),
     groups: STRUCTURE_GROUPS,
   };
 }
@@ -125,7 +122,6 @@ function allModules(): ModuleMeta[] {
     ...roofModules(),
     ...basementModules(),
     ...atticModules(),
-    ...exteriorModules(),
     ...roomModules(),
   ];
 }
@@ -151,7 +147,6 @@ function getSlotModule(key: ModuleSlotKey, id: string): ModuleMeta | undefined {
     case 'roof': return getRoof(id);
     case 'basement': return getBasement(id);
     case 'attic': return getAttic(id);
-    case 'exterior': return getExterior(id);
   }
 }
 
@@ -230,12 +225,6 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     meta = getStructureType(id);
     name = id;
     params = { decoration: DEFAULT_DECORATION };
-  } else if (category === 'exterior') {
-    // An exterior is a FINISH over a house: preview it on the default host structure with
-    // the style applied (its skin re-clads the shell + its volumes layer on).
-    meta = getExterior(id);
-    name = PREVIEW_HOST_STRUCTURE;
-    params = { decoration: DEFAULT_DECORATION, exterior: id };
   } else {
     meta = getDecoration(id);
     name = PREVIEW_HOST_STRUCTURE;

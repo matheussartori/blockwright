@@ -37,7 +37,6 @@ const STAGES: { category: ModuleCategory; label: MessageKey; role: MessageKey; u
   { category: 'roof', label: 'modules.catRoof', role: 'modules.roleRoof' },
   { category: 'attic', label: 'modules.catAttic', role: 'modules.roleAttic' },
   { category: 'basement', label: 'modules.catBasement', role: 'modules.roleBasement' },
-  { category: 'exterior', label: 'modules.catExterior', role: 'modules.roleExterior' },
   { category: 'room', label: 'modules.catRoom', role: 'modules.roleRoom' },
   { category: 'decoration', label: 'modules.catDecoration', role: 'modules.roleDecoration', universal: true },
 ];

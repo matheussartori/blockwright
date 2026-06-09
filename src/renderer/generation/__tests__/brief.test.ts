@@ -42,7 +42,6 @@ const catalog: GenerationCatalog = {
     { id: 'living', label: 'Living Room', category: 'room', description: '', hasPreview: false },
     { id: 'kitchen', label: 'Kitchen', category: 'room', description: '', hasPreview: false },
   ],
-  exterior: [{ id: 'farmhouse', label: 'Farmhouse', category: 'exterior', description: '', hasPreview: true, appliesTo: ['house'] }],
   groups: [{ id: 'house', label: 'House' }],
 };
 

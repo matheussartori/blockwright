@@ -1,8 +1,8 @@
 // "Modern" — the clean contemporary look: white concrete and smooth quartz masses, dark
 // accent columns (polished blackstone), warm wood infill (stripped dark oak), big glass,
 // and crisp sea-lantern light. No decay, no weathering — every edge is sharp. This is the
-// material half of a MODERN build: pair it with the `modern` exterior form (forms/modern)
-// so the white/glass massing reads right. Where cozy is honey-toned timber, modern is
+// material half of a MODERN build: pair it with the `modern` STRUCTURE TYPE so the
+// white/glass massing reads right. Where cozy is honey-toned timber, modern is
 // white + dark accent + wood + glass.
 import type { Decoration } from './types';
 

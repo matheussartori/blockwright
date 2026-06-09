@@ -11,7 +11,7 @@ import type { BuildBrief } from '@/shared/types';
 
 export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => string }) {
   const chips: { label: string; value: string }[] = [];
-  // One chip per picked slot (decoration/roof/basement/attic/exterior), in registry order.
+  // One chip per picked slot (decoration/roof/basement/attic), in registry order.
   for (const slot of MODULE_SLOTS) {
     const value = build[slot.key];
     if (value) chips.push({ label: t(slot.fieldLabel), value });

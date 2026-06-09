@@ -1,7 +1,7 @@
 // Pure domain predicate shared by BOTH processes. A module (roof/basement/room)
 // can declare `appliesTo` — the structure-type ids OR group ids it pairs with. A
 // GROUP id (e.g. `'house'`) shares the module across every member of that family, so
-// one tag offers it on classic/modern/cabin/l-shaped at once; a structure id keeps it
+// one tag offers it on classic/modern/farmhouse/sakura/gothic at once; a structure id keeps it
 // specific to that single type. The main domain uses this to gate knowledge guides;
 // the renderer uses it to filter the composer's Details selects. Keeping ONE
 // implementation here (no `fs`/`electron`/Node) means the two sides can never silently

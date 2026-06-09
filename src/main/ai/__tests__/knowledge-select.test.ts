@@ -79,7 +79,7 @@ describe('conditional core — complex-structures gate', () => {
   it('keeps complex-structures when the selection signals complexity', () => {
     expect(isComplexBuild('', { structureType: 'classic', basement: 'cellar' })).toBe(true);
     expect(isComplexBuild('', { structureType: 'classic', rooms: ['living', 'kitchen'] })).toBe(true);
-    expect(isComplexBuild('', { structureType: 'l-shaped' })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'gothic' })).toBe(true);
     expect(coreGuideIncluded(COMPLEX, '', { basement: 'cellar' })).toBe(true);
   });
 

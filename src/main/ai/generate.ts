@@ -114,7 +114,6 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       decoration: selection?.decoration,
       size: selection?.size,
       roof: selection?.roof,
-      exterior: selection?.exterior,
     }, session.dir);
   }
   const effectivePrompt = seed + prompt;

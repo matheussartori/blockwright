@@ -29,7 +29,7 @@ const CONDITIONAL_CORE: Record<string, (prompt: string, selection?: ModuleSelect
 };
 
 // Any signal of complexity keeps `08-complex-structures`. Selection signals: a basement,
-// two-plus rooms, or an inherently articulated structure (l-shaped). Prompt signals: words
+// two-plus rooms, or an inherently articulated structure (gothic). Prompt signals: words
 // that imply scale / multiple rooms / below-grade / articulation. Generous on purpose
 // (err toward INCLUDING the guide) so a build that turns out complex isn't left without it.
 const COMPLEX_PROMPT =
@@ -41,7 +41,7 @@ export function isComplexBuild(prompt: string, selection?: ModuleSelection): boo
   if (selection) {
     if (selection.basement) return true;
     if ((selection.rooms?.length ?? 0) >= 2) return true;
-    if (selection.structureType === 'l-shaped') return true;
+    if (selection.structureType === 'gothic') return true;
   }
   return COMPLEX_PROMPT.test(prompt);
 }

@@ -175,7 +175,6 @@ export const ptBR: Messages = {
   'gen.fieldRoof': 'Telhado',
   'gen.fieldBasement': 'Porão',
   'gen.fieldAttic': 'Sótão',
-  'gen.fieldExterior': 'Estilo externo',
   'gen.optNone': 'Nenhum',
   'gen.optDefault': 'Padrão',
   'gen.optAuto': 'Automático',
@@ -305,7 +304,6 @@ export const ptBR: Messages = {
   'modules.catRoof': 'Telhado',
   'modules.catAttic': 'Sótão',
   'modules.catRoom': 'Cômodo',
-  'modules.catExterior': 'Estilo externo',
   'modules.loading': 'Carregando módulos…',
   'modules.noneYet': 'Nenhum módulo de {category} ainda — em breve.',
   'modules.previewFailed': 'A prévia falhou ao construir.',
@@ -328,7 +326,6 @@ export const ptBR: Messages = {
   'modules.roleAttic': 'Loft no telhado',
   'modules.roleBasement': 'Nível subterrâneo',
   'modules.roleRoom': 'Ambientes internos, por andar',
-  'modules.roleExterior': 'Acabamento externo e volumes',
   'modules.roleDecoration': 'Material e atmosfera — combina com qualquer estrutura',
   'modules.conflictWith': 'Não combina com {label}',
 

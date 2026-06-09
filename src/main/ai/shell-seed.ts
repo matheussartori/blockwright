@@ -26,21 +26,18 @@ export interface ShellSeedOptions {
   size?: [number, number, number];
   /** The selected roof-module id (gable/hip/flat), threaded so the shell honours it. */
   roof?: string;
-  /** The selected exterior-style id, threaded into the template so a seeded shell also
-   *  carries the chosen finish's skin. (It does NOT force a seed — that's `seedShell`.) */
-  exterior?: string;
 }
 
 /**
  * Build the starting-shell seed preamble for a fresh build, or '' when the selected
  * structure type doesn't opt into shell-seeding (so the caller falls back to free-form).
  *
- * @param opts - The {@link ShellSeedOptions} (structure/decoration/size/roof/exterior).
+ * @param opts - The {@link ShellSeedOptions} (structure/decoration/size/roof).
  * @param dir - A scratch dir to compile the shell into (the session dir).
  * @returns The {@link shellPreamble} wrapping the compiled shell's authoring JSON, or ''.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<string> {
-  const { structureType, decoration, size, roof, exterior } = opts;
+  const { structureType, decoration, size, roof } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return '';
 
@@ -50,7 +47,6 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The roof-module id doubles as the structure's `roof` param value (gable/hip/flat), so
   // a Details roof pick (e.g. flat) flows straight into the seeded shell's massing.
   if (roof) params.roof = roof;
-  if (exterior) params.exterior = exterior;
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size: [W, H, D],

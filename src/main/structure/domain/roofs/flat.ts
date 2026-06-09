@@ -2,7 +2,7 @@
 // solid walkable DECK and a slim PARAPET rim around the edge (the low lip that reads as a
 // flat-roof terrace, not an open box top). It carries GENERIC geometry (`build()`, any
 // host) and is the roof every modern villa already builds inline — exposed here as a
-// selectable typology so the classic/cabin/l-shaped houses can take a flat roof too.
+// selectable typology so the classic/sakura/gothic houses can take a flat roof too.
 //
 // A flat roof leaves NO roof void, so it is INCOMPATIBLE with an attic (which lives in
 // that void) — declared via `incompatibleWith`. Run by `composeModule` for the gallery

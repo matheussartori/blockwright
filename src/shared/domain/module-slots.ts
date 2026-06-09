@@ -2,7 +2,7 @@
 // one-line change instead of an edit scattered across the brief, the Details form, the
 // build card, the structured selection and the knowledge-guide gating. A slot is ONE
 // single-select module category the user fills in the Build Planner: decoration, roof,
-// basement, attic, exterior. (The STRUCTURE type — the first, family-grouped pick that
+// basement, attic. (The STRUCTURE type — the first, family-grouped pick that
 // gates everything — and the per-floor ROOMS — multi-select — are NOT slots; they keep
 // their own bespoke UI.)
 //
@@ -17,7 +17,7 @@ import type { MessageKey } from '../i18n';
 /** The single-select module categories, by field key. Adding a category = add it here,
  *  add a `MODULE_SLOTS` entry, add the `GenerationCatalog` array + the registry, and ship
  *  the module — the brief/selection/card/Details/guides then pick it up automatically. */
-export type ModuleSlotKey = 'decoration' | 'roof' | 'basement' | 'attic' | 'exterior';
+export type ModuleSlotKey = 'decoration' | 'roof' | 'basement' | 'attic';
 
 /** One single-select module category's presentation + behaviour, consumed by every
  *  generic loop over the slots. */
@@ -70,14 +70,5 @@ export const MODULE_SLOTS: ModuleSlot[] = [
     filtered: true,
     affectsSize: true,
     brief: (l) => `- Attic: a ${l} in the roof void (see its module guide).\n`,
-  },
-  {
-    key: 'exterior',
-    fieldLabel: 'gen.fieldExterior',
-    neutral: 'gen.optNone',
-    filtered: true,
-    brief: (l) =>
-      `- Exterior style: ${l} — apply this exterior finish (cladding, roof colour, window ` +
-      `treatment) AND its signature added volumes to the outside of the house (see its module guide).\n`,
   },
 ];

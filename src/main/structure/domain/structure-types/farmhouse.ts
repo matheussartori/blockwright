@@ -3,7 +3,7 @@
 // covered VERANDA + upper GALLERY across the main wing's front, a covered porch tucked in
 // the notch, a tall exterior chimney on a gable end, and a steep DARK tiled roof. This is
 // the fix for "the farmhouse keeps coming out as the classic rectangle": the massing the
-// model can't reliably invent is owned by code (like modern/cabin/l-shaped) and SEEDED
+// model can't reliably invent is owned by code (like modern/sakura/gothic) and SEEDED
 // (`seedShell`), so a fresh build keeps this casco and only furnishes/refines it.
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own farmhouse kit.

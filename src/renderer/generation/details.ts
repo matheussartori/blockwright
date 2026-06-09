@@ -11,9 +11,15 @@ import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 
 /** Structures whose look is part of their identity, auto-paired with a decoration when
  *  picked: the modern villa is white-and-glass; the farmhouse is warm oak + a dark slate
- *  roof. Picking the structure defaults the decoration so the materials + guide come along
- *  (the user can still change it after). */
-const PAIRED_DECORATION: Record<string, string> = { modern: 'modern', farmhouse: 'farmhouse' };
+ *  roof; the sakura cottage is pink cherry; the gothic manor is black + white detailing.
+ *  Picking the structure defaults the decoration so the materials + guide come along (the
+ *  user can still change it after). */
+const PAIRED_DECORATION: Record<string, string> = {
+  modern: 'modern',
+  farmhouse: 'farmhouse',
+  sakura: 'sakura',
+  gothic: 'gothic',
+};
 
 /** The single-value Details selects driven by `setDetailField`: the structure pill plus
  *  every single-select module slot (decoration/roof/basement/attic/exterior). */

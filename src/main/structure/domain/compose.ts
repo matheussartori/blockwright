@@ -15,7 +15,6 @@ import {
 } from './decorations';
 import { getBasement } from './basements';
 import { getAttic } from './attics';
-import { getExterior, type ExteriorModule } from './exterior';
 import { resolveParams, type ParamValues } from './params';
 import { getRoof } from './roofs';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
@@ -79,8 +78,6 @@ function decorationId(params: Record<string, unknown>): string {
  * @param deco - The active decoration (maps roles→blocks + the weathering function).
  * @param raw - The op's raw params; a key naming a Role is a per-op block override.
  * @param intern - The compiler's get-or-create palette intern.
- * @param skin - An exterior style's re-clad overlay, resolved ABOVE the decoration (so a
- *   farmhouse/gothic forces its own cladding/roof regardless of the decoration). Optional.
  * @returns A {@link RolePalette} that interns a role's resolved (or weathered) block.
  */
 function makePalette(
@@ -88,12 +85,11 @@ function makePalette(
   deco: Decoration,
   raw: Record<string, unknown>,
   intern: Intern,
-  skin?: Partial<Record<Role, string>>,
 ): RolePalette {
   const idOf = (role: Role): string => {
     const override = raw[role];
     if (typeof override === 'string' && override.includes(':')) return override;
-    return skin?.[role] ?? deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
+    return deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
   };
   const weather = deco.weather ?? ((b: string) => b);
   return {
@@ -123,19 +119,6 @@ function resolveDecoration(params: Record<string, unknown>): Decoration {
     throw new Error(`unknown decoration "${decoId}" — available: ${decorationIds().join(', ')}`);
   }
   return deco;
-}
-
-/** Resolve the exterior finishing style a `template` op selects via the `exterior`
- *  param, or undefined when none is set. Throws an actionable error if it names an
- *  unknown style (so validate/compile surfaces it to the generator). The style's
- *  `appliesTo` is a UI/guide-gating concern, not enforced here — a template that names
- *  one applies it (the geometry guards on the host's footprint). */
-function resolveExterior(params: Record<string, unknown>): ExteriorModule | undefined {
-  const id = typeof params.exterior === 'string' ? params.exterior : '';
-  if (!id) return undefined;
-  const ext = getExterior(id);
-  if (!ext) throw new Error(`unknown exterior "${id}"`);
-  return ext;
 }
 
 /** Per-build seed: explicit `seed` param, else derived from the box origin. */
@@ -217,29 +200,17 @@ export function composeStructure(
     throw new Error(`unknown structure type "${name}" — available: ${knownStructureNames().join(', ')}`);
   }
   const deco = resolveDecoration(params);
-  const exterior = resolveExterior(params);
 
   const b = box(from, to);
   const values = resolveParams(type.params, params);
   applyDecorationDecay(values, deco, params); // "cozy = 0" default; an explicit op param wins
   const seed = seedFor(params, b);
-  // The exterior style's `skin` re-clads the type's massing (resolved above the decoration).
-  const palette = makePalette(type.defaults, deco, params, intern, exterior?.skin);
+  const palette = makePalette(type.defaults, deco, params, intern);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry).
   const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
 
-  const ops = type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
-  // Then layer the SELECTED exterior's additive volumes (spire, blossoms, framing) over
-  // the finished massing — same palette + seed, with the type as `host` so its
-  // host-specific integration runs (later ops overwrite, so it sits on top).
-  if (exterior) {
-    const extValues = resolveParams(exterior.params ?? {}, params);
-    ops.push(...runModuleGeometry(exterior, name, {
-      box: b, params: extValues, palette, seed, host: name, composeModule: composeModuleDelegate,
-    }));
-  }
-  return ops;
+  return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
 }
 
 /**

@@ -1,5 +1,5 @@
 // Structure GROUPS — a family that several structure types belong to (e.g. the
-// "House" group: classic, modern, cabin, l-shaped). A group is the SHARING unit for
+// "House" group: classic, modern, farmhouse, sakura, gothic). A group is the SHARING unit for
 // modules: a roof/basement/room whose `appliesTo` names a group id pairs with EVERY
 // member of that group, instead of having to list each structure id. So a gable roof
 // tagged `appliesTo: ['house']` is offered on every house-family structure, while one

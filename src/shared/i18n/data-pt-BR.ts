@@ -16,15 +16,15 @@ export const dataPtBR: Record<string, string> = {
   'mod.structure.modern.label': 'Casa moderna',
   'mod.structure.modern.desc':
     'Uma vila contemporânea de telhado plano: volumes de concreto branco empilhados e deslocados, com andar superior recuado e terraço na cobertura, paredes-cortina de vidro do piso ao teto interrompidas por colunas escuras de destaque e guarda-corpos de vidro. A alternativa moderna à casa de telhado inclinado — combine com a decoração Moderna para materiais de branco e vidro.',
-  'mod.structure.cabin.label': 'Cabana',
-  'mod.structure.cabin.desc':
-    'Uma cabana rústica de troncos e pedra: uma base elevada de pedra, pilares de canto em tronco e paredes de madeira, um telhado de duas águas íngreme com beirais profundos, uma varanda frontal coberta sobre pilares de tronco com guarda-corpos e degraus, e uma chaminé de pedra. A alternativa aconchegante e campestre à vila moderna.',
-  'mod.structure.l-shaped.label': 'Casa em L',
-  'mod.structure.l-shaped.desc':
-    'Uma casa com planta em L: uma ala principal comprida e uma ala traseira perpendicular que se encontram em ângulo reto, deixando um terraço abrigado no canto interno. Dois telhados inclinados e um pátio com guarda-corpo lhe dão uma silhueta dividida e cheia de personalidade, em vez de uma única caixa.',
   'mod.structure.farmhouse.label': 'Fazenda',
   'mod.structure.farmhouse.desc':
     'Uma rústica casa de sítio: uma silhueta em L com telhado de duas águas cruzadas — nunca uma caixa — com uma varanda coberta e profunda sobre pilares de madeira e uma galeria superior na frente, um alpendre abrigado no canto, estrutura aparente de troncos escuros sobre uma base de pedra, um telhado escuro e íngreme de ardósia e uma chamine alta na empena. Espraiada, habitada, enraizada.',
+  'mod.structure.sakura.label': 'Casa Sakura',
+  'mod.structure.sakura.desc':
+    'Um chalé das cerejeiras erguido sobre um porão de tijolos de pedra visível: a entrada fica no andar principal elevado, alcançada por uma escada externa de pedra que sobe por baixo do andar superior em balanço. Revestimento de madeira de cerejeira em rosa suave, um telhado de duas águas rosa coroado por cascatas de flores, floreiras frondosas e uma sacada frontal superior. Romântica e primaveril.',
+  'mod.structure.gothic.label': 'Gótica',
+  'mod.structure.gothic.desc':
+    'Uma mansão gótica sombria: paredes enegrecidas de madeira e blackstone realçadas por cordões de pedra clara, um telhado íngreme de ardósia, um pórtico frontal coberto, uma mini torre de canto que se ergue acima da linha do telhado até um remate pontiagudo e uma ala-capela de vidro com altas janelas cinzas em um dos lados. Soturna, vertical e assimétrica — iluminada por almas e senhorial.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',
@@ -39,6 +39,12 @@ export const dataPtBR: Record<string, string> = {
   'mod.decoration.farmhouse.label': 'Fazenda',
   'mod.decoration.farmhouse.desc':
     'A paleta rústica do campo: tábuas de carvalho quentes cruzadas por uma estrutura aparente de troncos escuros, uma base de pedregulho e um telhado escuro e íngreme de ardósia. O visual cor de mel e escuro de uma fazenda dos livros de histórias — combine com a estrutura Fazenda para a casa de sítio completa.',
+  'mod.decoration.sakura.label': 'Sakura',
+  'mod.decoration.sakura.desc':
+    'A paleta das cerejeiras: revestimento de madeira de cerejeira em rosa suave sobre uma base de tijolos de pedra clara, um telhado rosa de cerejeira coroado por flores, floreiras frondosas e luz quente de lanterna. Romântica e primaveril — combine com a estrutura Sakura para o chalé das flores completo erguido sobre seu porão de pedra visível.',
+  'mod.decoration.gothic.label': 'Gótica',
+  'mod.decoration.gothic.desc':
+    'A paleta da mansão sombria: paredes de carvalho escuro e blackstone realçadas por detalhes de pedra polida clara, um telhado íngreme de ardósia deepslate, vidro de capela cinza e lanternas com chama das almas. Soturna, vertical e assimétrica — combine com a estrutura Gótica para a mansão completa com torre, pórtico e capela de vidro.',
 
   // --- basements ------------------------------------------------------------
   'mod.basement.cellar.label': 'Adega',
@@ -69,17 +75,6 @@ export const dataPtBR: Record<string, string> = {
   'mod.attic.bedroom.label': 'Sótão-quarto',
   'mod.attic.bedroom.desc':
     'Um sótão-quarto acabado no vão do telhado: o espaço da empena assoalhado com tábuas de verdade como um aconchegante quarto no andar de cima — uma cama sob a inclinação, um tapete e uma mesa de apoio — acessado por uma escada de mão do último andar. Precisa de um telhado inclinado (fica no vão por baixo).',
-
-  // --- exterior styles ------------------------------------------------------
-  'mod.exterior.farmhouse.label': 'Acabamento fazenda',
-  'mod.exterior.farmhouse.desc':
-    'Um acabamento rústico de campo: tábuas de carvalho quentes cruzadas por uma estrutura aparente de troncos escuros, um telhado escuro de ardósia, uma base profunda de pedra e grandes janelas em faixa. Uma camada de revestimento + estrutura sobre o casco escolhido — para a forma de sítio completa, escolha a estrutura Fazenda.',
-  'mod.exterior.sakura.label': 'Casa Sakura',
-  'mod.exterior.sakura.desc':
-    'Um acabamento de chalé das cerejeiras: revestimento de madeira de cerejeira em rosa suave sobre uma base de pedra, um telhado escuro de ardósia e cascatas de flores rosadas escorrendo pelos beirais e pelos cantos frontais. Frondoso, romântico, primaveril — uma casa aninhada em um bosque de cerejeiras.',
-  'mod.exterior.gothic.label': 'Gótica',
-  'mod.exterior.gothic.desc':
-    'Um acabamento de mansão sombria: tábuas de carvalho escuro enegrecidas sobre deepslate, um telhado íngreme de ardósia, lanternas com chama das almas, uma torre pontiaguda de canto que se ergue acima da linha do telhado e uma ala-jardim de inverno de vidro com janelas ao longo de um dos lados. Soturna, vertical e assimétrica.',
 
   // --- tunable params -------------------------------------------------------
   'param.floors.label': 'Andares',

@@ -21,15 +21,17 @@ const house: [number, number, number] = [10, 7, 8];
 describe('compose: structure types × decorations', () => {
   it('recognises the registered structure types, rejects unknowns and retired names', () => {
     expect(isKnownStructure('classic')).toBe(true);
-    // The modern villa, cabin and L-shaped house are all code-built structure types now.
+    // The modern villa, sakura cottage and gothic manor are all code-built structure types now.
     expect(isKnownStructure('modern')).toBe(true);
-    expect(isKnownStructure('cabin')).toBe(true);
-    expect(isKnownStructure('l-shaped')).toBe(true);
+    expect(isKnownStructure('sakura')).toBe(true);
+    expect(isKnownStructure('gothic')).toBe(true);
+    expect(isKnownStructure('cabin')).toBe(false); // retired
+    expect(isKnownStructure('l-shaped')).toBe(false); // retired
     expect(isKnownStructure('house')).toBe(false); // 'house' is now the GROUP id, not a structure type
     expect(isKnownStructure('basement')).toBe(false); // basement is its own category, not a structure type
     expect(isKnownStructure('abandoned_house')).toBe(false); // alias retired
     expect(isKnownStructure('castle')).toBe(false);
-    expect(knownStructureNames()).toEqual(['classic', 'modern', 'cabin', 'l-shaped', 'farmhouse']);
+    expect(knownStructureNames()).toEqual(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']);
   });
 
   it('builds with the default (cozy) decoration and is deterministic for a seed', () => {
@@ -128,7 +130,7 @@ describe('compose: structure types × decorations', () => {
     expect(cat.room.map((m) => m.id)).toEqual(expect.arrayContaining(['living', 'kitchen', 'library']));
     // Every roof/basement/attic/room module declares the structures it pairs with, and all
     // resolve to the House family — whether tagged by the group id ('house') or by specific
-    // members (e.g. a gable applies to classic/cabin/l-shaped, but NOT the flat-roofed modern).
+    // members (e.g. a gable applies to classic/farmhouse/sakura/gothic, but NOT the flat modern).
     for (const m of [...cat.roof, ...cat.basement, ...cat.attic, ...cat.room]) {
       expect(m.appliesTo, `${m.id} must declare appliesTo`).toBeTruthy();
       expect(moduleAppliesTo(m.appliesTo, 'classic', 'house'), `${m.id} must apply to a house`).toBe(true);
@@ -211,16 +213,16 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
 
   it('lists the code-built archetypes as structure types, all in the House group', () => {
     const cat = listModuleCatalog();
-    expect(cat.structure.map((m) => m.id)).toEqual(expect.arrayContaining(['classic', 'modern', 'cabin', 'l-shaped']));
+    expect(cat.structure.map((m) => m.id)).toEqual(expect.arrayContaining(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']));
     // The House group families every current structure type, and the catalog ships it.
     expect(cat.groups).toEqual(expect.arrayContaining([{ id: 'house', label: 'House' }]));
     for (const m of cat.structure) expect(m.group, `${m.id} must be in the house group`).toBe('house');
   });
 
   it('a roof guide loads only for the structures it fits', () => {
-    // gable applies to the PITCHED houses (classic/cabin/l-shaped) — it loads for those,
-    // but NOT for the flat-roofed modern (which excludes it).
-    for (const structureType of ['classic', 'cabin', 'l-shaped']) {
+    // gable applies to the PITCHED houses (classic/farmhouse/sakura/gothic) — it loads for
+    // those, but NOT for the flat-roofed modern (which excludes it).
+    for (const structureType of ['classic', 'farmhouse', 'sakura', 'gothic']) {
       const guides = selectedGuides({ structureType, roof: 'gable' });
       expect(guides, structureType).toContain('nbt/modules/roof/gable.md');
     }
@@ -234,55 +236,12 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
     expect(selectedGuides({ structureType: 'classic', attic: 'storage' })).toContain('nbt/modules/attic/storage.md');
   });
 
-  it('the seeded archetypes (modern/cabin/l-shaped) compile from their preview', () => {
+  it('the seeded archetypes (modern/farmhouse/sakura/gothic) compile from their preview', () => {
     // Their geometry is real code — guard that each composes + compiles without throwing.
-    for (const id of ['modern', 'cabin', 'l-shaped']) {
+    for (const id of ['modern', 'farmhouse', 'sakura', 'gothic']) {
       const a = buildModulePreview('structure', id);
       expect(a, id).not.toBeNull();
       expect(() => compileStructure(a!), id).not.toThrow();
-    }
-  });
-});
-
-describe('compose: exterior finishing styles', () => {
-  const big: [number, number, number] = [12, 14, 10];
-
-  it('applies a selected exterior over the structure, adding geometry', () => {
-    for (const id of ['farmhouse', 'sakura', 'gothic']) {
-      const plain = composeStructure('classic', from, big, { seed: 3 }, stubIntern());
-      const styled = composeStructure('classic', from, big, { seed: 3, exterior: id }, stubIntern());
-      // The exterior layers its signature volumes on top, so it never emits fewer ops.
-      expect(styled.length, id).toBeGreaterThan(plain.length);
-    }
-  });
-
-  it('rejects an unknown exterior id', () => {
-    expect(() => composeStructure('classic', from, big, { exterior: 'nope' }, stubIntern())).toThrow(/unknown exterior/);
-  });
-
-  it('compiles each exterior on every pitched house via a template op', () => {
-    const size: [number, number, number] = [13, 15, 11];
-    const corner: [number, number, number] = [12, 14, 10];
-    for (const host of ['classic', 'cabin', 'l-shaped']) {
-      for (const exterior of ['farmhouse', 'sakura', 'gothic']) {
-        expect(() =>
-          compileStructure({
-            DataVersion: 3955,
-            size,
-            palette: [{ Name: 'minecraft:air' }],
-            ops: [{ op: 'template', name: host, from, to: corner, params: { exterior } }],
-          }),
-          `${host}+${exterior}`,
-        ).not.toThrow();
-      }
-    }
-  });
-
-  it('previews + loads each exterior guide for the pitched houses, not modern', () => {
-    for (const id of ['farmhouse', 'sakura', 'gothic']) {
-      expect(buildModulePreview('exterior', id), id).not.toBeNull();
-      expect(selectedGuides({ structureType: 'classic', exterior: id }), id).toContain(`nbt/modules/exterior/${id}.md`);
-      expect(selectedGuides({ structureType: 'modern', exterior: id }), id).not.toContain(`nbt/modules/exterior/${id}.md`);
     }
   });
 });
@@ -297,13 +256,13 @@ describe('module slots stay in lock-step with the catalog', () => {
 
   it('selectedGuides loads one guide per picked slot, gated by appliesTo', () => {
     const guides = selectedGuides({
-      structureType: 'classic', decoration: 'cozy', roof: 'gable', basement: 'cellar', exterior: 'gothic',
+      structureType: 'classic', decoration: 'cozy', roof: 'gable', basement: 'cellar',
     });
     expect(guides).toEqual(expect.arrayContaining([
       'nbt/modules/structure/classic.md',
       'nbt/modules/decoration/cozy.md',
       'nbt/modules/roof/gable.md',
-      'nbt/modules/exterior/gothic.md',
+      'nbt/modules/basement/cellar.md',
     ]));
   });
 });
