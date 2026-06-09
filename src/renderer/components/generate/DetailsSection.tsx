@@ -93,6 +93,7 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
   const roofs = (catalog?.roof ?? []).filter(fits);
   const basements = (catalog?.basement ?? []).filter(fits);
   const attics = (catalog?.attic ?? []).filter(fits);
+  const exteriors = (catalog?.exterior ?? []).filter(fits);
   const decorations = catalog?.decoration ?? [];
 
   // An attic lives in the roof void, so it clashes with the flat roof: grey the conflicting
@@ -156,6 +157,16 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
         onPick={(id) => onField('attic', id)}
         disabledFor={atticReason}
       />
+      {exteriors.length > 0 && (
+        <ChipSelect
+          label={t('gen.fieldExterior')}
+          value={details.exterior}
+          neutral={{ id: '', label: t('gen.optNone') }}
+          options={opts(exteriors)}
+          busy={busy}
+          onPick={(id) => onField('exterior', id)}
+        />
+      )}
 
       {(selStruct?.params ?? []).map((p) =>
         p.kind === 'int' ? (

@@ -14,6 +14,7 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
   if (build.roof) chips.push({ label: t('gen.fieldRoof'), value: build.roof });
   if (build.basement) chips.push({ label: t('gen.fieldBasement'), value: build.basement });
   if (build.attic) chips.push({ label: t('gen.fieldAttic'), value: build.attic });
+  if (build.exterior) chips.push({ label: t('gen.fieldExterior'), value: build.exterior });
   if (build.size) chips.push({ label: t('gen.statSize'), value: build.size.join('×') });
   if (build.blockCount != null) chips.push({ label: t('gen.statBlocks'), value: build.blockCount.toLocaleString() });
   const title = build.structure ?? t('gen.cardStructure');

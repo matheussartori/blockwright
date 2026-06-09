@@ -60,8 +60,13 @@ src/
                            are selectable guidance but not yet geometry-wired, and guidance-only
                            interior `room` modules assigned per floor). See "Composable
                            generation domain" below.
-        modules.ts         ModuleCategory + ModuleMeta (id/label/category/description/knowledge/
-                           keywords/preview) shared by every module, across categories.
+        modules.ts         ModuleMeta (id/label/category/description/knowledge/keywords/preview) — the
+                           RICH build-bearing contract shared by every module + toSummary (project to the
+                           wire shape). The renderer-facing shapes (`ModuleCategory`, `ModuleParam`,
+                           `ModuleSummary`=`GenerationModule`, `ModuleCatalog`=`GenerationCatalog`,
+                           `ModuleSelection`=`Omit<BuildSelection,'size'>`) are ALIASES of the canonical
+                           defs in `@/shared/types` — they cross IPC, so they live ONCE there; never
+                           re-declare a second copy in the domain (it only drifts).
         registry.ts        createRegistry<T extends ModuleMeta> — the shared factory (get/has/ids/
                            all/list) every category's index.ts is built on, so the per-category
                            lookup boilerplate exists once.
@@ -107,6 +112,17 @@ src/
                            (A short-lived guidance-only "form" category — cube/l-shaped/cabin/modern as
                            advisory silhouette TEXT — was RETIRED: advisory text couldn't override the
                            model's pitched-box prior, so each became a code-built structure type instead.)
+        exterior/          Category "exterior": one file per finishing STYLE (farmhouse/sakura/gothic) +
+                           types.ts (ExteriorModule) + index.ts (registry). The house's OUTSIDE finish:
+                           a `skin` (role→block overlay resolved ABOVE the decoration, so the style forces
+                           its cladding/roof colour/window block) PLUS optional additive `build()` volumes
+                           (farmhouse timber framing + plinth, sakura blossom cascades, gothic corner spire
+                           + glass conservatory). Unlike roof/basement it is NOT delegated by a type — the
+                           compose layer applies the SELECTED exterior to the type's build (skin + appended
+                           geometry) when a `template` op names `exterior:<id>` (and for the gallery preview,
+                           rendered on the classic host). On a free-form AI build it rides in as a `[Build
+                           details]` line + its own knowledge guide. `appliesTo` = the PITCHED houses
+                           (classic/cabin/l-shaped — NOT modern). Needs the `plant` role (decorative foliage).
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -200,14 +216,20 @@ src/
                           Suggest, Loading, SettingsModal (tabbed shell; each tab is a component in
                           components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
-                          (Module Gallery: structure/decoration/basement/roof modules + 3D preview —
+                          (Module Gallery: a host-first composition blueprint — pick a structure, see the
+                          roof/attic/basement/exterior/room/decoration parts that link to it + 3D preview —
                           store.modulesOpen), ConsoleDock (the full-width bottom log dock — see below).
                           NewStructurePanel (the Generate chat) is a thin ORCHESTRATOR — it owns the
                           composer's transient state + effects and composes the view from focused parts
                           in components/generate/: ChatTranscript (empty state + messages + result stats +
                           live progress), Composer (attachments + section slots + textarea + action
-                          toolbar), DetailsSection (the ⚙ Details selects/params/size/per-floor rooms),
-                          FloorsSection (the ▦ Floors editor), BuildCard (the chat build card).
+                          toolbar), DetailsSection (the progressive ⚙ Details selects/params/size/per-floor
+                          rooms — a PURE view), FloorsSection (the ▦ Floors editor), BuildCard (the chat
+                          build card). Opening ⚙ Details promotes the config out of the dock into the
+                          full-stage BuildPlanner (config column = DetailsSection + notes; right = a live
+                          BuildScalePreview of the build volume with a player figure) — its state lives in
+                          state/planner.ts so the dock + planner share one source of truth; both build the
+                          SAME brief/selection (generation/brief.ts) and hand off to runGeneration.
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
@@ -327,8 +349,8 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 ### Composable generation domain
 
 `structure/domain/` is the data-driven model behind the authoring `template` op. Everything
-is a **module** in one of five **categories** (`structure`, `decoration`, `basement`, `roof`,
-`room` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
+is a **module** in one of seven **categories** (`structure`, `decoration`, `basement`, `roof`,
+`attic`, `room`, `exterior` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
 knowledge/keywords/preview). The two live growth axes — **structure types** × **decorations**
 — combine without N×M code. A **StructureType** (`house`; more can be added) owns only the *massing*
 (shell, openings, structural detail) and emits ops in terms of **semantic roles** (`wall`,
@@ -548,15 +570,17 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   top. Documented for the model in `knowledge/nbt/13-templates.md`; block-name params (per-role
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
-- **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with four
-  registry-backed selects — **Structure** (house, modern, cabin, l-shaped), **Decoration**
-  (cozy/haunted/modern), **Roof** (gable/hip) and **Basement** (cellar/crypt/cult-temple) — plus, for a
+- **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with
+  registry-backed selects — **Structure** (classic, modern, cabin, l-shaped), **Decoration**
+  (cozy/haunted/modern), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/cult-temple), **Attic**
+  (storage/bedroom) and **Exterior style** (farmhouse/sakura/gothic — the pitched houses only, filtered by
+  `appliesTo`) — plus, for a
   storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
   room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
   are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per
   floor (`buildRoomPlan`) — (NOT a `template` op for the FREE-FORM house; a seeded archetype instead seeds
   its shell, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
-  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`rooms`/`size`, the rooms deduped across
+  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`exterior`/`rooms`/`size`, the rooms deduped across
   floors) so the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype
   compile its shell at the right box. Roof/Basement are enabled once a structure is chosen and are FILTERED

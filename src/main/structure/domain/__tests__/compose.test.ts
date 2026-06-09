@@ -243,6 +243,49 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
   });
 });
 
+describe('compose: exterior finishing styles', () => {
+  const big: [number, number, number] = [12, 14, 10];
+
+  it('applies a selected exterior over the structure, adding geometry', () => {
+    for (const id of ['farmhouse', 'sakura', 'gothic']) {
+      const plain = composeStructure('classic', from, big, { seed: 3 }, stubIntern());
+      const styled = composeStructure('classic', from, big, { seed: 3, exterior: id }, stubIntern());
+      // The exterior layers its signature volumes on top, so it never emits fewer ops.
+      expect(styled.length, id).toBeGreaterThan(plain.length);
+    }
+  });
+
+  it('rejects an unknown exterior id', () => {
+    expect(() => composeStructure('classic', from, big, { exterior: 'nope' }, stubIntern())).toThrow(/unknown exterior/);
+  });
+
+  it('compiles each exterior on every pitched house via a template op', () => {
+    const size: [number, number, number] = [13, 15, 11];
+    const corner: [number, number, number] = [12, 14, 10];
+    for (const host of ['classic', 'cabin', 'l-shaped']) {
+      for (const exterior of ['farmhouse', 'sakura', 'gothic']) {
+        expect(() =>
+          compileStructure({
+            DataVersion: 3955,
+            size,
+            palette: [{ Name: 'minecraft:air' }],
+            ops: [{ op: 'template', name: host, from, to: corner, params: { exterior } }],
+          }),
+          `${host}+${exterior}`,
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it('previews + loads each exterior guide for the pitched houses, not modern', () => {
+    for (const id of ['farmhouse', 'sakura', 'gothic']) {
+      expect(buildModulePreview('exterior', id), id).not.toBeNull();
+      expect(selectedGuides({ structureType: 'classic', exterior: id }), id).toContain(`nbt/modules/exterior/${id}.md`);
+      expect(selectedGuides({ structureType: 'modern', exterior: id }), id).not.toContain(`nbt/modules/exterior/${id}.md`);
+    }
+  });
+});
+
 describe('compose: house roof form + determinism', () => {
   it('the roof param forces the roof form (overriding the seeded pick)', () => {
     const big: [number, number, number] = [14, 20, 14];

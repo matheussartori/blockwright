@@ -4,10 +4,19 @@
 // (label, description, the knowledge guide it owns, and how to preview it) on top
 // of its category-specific behaviour contract. This is what lets one UI list them,
 // one knowledge loader pull only the selected guides, and one gallery preview them.
+// The renderer-facing shapes (`ModuleCategory`, `ModuleParam`, the module summary, the
+// catalog) live ONCE in `@/shared/types` — they cross the IPC boundary, so the domain
+// aliases them here instead of re-declaring (a second copy only drifts). The domain owns
+// the RICH side: `ModuleMeta` (the build-bearing contract) + `PreviewSpec` + `toSummary`.
+import type { ModuleCategory, GenerationModule } from '@/shared/types';
 import type { FurnishingPreset } from '@/shared/domain/furnishing';
 
-/** The module categories. Selected at creation; surfaced in the gallery. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room';
+/** The module categories — the canonical union lives in `@/shared/types`. */
+export type { ModuleCategory, ModuleParam } from '@/shared/types';
+
+/** The category-agnostic summary the gallery + Details selects consume — the wire shape
+ *  in `@/shared/types`, projected from a {@link ModuleMeta} by {@link toSummary}. */
+export type ModuleSummary = GenerationModule;
 
 /** How to build a representative structure for the gallery's 3D preview. The IPC
  *  layer composes this (via a `template` op) and compiles it to a real `.nbt`. */
@@ -53,40 +62,6 @@ export interface ModuleMeta {
   incompatibleWith?: string[];
   /** How to render this module in the gallery (omit → no preview). */
   preview?: PreviewSpec;
-}
-
-/** A structure type's tunable param, projected for the composer's Details controls
- *  (`unit` params like decay are not surfaced — see `paramFields`). */
-export type ModuleParam =
-  | { name: string; kind: 'int'; label: string; default: number; min: number; max: number }
-  | { name: string; kind: 'enum'; label: string; default: string; options: { value: string; label: string }[] };
-
-/** The category-agnostic shape the gallery + Details selects consume. */
-export interface ModuleSummary {
-  id: string;
-  label: string;
-  category: ModuleCategory;
-  description: string;
-  /** The structure GROUP id (structure types only) — drives the gallery/Details
-   *  grouping header and the host→group resolution for `moduleAppliesTo`. */
-  group?: string;
-  /** Whether a 3D preview can be composed for this module. */
-  hasPreview: boolean;
-  /** Structure-type ids and/or group ids this module pairs with (the growing
-   *  `appliesTo` link); a group id shares it across the whole family. Omit → applies
-   *  to every structure. */
-  appliesTo?: string[];
-  /** Module ids this one cannot combine with (e.g. attic vs the `flat` roof) → the
-   *  gallery dims + Details clears the conflicting pick. Omit → conflicts with nothing. */
-  incompatibleWith?: string[];
-  /** Tunable params (structure types only) → the Details controls. */
-  params?: ModuleParam[];
-  /** Max interior rooms a single floor accepts (structure types only) → the planner's
-   *  per-floor room cap. Omit → the generic default. */
-  maxRoomsPerFloor?: number;
-  /** Furnishing presets, tiered by floor space (room modules only) → the gallery's
-   *  expandable per-room preset list + the composer brief's preset selection. */
-  presets?: FurnishingPreset[];
 }
 
 /** Project a module to the renderer-facing summary. Room modules carry furnishing

@@ -14,7 +14,7 @@ const MODERN_STRUCTURE = 'modern';
 const MODERN_DECORATION = 'modern';
 
 /** The single-value Details selects driven by `setDetailField`. */
-export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement' | 'attic';
+export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement' | 'attic' | 'exterior';
 
 /** The roof id that leaves no roof void, so it cannot host an attic (see the `flat` roof
  *  module's `incompatibleWith`). Picking it clears any attic selection. */
@@ -45,7 +45,7 @@ export function setDetailField(d: BuildDetails, key: DetailField, value: string)
     // The modern house is a white-and-glass archetype — pair it with the Modern decoration
     // by default so its materials + guide come along (the user can still change it).
     const decoration = value === MODERN_STRUCTURE ? MODERN_DECORATION : '';
-    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', attic: '', rooms: [] };
+    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', attic: '', exterior: '', rooms: [] };
   }
   if (key === 'basement') {
     return { ...d, basement: value, size: null };

@@ -43,17 +43,19 @@ refines through an emit → render → review loop — previewed live in the vie
 - AI structure generation from a prompt or reference image, through an emit → render → review loop
   that refines the build live — with multiple provider backends to choose from (Claude
   subscription / API, OpenAI, Gemini, Codex), configured in Settings
-- Composable generation domain — pick a structure type, decoration, roof, basement and per-floor
-  interior rooms (living room, kitchen, library, bedroom, shared bedrooms, storage) in the Details
-  composer (browse them with live 3D previews in the Module Gallery); the selection guides the build
-  and loads only the relevant knowledge, and registered structure × decoration modules also cross at
-  compile time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
+- Composable generation domain — pick a structure type (classic / modern / cabin / L-shaped), a
+  decoration, a roof, a basement, an in-roof attic, an exterior finishing style (farmhouse / sakura /
+  gothic — the house's outside cladding + signature volumes) and per-floor interior rooms (living
+  room, kitchen, library, bedroom, shared bedrooms, storage) in the full-stage Build Planner (browse
+  every part with live 3D previews in the Module Gallery); the selection guides the build and loads
+  only the relevant knowledge, and registered structure × decoration modules also cross at compile
+  time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
   **furnishing presets** (snug / standard / grand) that the chosen decoration re-skins — so a big room
   is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - A browsable structure library — each generated build is saved to its own folder (the latest clean
-  `.nbt`, every kept version, and a generation log), with Open / Reveal actions on the chat's build card
+  `.nbt`, every kept version, and a generation log), revealed from the chat's build card
 - Namespace-aware asset resolution from an extracted Minecraft content pack
 - Mod workspace support — render modded structures with their own textures and models, with the
   workspace's target Minecraft version auto-detected
@@ -85,17 +87,18 @@ screen.
 
 **File ▸ New Structure** opens a chat where you describe a build (optionally attaching a reference
 image). Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer,
-iterating through a visual review loop. The optional **⚙ Details** composer lets you pick a structure
-type, decoration, roof and basement to steer the build — and, for a multi-storey house, assign up to
-two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_).
-Your picks are shown back as a tidy build card in the chat. Browse every module with live 3D previews
-in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI provider and
-model in **Settings ▸ AI** first.
+iterating through a visual review loop. The optional **⚙ Details** opens the full-stage **Build
+Planner**, where you pick a structure type, decoration, roof, basement, in-roof attic and exterior
+style to steer the build — and, for a multi-storey house, assign up to two interior rooms to each
+floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) — alongside a live 3D
+preview of the build volume. Your picks are shown back as a tidy build card in the chat. Browse every
+module with live 3D previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical
+levels. Pick an AI provider and model in **Settings ▸ AI** first.
 
 Every finished build is saved to a browsable library — one folder per build, holding the latest clean
-`.nbt`, every kept version, and a `generation.log` of how it was made. The chat's build card has
-**Open** (load it in the viewer) and **Reveal** (show the folder in your file manager) actions; the
-library root is configurable in **Settings ▸ AI**.
+`.nbt`, every kept version, and a `generation.log` of how it was made. A from-scratch build's tab
+becomes that saved project, so the chat's build card has a **Reveal** action (show the folder in your
+file manager); the library root is configurable in **Settings ▸ AI**.
 
 ## Mod Workspaces
 

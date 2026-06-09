@@ -21,6 +21,9 @@ export interface BuildSelection {
   /** In-roof attic module id (storage/bedroom), if picked — loads its own guide. Only on
    *  pitched-roof houses (it clashes with the flat roof). */
   attic?: string;
+  /** Exterior finishing style id (farmhouse/sakura/gothic), if picked — loads its own
+   *  guide. Only on the pitched houses (classic/cabin/l-shaped). */
+  exterior?: string;
   /** Interior room module ids assigned across floors (deduped) — each loads its own
    *  knowledge guide. The per-floor layout itself rides in the prompt text. */
   rooms?: string[];
@@ -43,6 +46,8 @@ export interface BuildBrief {
   basement?: string;
   /** In-roof attic label (Storage/Bedroom), if picked. */
   attic?: string;
+  /** Exterior finishing style label (Farmhouse/Sakura/Gothic), if picked. */
+  exterior?: string;
   /** Build box as [W, H, D]. */
   size?: [number, number, number];
   /** Per-floor room assignment (bottom-up): each floor's label + its room labels (0–2). */

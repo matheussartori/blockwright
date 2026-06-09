@@ -4,7 +4,7 @@
 // `composeModule`/`composeModulePreview`), the catalog the UI lists, and the
 // selection→knowledge-guide mapping the system prompt uses.
 import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
-import type { FloorDef } from '@/shared/types';
+import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { composeModulePreview } from './compose';
 import { resolveParams } from './params';
@@ -13,15 +13,16 @@ import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations }
 import { basementModules, getBasement, listBasements } from './basements';
 import { getRoof, listRoofs, roofModules } from './roofs';
 import { atticModules, getAttic, listAttics } from './attics';
+import { exteriorModules, getExterior, listExteriors } from './exterior';
 import { getRoom, listRooms, roomModules } from './rooms';
-import type { ModuleCategory, ModuleMeta, ModuleSummary } from './modules';
+import type { ModuleCategory, ModuleMeta } from './modules';
 import {
   getStructureType,
   listStructureTypes,
   structureGroupOf,
   structureModules,
 } from './structure-types';
-import { STRUCTURE_GROUPS, type StructureGroup } from './groups';
+import { STRUCTURE_GROUPS } from './groups';
 
 export {
   composeStructure,
@@ -56,6 +57,7 @@ export {
 export { listBasements, getBasement, type BasementModule } from './basements';
 export { listRoofs, getRoof, type RoofModule } from './roofs';
 export { listAttics, getAttic, type AtticModule } from './attics';
+export { listExteriors, getExterior, type ExteriorModule } from './exterior';
 export { listRooms, getRoom, type RoomModule } from './rooms';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
@@ -64,19 +66,11 @@ export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpe
 /** The structure type a decoration preview is rendered on. */
 const PREVIEW_HOST_STRUCTURE = 'classic';
 
-/** The renderer-facing catalog: every module summary, grouped by category, plus the
- *  structure GROUP definitions. Drives the composer's Structure/Decoration selects and
- *  the module gallery. */
-export interface ModuleCatalog {
-  structure: ModuleSummary[];
-  decoration: ModuleSummary[];
-  basement: ModuleSummary[];
-  roof: ModuleSummary[];
-  attic: ModuleSummary[];
-  room: ModuleSummary[];
-  /** Structure families (e.g. "House"), for the gallery rail + Details optgroups. */
-  groups: StructureGroup[];
-}
+/** The renderer-facing catalog: every module summary grouped by category, plus the
+ *  structure GROUP definitions. The wire shape (one array per category) is owned by
+ *  `GenerationCatalog` in `@/shared/types`, since it crosses the IPC boundary — adding a
+ *  category means adding its field there and a `listX()` line below, nowhere else. */
+export type ModuleCatalog = GenerationCatalog;
 
 /** List every module summary, grouped by category (+ the structure groups). */
 export function listModuleCatalog(): ModuleCatalog {
@@ -87,6 +81,7 @@ export function listModuleCatalog(): ModuleCatalog {
     roof: listRoofs(),
     attic: listAttics(),
     room: listRooms(),
+    exterior: listExteriors(),
     groups: STRUCTURE_GROUPS,
   };
 }
@@ -129,26 +124,17 @@ function allModules(): ModuleMeta[] {
     ...roofModules(),
     ...basementModules(),
     ...atticModules(),
+    ...exteriorModules(),
     ...roomModules(),
   ];
 }
 
-/** Which modules the user picked in the composer Details: a structure type, a
- *  decoration, and (for the structure) a roof + basement typology. Each maps to its
- *  own knowledge guide, loaded ONLY when selected — so an unused roof/basement guide
- *  never bloats the system prompt. */
-export interface ModuleSelection {
-  structureType?: string;
-  decoration?: string;
-  roof?: string;
-  basement?: string;
-  /** The in-roof attic module id (storage/bedroom), if picked. Loads its own guide; only
-   *  applies to pitched-roof houses (and clashes with the flat roof). */
-  attic?: string;
-  /** Interior room module ids assigned across the floors (deduped). Each loads its own
-   *  guide; the per-floor layout is conveyed to the model as prompt text, not here. */
-  rooms?: string[];
-}
+/** Which modules the user picked in the composer Details, as far as knowledge-guide
+ *  loading cares: it's the structured `BuildSelection` minus `size` (which only sizes a
+ *  shell seed, not which guides load). Each picked module maps to its own guide, loaded
+ *  ONLY when selected — so an unused module guide never bloats the system prompt. Defined
+ *  as a projection of the shared selection so the two can never list different fields. */
+export type ModuleSelection = Omit<BuildSelection, 'size'>;
 
 // `moduleAppliesTo` is the shared pure predicate (src/shared/domain/applies-to.ts) so
 // the renderer's Details filtering and this guide gating stay in lock-step. Re-exported
@@ -173,6 +159,8 @@ export function selectedGuides(sel: ModuleSelection): string[] {
   if (moduleAppliesTo(basement?.appliesTo, sel.structureType, hostGroup)) add(basement);
   const attic = sel.attic ? getAttic(sel.attic) : undefined;
   if (moduleAppliesTo(attic?.appliesTo, sel.structureType, hostGroup)) add(attic);
+  const exterior = sel.exterior ? getExterior(sel.exterior) : undefined;
+  if (moduleAppliesTo(exterior?.appliesTo, sel.structureType, hostGroup)) add(exterior);
   // One guide per selected room (deduped already), gated by appliesTo so a room that
   // doesn't fit the chosen structure doesn't drag its guide in.
   for (const id of sel.rooms ?? []) {
@@ -231,6 +219,12 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     meta = getStructureType(id);
     name = id;
     params = { decoration: DEFAULT_DECORATION };
+  } else if (category === 'exterior') {
+    // An exterior is a FINISH over a house: preview it on the default host structure with
+    // the style applied (its skin re-clads the shell + its volumes layer on).
+    meta = getExterior(id);
+    name = PREVIEW_HOST_STRUCTURE;
+    params = { decoration: DEFAULT_DECORATION, exterior: id };
   } else {
     meta = getDecoration(id);
     name = PREVIEW_HOST_STRUCTURE;

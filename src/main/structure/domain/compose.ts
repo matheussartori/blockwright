@@ -15,7 +15,8 @@ import {
 } from './decorations';
 import { getBasement } from './basements';
 import { getAttic } from './attics';
-import { resolveParams } from './params';
+import { getExterior, type ExteriorModule } from './exterior';
+import { resolveParams, type ParamValues } from './params';
 import { getRoof } from './roofs';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
 import { seed3 } from './rng';
@@ -78,6 +79,8 @@ function decorationId(params: Record<string, unknown>): string {
  * @param deco - The active decoration (maps roles→blocks + the weathering function).
  * @param raw - The op's raw params; a key naming a Role is a per-op block override.
  * @param intern - The compiler's get-or-create palette intern.
+ * @param skin - An exterior style's re-clad overlay, resolved ABOVE the decoration (so a
+ *   farmhouse/gothic forces its own cladding/roof regardless of the decoration). Optional.
  * @returns A {@link RolePalette} that interns a role's resolved (or weathered) block.
  */
 function makePalette(
@@ -85,11 +88,12 @@ function makePalette(
   deco: Decoration,
   raw: Record<string, unknown>,
   intern: Intern,
+  skin?: Partial<Record<Role, string>>,
 ): RolePalette {
   const idOf = (role: Role): string => {
     const override = raw[role];
     if (typeof override === 'string' && override.includes(':')) return override;
-    return deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
+    return skin?.[role] ?? deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
   };
   const weather = deco.weather ?? ((b: string) => b);
   return {
@@ -98,6 +102,16 @@ function makePalette(
     weather: (role, props) => intern(weather(idOf(role)), props),
     air: () => intern('minecraft:air'),
   };
+}
+
+/** Apply the decoration's default decay level to resolved params — unless the build
+ *  declares a `decay` param at all, OR an explicit `decay` was passed in any raw source
+ *  (op params, delegate extras). One place so the structure/module/delegate paths can't
+ *  drift on how the "cozy = 0, op param wins" rule works. */
+function applyDecorationDecay(values: ParamValues, deco: Decoration, ...raws: Record<string, unknown>[]): void {
+  if (deco.decay === undefined || !('decay' in values)) return;
+  if (raws.some((r) => r.decay !== undefined)) return;
+  values.decay = deco.decay;
 }
 
 /** Resolve the decoration a `template`/module op selects, throwing an actionable error
@@ -109,6 +123,19 @@ function resolveDecoration(params: Record<string, unknown>): Decoration {
     throw new Error(`unknown decoration "${decoId}" — available: ${decorationIds().join(', ')}`);
   }
   return deco;
+}
+
+/** Resolve the exterior finishing style a `template` op selects via the `exterior`
+ *  param, or undefined when none is set. Throws an actionable error if it names an
+ *  unknown style (so validate/compile surfaces it to the generator). The style's
+ *  `appliesTo` is a UI/guide-gating concern, not enforced here — a template that names
+ *  one applies it (the geometry guards on the host's footprint). */
+function resolveExterior(params: Record<string, unknown>): ExteriorModule | undefined {
+  const id = typeof params.exterior === 'string' ? params.exterior : '';
+  if (!id) return undefined;
+  const ext = getExterior(id);
+  if (!ext) throw new Error(`unknown exterior "${id}"`);
+  return ext;
 }
 
 /** Per-build seed: explicit `seed` param, else derived from the box origin. */
@@ -154,9 +181,7 @@ function makeModuleComposer(
     if (!module) throw new Error(`unknown ${category} module "${id}"`);
     const subBox = box(from, to);
     const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
-    if (deco.decay !== undefined && extra.decay === undefined && rawParams.decay === undefined && 'decay' in subParams) {
-      subParams.decay = deco.decay;
-    }
+    applyDecorationDecay(subParams, deco, extra, rawParams);
     const palette = category === 'roof' || category === 'attic'
       ? hostPalette
       : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern);
@@ -192,20 +217,29 @@ export function composeStructure(
     throw new Error(`unknown structure type "${name}" — available: ${knownStructureNames().join(', ')}`);
   }
   const deco = resolveDecoration(params);
+  const exterior = resolveExterior(params);
 
   const b = box(from, to);
   const values = resolveParams(type.params, params);
-  // The decoration can lower the decay default (e.g. "cozy" = 0); an explicit op param wins.
-  if (deco.decay !== undefined && params.decay === undefined && 'decay' in values) {
-    values.decay = deco.decay;
-  }
+  applyDecorationDecay(values, deco, params); // "cozy = 0" default; an explicit op param wins
   const seed = seedFor(params, b);
-  const palette = makePalette(type.defaults, deco, params, intern);
+  // The exterior style's `skin` re-clads the type's massing (resolved above the decoration).
+  const palette = makePalette(type.defaults, deco, params, intern, exterior?.skin);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry).
   const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
 
-  return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
+  const ops = type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
+  // Then layer the SELECTED exterior's additive volumes (spire, blossoms, framing) over
+  // the finished massing — same palette + seed, with the type as `host` so its
+  // host-specific integration runs (later ops overwrite, so it sits on top).
+  if (exterior) {
+    const extValues = resolveParams(exterior.params ?? {}, params);
+    ops.push(...runModuleGeometry(exterior, name, {
+      box: b, params: extValues, palette, seed, host: name, composeModule: composeModuleDelegate,
+    }));
+  }
+  return ops;
 }
 
 /**
@@ -245,9 +279,7 @@ export function composeModule(
   const deco = resolveDecoration(params);
   const b = box(from, to);
   const values = resolveParams(module.params ?? {}, params);
-  if (deco.decay !== undefined && params.decay === undefined && 'decay' in values) {
-    values.decay = deco.decay;
-  }
+  applyDecorationDecay(values, deco, params);
   const seed = seedFor(params, b);
   const palette = makePalette(module.defaults ?? {}, deco, params, intern);
   const args: BuildArgs = {

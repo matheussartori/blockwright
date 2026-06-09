@@ -173,6 +173,7 @@ export const en = {
   'gen.fieldRoof': 'Roof',
   'gen.fieldBasement': 'Basement',
   'gen.fieldAttic': 'Attic',
+  'gen.fieldExterior': 'Exterior style',
   'gen.conflictPitchedRoof': 'Needs a pitched roof',
   'gen.optNone': 'None',
   'gen.optDefault': 'Default',
@@ -303,6 +304,7 @@ export const en = {
   'modules.catRoof': 'Roof',
   'modules.catAttic': 'Attic',
   'modules.catRoom': 'Room',
+  'modules.catExterior': 'Exterior style',
   'modules.loading': 'Loading modules…',
   'modules.noneYet': 'No {category} modules yet — coming soon.',
   'modules.previewFailed': 'Preview failed to build.',
@@ -325,6 +327,7 @@ export const en = {
   'modules.roleAttic': 'In-roof loft',
   'modules.roleBasement': 'Below-grade level',
   'modules.roleRoom': 'Interior programs, per floor',
+  'modules.roleExterior': 'Outside finish & added volumes',
   'modules.roleDecoration': 'Material & mood — fits any structure',
   'modules.conflictWith': "Can't combine with {label}",
 
