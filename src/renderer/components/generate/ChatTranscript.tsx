@@ -18,6 +18,16 @@ const PHASE_LABEL: Record<GenerateProgress['phase'], MessageKey> = {
   reviewing: 'gen.phase.reviewing',
 };
 
+/** i18n label per design pass id (massing/roof/…), sent by main as `designPhase`. */
+const DESIGN_PHASE_LABEL: Record<string, MessageKey> = {
+  massing: 'gen.designPhase.massing',
+  roof: 'gen.designPhase.roof',
+  facade: 'gen.designPhase.facade',
+  interior: 'gen.designPhase.interior',
+  circulation: 'gen.designPhase.circulation',
+  audit: 'gen.designPhase.audit',
+};
+
 const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
 type T = (key: MessageKey) => string;
@@ -131,7 +141,8 @@ function LiveProgress({ progress, elapsedMs, t }: { progress: GenerateProgress |
           {progress ? t(PHASE_LABEL[progress.phase]) : t('gen.phase.generating')}
           {progress?.designPhase && (
             <span className="gen-design-phase">
-              {' · '}{progress.designPhase}
+              {' · '}
+              {DESIGN_PHASE_LABEL[progress.designPhase] ? t(DESIGN_PHASE_LABEL[progress.designPhase]) : progress.designPhase}
               {progress.designStep ? ` (${progress.designStep}/${progress.designSteps})` : ''}
             </span>
           )}

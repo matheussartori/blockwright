@@ -70,11 +70,16 @@ export interface GenerationModule {
   category: ModuleCategory;
   /** One-paragraph description for the gallery screen. */
   description: string;
+  /** The structure GROUP id (structure types only) — the family this type belongs to
+   *  (e.g. `'house'`). Drives the gallery rail + Details grouping and host→group
+   *  resolution for `appliesTo`. */
+  group?: string;
   /** Whether a 3D preview can be composed for this module (gallery). */
   hasPreview: boolean;
-  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`) — a growing
-   *  link. The UI shows all modules for now; this drives future category filtering
-   *  (e.g. show only the roofs that fit the chosen structure). Omit → applies to all. */
+  /** Structure-type ids and/or group ids this module pairs with (e.g. a roof's
+   *  `['house']`, the group) — a growing link. A group id shares it across the whole
+   *  family; the renderer filters the composer's roof/basement/room selects on it.
+   *  Omit → applies to all. */
   appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
@@ -83,7 +88,14 @@ export interface GenerationModule {
   presets?: FurnishingPreset[];
 }
 
-/** The generation module registry, grouped by category. */
+/** A structure family (e.g. "House") — a group several structure types belong to,
+ *  letting modules be shared across the family and the UI header them together. */
+export interface GenerationGroup {
+  id: string;
+  label: string;
+}
+
+/** The generation module registry, grouped by category (+ the structure families). */
 export interface GenerationCatalog {
   structure: GenerationModule[];
   decoration: GenerationModule[];
@@ -91,4 +103,6 @@ export interface GenerationCatalog {
   roof: GenerationModule[];
   /** Interior room modules (living/kitchen/library/…) assigned per floor. */
   room: GenerationModule[];
+  /** Structure families, for the gallery rail headers + Details optgroups. */
+  groups: GenerationGroup[];
 }

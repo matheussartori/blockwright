@@ -42,6 +42,7 @@ export const en = {
   // Shared.
   'common.clear': 'Clear',
   'common.dismiss': 'Dismiss',
+  'common.close': 'Close',
 
   // Tab bar.
   'tab.home': 'Home',
@@ -293,6 +294,16 @@ export const en = {
   'modules.scaleStandard': 'Standard',
   'modules.scaleGrand': 'Grand',
   'modules.count': '{count} modules',
+  'modules.structures': 'Structures',
+  'modules.hostStructure': 'Host structure',
+  'modules.partsCount': '{count} linked parts',
+  'modules.presetsCount': '{count} presets',
+  'modules.universal': 'Universal',
+  'modules.stageEmpty': 'Nothing links to {structure} yet.',
+  'modules.roleRoof': 'Caps the structure',
+  'modules.roleBasement': 'Below-grade level',
+  'modules.roleRoom': 'Interior programs, per floor',
+  'modules.roleDecoration': 'Material & mood — fits any structure',
 
   // Settings ▸ AI.
   'ai.stable': 'Stable',
@@ -340,4 +351,30 @@ export const en = {
   'image.previewLabel': 'Image preview',
   'image.closePreview': 'Close preview',
   'image.close': 'Close',
+
+  // Console dock.
+  'console.title': 'Console',
+  'console.filter': 'Filter…',
+  'console.levelFilter': 'Log level filter',
+  'console.all': 'All',
+  'console.warnings': 'Warnings',
+  'console.errors': 'Errors',
+  'console.clear': 'Clear console',
+  'console.close': 'Close console',
+  'console.closeHint': 'Close console (reopen from the View menu)',
+  'console.emptyNoLogs': 'No logs yet.',
+  'console.emptyNoMatch': 'No logs match the current filter.',
+
+  // Empty document tab.
+  'emptyTab.title': 'This tab is empty.',
+  'emptyTab.hintPre': 'Describe a build in the Generate panel, or open an ',
+  'emptyTab.hintPost': ' file.',
+
+  // Generation design passes (live progress).
+  'gen.designPhase.massing': 'Massing',
+  'gen.designPhase.roof': 'Roof',
+  'gen.designPhase.facade': 'Facade',
+  'gen.designPhase.interior': 'Interior',
+  'gen.designPhase.circulation': 'Circulation',
+  'gen.designPhase.audit': 'Audit',
 };

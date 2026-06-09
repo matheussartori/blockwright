@@ -56,7 +56,7 @@ export interface BuildArgs {
   palette: RolePalette;
   /** Stable per-build seed (explicit `seed` param, else derived from the box). */
   seed: number;
-  /** The host structure-type id this module is being applied to (e.g. `'house'`),
+  /** The host structure-type id this module is being applied to (e.g. `'classic'`),
    *  when applicable. Lets a roof/basement module run GENERIC geometry for any host
    *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
    *  Undefined for a structure type building itself, or a context-free preview. */
@@ -101,6 +101,11 @@ export type FinalizePass = 'stairs' | 'chimney';
  *  always `'structure'`. */
 export interface StructureType extends ModuleMeta {
   category: 'structure';
+  /** The structure GROUP (family) this type belongs to — see `domain/groups.ts`. A
+   *  module can target the whole group via `appliesTo`, so every member shares it; the
+   *  UI also headers the gallery rail + Details select by group. Every house-family
+   *  type declares `'house'`. */
+  group: string;
   /** Shape/behaviour params (floors, decay, …). Block choices come from the decoration. */
   params: ParamSpec;
   /** This type's default block per role — its material "kit", overridable by the

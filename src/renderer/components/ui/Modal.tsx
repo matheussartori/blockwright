@@ -4,6 +4,7 @@
 // dialog in the app looks and behaves the same. Settings and the Block Catalog
 // are both built on it.
 import { useEffect, type ReactNode } from 'react';
+import { useT } from '../../hooks/useStores';
 
 interface ModalProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, className, bodyClassName, children, footer }: ModalProps) {
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -38,7 +40,7 @@ export function Modal({ open, onClose, title, className, bodyClassName, children
       <div className={`modal${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true">
         <header className="modal-head">
           <h2 className="modal-title">{title}</h2>
-          <button className="modal-close" title="Close" aria-label="Close" onClick={onClose}>
+          <button className="modal-close" title={t('common.close')} aria-label={t('common.close')} onClick={onClose}>
             ✕
           </button>
         </header>

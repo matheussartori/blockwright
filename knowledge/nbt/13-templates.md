@@ -22,7 +22,7 @@ pick the form and the mood independently. Each structure type has its own deeper
 ```json
 {
   "op": "template",
-  "name": "house",
+  "name": "classic",
   "from": [0, 0, 0],
   "to": [20, 12, 16],
   "params": { "decoration": "cozy", "wall": "minecraft:spruce_planks", "floors": 2 }

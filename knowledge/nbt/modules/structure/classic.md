@@ -1,7 +1,8 @@
 # Structure module — Houses & small homes
 
-> Module guide for the **house** structure type. It loads into the system prompt only
-> when a house is selected (or the prompt asks for one). **There is NO house template** —
+> Module guide for the **classic** house structure type (a member of the `house`
+> family). It loads into the system prompt only when the classic house is selected (or
+> the prompt asks for one). **There is NO house template** —
 > you design and build the whole house YOURSELF with ordinary ops. The core construction
 > recipes live in `05-building-houses.md`, `10-design-principles.md`, and
 > `12-exterior-and-facade-detailing.md`; this file is the house-specific playbook on top

@@ -13,6 +13,7 @@ export const cabin: StructureType = {
   id: 'cabin',
   label: 'Cabin',
   category: 'structure',
+  group: 'house',
   description:
     'A rustic log-and-stone cabin: a raised stone plinth, log corner posts and timber walls, ' +
     'a steep gable roof with deep eaves, a covered front porch on log posts with railings and ' +

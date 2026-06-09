@@ -44,6 +44,7 @@ export const ptBR: Messages = {
   // Shared.
   'common.clear': 'Limpar',
   'common.dismiss': 'Dispensar',
+  'common.close': 'Fechar',
 
   // Tab bar.
   'tab.home': 'Início',
@@ -295,6 +296,16 @@ export const ptBR: Messages = {
   'modules.scaleStandard': 'Padrão',
   'modules.scaleGrand': 'Amplo',
   'modules.count': '{count} módulos',
+  'modules.structures': 'Estruturas',
+  'modules.hostStructure': 'Estrutura base',
+  'modules.partsCount': '{count} partes vinculadas',
+  'modules.presetsCount': '{count} presets',
+  'modules.universal': 'Universal',
+  'modules.stageEmpty': 'Nada se vincula a {structure} ainda.',
+  'modules.roleRoof': 'Cobre a estrutura',
+  'modules.roleBasement': 'Nível subterrâneo',
+  'modules.roleRoom': 'Ambientes internos, por andar',
+  'modules.roleDecoration': 'Material e atmosfera — combina com qualquer estrutura',
 
   // Settings ▸ AI.
   'ai.stable': 'Estável',
@@ -342,4 +353,30 @@ export const ptBR: Messages = {
   'image.previewLabel': 'Visualização de imagem',
   'image.closePreview': 'Fechar visualização',
   'image.close': 'Fechar',
+
+  // Console dock.
+  'console.title': 'Console',
+  'console.filter': 'Filtrar…',
+  'console.levelFilter': 'Filtro de nível de log',
+  'console.all': 'Tudo',
+  'console.warnings': 'Avisos',
+  'console.errors': 'Erros',
+  'console.clear': 'Limpar console',
+  'console.close': 'Fechar console',
+  'console.closeHint': 'Fechar console (reabra pelo menu Exibir)',
+  'console.emptyNoLogs': 'Nenhum log ainda.',
+  'console.emptyNoMatch': 'Nenhum log corresponde ao filtro atual.',
+
+  // Empty document tab.
+  'emptyTab.title': 'Esta aba está vazia.',
+  'emptyTab.hintPre': 'Descreva uma construção no painel Gerar, ou abra um arquivo ',
+  'emptyTab.hintPost': '.',
+
+  // Generation design passes (live progress).
+  'gen.designPhase.massing': 'Volumetria',
+  'gen.designPhase.roof': 'Telhado',
+  'gen.designPhase.facade': 'Fachada',
+  'gen.designPhase.interior': 'Interior',
+  'gen.designPhase.circulation': 'Circulação',
+  'gen.designPhase.audit': 'Auditoria',
 };

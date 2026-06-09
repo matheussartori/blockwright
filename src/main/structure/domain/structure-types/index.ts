@@ -7,18 +7,24 @@ import { toSummary, type ModuleSummary } from '../modules';
 import { paramFields } from '../params';
 import { createRegistry } from '../registry';
 import { cabin } from './cabin';
-import { house } from './house';
+import { classic } from './classic';
 import { lShaped } from './l-shaped';
 import { modern } from './modern';
 import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-const registry = createRegistry<StructureType>([house, modern, cabin, lShaped]);
+const registry = createRegistry<StructureType>([classic, modern, cabin, lShaped]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {
   return registry.get(id);
+}
+
+/** The structure GROUP id a type belongs to (undefined for an unknown id) — the host
+ *  link `moduleAppliesTo` resolves so a group-tagged module shares across the family. */
+export function structureGroupOf(id: string | undefined): string | undefined {
+  return id ? registry.get(id)?.group : undefined;
 }
 
 /** Is `id` a registered structure type? (Aliases are resolved in compose, not here.) */
@@ -34,7 +40,7 @@ export function structureTypeIds(): string[] {
 /** Every structure type, as a module summary (for the composer picker + gallery),
  *  carrying its tunable params so the Details controls are registry-driven. */
 export function listStructureTypes(): ModuleSummary[] {
-  return registry.all().map((t) => ({ ...toSummary(t), params: paramFields(t.params) }));
+  return registry.all().map((t) => ({ ...toSummary(t), group: t.group, params: paramFields(t.params) }));
 }
 
 /** Every structure module (for the knowledge loader / gallery preview). */

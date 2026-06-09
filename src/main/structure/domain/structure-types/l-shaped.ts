@@ -12,6 +12,7 @@ export const lShaped: StructureType = {
   id: 'l-shaped',
   label: 'L-shaped house',
   category: 'structure',
+  group: 'house',
   description:
     'A house with an L-shaped footprint: a long main wing and a perpendicular back wing meeting ' +
     'at a right angle, leaving a sheltered terrace in the inner corner. Two pitched roofs and a ' +

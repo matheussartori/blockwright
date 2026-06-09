@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { includedModuleGuides, isModuleGuide } from '../knowledge-select';
 
-const HOUSE = 'nbt/modules/structure/house.md';
+const HOUSE = 'nbt/modules/structure/classic.md';
 const COZY = 'nbt/modules/decoration/cozy.md';
 
 describe('isModuleGuide', () => {
@@ -24,7 +24,7 @@ describe('includedModuleGuides — prompt keyword fallback (no selection)', () =
 
 describe('includedModuleGuides — explicit selection', () => {
   it('includes the selected structure + decoration guides', () => {
-    const set = includedModuleGuides('', { structureType: 'house', decoration: 'cozy' });
+    const set = includedModuleGuides('', { structureType: 'classic', decoration: 'cozy' });
     expect(set).toContain(HOUSE);
     expect(set).toContain(COZY);
   });
@@ -34,7 +34,7 @@ describe('includedModuleGuides — explicit selection', () => {
   });
 
   it('loads a selected roof/basement guide, and ONLY the selected one', () => {
-    const set = includedModuleGuides('', { structureType: 'house', roof: 'gable', basement: 'cellar' });
+    const set = includedModuleGuides('', { structureType: 'classic', roof: 'gable', basement: 'cellar' });
     expect(set).toContain('nbt/modules/roof/gable.md');
     expect(set).toContain('nbt/modules/basement/cellar.md');
     // The roof/basement the user did NOT pick must not ride along.
@@ -43,7 +43,7 @@ describe('includedModuleGuides — explicit selection', () => {
   });
 
   it('loads a guide for each selected interior room, and only those', () => {
-    const set = includedModuleGuides('', { structureType: 'house', rooms: ['living', 'kitchen'] });
+    const set = includedModuleGuides('', { structureType: 'classic', rooms: ['living', 'kitchen'] });
     expect(set).toContain('nbt/modules/room/living.md');
     expect(set).toContain('nbt/modules/room/kitchen.md');
     expect(set).not.toContain('nbt/modules/room/library.md');

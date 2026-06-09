@@ -150,7 +150,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     const dp = phaseAt(phaseIndex);
     onProgress({
       sessionId, phase, inputTokens: meter.inputTokens, outputTokens: meter.displayedOutput(), turns,
-      designPhase: dp.label, designStep: phaseIndex + 1, designSteps: PHASES.length,
+      designPhase: dp.id, designStep: phaseIndex + 1, designSteps: PHASES.length,
     });
   };
   emitProgress(true); // flip the UI to a live status immediately

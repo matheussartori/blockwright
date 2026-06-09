@@ -1,28 +1,26 @@
-// The Module Gallery: browse what the generator can build, grouped by category
-// (Structure / Decoration / Basement / Roof / Room), and read what each module
-// does. Unlike the Block Catalog (hundreds of items → grid-dominant), there are
-// only a handful of modules per category and each carries rich, paragraph-length
-// detail — so this screen is DETAIL-DOMINANT: a compact left index of modules and
-// a wide right pane with a hero image, the description, and (for room modules) the
-// FURNISHING PRESETS laid out as readable per-scale cards (the old narrow sidebar
-// crushed them). Previews are image placeholders — drop `previews/<category>-<id>.png`
-// in public/ to fill them with in-game screenshots (see `modulePreviewSrc`).
+// The Module Gallery: a composition BLUEPRINT rather than a flat catalog. The old
+// screen flattened every module under category pills, which hid the one thing that
+// actually matters here — how the modules COMPOSE. So the gallery is now host-first:
+// pick a STRUCTURE (house/modern/…) on the left, and the right pane reads as an
+// assembly sequence of the parts that link into it, in build order (roof → basement
+// → rooms → decoration), joined by a connector spine. A part links via its
+// `appliesTo`, so switching the host re-filters what's shown (a structure with
+// nothing wired yet reads as "nothing links here yet"); the decoration stage is
+// UNIVERSAL (no `appliesTo`) and marked as fitting any structure. Clicking a part
+// expands its detail (description, applies-to, and — for rooms — the FURNISHING
+// PRESETS) inline under its stage. Previews are image placeholders — drop
+// `previews/<category>-<id>.png` in public/ to fill them (see `modulePreviewSrc`).
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
+import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import type { GenerationCatalog, GenerationModule, ModuleCategory } from '@/shared/types';
 import type { MessageKey } from '@/shared/i18n';
 import { Modal } from './ui/Modal';
 import { PreviewFrame, modulePreviewSrc } from './ui/PreviewFrame';
 
-const CATEGORIES: { value: ModuleCategory; label: MessageKey }[] = [
-  { value: 'structure', label: 'modules.catStructure' },
-  { value: 'decoration', label: 'modules.catDecoration' },
-  { value: 'basement', label: 'modules.catBasement' },
-  { value: 'roof', label: 'modules.catRoof' },
-  { value: 'room', label: 'modules.catRoom' },
-];
+type T = ReturnType<typeof useT>;
 
 /** i18n key for a furnishing-preset space tier chip. */
 const SCALE_LABEL: Record<string, MessageKey> = {
@@ -31,13 +29,33 @@ const SCALE_LABEL: Record<string, MessageKey> = {
   grand: 'modules.scaleGrand',
 };
 
+/** The composition stages, in build ORDER — a host structure is capped by a roof,
+ *  dug under by a basement, partitioned into rooms, then skinned by a decoration.
+ *  The decoration carries no `appliesTo`, so it's UNIVERSAL (fits any structure). */
+const STAGES: { category: ModuleCategory; label: MessageKey; role: MessageKey; universal?: boolean }[] = [
+  { category: 'roof', label: 'modules.catRoof', role: 'modules.roleRoof' },
+  { category: 'basement', label: 'modules.catBasement', role: 'modules.roleBasement' },
+  { category: 'room', label: 'modules.catRoom', role: 'modules.roleRoom' },
+  { category: 'decoration', label: 'modules.catDecoration', role: 'modules.roleDecoration', universal: true },
+];
+
+/** Count the parts that link to a host (exclude the universal decoration stage).
+ *  Resolves the host's GROUP so a group-shared module is counted too. */
+function linkedParts(catalog: GenerationCatalog, host: GenerationModule): number {
+  return STAGES.filter((s) => !s.universal).reduce(
+    (n, s) => n + (catalog[s.category] ?? []).filter((m) => moduleAppliesTo(m.appliesTo, host.id, host.group)).length,
+    0,
+  );
+}
+
 export function ModulesModal() {
   const t = useT();
   const open = useApp((s) => s.modulesOpen);
 
   const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
-  const [category, setCategory] = useState<ModuleCategory>('structure');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [structureId, setStructureId] = useState<string | null>(null);
+  // `${category}:${id}` of the expanded part, or null. Reset when the host changes.
+  const [openKey, setOpenKey] = useState<string | null>(null);
 
   const close = () => store.getState().setModulesOpen(false);
 
@@ -53,130 +71,223 @@ export function ModulesModal() {
     };
   }, [open]);
 
-  const modules: GenerationModule[] = useMemo(() => catalog?.[category] ?? [], [catalog, category]);
-  const selected = useMemo(
-    () => modules.find((m) => m.id === selectedId) ?? modules[0] ?? null,
-    [modules, selectedId],
+  const structures: GenerationModule[] = useMemo(() => catalog?.structure ?? [], [catalog]);
+  const structure = useMemo(
+    () => structures.find((s) => s.id === structureId) ?? structures[0] ?? null,
+    [structures, structureId],
   );
 
-  // Default the selection to the first module of the active category.
+  // Default the host to the first structure once the catalog arrives.
   useEffect(() => {
-    setSelectedId(modules[0]?.id ?? null);
-  }, [modules]);
+    setStructureId(structures[0]?.id ?? null);
+  }, [structures]);
 
-  const catLabel = (c: ModuleCategory) => t(CATEGORIES.find((x) => x.value === c)!.label);
+  // Collapse any open part detail when the host changes.
+  useEffect(() => {
+    setOpenKey(null);
+  }, [structure?.id]);
+
+  const stages = useMemo(() => {
+    if (!catalog || !structure) return [];
+    return STAGES.map((s) => ({
+      ...s,
+      modules: (catalog[s.category] ?? []).filter((m) =>
+        s.universal ? true : moduleAppliesTo(m.appliesTo, structure.id, structure.group),
+      ),
+    }));
+  }, [catalog, structure]);
+
+  const partsCount = catalog && structure ? linkedParts(catalog, structure) : 0;
+
+  // Structures bucketed by their family (group), so the rail headers each group and
+  // any ungrouped types fall into a trailing label-less section.
+  const groupedStructures = useMemo(() => {
+    if (!catalog) return [];
+    const groups = catalog.groups ?? [];
+    const out: { id: string; label?: string; items: GenerationModule[] }[] = [];
+    for (const g of groups) {
+      const items = structures.filter((s) => s.group === g.id);
+      if (items.length > 0) out.push({ id: g.id, label: g.label, items });
+    }
+    const ungrouped = structures.filter((s) => !s.group || !groups.some((g) => g.id === s.group));
+    if (ungrouped.length > 0) out.push({ id: '_ungrouped', items: ungrouped });
+    return out;
+  }, [catalog, structures]);
 
   return (
     <Modal open={open} onClose={close} title={t('modules.title')} className="modal-xl gallery" bodyClassName="gallery-body">
       <div className="gallery-main">
         <aside className="gallery-rail">
-          <div className="gallery-cats" role="tablist" aria-label={t('modules.category')}>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                role="tab"
-                aria-selected={category === c.value}
-                className={`gallery-cat${category === c.value ? ' active' : ''}`}
-                onClick={() => setCategory(c.value)}
-              >
-                {t(c.label)}
-              </button>
-            ))}
-          </div>
-
-          <div className="gallery-index">
+          <div className="gallery-rail-head">{t('modules.structures')}</div>
+          <div className="gallery-structures">
             {catalog === null && <div className="catalog-empty">{t('modules.loading')}</div>}
-            {catalog !== null && modules.length === 0 && (
-              <div className="catalog-empty">{t('modules.noneYet', { category: catLabel(category).toLowerCase() })}</div>
-            )}
-            {modules.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                className={`gallery-item${selected?.id === m.id ? ' selected' : ''}`}
-                onClick={() => setSelectedId(m.id)}
-              >
-                <PreviewFrame
-                  className="gallery-item-thumb"
-                  src={modulePreviewSrc(m.category, m.id)}
-                  alt={m.label}
-                />
-                <span className="gallery-item-text">
-                  <span className="gallery-item-name">{m.label}</span>
-                  <span className="gallery-item-desc">{m.description}</span>
-                </span>
-              </button>
+            {groupedStructures.map((grp) => (
+              <div key={grp.id} className="gallery-group">
+                {grp.label && <div className="gallery-group-head">{grp.label}</div>}
+                {grp.items.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`gallery-structure${structure?.id === s.id ? ' selected' : ''}`}
+                    onClick={() => setStructureId(s.id)}
+                  >
+                    <PreviewFrame
+                      className="gallery-structure-thumb"
+                      src={modulePreviewSrc('structure', s.id)}
+                      alt={s.label}
+                    />
+                    <span className="gallery-structure-text">
+                      <span className="gallery-structure-name">{s.label}</span>
+                      <span className="gallery-structure-meta">
+                        {catalog ? t('modules.partsCount', { count: linkedParts(catalog, s) }) : ''}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
-
-          {catalog !== null && modules.length > 0 && (
-            <div className="gallery-rail-foot">{t('modules.count', { count: modules.length })}</div>
-          )}
         </aside>
 
         <section className="gallery-detail">
-          {selected ? (
+          {structure ? (
             <>
-              <div className="gallery-hero">
+              <header className="gallery-host">
                 <PreviewFrame
-                  src={modulePreviewSrc(selected.category, selected.id)}
-                  alt={selected.label}
-                  badge={<span className="chip gallery-hero-badge">{catLabel(selected.category)}</span>}
+                  className="gallery-host-thumb"
+                  src={modulePreviewSrc('structure', structure.id)}
+                  alt={structure.label}
                   placeholder={t('modules.previewSoon')}
                 />
-              </div>
+                <div className="gallery-host-text">
+                  <span className="gallery-eyebrow">{t('modules.hostStructure')}</span>
+                  <h3 className="gallery-host-name">{structure.label}</h3>
+                  <p className="gallery-host-desc">{structure.description}</p>
+                  <div className="gallery-host-meta">{t('modules.partsCount', { count: partsCount })}</div>
+                </div>
+              </header>
 
-              <div className="gallery-detail-body">
-                <header className="gallery-detail-head">
-                  <h3 className="gallery-detail-name">{selected.label}</h3>
-                  {selected.appliesTo && selected.appliesTo.length > 0 && (
-                    <p className="gallery-applies">
-                      <span className="gallery-applies-label">{t('modules.appliesTo')}</span>
-                      {selected.appliesTo.map((id) => (
-                        <span key={id} className="chip">
-                          {catalog?.structure.find((s) => s.id === id)?.label ?? id}
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </header>
+              <div className="gallery-flow">
+                <div className="gallery-flow-root">
+                  <span className="gallery-node gallery-node-root" />
+                  <span className="gallery-flow-root-label">{structure.label}</span>
+                </div>
 
-                <p className="gallery-detail-desc">{selected.description}</p>
+                {stages.map((stage) => (
+                  <div key={stage.category} className={`gallery-stage${stage.universal ? ' universal' : ''}`}>
+                    <span className="gallery-node" />
+                    <div className="gallery-stage-main">
+                      <div className="gallery-stage-head">
+                        <span className="gallery-stage-label">{t(stage.label)}</span>
+                        {stage.universal ? (
+                          <span className="chip gallery-tag-universal">{t('modules.universal')}</span>
+                        ) : (
+                          <span className="gallery-stage-count">{stage.modules.length}</span>
+                        )}
+                        <span className="gallery-stage-role">{t(stage.role)}</span>
+                      </div>
 
-                {selected.presets && selected.presets.length > 0 && (
-                  <div className="gallery-presets">
-                    <div className="gallery-presets-head">
-                      <span className="gallery-section-label">{t('modules.presets')}</span>
-                      <span className="gallery-presets-hint">{t('modules.presetsHint')}</span>
-                    </div>
-                    <div className="gallery-presets-grid">
-                      {selected.presets.map((p) => (
-                        <article key={p.id} className="gallery-preset">
-                          <div className="gallery-preset-head">
-                            <span className={`chip gallery-preset-scale scale-${p.scale}`}>
-                              {SCALE_LABEL[p.scale] ? t(SCALE_LABEL[p.scale]) : p.scale}
-                            </span>
-                            <span className="gallery-preset-name">{p.label}</span>
-                          </div>
-                          <p className="gallery-preset-summary">{p.summary}</p>
-                          <ul className="gallery-preset-items">
-                            {p.furnishings.map((f, j) => (
-                              <li key={j}>{f}</li>
-                            ))}
-                          </ul>
-                        </article>
-                      ))}
+                      {stage.modules.length === 0 ? (
+                        <p className="gallery-stage-empty">
+                          {t('modules.stageEmpty', { structure: structure.label })}
+                        </p>
+                      ) : (
+                        <div className="gallery-stage-grid">
+                          {stage.modules.map((m) => {
+                            const key = `${stage.category}:${m.id}`;
+                            const isOpen = openKey === key;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                className={`gallery-part${isOpen ? ' open' : ''}`}
+                                aria-expanded={isOpen}
+                                onClick={() => setOpenKey(isOpen ? null : key)}
+                              >
+                                <span className="gallery-part-name">{m.label}</span>
+                                <span className="gallery-part-desc">{m.description}</span>
+                                {m.presets && m.presets.length > 0 && (
+                                  <span className="gallery-part-tag">
+                                    {t('modules.presetsCount', { count: m.presets.length })}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {stage.modules
+                        .filter((m) => `${stage.category}:${m.id}` === openKey)
+                        .map((m) => (
+                          <PartDetail key={m.id} module={m} catalog={catalog} t={t} />
+                        ))}
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </>
           ) : (
-            <div className="gallery-detail-empty">{t('modules.selectModule')}</div>
+            <div className="gallery-detail-empty">{t('modules.loading')}</div>
           )}
         </section>
       </div>
     </Modal>
+  );
+}
+
+/** The expanded detail for one linked part — preview, full description, the
+ *  structures it pairs with, and (room modules) the furnishing presets. */
+function PartDetail({ module, catalog, t }: { module: GenerationModule; catalog: GenerationCatalog | null; t: T }) {
+  return (
+    <div className="gallery-partdetail">
+      <PreviewFrame
+        className="gallery-partdetail-thumb"
+        src={modulePreviewSrc(module.category, module.id)}
+        alt={module.label}
+        placeholder={t('modules.previewSoon')}
+      />
+      <div className="gallery-partdetail-body">
+        <p className="gallery-partdetail-desc">{module.description}</p>
+
+        {module.appliesTo && module.appliesTo.length > 0 && (
+          <p className="gallery-applies">
+            <span className="gallery-applies-label">{t('modules.appliesTo')}</span>
+            {module.appliesTo.map((id) => (
+              <span key={id} className="chip">
+                {catalog?.structure.find((s) => s.id === id)?.label ?? id}
+              </span>
+            ))}
+          </p>
+        )}
+
+        {module.presets && module.presets.length > 0 && (
+          <div className="gallery-presets">
+            <div className="gallery-presets-head">
+              <span className="gallery-section-label">{t('modules.presets')}</span>
+              <span className="gallery-presets-hint">{t('modules.presetsHint')}</span>
+            </div>
+            <div className="gallery-presets-grid">
+              {module.presets.map((p) => (
+                <article key={p.id} className="gallery-preset">
+                  <div className="gallery-preset-head">
+                    <span className={`chip gallery-preset-scale scale-${p.scale}`}>
+                      {SCALE_LABEL[p.scale] ? t(SCALE_LABEL[p.scale]) : p.scale}
+                    </span>
+                    <span className="gallery-preset-name">{p.label}</span>
+                  </div>
+                  <p className="gallery-preset-summary">{p.summary}</p>
+                  <ul className="gallery-preset-items">
+                    {p.furnishings.map((f, j) => (
+                      <li key={j}>{f}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

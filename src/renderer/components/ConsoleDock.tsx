@@ -5,8 +5,9 @@
 // cohesive look, adds a top drag-handle to resize, and tails new lines live.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { LogLevel } from '@/shared/types';
+import type { MessageKey } from '@/shared/i18n';
 import { windowsStore, MIN_CONSOLE_H } from '../state/windows';
-import { useWindows, useLogs } from '../hooks/useStores';
+import { useWindows, useLogs, useT } from '../hooks/useStores';
 import type { LoggedEntry } from '../state/logs';
 import { logsStore } from '../state/logs';
 import { Segmented } from './ui/Segmented';
@@ -18,10 +19,10 @@ const SEVERITY: Record<LogLevel, number> = { debug: 0, log: 1, info: 1, warn: 2,
 type Filter = 'all' | 'warn' | 'error';
 const FILTER_MIN: Record<Filter, number> = { all: 0, warn: 2, error: 3 };
 
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'warn', label: 'Warnings' },
-  { value: 'error', label: 'Errors' },
+const FILTERS: { value: Filter; label: MessageKey }[] = [
+  { value: 'all', label: 'console.all' },
+  { value: 'warn', label: 'console.warnings' },
+  { value: 'error', label: 'console.errors' },
 ];
 
 const TIME = new Intl.DateTimeFormat(undefined, {
@@ -54,6 +55,7 @@ function LogRow({ entry }: { entry: LoggedEntry }) {
 }
 
 export function ConsoleDock() {
+  const t = useT();
   const visible = useWindows((s) => s.console.visible);
   const height = useWindows((s) => s.consoleHeight);
   const entries = useLogs((s) => s.entries);
@@ -119,23 +121,28 @@ export function ConsoleDock() {
     <section className="console-dock" style={{ height }}>
       <div className="console-resize" onPointerDown={onResizeDown} aria-hidden="true" />
       <div className="dock-head console-head">
-        <span className="console-title">Console</span>
+        <span className="console-title">{t('console.title')}</span>
         <span className="console-count">{shown.length}</span>
         <input
           className="console-search"
           type="search"
-          placeholder="Filter…"
+          placeholder={t('console.filter')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           spellCheck={false}
         />
         <div className="console-head-actions">
-          <Segmented<Filter> value={filter} options={FILTERS} onChange={setFilter} ariaLabel="Log level filter" />
+          <Segmented<Filter>
+            value={filter}
+            options={FILTERS.map((f) => ({ value: f.value, label: t(f.label) }))}
+            onChange={setFilter}
+            ariaLabel={t('console.levelFilter')}
+          />
           <button
             type="button"
             className="dock-btn"
-            title="Clear console"
-            aria-label="Clear console"
+            title={t('console.clear')}
+            aria-label={t('console.clear')}
             onClick={() => logsStore.getState().clear()}
           >
             ⌫
@@ -143,8 +150,8 @@ export function ConsoleDock() {
           <button
             type="button"
             className="dock-btn"
-            title="Close console (reopen from the View menu)"
-            aria-label="Close console"
+            title={t('console.closeHint')}
+            aria-label={t('console.close')}
             onClick={() => windowsStore.getState().setVisible('console', false)}
           >
             ✕
@@ -154,7 +161,7 @@ export function ConsoleDock() {
       <div className="console-body" ref={bodyRef} onScroll={onScroll}>
         {shown.length === 0 ? (
           <div className="console-empty">
-            {entries.length === 0 ? 'No logs yet.' : 'No logs match the current filter.'}
+            {entries.length === 0 ? t('console.emptyNoLogs') : t('console.emptyNoMatch')}
           </div>
         ) : (
           shown.map((entry) => <LogRow key={entry.key} entry={entry} />)

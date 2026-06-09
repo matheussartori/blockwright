@@ -28,8 +28,10 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
   // The selected structure (if any) drives the param controls + size + room editor.
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
   // Roof/basement/room options are filtered by the chosen structure's `appliesTo` — the
-  // SAME pure predicate main uses to gate knowledge guides, so the two can't drift.
-  const fits = (m: GenerationModule): boolean => moduleAppliesTo(m.appliesTo, details.structureType || undefined);
+  // SAME pure predicate main uses to gate knowledge guides, so the two can't drift. A
+  // module tagged with the structure's GROUP applies across the whole family.
+  const fits = (m: GenerationModule): boolean =>
+    moduleAppliesTo(m.appliesTo, details.structureType || undefined, selStruct?.group);
   // Per-floor room editor: shown for a storeyed structure (one with a `floors` param —
   // the house). Each floor takes up to two interior room modules that fit the structure.
   const nFloors = floorCount(selStruct, details.params);
@@ -49,7 +51,17 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
           <span>{t('gen.fieldStructure')}</span>
           <select value={details.structureType} onChange={(e) => onField('structureType', e.target.value)} disabled={busy}>
             <option value="">{t('gen.optNone')}</option>
-            {(catalog?.structure ?? []).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            {(catalog?.groups ?? []).map((g) => {
+              const items = (catalog?.structure ?? []).filter((m) => m.group === g.id);
+              return items.length > 0 ? (
+                <optgroup key={g.id} label={g.label}>
+                  {items.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </optgroup>
+              ) : null;
+            })}
+            {(catalog?.structure ?? [])
+              .filter((m) => !m.group || !(catalog?.groups ?? []).some((g) => g.id === m.group))
+              .map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
         </label>
         <label className="gen-field">

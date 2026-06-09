@@ -9,7 +9,7 @@ import { useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
-import { useActiveDoc } from './hooks/useStores';
+import { useActiveDoc, useT } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
 import { useAiRenderBridge } from './app/useAiRenderBridge';
 import { useAppIpc } from './app/useAppIpc';
@@ -30,6 +30,7 @@ import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 
 function Shell() {
+  const t = useT();
   const viewer = useViewer();
   const captureViewer = useCaptureViewer();
   const activeDoc = useActiveDoc();
@@ -76,9 +77,9 @@ function Shell() {
               )}
               {activeDoc && !fileOpen && !activeDoc.loading && (
                 <div className="empty-tab">
-                  <p>This tab is empty.</p>
+                  <p>{t('emptyTab.title')}</p>
                   <p className="empty-tab-hint">
-                    Describe a build in the Generate panel, or open an <code>.nbt</code> file.
+                    {t('emptyTab.hintPre')}<code>.nbt</code>{t('emptyTab.hintPost')}
                   </p>
                 </div>
               )}

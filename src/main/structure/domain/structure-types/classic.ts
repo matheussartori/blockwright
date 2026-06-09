@@ -1,4 +1,5 @@
-// "house" — a storeyed home whose MASSING (the part the model is bad at) is owned
+// "classic" — the original house archetype (a member of the "house" group). A
+// storeyed home whose MASSING (the part the model is bad at) is owned
 // entirely by code: a real stack of levels (optional below-grade basement, N
 // above-ground storeys, an optional in-roof attic), a SINGLE pitched roof, a
 // connected switchback stair core linking every level, window bands, a seated front
@@ -15,16 +16,17 @@ import { mulberry32 } from '../rng';
 import type { Box, StructureType } from './types';
 import { logProps } from './types';
 
-export const house: StructureType = {
-  id: 'house',
-  label: 'House',
+export const classic: StructureType = {
+  id: 'classic',
+  label: 'Classic',
   category: 'structure',
+  group: 'house',
   description:
     'A storeyed home with a pitched roof, framed corner posts, a centred doorway, and ' +
     'banded windows. Owns its full massing: an optional basement, 1–4 above-ground floors, ' +
     'an optional attic in the roof, a connected stair core, and an optional covered balcony. ' +
     'Decoration supplies the materials and (optionally) decay.',
-  knowledge: 'nbt/modules/structure/house.md',
+  knowledge: 'nbt/modules/structure/classic.md',
   preview: { size: [11, 13, 9], params: { floors: 2, attic: 'storage' } },
   // Multi-storey (stair cleanup) + a single complete chimney — the house-only finalizers.
   finalize: ['stairs', 'chimney'],
@@ -32,7 +34,7 @@ export const house: StructureType = {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
     // Surfaced in Details as the separate "Basement" module select (category
     // 'basement'), so it's omitted from the house's own param controls — but kept here
-    // so the legacy `template name:'house'` build path still resolves it.
+    // so the legacy `template name:'classic'` build path still resolves it.
     basement: {
       kind: 'enum', default: 'none', values: ['none', 'full', 'half'], label: 'Basement',
       labels: { none: 'None', full: 'Full cellar', half: 'Half-buried' }, module: 'basement',
@@ -47,7 +49,7 @@ export const house: StructureType = {
     },
     // Surfaced in Details as the separate "Roof" module select (category 'roof'), so
     // it's omitted from the house's own param controls — but kept here so the legacy
-    // `template name:'house'` build path still resolves it.
+    // `template name:'classic'` build path still resolves it.
     roof: {
       kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip'], label: 'Roof',
       labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip' }, module: 'roof',

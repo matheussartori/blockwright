@@ -14,8 +14,10 @@ import type { ModuleCategory, ModuleMeta, ModuleSummary } from './modules';
 import {
   getStructureType,
   listStructureTypes,
+  structureGroupOf,
   structureModules,
 } from './structure-types';
+import { STRUCTURE_GROUPS, type StructureGroup } from './groups';
 
 export {
   composeStructure,
@@ -32,10 +34,12 @@ export {
   structureTypeIds,
   listStructureTypes,
   structureModules,
+  structureGroupOf,
   structureFinalizers,
   type StructureType,
   type FinalizePass,
 } from './structure-types';
+export { STRUCTURE_GROUPS, getStructureGroup, type StructureGroup } from './groups';
 export {
   getDecoration,
   decorationIds,
@@ -53,19 +57,22 @@ export { paramFields } from './params';
 export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpec } from './modules';
 
 /** The structure type a decoration preview is rendered on. */
-const PREVIEW_HOST_STRUCTURE = 'house';
+const PREVIEW_HOST_STRUCTURE = 'classic';
 
-/** The renderer-facing catalog: every module summary, grouped by category. Drives
- *  the composer's Structure/Decoration selects and the module gallery. */
+/** The renderer-facing catalog: every module summary, grouped by category, plus the
+ *  structure GROUP definitions. Drives the composer's Structure/Decoration selects and
+ *  the module gallery. */
 export interface ModuleCatalog {
   structure: ModuleSummary[];
   decoration: ModuleSummary[];
   basement: ModuleSummary[];
   roof: ModuleSummary[];
   room: ModuleSummary[];
+  /** Structure families (e.g. "House"), for the gallery rail + Details optgroups. */
+  groups: StructureGroup[];
 }
 
-/** List every module summary, grouped by category. */
+/** List every module summary, grouped by category (+ the structure groups). */
 export function listModuleCatalog(): ModuleCatalog {
   return {
     structure: listStructureTypes(),
@@ -73,6 +80,7 @@ export function listModuleCatalog(): ModuleCatalog {
     basement: listBasements(),
     roof: listRoofs(),
     room: listRooms(),
+    groups: STRUCTURE_GROUPS,
   };
 }
 
@@ -115,17 +123,18 @@ export function selectedGuides(sel: ModuleSelection): string[] {
   const add = (m?: ModuleMeta) => {
     if (m?.knowledge) out.push(m.knowledge);
   };
+  const hostGroup = structureGroupOf(sel.structureType);
   add(sel.structureType ? getStructureType(sel.structureType) : undefined);
   add(sel.decoration ? getDecoration(sel.decoration) : undefined);
   const roof = sel.roof ? getRoof(sel.roof) : undefined;
-  if (moduleAppliesTo(roof?.appliesTo, sel.structureType)) add(roof);
+  if (moduleAppliesTo(roof?.appliesTo, sel.structureType, hostGroup)) add(roof);
   const basement = sel.basement ? getBasement(sel.basement) : undefined;
-  if (moduleAppliesTo(basement?.appliesTo, sel.structureType)) add(basement);
+  if (moduleAppliesTo(basement?.appliesTo, sel.structureType, hostGroup)) add(basement);
   // One guide per selected room (deduped already), gated by appliesTo so a room that
   // doesn't fit the chosen structure doesn't drag its guide in.
   for (const id of sel.rooms ?? []) {
     const room = getRoom(id);
-    if (moduleAppliesTo(room?.appliesTo, sel.structureType)) add(room);
+    if (moduleAppliesTo(room?.appliesTo, sel.structureType, hostGroup)) add(room);
   }
   return out;
 }

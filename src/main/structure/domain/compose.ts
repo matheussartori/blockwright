@@ -167,7 +167,7 @@ function makeModuleComposer(
  * Expand a `template` op into ordinary ops — the cross of a structure TYPE and a
  * DECORATION resolved against a role palette.
  *
- * @param name - The structure-type id (e.g. 'house').
+ * @param name - The structure-type id (e.g. 'classic').
  * @param from - One corner of the build box [x, y, z].
  * @param to - The opposite corner of the build box [x, y, z].
  * @param params - The op's loose params: a `decoration`/`theme` key, role-name block

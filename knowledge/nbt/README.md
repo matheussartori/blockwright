@@ -77,7 +77,7 @@ never speculatively. Categories:
 
 | File | Category | What it covers |
 |------|----------|----------------|
-| [`modules/structure/house.md`](modules/structure/house.md) | structure | The `house` type: design it yourself (no template) + a house refinement checklist. |
+| [`modules/structure/classic.md`](modules/structure/classic.md) | structure | The `classic` house type: design it yourself (no template) + a house refinement checklist. |
 | [`modules/structure/tower.md`](modules/structure/tower.md) | structure | The `tower` type: base→shaft→crown massing, exterior detailing, crowns, furnished floors, lighting. |
 | [`modules/decoration/cozy.md`](modules/decoration/cozy.md) | decoration | The `cozy` look: warm palette, lighting, soft furnishings, hearth, plants. |
 | [`modules/roof/gable.md`](modules/roof/gable.md) | roof | The `gable` roof: two slopes + a triangular gable end, ridge axis, overhang/fascia, attic void. |

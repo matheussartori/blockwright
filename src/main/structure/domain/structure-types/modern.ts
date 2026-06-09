@@ -46,6 +46,7 @@ export const modern: StructureType = {
   id: 'modern',
   label: 'Modern house',
   category: 'structure',
+  group: 'house',
   description:
     'A contemporary flat-roofed villa: stacked, offset white-concrete volumes with a set-back ' +
     'upper floor and roof terrace, floor-to-ceiling glass curtain walls broken by dark accent ' +

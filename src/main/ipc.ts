@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type { AssembleOptions, BuildSelection, ChatRecord, FloorDef, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
-import { getLanguage, setLanguage } from './language';
+import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
 import { metadataFromStructure, writeLoadMetadata } from './structure/metadata';
@@ -90,7 +90,7 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.workspaceOpen, async () => {
     const { workspace, error } = await promptOpenWorkspace();
-    if (error) dialog.showErrorBox('Open mod workspace', error);
+    if (error) dialog.showErrorBox(mt('dialog.openWorkspaceTitle'), error);
     buildAppMenu(); // reflect the active workspace in the File menu
     return workspace;
   });

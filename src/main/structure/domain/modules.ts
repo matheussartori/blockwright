@@ -38,13 +38,14 @@ export interface ModuleMeta {
    *  selection (e.g. a structure whose keywords match the prompt). Omit for modules
    *  that should only load when explicitly selected. */
   keywords?: RegExp;
-  /** Structure-type ids this module pairs with (e.g. a roof's `['house']`). A GROWING
-   *  link: a module built for the house can later also list another structure here to be
-   *  reused by it (e.g. a `crypt` basement gaining `'tower'` → `['house', 'tower']`). Drives
-   *  the composer Details filtering + knowledge-guide gating (`moduleAppliesTo`). Omit →
-   *  applies to every structure (decorations, which cross with all types). The roof/basement/
-   *  room contracts narrow this to REQUIRED, so those always declare their structure links
-   *  explicitly rather than silently applying to all. */
+  /** Structure-type ids AND/OR group ids this module pairs with (e.g. a roof's
+   *  `['house']` — the GROUP, so it's shared across every house-family member). A
+   *  GROWING link: tag the whole family via its group, or narrow to specific structures
+   *  (e.g. `['classic']`, or `['classic', 'cabin']`). Drives the composer Details
+   *  filtering + knowledge-guide gating (`moduleAppliesTo`, which resolves the host's
+   *  group). Omit → applies to every structure (decorations, which cross with all types).
+   *  The roof/basement/room contracts narrow this to REQUIRED, so those always declare
+   *  their links explicitly rather than silently applying to all. */
   appliesTo?: string[];
   /** How to render this module in the gallery (omit → no preview). */
   preview?: PreviewSpec;
@@ -62,10 +63,14 @@ export interface ModuleSummary {
   label: string;
   category: ModuleCategory;
   description: string;
+  /** The structure GROUP id (structure types only) — drives the gallery/Details
+   *  grouping header and the host→group resolution for `moduleAppliesTo`. */
+  group?: string;
   /** Whether a 3D preview can be composed for this module. */
   hasPreview: boolean;
-  /** Structure-type ids this module pairs with (the growing `appliesTo` link); the UI
-   *  shows all for now but can later filter on it. Omit → applies to every structure. */
+  /** Structure-type ids and/or group ids this module pairs with (the growing
+   *  `appliesTo` link); a group id shares it across the whole family. Omit → applies
+   *  to every structure. */
   appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];

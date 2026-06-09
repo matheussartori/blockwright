@@ -193,7 +193,8 @@ export interface GenerateProgress {
   outputTokens: number;
   /** Assistant turns started so far. */
   turns: number;
-  /** Current design pass label (massing/roof/facade/…), for the phased review loop. */
+  /** Current design pass id (massing/roof/facade/…), for the phased review loop;
+   *  the renderer maps it to a localized label. */
   designPhase?: string;
   /** 1-based index + total of the design passes (e.g. step 3 of 6). */
   designStep?: number;

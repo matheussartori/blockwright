@@ -1,11 +1,12 @@
 // "gable" — a classic two-sided pitched roof with a triangular gable end at each end
 // of the ridge. It carries GENERIC geometry (`build()` — a single gable `roof` op over
-// the host's wall box, works on any structure) PLUS a HOUSE-SPECIFIC integration
-// (`integrations.house` — gable-end vents, which only make sense over a house's attic).
-// Run by `composeModule` — for the gallery preview AND the house's roof delegation.
+// the host's wall box, works on any structure) PLUS a CLASSIC-SPECIFIC integration
+// (`integrations.classic` — gable-end vents, which only make sense over the classic
+// house's attic). Run by `composeModule` — for the gallery preview AND the house's roof
+// delegation.
 //
-// Linked to the `house` via `appliesTo`; add another structure id (and optionally an
-// `integrations` entry for it) to reuse it on another structure.
+// Shared with the whole `house` group via `appliesTo`; its host integration is keyed by
+// structure id, so add an `integrations` entry per structure that wants the extra detail.
 import type { AuthoringOp } from '../../authoring/types';
 import type { Box } from '../structure-types/types';
 import type { RoofModule } from './types';
@@ -34,9 +35,9 @@ export const gable: RoofModule = {
     const ridge = gableRidge(params.ridge, box);
     return [{ op: 'roof', from: [x0, y0, z0], to: [x1, y1, z1], state: stair, style: 'gable', ridge, fill }];
   },
-  // HOUSE-SPECIFIC: a small vent at each gable end's peak (houses have attics to breathe).
+  // CLASSIC-SPECIFIC: a small vent at each gable end's peak (the classic house has an attic to breathe).
   integrations: {
-    house({ box, params, palette }): AuthoringOp[] {
+    classic({ box, params, palette }): AuthoringOp[] {
       const { x0, y0, z0, x1, y1, z1 } = box;
       const vent = palette.get('window');
       const ridge = gableRidge(params.ridge, box);
