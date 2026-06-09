@@ -1,5 +1,6 @@
 // AI structure-generation contracts: the prompt inputs, the per-turn result, the
 // persisted chat transcript, and the live progress / self-review render round-trip.
+import type { ModuleSlotKey } from '../domain/module-slots';
 
 /** A reference image attached to a generation prompt. `data` is base64 with no
  *  `data:` URL prefix; `mediaType` is one Claude accepts (png/jpeg/gif/webp). */
@@ -8,22 +9,13 @@ export interface GenerateImage {
   data: string;
 }
 
-/** The modules the user picked in the composer Details: a structure type, a
- *  decoration, and (for the structure) a roof + basement typology. Threaded into
- *  generation as STRUCTURED data — separate from the prompt text — so the system prompt
- *  loads only the selected modules' knowledge guides (one guide per selected module, so
- *  an unused roof/basement guide is never sent). */
-export interface BuildSelection {
+/** The modules the user picked in the composer Details: a structure type plus one id per
+ *  single-select module SLOT (decoration/roof/basement/attic/exterior — the per-slot
+ *  fields are DERIVED from {@link ModuleSlotKey}, so adding a category adds the field
+ *  here automatically). Threaded into generation as STRUCTURED data — separate from the
+ *  prompt text — so the system prompt loads only the selected modules' knowledge guides. */
+export type BuildSelection = Partial<Record<ModuleSlotKey, string>> & {
   structureType?: string;
-  decoration?: string;
-  roof?: string;
-  basement?: string;
-  /** In-roof attic module id (storage/bedroom), if picked — loads its own guide. Only on
-   *  pitched-roof houses (it clashes with the flat roof). */
-  attic?: string;
-  /** Exterior finishing style id (farmhouse/sakura/gothic), if picked — loads its own
-   *  guide. Only on the pitched houses (classic/cabin/l-shaped). */
-  exterior?: string;
   /** Interior room module ids assigned across floors (deduped) — each loads its own
    *  knowledge guide. The per-floor layout itself rides in the prompt text. */
   rooms?: string[];
@@ -31,23 +23,17 @@ export interface BuildSelection {
    *  that ships a code-built starting SHELL (e.g. the modern house) can compile that
    *  shell at the right size and seed the model with it. */
   size?: [number, number, number];
-}
+};
 
 /** A display-ready build card shown in the chat. On the USER message it summarises
  *  the details the user picked (a preview of the request); on the ASSISTANT message
  *  of a finished build it's the COMPLETE card — the request plus the result (version,
- *  block count) and Open/Reveal actions for the saved library file. All module fields
- *  are human LABELS, so the card renders without any catalog lookup. */
-export interface BuildBrief {
+ *  block count) and a Reveal action for the saved library file. The per-slot module
+ *  fields are human LABELS (derived from {@link ModuleSlotKey}), so the card renders
+ *  without any catalog lookup. */
+export type BuildBrief = Partial<Record<ModuleSlotKey, string>> & {
   /** Structure-type label, or undefined for a plain free-form prompt with no Details. */
   structure?: string;
-  decoration?: string;
-  roof?: string;
-  basement?: string;
-  /** In-roof attic label (Storage/Bedroom), if picked. */
-  attic?: string;
-  /** Exterior finishing style label (Farmhouse/Sakura/Gothic), if picked. */
-  exterior?: string;
   /** Build box as [W, H, D]. */
   size?: [number, number, number];
   /** Per-floor room assignment (bottom-up): each floor's label + its room labels (0–2). */
@@ -63,7 +49,7 @@ export interface BuildBrief {
    *  card's Reveal-in-folder action (assistant result card). The build's own tab is
    *  already this file, so there is no "Open". */
   libraryPath?: string;
-}
+};
 
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
  *  its metadata, or an error message for the UI to surface. */

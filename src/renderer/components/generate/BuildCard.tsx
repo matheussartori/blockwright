@@ -5,16 +5,17 @@
 // saved library file — so the user can jump straight to the build's folder on disk.
 import { api } from '../../api';
 import { dirname } from '../../ui/path';
+import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import type { MessageKey } from '@/shared/i18n';
 import type { BuildBrief } from '@/shared/types';
 
 export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey) => string }) {
   const chips: { label: string; value: string }[] = [];
-  if (build.decoration) chips.push({ label: t('gen.fieldDecoration'), value: build.decoration });
-  if (build.roof) chips.push({ label: t('gen.fieldRoof'), value: build.roof });
-  if (build.basement) chips.push({ label: t('gen.fieldBasement'), value: build.basement });
-  if (build.attic) chips.push({ label: t('gen.fieldAttic'), value: build.attic });
-  if (build.exterior) chips.push({ label: t('gen.fieldExterior'), value: build.exterior });
+  // One chip per picked slot (decoration/roof/basement/attic/exterior), in registry order.
+  for (const slot of MODULE_SLOTS) {
+    const value = build[slot.key];
+    if (value) chips.push({ label: t(slot.fieldLabel), value });
+  }
   if (build.size) chips.push({ label: t('gen.statSize'), value: build.size.join('×') });
   if (build.blockCount != null) chips.push({ label: t('gen.statBlocks'), value: build.blockCount.toLocaleString() });
   const title = build.structure ?? t('gen.cardStructure');

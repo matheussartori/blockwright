@@ -15,12 +15,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   AI_PROVIDERS,
+  DEFAULT_GENERATION_SETTINGS,
   DEFAULT_PROVIDER,
+  GENERATION_LIMITS,
   providerMeta,
   type AiConfig,
   type AiProviderId,
   type AiProviderMeta,
   type AiProviderState,
+  type GenerationSettings,
 } from '@/shared/ai';
 
 // --- on-disk locations -------------------------------------------------------
@@ -60,9 +63,9 @@ function migrateLegacy(): Partial<Record<AiProviderId, string>> {
     if (!safeStorage.isEncryptionAvailable()) return {};
     const secret = safeStorage.decryptString(buf).trim();
     if (!secret) return {};
-    // An `sk-ant-api…` key is an API key; an `sk-ant-oat…` token is the subscription.
-    const id: AiProviderId = secret.startsWith('sk-ant-api') ? 'claude-api' : 'claude-subscription';
-    const map: Partial<Record<AiProviderId, string>> = { [id]: secret };
+    // Both an `sk-ant-api…` key and an `sk-ant-oat…` token migrate to the Claude
+    // subscription provider — `authEnv` applies whichever the secret is.
+    const map: Partial<Record<AiProviderId, string>> = { 'claude-subscription': secret };
     writeSecrets(map);
     fs.rmSync(legacyFile(), { force: true });
     return map;
@@ -109,8 +112,26 @@ export function clearCredential(id: AiProviderId): void {
 interface Prefs {
   activeProvider: AiProviderId;
   models: Partial<Record<AiProviderId, string>>;
+  /** The generation cost/quality knobs (see shared/ai.ts). Absent = the cheap default. */
+  generation: GenerationSettings;
 }
 let prefsCache: Prefs | undefined;
+
+/** Coerce a stored (possibly partial/garbage) generation blob to valid, clamped
+ *  settings — so a hand-edited file or a missing field can't break a run. */
+function normalizeGeneration(g: Partial<GenerationSettings> | undefined): GenerationSettings {
+  const d = DEFAULT_GENERATION_SETTINGS;
+  const clamp = (v: unknown, lo: number, hi: number, def: number): number => {
+    const n = typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : def;
+    return Math.max(lo, Math.min(hi, n));
+  };
+  return {
+    // 0 = AUTO (volume-scaled); otherwise clamp to the explicit min..max round bounds.
+    maxRounds: g?.maxRounds === 0 ? 0 : clamp(g?.maxRounds, GENERATION_LIMITS.minRounds, GENERATION_LIMITS.maxRounds, d.maxRounds),
+    thinkingBudget: clamp(g?.thinkingBudget, GENERATION_LIMITS.minThinking, GENERATION_LIMITS.maxThinking, d.thinkingBudget),
+    critic: typeof g?.critic === 'boolean' ? g.critic : d.critic,
+  };
+}
 
 function readPrefs(): Prefs {
   try {
@@ -120,9 +141,10 @@ function readPrefs(): Prefs {
         ? parsed.activeProvider
         : DEFAULT_PROVIDER,
       models: parsed.models ?? {},
+      generation: normalizeGeneration(parsed.generation),
     };
   } catch {
-    return { activeProvider: DEFAULT_PROVIDER, models: {} };
+    return { activeProvider: DEFAULT_PROVIDER, models: {}, generation: normalizeGeneration(undefined) };
   }
 }
 
@@ -149,6 +171,19 @@ export function setModel(id: AiProviderId, model: string): void {
   const meta = providerMeta(id);
   if (!meta) return;
   writePrefs({ ...prefs(), models: { ...prefs().models, [id]: model.trim() || meta.defaultModel } });
+}
+
+/** The persisted generation cost/quality settings (clamped to valid bounds). */
+export function getGenerationSettings(): GenerationSettings {
+  return prefs().generation;
+}
+
+/** Merge a partial generation update over the current settings (clamping), persist
+ *  it, and return the resolved settings. */
+export function setGenerationSettings(patch: Partial<GenerationSettings>): GenerationSettings {
+  const next = normalizeGeneration({ ...prefs().generation, ...patch });
+  writePrefs({ ...prefs(), generation: next });
+  return next;
 }
 
 /** The model chosen for a provider, falling back to its default. */
@@ -232,7 +267,7 @@ export function getConfig(): AiConfig {
       model: modelFor(meta.id),
     };
   });
-  return { providers, activeProvider: prefs().activeProvider };
+  return { providers, activeProvider: prefs().activeProvider, generation: prefs().generation };
 }
 
 // --- subprocess env for the SDK-based providers ------------------------------
@@ -252,8 +287,6 @@ export function authEnv(id: AiProviderId): Record<string, string | undefined> {
     if (id === 'claude-subscription') {
       if (value.startsWith('sk-ant-api')) env.ANTHROPIC_API_KEY = value;
       else env.CLAUDE_CODE_OAUTH_TOKEN = value;
-    } else if (id === 'claude-api') {
-      env.ANTHROPIC_API_KEY = value;
     } else if (id === 'codex') {
       env.CODEX_API_KEY = value;
       env.OPENAI_API_KEY = value;

@@ -2794,6 +2794,38 @@ body.row-resizing {
   cursor: pointer;
 }
 
+/* --- AI generation cost presets -------------------------------------------- */
+
+.ai-preset-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.ai-preset {
+  -webkit-app-region: no-drag;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ai-preset:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.ai-preset.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.ai-preset-custom {
+  cursor: default;
+}
+
 /* --- AI provider cards ----------------------------------------------------- */
 
 .ai-provider-head {

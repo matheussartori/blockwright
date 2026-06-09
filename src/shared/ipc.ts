@@ -53,6 +53,8 @@ export const IPC_CHANNELS = {
   aiSetCredential: 'ai:set-credential',
   /** Remove a provider's stored credential — payload: id. */
   aiClearCredential: 'ai:clear-credential',
+  /** Update the generation cost/quality settings — payload: a partial GenerationSettings. */
+  aiSetGeneration: 'ai:set-generation',
   /** Generate/edit a structure for a session (payload: sessionId + prompt). */
   aiGenerate: 'ai:generate',
   /** Cancel the in-flight generation for a session (payload: sessionId). */

@@ -6,6 +6,7 @@
 import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
 import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
+import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 import { composeModulePreview } from './compose';
 import { resolveParams } from './params';
 import { box } from './structure-types/types';
@@ -141,32 +142,42 @@ export type ModuleSelection = Omit<BuildSelection, 'size'>;
 // for existing importers of the domain barrel.
 export { moduleAppliesTo };
 
+/** Resolve a single-select slot's module by category — the one place that maps a
+ *  {@link ModuleSlotKey} to its registry getter (the exhaustive switch makes adding a
+ *  slot a compile error until it's wired here). */
+function getSlotModule(key: ModuleSlotKey, id: string): ModuleMeta | undefined {
+  switch (key) {
+    case 'decoration': return getDecoration(id);
+    case 'roof': return getRoof(id);
+    case 'basement': return getBasement(id);
+    case 'attic': return getAttic(id);
+    case 'exterior': return getExterior(id);
+  }
+}
+
 /** The module guides to include for an explicit selection (paths relative to the
  *  knowledge dir, e.g. `nbt/modules/structure/house.md`). One guide per selected
- *  module — a roof/basement guide loads only when that type is chosen AND it applies to
- *  the chosen structure (so a house-only roof guide is never sent for another type). */
+ *  module — a slot guide loads only when that module is chosen AND it applies to the
+ *  chosen structure (so a house-only roof guide is never sent for another type). Loops
+ *  the shared {@link MODULE_SLOTS} so a new category is gated automatically. */
 export function selectedGuides(sel: ModuleSelection): string[] {
   const out: string[] = [];
+  const hostGroup = structureGroupOf(sel.structureType);
   const add = (m?: ModuleMeta) => {
     if (m?.knowledge) out.push(m.knowledge);
   };
-  const hostGroup = structureGroupOf(sel.structureType);
+  // Gated by appliesTo so a module that doesn't fit the chosen structure (or a room/roof
+  // for another family) never drags its guide in. A universal module (no appliesTo, e.g.
+  // a decoration) always passes.
+  const gatedAdd = (m?: ModuleMeta) => {
+    if (moduleAppliesTo(m?.appliesTo, sel.structureType, hostGroup)) add(m);
+  };
   add(sel.structureType ? getStructureType(sel.structureType) : undefined);
-  add(sel.decoration ? getDecoration(sel.decoration) : undefined);
-  const roof = sel.roof ? getRoof(sel.roof) : undefined;
-  if (moduleAppliesTo(roof?.appliesTo, sel.structureType, hostGroup)) add(roof);
-  const basement = sel.basement ? getBasement(sel.basement) : undefined;
-  if (moduleAppliesTo(basement?.appliesTo, sel.structureType, hostGroup)) add(basement);
-  const attic = sel.attic ? getAttic(sel.attic) : undefined;
-  if (moduleAppliesTo(attic?.appliesTo, sel.structureType, hostGroup)) add(attic);
-  const exterior = sel.exterior ? getExterior(sel.exterior) : undefined;
-  if (moduleAppliesTo(exterior?.appliesTo, sel.structureType, hostGroup)) add(exterior);
-  // One guide per selected room (deduped already), gated by appliesTo so a room that
-  // doesn't fit the chosen structure doesn't drag its guide in.
-  for (const id of sel.rooms ?? []) {
-    const room = getRoom(id);
-    if (moduleAppliesTo(room?.appliesTo, sel.structureType, hostGroup)) add(room);
+  for (const slot of MODULE_SLOTS) {
+    const id = sel[slot.key];
+    if (id) gatedAdd(getSlotModule(slot.key, id));
   }
+  for (const id of sel.rooms ?? []) gatedAdd(getRoom(id));
   return out;
 }
 

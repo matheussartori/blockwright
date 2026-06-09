@@ -41,8 +41,9 @@ refines through an emit → render → review loop — previewed live in the vie
 
 - Real-time 3D rendering of `.nbt` structures with [Three.js](https://threejs.org)
 - AI structure generation from a prompt or reference image, through an emit → render → review loop
-  that refines the build live — with multiple provider backends to choose from (Claude
-  subscription / API, OpenAI, Gemini, Codex), configured in Settings
+  that refines the build live — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT
+  Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
+  to trade quality for spend, configured in Settings ▸ AI
 - Composable generation domain — pick a structure type (classic / modern / cabin / L-shaped), a
   decoration, a roof, a basement, an in-roof attic, an exterior finishing style (farmhouse / sakura /
   gothic — the house's outside cladding + signature volumes) and per-floor interior rooms (living

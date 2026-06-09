@@ -4,21 +4,19 @@
 // without an extra round-trip, while the main process resolves credentials and
 // drives the actual model.
 //
-// Blockwright supports several AI backends. Two authenticate via a *subscription*
-// (an existing CLI login — no API credits): the Claude Agent SDK (Claude Code /
-// Pro·Max) and Codex (ChatGPT Plus·Pro). The rest authenticate with a paid
-// *API key*: the Anthropic, OpenAI, and Google Gemini APIs. The user can
-// configure more than one and pick which is active.
+// Blockwright drives generation through one of two *subscription* backends (an
+// existing CLI login — no API credits): the Claude Agent SDK (Claude Code /
+// Pro·Max), the supported default, and Codex (ChatGPT Plus·Pro), a best-effort
+// beta. The user configures both and picks which is active.
 
 /** Stable identifier for each backend. */
 export type AiProviderId =
   | 'claude-subscription'
-  | 'claude-api'
-  | 'openai'
-  | 'gemini'
   | 'codex';
 
-/** How a provider authenticates: a CLI/subscription login, or a pasted API key. */
+/** How a provider authenticates. Both backends use a CLI/subscription login; the
+ *  `api-key` kind is kept on the contract because a subscription provider can also
+ *  accept a pasted token (e.g. Claude via `claude setup-token`). */
 export type AiAuthKind = 'subscription' | 'api-key';
 
 /** One selectable model for a provider. */
@@ -70,52 +68,6 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     defaultModel: 'claude-opus-4-8',
   },
   {
-    id: 'claude-api',
-    label: 'Claude API',
-    authKind: 'api-key',
-    stability: 'beta',
-    blurb: 'Anthropic API key (pay-as-you-go credits). Same models, billed per token.',
-    envVars: ['ANTHROPIC_API_KEY'],
-    keyPlaceholder: 'sk-ant-api…',
-    models: [
-      { id: 'claude-opus-4-8', label: 'Opus 4.8' },
-      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
-      { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
-    ],
-    defaultModel: 'claude-sonnet-4-6',
-  },
-  {
-    id: 'openai',
-    label: 'OpenAI (ChatGPT)',
-    authKind: 'api-key',
-    stability: 'beta',
-    blurb: 'OpenAI API key (pay-as-you-go). GPT models with vision for the self-review loop.',
-    envVars: ['OPENAI_API_KEY'],
-    keyPlaceholder: 'sk-…',
-    models: [
-      { id: 'gpt-5', label: 'GPT-5' },
-      { id: 'gpt-5-mini', label: 'GPT-5 mini' },
-      { id: 'gpt-4.1', label: 'GPT-4.1' },
-      { id: 'gpt-4o', label: 'GPT-4o' },
-    ],
-    defaultModel: 'gpt-4.1',
-  },
-  {
-    id: 'gemini',
-    label: 'Google Gemini',
-    authKind: 'api-key',
-    stability: 'beta',
-    blurb: 'Google AI API key (generous free tier). Strong vision; great value.',
-    envVars: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
-    keyPlaceholder: 'AIza…',
-    models: [
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-    ],
-    defaultModel: 'gemini-2.5-flash',
-  },
-  {
     id: 'codex',
     label: 'Codex (ChatGPT)',
     authKind: 'subscription',
@@ -156,9 +108,93 @@ export interface AiProviderState {
   model: string;
 }
 
+// --- generation cost settings ------------------------------------------------
+//
+// The dominant cost of a build is the emit→render→review LOOP re-sending the big
+// knowledge-base system prompt every round (input tokens, cached), plus extended
+// thinking (output) and the optional independent critic (an extra model call).
+// These three knobs let the user trade quality for cost; the default (Balanced)
+// is the original full-quality run, with Saver as the cheap draft fallback.
+// Env vars (BW_AI_MAX_ROUNDS / BW_AI_THINKING_BUDGET) still override.
+
+/** The user-tunable cost/quality knobs for generation. */
+export interface GenerationSettings {
+  /** Max emit→render→review rounds before the loop must stop. Each round
+   *  re-renders + re-reviews the build, re-sending the system prompt — so this is
+   *  the #1 cost lever. Fewer = cheaper + faster, but less polish. `0` = AUTO: the
+   *  cap scales with the build's volume, floored to the full design-pass sequence. */
+  maxRounds: number;
+  /** Extended-thinking budget in tokens (0 = off). The model plans geometry in
+   *  thinking; more = better massing/roofs but more output tokens. */
+  thinkingBudget: number;
+  /** Run the INDEPENDENT audit critic — a separate fresh-context model call on the
+   *  final pass that judges the build. Catches more, but costs an extra call.
+   *  Claude only (Codex has no critic; the flag is ignored there). */
+  critic: boolean;
+}
+
+/** Bounds the UI + main clamp `maxRounds`/`thinkingBudget` to. */
+export const GENERATION_LIMITS = {
+  minRounds: 1,
+  maxRounds: 10,
+  minThinking: 0,
+  maxThinking: 8000,
+} as const;
+
+/** A named cost preset (the simple one-click control) + its underlying settings. */
+export interface GenerationPreset {
+  id: 'saver' | 'balanced' | 'thorough';
+  label: string;
+  /** One-line description of the cost/quality tradeoff. */
+  blurb: string;
+  settings: GenerationSettings;
+}
+
+/** The presets. "Balanced" is the default — it restores the original always-on
+ *  full design-pass + thinking + critic run (the quality baseline before the cost
+ *  knobs were added). "Saver" is the cheap draft fallback, listed last. */
+export const GENERATION_PRESETS: GenerationPreset[] = [
+  {
+    id: 'balanced',
+    label: 'Balanced',
+    blurb: 'The full design-pass sequence (rounds auto-scaled to build size), extended thinking, and the independent critic. The quality baseline for real builds.',
+    settings: { maxRounds: 0, thinkingBudget: 5000, critic: true },
+  },
+  {
+    id: 'thorough',
+    label: 'Thorough',
+    blurb: 'Most expensive — a high fixed round cap and the deepest thinking on top of the critic.',
+    settings: { maxRounds: 10, thinkingBudget: 8000, critic: true },
+  },
+  {
+    id: 'saver',
+    label: 'Saver',
+    blurb: 'Cheapest — a few quick passes, no extended thinking, no critic. Best for quick drafts.',
+    settings: { maxRounds: 3, thinkingBudget: 0, critic: false },
+  },
+];
+
+/** The default generation settings (the "Balanced" preset) — the original quality baseline. */
+export const DEFAULT_GENERATION_SETTINGS: GenerationSettings =
+  GENERATION_PRESETS.find((p) => p.id === 'balanced')!.settings;
+
+/** The preset id whose settings exactly match `s`, or `'custom'` when none does
+ *  (the user hand-tuned a value). Drives the Settings preset highlight. */
+export function presetIdFor(s: GenerationSettings): GenerationPreset['id'] | 'custom' {
+  const hit = GENERATION_PRESETS.find(
+    (p) =>
+      p.settings.maxRounds === s.maxRounds &&
+      p.settings.thinkingBudget === s.thinkingBudget &&
+      p.settings.critic === s.critic,
+  );
+  return hit?.id ?? 'custom';
+}
+
 /** The whole AI configuration the Settings panel renders + edits. */
 export interface AiConfig {
   providers: AiProviderState[];
   /** The provider used for generation. */
   activeProvider: AiProviderId;
+  /** The generation cost/quality settings (see {@link GenerationSettings}). */
+  generation: GenerationSettings;
 }

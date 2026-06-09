@@ -14,9 +14,9 @@ import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
 import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
-import { getConfig, setActiveProvider, setModel, setCredential, clearCredential } from './ai/credentials';
+import { getConfig, setActiveProvider, setModel, setCredential, clearCredential, setGenerationSettings } from './ai/credentials';
 import { getOutputDir, setOutputDir } from './ai/output-dir';
-import type { AiProviderId } from '@/shared/ai';
+import type { AiProviderId, GenerationSettings } from '@/shared/ai';
 import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/jigsaw/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
@@ -156,6 +156,10 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IPC_CHANNELS.aiClearCredential, async (_e, id: AiProviderId) => {
     clearCredential(id);
+    return getConfig();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiSetGeneration, async (_e, patch: Partial<GenerationSettings>) => {
+    setGenerationSettings(patch);
     return getConfig();
   });
   // Render round-trip for the generator's self-review loop: generate.ts calls the

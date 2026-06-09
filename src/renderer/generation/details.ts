@@ -6,15 +6,17 @@
 //
 // The `BuildDetails` model itself + the brief/selection/summary builders live in
 // `brief.ts`; this module only mutates the model.
-import { type BuildDetails, ROOMS_PER_FLOOR } from './brief';
+import { type BuildDetails, EMPTY_SLOTS, ROOMS_PER_FLOOR } from './brief';
+import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 
 /** The modern house structure + its paired decoration (auto-selected together): the
  *  modern villa is a white-and-glass archetype, so picking it defaults the look to Modern. */
 const MODERN_STRUCTURE = 'modern';
 const MODERN_DECORATION = 'modern';
 
-/** The single-value Details selects driven by `setDetailField`. */
-export type DetailField = 'structureType' | 'decoration' | 'roof' | 'basement' | 'attic' | 'exterior';
+/** The single-value Details selects driven by `setDetailField`: the structure pill plus
+ *  every single-select module slot (decoration/roof/basement/attic/exterior). */
+export type DetailField = 'structureType' | ModuleSlotKey;
 
 /** The roof id that leaves no roof void, so it cannot host an attic (see the `flat` roof
  *  module's `incompatibleWith`). Picking it clears any attic selection. */
@@ -42,24 +44,19 @@ export const SIZE_MAX = 64;
  *  @returns The next Details state (a new object). */
 export function setDetailField(d: BuildDetails, key: DetailField, value: string): BuildDetails {
   if (key === 'structureType') {
-    // The modern house is a white-and-glass archetype — pair it with the Modern decoration
-    // by default so its materials + guide come along (the user can still change it).
+    // Switching structure clears every slot (the compatible set is structure-specific) +
+    // the params/size/rooms. The modern house is a white-and-glass archetype — pair it with
+    // the Modern decoration by default so its materials + guide come along.
     const decoration = value === MODERN_STRUCTURE ? MODERN_DECORATION : '';
-    return { ...d, structureType: value, decoration, params: {}, size: null, roof: '', basement: '', attic: '', exterior: '', rooms: [] };
+    return { ...d, ...EMPTY_SLOTS, decoration, structureType: value, params: {}, size: null, rooms: [] };
   }
-  if (key === 'basement') {
-    return { ...d, basement: value, size: null };
-  }
-  if (key === 'roof') {
-    // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
-    // two can't be selected together (mirrors the gallery dimming + the modules' conflict).
-    const attic = value === FLAT_ROOF ? '' : d.attic;
-    return { ...d, roof: value, attic };
-  }
-  if (key === 'attic') {
-    return { ...d, attic: value, size: null };
-  }
-  return { ...d, [key]: value };
+  const slot = MODULE_SLOTS.find((s) => s.key === key);
+  const next: BuildDetails = { ...d, [key]: value };
+  if (slot?.affectsSize) next.size = null; // a basement/attic grows the box → re-derive
+  // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
+  // two can't be selected together (mirrors the attic module's `incompatibleWith: ['flat']`).
+  if (key === 'roof' && value === FLAT_ROOF) next.attic = '';
+  return next;
 }
 
 /** Assign (or clear, with '') a room to one floor's slot, growing the per-floor

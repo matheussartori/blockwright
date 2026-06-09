@@ -6,9 +6,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { useT } from '../../hooks/useStores';
+import type { MessageKey } from '@/shared/i18n';
 import {
-  AI_PROVIDERS, providerMeta,
+  AI_PROVIDERS, GENERATION_LIMITS, GENERATION_PRESETS, presetIdFor, providerMeta,
   type AiConfig, type AiProviderId, type AiProviderMeta, type AiProviderState, type AiStability,
+  type GenerationSettings,
 } from '@/shared/ai';
 
 /** A "Stable"/"Beta" maturity badge (reuses the `.ai-pill` chrome). */
@@ -63,6 +65,8 @@ export function AiTab() {
         <span className="ai-active-model">{modelLabel(activeMeta, stateOf(config.activeProvider).model)}</span>
       </section>
 
+      <GenerationCard generation={config.generation} onChange={setConfig} />
+
       {stable.map(card)}
 
       <section className="settings-group ai-beta-section">
@@ -81,6 +85,124 @@ export function AiTab() {
       </section>
       {showBeta && beta.map(card)}
     </>
+  );
+}
+
+/** Named "thinking budget" steps, so the user picks Off/Light/Standard/Deep instead
+ *  of raw token counts. The tokens match the presets so the preset highlight is stable. */
+const THINKING_OPTS: { tokens: number; key: MessageKey }[] = [
+  { tokens: 0, key: 'ai.thinkOff' },
+  { tokens: 1500, key: 'ai.thinkLight' },
+  { tokens: 3000, key: 'ai.thinkStandard' },
+  { tokens: 5000, key: 'ai.thinkDeep' },
+];
+
+/** The global generation cost/quality control: a one-click preset row (Balanced /
+ *  Thorough / Saver) over the three underlying knobs, plus a "Fine-tune"
+ *  disclosure to set rounds / thinking / critic directly (which flips the preset
+ *  highlight to "Custom"). Defaults are cheap. */
+function GenerationCard({
+  generation,
+  onChange,
+}: {
+  generation: GenerationSettings;
+  onChange: (c: AiConfig) => void;
+}) {
+  const t = useT();
+  const [advanced, setAdvanced] = useState(false);
+  const g = generation;
+  const active = presetIdFor(g);
+  const set = (patch: Partial<GenerationSettings>): void => void api.aiSetGeneration(patch).then(onChange);
+  const activeBlurb = GENERATION_PRESETS.find((p) => p.id === active)?.blurb;
+
+  return (
+    <section className="settings-group ai-generation">
+      <div className="ai-provider-head">
+        <span className="settings-group-name">{t('ai.genTitle')}</span>
+      </div>
+      <p className="setting-note">{t('ai.genNote')}</p>
+
+      <div className="ai-preset-row no-drag">
+        {GENERATION_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={`ai-preset${active === p.id ? ' selected' : ''}`}
+            onClick={() => set(p.settings)}
+          >
+            {p.label}
+          </button>
+        ))}
+        {active === 'custom' && (
+          <span className="ai-preset selected ai-preset-custom">{t('ai.presetCustom')}</span>
+        )}
+      </div>
+      {activeBlurb && <p className="setting-note">{activeBlurb}</p>}
+
+      <button
+        type="button"
+        className="ai-beta-toggle no-drag"
+        aria-expanded={advanced}
+        onClick={() => setAdvanced((v) => !v)}
+      >
+        <span className={`ai-beta-chevron${advanced ? ' open' : ''}`} aria-hidden>›</span>
+        <span className="settings-group-name">{t('ai.genAdvanced')}</span>
+      </button>
+
+      {advanced && (
+        <>
+          <label className="setting-row">
+            <span className="setting-label">{t('ai.genRounds')}</span>
+            <input
+              className="input setting-select"
+              type="number"
+              min={0}
+              max={GENERATION_LIMITS.maxRounds}
+              placeholder={t('ai.genRoundsAuto')}
+              value={g.maxRounds === 0 ? '' : g.maxRounds}
+              onChange={(e) => {
+                const raw = e.target.value.trim();
+                if (raw === '') return void set({ maxRounds: 0 });
+                const n = Math.trunc(Number(raw));
+                if (!Number.isFinite(n)) return;
+                set({ maxRounds: n <= 0 ? 0 : Math.max(GENERATION_LIMITS.minRounds, Math.min(GENERATION_LIMITS.maxRounds, n)) });
+              }}
+            />
+          </label>
+          <p className="setting-note">{t('ai.genRoundsNote')}</p>
+
+          <label className="setting-row">
+            <span className="setting-label">{t('ai.genThinking')}</span>
+            <select
+              className="input setting-select"
+              value={String(g.thinkingBudget)}
+              onChange={(e) => set({ thinkingBudget: Number(e.target.value) })}
+            >
+              {THINKING_OPTS.map((o) => (
+                <option key={o.tokens} value={o.tokens}>{t(o.key)}</option>
+              ))}
+              {!THINKING_OPTS.some((o) => o.tokens === g.thinkingBudget) && (
+                <option value={g.thinkingBudget}>{g.thinkingBudget}</option>
+              )}
+            </select>
+          </label>
+          <p className="setting-note">{t('ai.genThinkingNote')}</p>
+
+          <label className="setting-row">
+            <span className="setting-label">{t('ai.genCritic')}</span>
+            <select
+              className="input setting-select"
+              value={g.critic ? 'on' : 'off'}
+              onChange={(e) => set({ critic: e.target.value === 'on' })}
+            >
+              <option value="off">{t('ai.off')}</option>
+              <option value="on">{t('ai.on')}</option>
+            </select>
+          </label>
+          <p className="setting-note">{t('ai.genCriticNote')}</p>
+        </>
+      )}
+    </section>
   );
 }
 

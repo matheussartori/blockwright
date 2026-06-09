@@ -23,7 +23,7 @@ import { mergePatch } from './patch';
 import { validateEmit } from './emit-validate';
 import { buildSeed } from './seed';
 import { buildShellSeed } from './shell-seed';
-import { activeCredential, aiAvailable } from './credentials';
+import { activeCredential, aiAvailable, getGenerationSettings } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
 import { RunLog } from './gen-log';
 import { buildReviewContent } from './review-content';
@@ -39,17 +39,14 @@ export type CapturePreview = (
   version: number,
 ) => Promise<{ images?: GenerateImage[]; error?: string }>;
 
-/** Extended thinking budget (tokens). Spatial builds need real planning — roofs
- *  and massing come out boxy/broken without it — so we enable it by default.
- *  Set BW_AI_THINKING_BUDGET=0 to disable, or a token count to tune the budget. */
-const THINKING_BUDGET = process.env.BW_AI_THINKING_BUDGET !== undefined
-  ? Number(process.env.BW_AI_THINKING_BUDGET)
-  : 5000;
-
-/** Max emit→render→review rounds before we force the model to stop, so the
- *  self-correction loop can't run forever. When BW_AI_MAX_ROUNDS is unset we pick
- *  the cap per-build from its volume; the env override, when present, wins. */
-const ENV_MAX_ROUNDS = process.env.BW_AI_MAX_ROUNDS ? Number(process.env.BW_AI_MAX_ROUNDS) : null;
+/** A numeric env override (e.g. BW_AI_MAX_ROUNDS), or null when unset/blank —
+ *  power-user escape hatch that wins over the persisted Settings ▸ AI knobs. */
+function envNum(name: string): number | null {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 export { aiAvailable };
 // Session lifecycle + the edit-seed live in their own modules; re-export the
@@ -95,9 +92,16 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   const run = new RunLog();
   const cred = activeCredential();
   const resumable = RESUMABLE_PROVIDERS.has(cred.id);
-  // Independent critic for the audit gate (null on providers without one → the gate
-  // falls back to the model's self-reported audit).
-  const critic = await getCritic(cred.id);
+  // The user's cost/quality knobs (Settings ▸ AI), defaulting CHEAP; a BW_AI_* env
+  // var still wins for power users.
+  const gen = getGenerationSettings();
+  const thinkingBudget = envNum('BW_AI_THINKING_BUDGET') ?? gen.thinkingBudget;
+  // A numeric budget (env or a positive `maxRounds` setting) is the authoritative cap;
+  // `maxRounds:0` (Balanced) is the AUTO sentinel → null → volume-scaled (see below).
+  const roundsBudget = envNum('BW_AI_MAX_ROUNDS') ?? (gen.maxRounds > 0 ? gen.maxRounds : null);
+  // Independent critic for the audit gate — only when the user enabled it AND the
+  // provider has one (null → the gate falls back to the model's self-reported audit).
+  const critic = gen.critic ? await getCritic(cred.id) : null;
 
   // A fresh build of a shell-seeded archetype (the modern villa) starts from its
   // code-built exterior shell, so the model finishes a guaranteed-modern silhouette
@@ -125,9 +129,10 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   let captureError: string | null = null;
   const startedAt = Date.now();
   let rounds = 0;
-  // Volume is unknown until the first emit, so start at the floor; re-derived from
-  // the build's size on round 1 below.
-  let maxRounds = maxRoundsFor(0, ENV_MAX_ROUNDS);
+  // The round budget: a numeric `maxRounds` knob is honored down to 1; the auto path
+  // (roundsBudget null) floors to the full design-pass sequence and is recomputed from
+  // the build volume after the first emit (size is unknown until then).
+  let maxRounds = maxRoundsFor(0, roundsBudget);
   // The design pass the model should be working on this emit (massing → … → audit).
   // The orchestrator owns this pointer; it advances one pass per emit (clamped at
   // the terminal audit pass) regardless of provider.
@@ -307,7 +312,9 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     };
     captureError = null;
     rounds += 1;
-    if (ENV_MAX_ROUNDS == null && rounds === 1) {
+    // Auto budget: now that the first emit revealed the build's size, scale the cap to
+    // its volume (floored to the full design-pass sequence). Numeric budgets are fixed.
+    if (roundsBudget == null && rounds === 1) {
       maxRounds = maxRoundsFor(size[0] * size[1] * size[2], null);
     }
     // Per-round telemetry (Console dock + dev terminal) to profile time/token cost.
@@ -426,7 +433,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       systemPrompt: systemPrompt(prompt, selection),
       userText: effectivePrompt,
       images: images ?? [],
-      thinkingBudget: THINKING_BUDGET,
+      thinkingBudget,
       abort: ac,
       resume: session.sdkSessionId,
       setSessionId: (id) => {

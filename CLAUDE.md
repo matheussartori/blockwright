@@ -154,7 +154,7 @@ src/
                             per session (`reserveLibraryDir`/`mirrorToLibrary` — best-effort copy):
                             the latest clean `<slug>.nbt`, every kept `versions/vN.nbt`, and the build's
                             `generation.log` (the AI/fix play-by-play, see gen-log.ts `RunLog`)
-      providers/            One Driver per backend (claude-sdk, anthropic, openai, gemini, codex) +
+      providers/            One Driver per backend (claude-sdk, codex — the only two) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt:
                             all CORE guides always, plus a MODULE guide (knowledge/nbt/modules/**)
@@ -262,9 +262,15 @@ src/
     domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
                           two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
                           Details filtering and the main guide gating call the SAME function) +
-                          furnishing.ts (the SPACE × DECORATION model: RoomScale tiers + scaleForArea
-                          + FurnishingPreset + presetForScale — the room-plan brief picks a preset by
-                          area, the gallery lists them; the scale thresholds live here once).
+                          conflicts.ts (modulesConflict — symmetric `incompatibleWith` check, dims the
+                          gallery + Details) + module-slots.ts (MODULE_SLOTS + ModuleSlotKey — the
+                          single-select module categories: ONE registry that drives the brief, the
+                          Details selects, the build-card chips, the structured selection AND the
+                          knowledge-guide gating, so "add a category" is one slot entry, not edits in
+                          ~10 files; ModuleSlotKey also DERIVES the per-slot fields of BuildDetails/
+                          BuildSelection/BuildBrief — see below) + furnishing.ts (the SPACE × DECORATION
+                          model: RoomScale tiers + scaleForArea + FurnishingPreset + presetForScale — the
+                          room-plan brief picks a preset by area, the gallery lists them; thresholds once).
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
     i18n/                 Tiny framework-free i18n shared by both processes: en.ts (canonical key
                           space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
@@ -379,6 +385,18 @@ decoration, and a new module is one small file.
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
   (the structure ids it pairs with — a growing link; omit = applies to all).
+- **The single-select module SLOTS are registry-driven** (`shared/domain/module-slots.ts`,
+  `MODULE_SLOTS` + `ModuleSlotKey` = decoration/roof/basement/attic/exterior — NOT structure,
+  which is the grouped first pick, nor rooms, which are per-floor multi-select). This one list is
+  the single source the brief (`buildBrief`/`buildSelection`/`buildSummary`/`hasDetails`), the
+  Details selects (`DetailsSection` loops it), the build-card chips (`BuildCard`), and the
+  knowledge gating (`selectedGuides` loops it via `getSlotModule`) all iterate — so a category is
+  ONE slot entry, not edits in ~10 files. `ModuleSlotKey` is also the key set that DERIVES the
+  per-slot fields of `BuildDetails`/`BuildSelection`/`BuildBrief` (`Partial<Record<ModuleSlotKey,…>>`),
+  so adding the union member adds those fields for free. **Add a single-select category:** the
+  module's category files (contract + registry, as below) + its array on `GenerationCatalog` +
+  a `listX()` line in `listModuleCatalog` + a `getSlotModule` case + a `MODULE_SLOTS` entry
+  (label/neutral/`filtered`/optional `affectsSize`+`brief`) + its `gen.fieldX` i18n labels.
 - **basement/roof modules carry geometry + knowledge** (`basements/`: cellar/crypt/cult-temple;
   `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge` + optional
   `build`/`params`/`defaults`/`integrations`/`preview`), surfaced in the composer Details + the gallery.
@@ -487,38 +505,41 @@ dispatches the LLM transport to a **provider driver** (`providers/`). The shared
 live in `schema.ts`. Validation errors are returned to the model so it self-corrects in the same turn.
 
 The user picks the **active provider** + model in Settings ▸ AI (`shared/ai.ts` = the registry: id,
-label, auth kind, models). Supported backends:
-- **claude-subscription** — the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`): authenticates
-  like the Claude Code CLI, runs on the user's **Pro/Max plan** (no API credits). The SDK manages the
-  conversation/tool dispatch/resume; the driver just registers `emit_structure`.
-- **claude-api** — the raw Anthropic API (`@anthropic-ai/sdk`) with a pasted key; a manual tool loop
-  with prompt caching on the (huge) system prompt.
-- **openai** — OpenAI Chat Completions (`openai`); function calling + vision. `tool` messages are
-  text-only, so the review screenshots come back as a follow-up `user` message.
-- **gemini** — Gemini (`@google/genai`); function declarations can't express the free-form authoring
-  maps, so `emit_structure` takes the structure as a **JSON string** (parsed in the driver); review
-  images ride a follow-up user turn.
-- **codex** — the Codex CLI (`@openai/codex-sdk`) on the **ChatGPT Plus/Pro** plan. No in-process
+label, auth kind, models). There are exactly TWO backends — both **subscription** (an existing CLI
+login, no API credits). The raw-API providers (Anthropic/OpenAI/Gemini) and their drivers were
+REMOVED to keep the surface small + the cost story simple:
+- **claude-subscription** (stable, default) — the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`):
+  authenticates like the Claude Code CLI, runs on the user's **Pro/Max plan**. The SDK manages the
+  conversation/tool dispatch/resume; the driver just registers `emit_structure`. The ONLY path with an
+  independent critic (`claudeSdkCritique`).
+- **codex** (beta) — the Codex CLI (`@openai/codex-sdk`) on the **ChatGPT Plus/Pro** plan. No in-process
   tools: it uses **structured output** for the authoring JSON and takes review screenshots as
-  `local_image` file paths. Best-effort.
+  `local_image` file paths. Best-effort; no critic.
 
-Resumable providers (claude-subscription, codex — see `RESUMABLE_PROVIDERS`) continue their own
-server/CLI conversation via a stored session id; the stateless API providers have no server memory,
-so the orchestrator **re-seeds them each turn** with the latest emitted version's authoring JSON
-(`buildSeed`) so follow-up edits stay coherent.
+Both providers are resumable (`RESUMABLE_PROVIDERS`) — they continue their own server/CLI conversation
+via a stored session id (no per-turn re-seed needed). `buildSeed` still seeds a FRESH session from the
+open file / shell.
 
 `credentials.ts` resolves auth per provider: env var(s) for that provider win and lock the field
 in-app, else an in-app secret (encrypted via `safeStorage` in one blob), else (for subscription
 providers) the existing CLI keychain login. Secrets never cross the IPC bridge — only a `configured?`
 flag, a masked hint, and the chosen model (`getConfig` → `AiConfig`). `aiAvailable()` reflects the
-active provider (subscription = optimistic, api-key = key present); a real auth failure surfaces as a
-clear error on first send (see `authHint`). Old single-Claude credentials migrate on first read.
+active provider (subscription = optimistic); a real auth failure surfaces as a clear error on first
+send (see `authHint`). Old single-Claude credentials migrate to `claude-subscription` on first read.
+- **Generation cost/quality knobs** (`GenerationSettings` in `shared/ai.ts`, persisted in the prefs
+  blob via `getGenerationSettings`/`setGenerationSettings`, surfaced in Settings ▸ AI + `AiConfig.generation`,
+  edited via `aiSetGeneration`): `maxRounds` (the emit→render→review cap — the #1 cost lever), `thinkingBudget`
+  (extended-thinking tokens, 0 = off), `critic` (run the independent audit critic — Claude only). Three
+  one-click PRESETS (`GENERATION_PRESETS`: Saver/Balanced/Thorough) set all three; the DEFAULT is **Saver**
+  (3 rounds, no thinking, no critic) — deliberately cheap, since the old always-on full-pass + critic run
+  was expensive. `generate.ts` reads these per-run (env `BW_AI_MAX_ROUNDS`/`BW_AI_THINKING_BUDGET` still
+  override); `maxRoundsFor` now HONORS an explicit budget down to 1 (so Saver can stop before the full
+  design-pass sequence — `rounds.ts`).
 
-- **The AI SDKs are externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
+- **The two AI SDKs are externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
   loaded via dynamic `import()` inside each `providers/` driver (so a provider's SDK only loads when
   used). The Claude Agent SDK and Codex SDK each spawn a bundled **native binary** resolved relative
-  to their own module path, so they must not be inlined; the rest (`@anthropic-ai/sdk`, `openai`,
-  `@google/genai`) stay external for the same load path. **zod** is external too so the Agent SDK's
+  to their own module path, so they must not be inlined. **zod** is external too so the Agent SDK's
   `tool()` gets schemas from the same instance. When packaging, those SDKs + their platform-native
   packages (`@anthropic-ai/claude-agent-sdk-*`, `@openai/codex` + `@openai/codex-*`) are asar-unpacked
   (`forge.config.ts`) so the binaries are spawnable.
@@ -533,7 +554,8 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   `emit_structure` the handler asks the renderer to load + screenshot the compiled `.nbt` and
   returns those images as **image content blocks in the tool result**; the model critiques them
   against the prompt/reference and re-emits a complete improved structure, stopping when it matches
-  (capped at `BW_AI_MAX_ROUNDS`, default 4 — but floored to the number of design passes). The loop is
+  (capped at the user's `maxRounds` knob / `BW_AI_MAX_ROUNDS`, default 3 — honored down to 1, so a cheap
+  budget can stop BEFORE the full design-pass sequence). The loop is
   **phase-driven** (`ai/phases.ts`): instead of one vague "make it better", the orchestrator walks the
   model through ordered design passes — massing → roof → facade → interior → circulation → audit — and
   the `onEmit` feedback briefs the NEXT pass's focused rubric each round (`phaseBriefing`). The
@@ -546,12 +568,13 @@ clear error on first send (see `authHint`). Old single-Claude credentials migrat
   in `phases.ts`. This is the lever for the aesthetic/layout defects that can't be enforced in code.
   Because the *builder* rubber-stamps its own audit, the gate is driven by an **independent critic**
   when available (`ai/critic.ts` + `providers/getCritic`): a SEPARATE, fresh-context model call
-  (claude-sdk `query` with no resume/tools, or the anthropic Messages API) that judges only the
-  screenshots + checklist and returns the failing items — it has no stake in the build, so it catches
-  what the builder rationalizes. Claude paths only; other providers fall back to the self-report.
-  `BW_AI_CRITIC_MODEL` can point the critic at a cheaper model. **Extended thinking is on by default** (`BW_AI_THINKING_BUDGET`,
-  default 5000 tokens, `0` disables) so it can plan geometry, and the system prompt tells it to plan
-  → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
+  (claude-sdk `query` with no resume/tools) that judges only the screenshots + checklist and returns
+  the failing items — it has no stake in the build, so it catches what the builder rationalizes. The
+  critic is OFF by default (it's an extra call) and only runs when the user's `critic` knob is on AND
+  the provider is claude-subscription (Codex has none → self-report). `BW_AI_CRITIC_MODEL` can point it
+  at a cheaper model. **Extended thinking is tunable** (`thinkingBudget` knob / `BW_AI_THINKING_BUDGET`,
+  `0` disables; default OFF under the Saver preset) — when on it plans geometry, and the system prompt
+  tells it to plan → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
   callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +
   `Viewer.capture()` (synchronous multi-angle PNGs, downscaled) → replies on
   `IPC_CHANNELS.aiRenderResult`, which resolves the matching pending promise in `ipc.ts`

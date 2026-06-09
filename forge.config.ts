@@ -18,10 +18,7 @@ import path from 'node:path';
 // and the `asar.unpack` glob can extract the native binaries.
 const RUNTIME_PACKAGES = [
   '@anthropic-ai/claude-agent-sdk',
-  '@anthropic-ai/sdk',
   '@openai/codex-sdk',
-  'openai',
-  '@google/genai',
   'zod',
 ];
 

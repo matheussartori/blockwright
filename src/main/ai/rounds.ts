@@ -19,10 +19,14 @@ export function roundsForVolume(volume: number): number {
   return 4;
 }
 
-/** The round cap for a build: the env override when set, else the volume-based cap —
- *  always floored to {@link MIN_ROUNDS} so the cap can't truncate the design-pass
- *  sequence or starve the audit loop. `volume` is unknown (0) before the first emit. */
-export function maxRoundsFor(volume: number, envOverride: number | null): number {
-  if (envOverride != null) return Math.max(envOverride, MIN_ROUNDS);
+/** The round cap for a build. An explicit `override` (a numeric `maxRounds`
+ *  setting, or the BW_AI_MAX_ROUNDS env) is the AUTHORITATIVE budget and is honored
+ *  down to 1 — the user can deliberately trade the full design-pass sequence for a
+ *  cheaper run (Saver). The AUTO path (`override` null — the Balanced preset's
+ *  `maxRounds:0`) scales the cap with build {@link roundsForVolume volume}, floored
+ *  to {@link MIN_ROUNDS} so a volume-derived cap can't starve the passes. `volume`
+ *  is unknown (0) pre-first-emit, so the auto cap is recomputed after the first emit. */
+export function maxRoundsFor(volume: number, override: number | null): number {
+  if (override != null) return Math.max(1, Math.trunc(override));
   return Math.max(roundsForVolume(volume), MIN_ROUNDS);
 }

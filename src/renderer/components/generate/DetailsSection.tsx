@@ -10,6 +10,7 @@
 import { store } from '../../state/store';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { modulesConflict } from '@/shared/domain/conflicts';
+import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import {
   type BuildDetails,
   effectiveSize,
@@ -19,10 +20,10 @@ import {
 import type { DetailField, SizeBox } from '../../generation/details';
 import { Chip, ChipRow, ChipSelect, type ChipOption } from './chips';
 import { FloorStack } from './FloorStack';
-import type { MessageKey } from '@/shared/i18n';
+import type { TFunction } from '@/shared/i18n';
 import type { GenerationCatalog, GenerationModule } from '@/shared/types';
 
-type T = (key: MessageKey) => string;
+type T = TFunction;
 
 interface Props {
   details: BuildDetails;
@@ -90,23 +91,19 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
     moduleAppliesTo(m.appliesTo, details.structureType || undefined, selStruct?.group);
   const nFloors = floorCount(selStruct, details.params);
   const roomOptions: ChipOption[] = (catalog?.room ?? []).filter(fits).map((m) => ({ id: m.id, label: m.label }));
-  const roofs = (catalog?.roof ?? []).filter(fits);
-  const basements = (catalog?.basement ?? []).filter(fits);
-  const attics = (catalog?.attic ?? []).filter(fits);
-  const exteriors = (catalog?.exterior ?? []).filter(fits);
-  const decorations = catalog?.decoration ?? [];
-
-  // An attic lives in the roof void, so it clashes with the flat roof: grey the conflicting
-  // attic options when the picked roof can't host one (the SAME `modulesConflict` the
-  // gallery uses). The chosen roof module drives the reason note.
-  const roofMod = (catalog?.roof ?? []).find((m) => m.id === details.roof);
-  const atticReason = (atticId: string): string | undefined => {
-    const atticMod = attics.find((m) => m.id === atticId);
-    return roofMod && atticMod && modulesConflict(roofMod, atticMod) ? t('gen.conflictPitchedRoof') : undefined;
-  };
-
   const opts = (modules: GenerationModule[]): ChipOption[] =>
     modules.map((m) => ({ id: m.id, label: m.label }));
+
+  // The currently-selected module in each slot, so a conflicting OPTION in another slot
+  // (e.g. an attic when the flat roof is picked) can be greyed with a reason — the SAME
+  // `modulesConflict` the gallery uses, now generic across every slot pair.
+  const selectedModules = MODULE_SLOTS
+    .map((slot) => (catalog?.[slot.key] ?? []).find((m) => m.id === details[slot.key]))
+    .filter((m): m is GenerationModule => !!m);
+  const conflictReason = (opt: GenerationModule): string | undefined => {
+    const clash = selectedModules.find((m) => m.id !== opt.id && modulesConflict(m, opt));
+    return clash ? t('modules.conflictWith', { label: clash.label }) : undefined;
+  };
 
   return (
     // `key` re-mounts the cascade on a structure change, so the reveal animation replays.
@@ -124,49 +121,28 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
         </button>
       </div>
 
-      <ChipSelect
-        label={t('gen.fieldDecoration')}
-        value={details.decoration}
-        neutral={{ id: '', label: t('gen.optDefault') }}
-        options={opts(decorations)}
-        busy={busy}
-        onPick={(id) => onField('decoration', id)}
-      />
-      <ChipSelect
-        label={t('gen.fieldRoof')}
-        value={details.roof}
-        neutral={{ id: '', label: t('gen.optAuto') }}
-        options={opts(roofs)}
-        busy={busy}
-        onPick={(id) => onField('roof', id)}
-      />
-      <ChipSelect
-        label={t('gen.fieldBasement')}
-        value={details.basement}
-        neutral={{ id: '', label: t('gen.optNone') }}
-        options={opts(basements)}
-        busy={busy}
-        onPick={(id) => onField('basement', id)}
-      />
-      <ChipSelect
-        label={t('gen.fieldAttic')}
-        value={details.attic}
-        neutral={{ id: '', label: t('gen.optNone') }}
-        options={opts(attics)}
-        busy={busy}
-        onPick={(id) => onField('attic', id)}
-        disabledFor={atticReason}
-      />
-      {exteriors.length > 0 && (
-        <ChipSelect
-          label={t('gen.fieldExterior')}
-          value={details.exterior}
-          neutral={{ id: '', label: t('gen.optNone') }}
-          options={opts(exteriors)}
-          busy={busy}
-          onPick={(id) => onField('exterior', id)}
-        />
-      )}
+      {/* One select per single-select module slot, in registry order. A filtered slot with
+          nothing applicable to this structure is hidden (e.g. an attic on a cabin). */}
+      {MODULE_SLOTS.map((slot) => {
+        const all = catalog?.[slot.key] ?? [];
+        const options = slot.filtered ? all.filter(fits) : all;
+        if (slot.filtered && options.length === 0) return null;
+        return (
+          <ChipSelect
+            key={slot.key}
+            label={t(slot.fieldLabel)}
+            value={details[slot.key]}
+            neutral={{ id: '', label: t(slot.neutral) }}
+            options={opts(options)}
+            busy={busy}
+            onPick={(id) => onField(slot.key, id)}
+            disabledFor={(id) => {
+              const o = options.find((m) => m.id === id);
+              return o ? conflictReason(o) : undefined;
+            }}
+          />
+        );
+      })}
 
       {(selStruct?.params ?? []).map((p) =>
         p.kind === 'int' ? (

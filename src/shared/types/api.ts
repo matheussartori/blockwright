@@ -1,6 +1,6 @@
 // The preload bridge contract: every method/event the renderer reaches main
 // through (window.blockwright). One method per IPC channel/event in shared/ipc.ts.
-import type { AiConfig, AiProviderId } from '../ai';
+import type { AiConfig, AiProviderId, GenerationSettings } from '../ai';
 import type { LanguageInfo, LanguagePref } from '../i18n';
 import type { StructureData } from './structure';
 import type { Workspace } from './workspace';
@@ -64,6 +64,8 @@ export interface BlockwrightApi {
   aiSetCredential: (id: AiProviderId, secret: string) => Promise<AiConfig>;
   /** Remove a provider's stored credential; returns the updated config. */
   aiClearCredential: (id: AiProviderId) => Promise<AiConfig>;
+  /** Update the generation cost/quality settings (a partial merge); returns the updated config. */
+  aiSetGeneration: (patch: Partial<GenerationSettings>) => Promise<AiConfig>;
   /** Generate or edit a structure for a session; returns the written `.nbt` or an error.
    *  Optional reference images are sent to the model as visual guidance. `basePath` is
    *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model with

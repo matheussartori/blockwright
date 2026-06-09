@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
-import type { AiConfig, AiProviderId } from '@/shared/ai';
+import type { AiConfig, AiProviderId, GenerationSettings } from '@/shared/ai';
 import type { LanguageInfo, LanguagePref } from '@/shared/i18n';
 import type {
   AssembleOptions,
@@ -79,6 +79,8 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiSetCredential, id, secret),
   aiClearCredential: (id: AiProviderId): Promise<AiConfig> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiClearCredential, id),
+  aiSetGeneration: (patch: Partial<GenerationSettings>): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSetGeneration, patch),
   aiGenerate: (
     sessionId: string,
     prompt: string,

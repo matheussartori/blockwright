@@ -6,28 +6,20 @@
 // unit-testable in isolation and the component stays a thin view. No React, no IO.
 import type { BuildBrief, BuildSelection, GenerationCatalog, GenerationModule } from '@/shared/types';
 import { presetForScale, scaleForArea } from '@/shared/domain/furnishing';
+import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 
 /** Max interior rooms a single floor can be assigned in the composer. */
 export const ROOMS_PER_FLOOR = 2;
 
-/** The build modules the user picked for a fresh build: a structure type, a
- *  decoration, and the structure's tunable params (floors/basement/attic/…). They
+/** The build modules the user picked for a fresh build: a structure type, one id per
+ *  single-select module SLOT (decoration/roof/basement/attic/exterior — the per-slot
+ *  fields DERIVE from {@link ModuleSlotKey}, so a new category needs no edit here), the
+ *  structure's tunable params, an optional size override, and the per-floor rooms. They
  *  describe WHAT to build as plain-language guidance AND ride along as a structured
  *  selection so the system prompt loads only those modules' guides. They never emit a
  *  `template` op — the model designs the build itself (no stamped initial shell). */
-export interface BuildDetails {
+export type BuildDetails = Record<ModuleSlotKey, string> & {
   structureType: string;
-  decoration: string;
-  /** Selected roof module id (category 'roof'), or '' for none/auto. */
-  roof: string;
-  /** Selected basement module id (category 'basement'), or '' for none. */
-  basement: string;
-  /** Selected attic module id (category 'attic'), or '' for none. Only meaningful on a
-   *  pitched-roof house; cleared when the roof is set to flat (no roof void). */
-  attic: string;
-  /** Selected exterior finishing style id (category 'exterior'), or '' for none. Only
-   *  meaningful on the pitched houses (classic/cabin/l-shaped). */
-  exterior: string;
   /** Structure-type param values, keyed by param name. Missing keys fall back to
    *  the param's default when the brief is built. */
   params: Record<string, string | number>;
@@ -38,16 +30,15 @@ export interface BuildDetails {
    *  floor holds up to 2 room ids; '' marks an empty slot. Only meaningful for a storeyed
    *  structure (one with a `floors` param). */
   rooms: string[][];
-}
+};
+
+/** Every module slot, unset ('') — the reset applied on a structure switch too. */
+export const EMPTY_SLOTS = Object.fromEntries(MODULE_SLOTS.map((s) => [s.key, ''])) as Record<ModuleSlotKey, string>;
 
 /** The empty Details state — nothing picked yet. */
 export const EMPTY_DETAILS: BuildDetails = {
   structureType: '',
-  decoration: '',
-  roof: '',
-  basement: '',
-  attic: '',
-  exterior: '',
+  ...EMPTY_SLOTS,
   params: {},
   size: null,
   rooms: [],
@@ -230,10 +221,6 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
   if (!d.structureType) return '';
   const s = catalog?.structure.find((m) => m.id === d.structureType);
   const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
-  const roof = d.roof ? catalog?.roof.find((m) => m.id === d.roof) : undefined;
-  const basement = d.basement ? catalog?.basement.find((m) => m.id === d.basement) : undefined;
-  const attic = d.attic ? catalog?.attic.find((m) => m.id === d.attic) : undefined;
-  const exterior = d.exterior ? catalog?.exterior.find((m) => m.id === d.exterior) : undefined;
   const sz = effectiveSize(d, s);
   const label = s?.label ?? d.structureType;
   const decoClause = deco ? ` with the "${deco.label}" decoration (its materials and mood)` : '';
@@ -243,14 +230,18 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     .filter(([k]) => k !== 'seed' && k !== 'decay')
     .map(([k, v]) => `${k}: ${v}`)
     .join(', ');
+  // One bullet per picked slot that carries a brief line (decoration is folded into the
+  // structure sentence above, so it has no `brief`). Loops MODULE_SLOTS → a new category's
+  // bullet shows up for free once it declares one.
+  const slotLines = MODULE_SLOTS
+    .filter((slot) => slot.brief && d[slot.key])
+    .map((slot) => slot.brief!(catalog?.[slot.key].find((m) => m.id === d[slot.key])?.label ?? d[slot.key]))
+    .join('');
   return (
     `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +
     `- Build a ${label}${decoClause}, roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D).\n` +
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
-    (roof ? `- Roof: a ${roof.label} roof (see its module guide).\n` : '') +
-    (basement ? `- Basement: a ${basement.label} (see its module guide).\n` : '') +
-    (attic ? `- Attic: a ${attic.label} in the roof void (see its module guide).\n` : '') +
-    (exterior ? `- Exterior style: ${exterior.label} — apply this exterior finish (cladding, roof colour, window treatment) AND its signature added volumes to the outside of the house (see its module guide).\n` : '') +
+    slotLines +
     buildRoomPlan(d, catalog) +
     `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`
   );
@@ -272,13 +263,13 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
     name: `Floor ${i + 1}`,
     rooms: roomsOnFloor(d, i).map((id) => lbl('room', id)),
   }));
+  // One label per picked slot (decoration/roof/basement/attic/exterior) — generic over
+  // MODULE_SLOTS so a new category's chip appears on the card automatically.
+  const slotLabels: Partial<Record<ModuleSlotKey, string>> = {};
+  for (const slot of MODULE_SLOTS) if (d[slot.key]) slotLabels[slot.key] = lbl(slot.key, d[slot.key]);
   return {
     structure: s?.label ?? d.structureType,
-    decoration: d.decoration ? lbl('decoration', d.decoration) : undefined,
-    roof: d.roof ? lbl('roof', d.roof) : undefined,
-    basement: d.basement ? lbl('basement', d.basement) : undefined,
-    attic: d.attic ? lbl('attic', d.attic) : undefined,
-    exterior: d.exterior ? lbl('exterior', d.exterior) : undefined,
+    ...slotLabels,
     size: [sz.w, sz.h, sz.d],
     floors: floors.length ? floors : undefined,
   };
@@ -294,13 +285,13 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
   const rooms = [...new Set(d.rooms.flat().filter(Boolean))];
   const s = d.structureType ? catalog?.structure.find((m) => m.id === d.structureType) : undefined;
   const sz = d.structureType ? effectiveSize(d, s) : undefined;
+  // One id per picked slot, generic over MODULE_SLOTS (only the set ones ride along, so an
+  // unused module's guide is never loaded).
+  const slots: Partial<Record<ModuleSlotKey, string>> = {};
+  for (const slot of MODULE_SLOTS) if (d[slot.key]) slots[slot.key] = d[slot.key];
   return {
     structureType: d.structureType || undefined,
-    decoration: d.decoration || undefined,
-    roof: d.roof || undefined,
-    basement: d.basement || undefined,
-    attic: d.attic || undefined,
-    exterior: d.exterior || undefined,
+    ...slots,
     rooms: rooms.length ? rooms : undefined,
     size: sz ? [sz.w, sz.h, sz.d] : undefined,
   };
@@ -312,11 +303,7 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
 export function hasDetails(d: BuildDetails): boolean {
   return (
     d.structureType !== '' ||
-    d.decoration !== '' ||
-    d.roof !== '' ||
-    d.basement !== '' ||
-    d.attic !== '' ||
-    d.exterior !== '' ||
+    MODULE_SLOTS.some((slot) => d[slot.key] !== '') ||
     d.rooms.some((r) => r.some(Boolean))
   );
 }

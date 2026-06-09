@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { composeStructure, composeModule, composeModulePreview, isKnownStructure, knownStructureNames, type Intern } from '../compose';
 import { buildModulePreview, listModuleCatalog, selectedGuides, structureFinalizers, structureFloorPlan } from '../index';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
+import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import { compileStructure } from '../../authoring';
 
 /** A throwaway intern that just hands out incrementing indices per distinct key. */
@@ -283,6 +284,27 @@ describe('compose: exterior finishing styles', () => {
       expect(selectedGuides({ structureType: 'classic', exterior: id }), id).toContain(`nbt/modules/exterior/${id}.md`);
       expect(selectedGuides({ structureType: 'modern', exterior: id }), id).not.toContain(`nbt/modules/exterior/${id}.md`);
     }
+  });
+});
+
+describe('module slots stay in lock-step with the catalog', () => {
+  it('every single-select slot resolves to a catalog array (so the generic loops work)', () => {
+    const cat = listModuleCatalog() as unknown as Record<string, unknown[]>;
+    for (const slot of MODULE_SLOTS) {
+      expect(Array.isArray(cat[slot.key]), `catalog.${slot.key}`).toBe(true);
+    }
+  });
+
+  it('selectedGuides loads one guide per picked slot, gated by appliesTo', () => {
+    const guides = selectedGuides({
+      structureType: 'classic', decoration: 'cozy', roof: 'gable', basement: 'cellar', exterior: 'gothic',
+    });
+    expect(guides).toEqual(expect.arrayContaining([
+      'nbt/modules/structure/classic.md',
+      'nbt/modules/decoration/cozy.md',
+      'nbt/modules/roof/gable.md',
+      'nbt/modules/exterior/gothic.md',
+    ]));
   });
 });
 

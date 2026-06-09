@@ -22,8 +22,12 @@ describe('maxRoundsFor', () => {
     expect(maxRoundsFor(50000, null)).toBe(Math.max(7, MIN_ROUNDS));
   });
 
-  it('honours the env override, still floored', () => {
-    expect(maxRoundsFor(50000, 3)).toBe(MIN_ROUNDS); // 3 < floor → floor
+  it('honours an explicit override down to 1 (the user can trade passes for cost)', () => {
+    // The user's `maxRounds` knob (or BW_AI_MAX_ROUNDS) is AUTHORITATIVE — a cheap
+    // budget below the design-pass count is respected, not floored.
+    expect(maxRoundsFor(50000, 3)).toBe(3); // explicit low budget wins over the volume cap
     expect(maxRoundsFor(500, 20)).toBe(20); // explicit high override wins
+    expect(maxRoundsFor(0, 1)).toBe(1); // honored down to the minimum
+    expect(maxRoundsFor(0, 0)).toBe(1); // clamped to ≥ 1
   });
 });

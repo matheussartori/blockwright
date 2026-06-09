@@ -13,12 +13,6 @@ export async function getDriver(id: AiProviderId): Promise<Driver> {
   switch (id) {
     case 'claude-subscription':
       return (await import('./claude-sdk')).claudeSdkDriver;
-    case 'claude-api':
-      return (await import('./anthropic')).anthropicDriver;
-    case 'openai':
-      return (await import('./openai')).openaiDriver;
-    case 'gemini':
-      return (await import('./gemini')).geminiDriver;
     case 'codex':
       return (await import('./codex')).codexDriver;
     default:
@@ -28,13 +22,11 @@ export async function getDriver(id: AiProviderId): Promise<Driver> {
 
 /** The independent critic for a provider, or null when it has none (→ the
  *  orchestrator falls back to the model's self-reported audit). Only the Claude
- *  paths implement a fresh-context critic call. */
+ *  subscription path implements a fresh-context critic call (Codex has none). */
 export async function getCritic(id: AiProviderId): Promise<Critic | null> {
   switch (id) {
     case 'claude-subscription':
       return (await import('./claude-sdk')).claudeSdkCritique;
-    case 'claude-api':
-      return (await import('./anthropic')).anthropicCritique;
     default:
       return null;
   }
