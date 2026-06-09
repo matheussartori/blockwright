@@ -13,6 +13,7 @@ import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-asse
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
 import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
+import { localizeCatalog } from '@/shared/i18n/registry';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { getConfig, setActiveProvider, setModel, setCredential, clearCredential, setGenerationSettings } from './ai/credentials';
 import { getOutputDir, setOutputDir } from './ai/output-dir';
@@ -216,7 +217,9 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
   ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));
-  ipcMain.handle(IPC_CHANNELS.generationCatalog, async () => listModuleCatalog());
+  ipcMain.handle(IPC_CHANNELS.generationCatalog, async () =>
+    localizeCatalog(listModuleCatalog(), getLanguage().locale),
+  );
   ipcMain.handle(IPC_CHANNELS.previewModule, async (_e, category: ModuleCategory, id: string) =>
     previewModule(category, id),
   );

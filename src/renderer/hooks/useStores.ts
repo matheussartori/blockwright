@@ -1,7 +1,7 @@
 // Thin React bindings over the framework-agnostic vanilla Zustand stores, so
 // components subscribe to just the slice they render.
 import { useStore } from 'zustand';
-import type { TFunction } from '@/shared/i18n';
+import type { Locale, TFunction } from '@/shared/i18n';
 import { store, type AppState } from '../state/store';
 import { settingsStore, type SettingsState } from '../state/settings';
 import { i18nStore, type I18nState } from '../state/i18n';
@@ -51,4 +51,10 @@ export function useI18n<T>(selector: (s: I18nState) => T): T {
 /** The translate function for the current locale (re-renders on language change). */
 export function useT(): TFunction {
   return useStore(i18nStore, (s) => s.t);
+}
+
+/** The current locale (re-renders on language change) — for localizing registry
+ *  data (module/provider labels) via `@/shared/i18n/registry`'s `localizeData`. */
+export function useLocale(): Locale {
+  return useStore(i18nStore, (s) => s.locale);
 }

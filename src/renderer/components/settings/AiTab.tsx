@@ -5,8 +5,9 @@
 // behind a toggle.
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
-import { useT } from '../../hooks/useStores';
+import { useT, useLocale } from '../../hooks/useStores';
 import type { MessageKey } from '@/shared/i18n';
+import { localizeData, aiProviderKey, aiPresetKey } from '@/shared/i18n/registry';
 import {
   AI_PROVIDERS, GENERATION_LIMITS, GENERATION_PRESETS, presetIdFor, providerMeta,
   type AiConfig, type AiProviderId, type AiProviderMeta, type AiProviderState, type AiStability,
@@ -28,6 +29,8 @@ function modelLabel(meta: AiProviderMeta | undefined, modelId: string): string {
 
 export function AiTab() {
   const t = useT();
+  const locale = useLocale();
+  const provLabel = (m: AiProviderMeta) => localizeData(locale, aiProviderKey(m.id).label, m.label);
   const [config, setConfig] = useState<AiConfig | null>(null);
   const [showBeta, setShowBeta] = useState(false);
 
@@ -60,7 +63,7 @@ export function AiTab() {
     <>
       <section className="settings-group ai-active-banner">
         <span className="ai-active-label">{t('ai.generatingWith')}</span>
-        <span className="ai-active-name">{activeMeta?.label ?? config.activeProvider}</span>
+        <span className="ai-active-name">{activeMeta ? provLabel(activeMeta) : config.activeProvider}</span>
         {activeMeta && <StabilityPill stability={activeMeta.stability} />}
         <span className="ai-active-model">{modelLabel(activeMeta, stateOf(config.activeProvider).model)}</span>
       </section>
@@ -79,7 +82,7 @@ export function AiTab() {
           <span className={`ai-beta-chevron${showBeta ? ' open' : ''}`} aria-hidden>›</span>
           <span className="settings-group-name">{t('ai.betaProviders')}</span>
           <span className="ai-pill ai-pill-beta">{t('ai.beta')}</span>
-          <span className="ai-beta-sub">{beta.map((b) => b.label).join(' · ')}</span>
+          <span className="ai-beta-sub">{beta.map(provLabel).join(' · ')}</span>
         </button>
         <p className="setting-note">{t('ai.betaNote')}</p>
       </section>
@@ -109,11 +112,13 @@ function GenerationCard({
   onChange: (c: AiConfig) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [advanced, setAdvanced] = useState(false);
   const g = generation;
   const active = presetIdFor(g);
   const set = (patch: Partial<GenerationSettings>): void => void api.aiSetGeneration(patch).then(onChange);
-  const activeBlurb = GENERATION_PRESETS.find((p) => p.id === active)?.blurb;
+  const activePreset = GENERATION_PRESETS.find((p) => p.id === active);
+  const activeBlurb = activePreset && localizeData(locale, aiPresetKey(activePreset.id).blurb, activePreset.blurb);
 
   return (
     <section className="settings-group ai-generation">
@@ -130,7 +135,7 @@ function GenerationCard({
             className={`ai-preset${active === p.id ? ' selected' : ''}`}
             onClick={() => set(p.settings)}
           >
-            {p.label}
+            {localizeData(locale, aiPresetKey(p.id).label, p.label)}
           </button>
         ))}
         {active === 'custom' && (
@@ -220,6 +225,7 @@ function ProviderCard({
   onActivate: (id: AiProviderId) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -255,7 +261,7 @@ function ProviderCard({
   return (
     <section className="settings-group ai-provider">
       <div className="ai-provider-head">
-        <span className="settings-group-name">{meta.label}</span>
+        <span className="settings-group-name">{localizeData(locale, aiProviderKey(meta.id).label, meta.label)}</span>
         <StabilityPill stability={meta.stability} />
         <span className={`ai-pill${state.configured || state.fromEnv ? ' ai-pill-ok' : ''}`}>{status}</span>
         {active ? (
@@ -266,7 +272,7 @@ function ProviderCard({
           </button>
         )}
       </div>
-      <p className="setting-note">{meta.blurb}</p>
+      <p className="setting-note">{localizeData(locale, aiProviderKey(meta.id).blurb, meta.blurb)}</p>
 
       <label className="setting-row">
         <span className="setting-label">{t('ai.model')}</span>

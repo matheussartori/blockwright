@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
-import { useApp, useT } from '../hooks/useStores';
+import { useApp, useT, useLocale } from '../hooks/useStores';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { modulesConflict } from '@/shared/domain/conflicts';
 import type { GenerationCatalog, GenerationModule, ModuleCategory } from '@/shared/types';
@@ -53,6 +53,7 @@ function linkedParts(catalog: GenerationCatalog, host: GenerationModule): number
 
 export function ModulesModal() {
   const t = useT();
+  const locale = useLocale();
   const open = useApp((s) => s.modulesOpen);
 
   const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
@@ -62,7 +63,8 @@ export function ModulesModal() {
 
   const close = () => store.getState().setModulesOpen(false);
 
-  // Load the registry once the gallery opens.
+  // Load the registry once the gallery opens (re-fetch on language change so the
+  // localized module labels/descriptions update without a reload).
   useEffect(() => {
     if (!open) return;
     let alive = true;
@@ -72,7 +74,7 @@ export function ModulesModal() {
     return () => {
       alive = false;
     };
-  }, [open]);
+  }, [open, locale]);
 
   const structures: GenerationModule[] = useMemo(() => catalog?.structure ?? [], [catalog]);
   const structure = useMemo(

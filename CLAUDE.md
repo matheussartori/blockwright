@@ -292,8 +292,22 @@ go through `setLanguage`, which rebuilds the menu + pushes `languageChanged`. **
 add it to `shared/i18n/en.ts` AND `pt-BR.ts` (pt-BR is typed against en, so a missing key won't
 compile), then `t('key')` in the renderer or `mt('key')` in main. The whole renderer UI is wired
 (shell, menu, all Settings tabs, Generate panel, catalogs, module gallery, inspector/jigsaw/versions
-panels, floating-window chrome); the only deliberately-untranslated strings are *data* from the
-registries — `shared/ai.ts` provider/model labels + blurbs and `structure/domain` module labels.
+panels, floating-window chrome). The **`ai.genRoundsAuto`** field shows "Auto" for `maxRounds:0`.
+
+**Registry DATA is localized too** (provider/model lists in `shared/ai.ts`; `structure/domain` module +
+param + furnishing-preset labels & descriptions). Because English is authored INLINE in those registries
+(not in `en.ts`), it uses a separate **override** mechanism in `shared/i18n/registry.ts`: English is the
+canonical fallback, and `data-pt-BR.ts` supplies only the translations, keyed by the builders there
+(`moduleKey`/`paramKey`/`paramOptionKey`/`groupKey`/`presetKey`/`aiProviderKey`/`aiPresetKey`). `localizeData`
+returns the override or the English fallback. The module catalog is localized at the IPC boundary in
+`main/ipc.ts` (`localizeCatalog(listModuleCatalog(), getLanguage().locale)`); `ai.ts` data (imported
+directly by the renderer) is localized in `AiTab` via `useLocale()` + `localizeData`. The catalog re-fetches
+on `locale` change (ModulesModal + BuildPlanner deps), and chat build-card labels follow because they derive
+from the localized catalog. **When you add/edit a module, param, furnishing preset, AI provider or
+generation preset, add its pt-BR entry to `data-pt-BR.ts`** (only model labels like "Opus 4.8" stay literal).
+The guard test `shared/i18n/__tests__/coverage.test.ts` fails if any registry-data key lacks a pt-BR override,
+OR if a chrome pt-BR value is left identical to English (outside its loanword allowlist) — so English-only
+strings can't ship.
 
 ### IPC pattern
 

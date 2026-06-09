@@ -72,7 +72,7 @@ export const ptBR: Messages = {
   // Status bar.
   'statusbar.noFile': 'Nenhum arquivo carregado',
   'statusbar.blocksLabel': 'blocos',
-  'statusbar.contentPack': 'Content pack',
+  'statusbar.contentPack': 'Pacote de conteúdo',
   'statusbar.fallbackColors': 'Cores de fallback',
 
   // Settings.

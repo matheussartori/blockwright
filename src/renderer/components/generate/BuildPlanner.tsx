@@ -11,7 +11,7 @@ import { plannerStore } from '../../state/planner';
 import { documentsStore } from '../../state/documents';
 import { windowsStore } from '../../state/windows';
 import { runGeneration } from '../../state/generation';
-import { usePlanner, useT } from '../../hooks/useStores';
+import { usePlanner, useT, useLocale } from '../../hooks/useStores';
 import { api } from '../../api';
 import {
   buildBrief,
@@ -35,6 +35,7 @@ import type { GenerationCatalog } from '@/shared/types';
 
 export function BuildPlanner() {
   const t = useT();
+  const locale = useLocale();
   const open = usePlanner((s) => s.open);
   const details = usePlanner((s) => s.details);
   const notes = usePlanner((s) => s.notes);
@@ -43,7 +44,7 @@ export function BuildPlanner() {
 
   useEffect(() => {
     void api.generationCatalog().then(setCatalog);
-  }, []);
+  }, [locale]);
 
   // Re-probe the AI credential each time the planner opens (it may have just been added).
   useEffect(() => {
