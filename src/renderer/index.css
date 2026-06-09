@@ -356,6 +356,7 @@ body {
   flex-direction: row;
   min-height: 0;
   overflow: hidden;
+  position: relative; /* anchor for the full-stage Build Planner overlay */
 }
 /* The left column: viewport on top, the bottom Console dock below it. The
    console shrinks the viewport (so the WebGL canvas resizes instead of being
@@ -2571,12 +2572,6 @@ body.row-resizing {
 .gallery-preset-items li {
   margin: 1px 0;
 }
-.gen-details-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 0 0 8px;
-  line-height: 1.4;
-}
 .catalog-side {
   flex: none;
   width: 252px;
@@ -3323,64 +3318,470 @@ body.row-resizing {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--panel);
-  padding: 10px;
-  max-height: 38vh;
+  padding: 12px;
+  max-height: 42vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.gen-details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+
+/* Progressive form: each group fades + lifts in, lightly staggered, so the cascade
+   that a structure pick unlocks reads as a reveal rather than a layout jump. */
+.gen-details > * {
+  animation: gen-reveal 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.gen-field {
+.gen-details > *:nth-child(2) { animation-delay: 0.03s; }
+.gen-details > *:nth-child(3) { animation-delay: 0.06s; }
+.gen-details > *:nth-child(4) { animation-delay: 0.09s; }
+.gen-details > *:nth-child(5) { animation-delay: 0.12s; }
+.gen-details > *:nth-child(6) { animation-delay: 0.15s; }
+.gen-details > *:nth-child(n + 7) { animation-delay: 0.18s; }
+@keyframes gen-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gen-details > * { animation: none; }
+}
+
+/* Step 1 — the structure chooser header. */
+.gen-pick-head {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 11px;
-  color: var(--muted, #9aa);
-  min-width: 0;
 }
-.gen-field > span {
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-.gen-field-wide {
-  grid-column: 1 / -1;
-}
-.gen-field input,
-.gen-field select {
-  font: inherit;
-  font-size: 12px;
+.gen-pick-title {
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text);
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
-  min-width: 0;
+  letter-spacing: -0.01em;
 }
-.gen-field input:focus,
-.gen-field select:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-.gen-field input:disabled,
-.gen-field select:disabled {
-  opacity: 0.5;
-}
-.gen-size-inputs {
-  display: flex;
-  gap: 4px;
+.gen-pick-hint {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
-/* Per-floor interior room assignment (house) — sits inside .gen-details. */
-.gen-rooms {
+/* Step 2 — the chosen-structure header: a removable pill that doubles as "change". */
+.gen-config-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gen-config-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.gen-struct-pill {
+  -webkit-app-region: no-drag;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.gen-struct-pill:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 20%, var(--panel));
+}
+.gen-struct-pill:disabled { opacity: 0.55; cursor: default; }
+.gen-struct-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.gen-struct-change {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+/* A labelled group of chips (the unit the whole form is built from). */
+.gen-chip-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
+}
+.gen-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.gen-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gen-chip {
+  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2, var(--text));
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.13s, border-color 0.13s, color 0.13s, transform 0.08s;
+}
+.gen-chip:hover:not(:disabled):not(.on) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text);
+}
+.gen-chip:active:not(:disabled) { transform: scale(0.96); }
+.gen-chip.on {
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.gen-chip:disabled { opacity: 0.5; cursor: default; }
+
+/* Integer param — a compact number field with its allowed range alongside. */
+.gen-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gen-stepper input {
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  width: 64px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.gen-stepper input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.gen-stepper input:disabled { opacity: 0.5; }
+.gen-stepper-range {
+  font-size: 11px;
+  font-family: var(--mono, monospace);
+  color: var(--text-muted);
+}
+
+/* Size — three tight W/H/D axis fields on one line. */
+.gen-size {
+  display: flex;
+  gap: 6px;
+}
+.gen-size-axis {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gen-size-axis > span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 10px;
+  text-align: center;
+}
+.gen-size-axis input {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  width: 52px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.gen-size-axis input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.gen-size-axis input:disabled { opacity: 0.5; }
+
+/* Footer link to the module gallery. */
+.gen-details-foot {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+}
+.gen-gallery-link { font-size: 11.5px; }
+
+/* Per-floor room editor (FloorStack) — a vertical stack, one card per storey, that
+   scales past the old fixed 2-dropdown grid. */
+.gen-floors-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+.gen-floor-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text) 3%, var(--bg, var(--panel)));
+  border: 1px solid var(--border);
+}
+.gen-floor-tag {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.gen-floor-rooms {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gen-room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+.gen-room-chip-x {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  cursor: pointer;
+  transition: background 0.13s;
+}
+.gen-room-chip-x:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+.gen-room-add {
+  -webkit-app-region: no-drag;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  cursor: pointer;
+}
+.gen-room-add:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text);
+}
+.gen-floor-full {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Full-stage Build Planner — overlays the whole stage area ────────────────── */
+.planner {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg, var(--panel));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  animation: planner-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes planner-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.planner-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.planner-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.planner-title-icon {
+  color: var(--accent);
+  font-size: 16px;
+}
+.planner-close {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+.planner-close:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+.planner-warn {
+  flex: none;
+  padding: 9px 16px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--danger, #d9534f) 12%, var(--panel));
+  border-bottom: 1px solid var(--border);
+}
+.planner-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+}
+.planner-config {
+  flex: 0 0 clamp(320px, 38%, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+}
+/* The progressive form flows naturally inside the scrolling config column — drop the
+   dock-card chrome + its own scroll so there's no nested scrollbar. */
+.planner-config .gen-details {
+  max-height: none;
+  overflow: visible;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.planner-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.planner-notes-input {
+  resize: vertical;
+  min-height: 60px;
+  max-height: 30vh;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  padding: 9px 11px;
+  border-radius: var(--radius);
+  background: var(--bg, var(--panel));
+  border: 1px solid var(--border);
+}
+.planner-notes-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.planner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.planner-build {
+  margin-left: auto;
+  justify-content: center;
+}
+.planner-preview {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%);
+}
+.scale-preview-canvas {
+  position: absolute;
+  inset: 0;
+}
+.planner-preview-caption {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg, var(--panel)) 82%, transparent);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.planner-dims {
+  font-family: var(--mono, monospace);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.planner-dims-key {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.planner-scale-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.planner-preview-empty {
+  max-width: 240px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* FloorStack header (the rooms-per-floor title + hint). */
 .gen-rooms-head {
   display: flex;
   flex-direction: column;
@@ -3396,41 +3797,6 @@ body.row-resizing {
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-muted);
-}
-.gen-room-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.gen-room-floor-label {
-  flex: 0 0 64px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.gen-room-selects {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  min-width: 0;
-}
-.gen-room-select {
-  font: inherit;
-  font-size: 12px;
-  color: var(--text);
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
-  min-width: 0;
-}
-.gen-room-select:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-.gen-room-select:disabled {
-  opacity: 0.5;
 }
 
 /* The presentable build-details card shown in a user chat message. */
@@ -3637,11 +4003,6 @@ body.row-resizing {
   -webkit-app-region: no-drag;
   align-self: flex-start;
 }
-.gen-size-inputs input {
-  width: 100%;
-  text-align: center;
-}
-
 /* Staged reference-image thumbnails above the textarea. */
 .gen-attachments {
   display: flex;

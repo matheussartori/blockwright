@@ -65,6 +65,36 @@ export function assignRoom(d: BuildDetails, floor: number, slot: number, value: 
   return { ...d, rooms };
 }
 
+/** Add a room module to a floor (the planner's add/remove model), capped at `max`
+ *  rooms on that floor. Duplicates are allowed — two bedrooms is a valid floor. Grows
+ *  the rooms grid to the floor as needed and normalises every row to its assigned ids
+ *  (no padding); a no-op when the floor is already full or `id` is empty.
+ *  @param d - The current Details state.
+ *  @param floor - The 0-based floor index (bottom-up).
+ *  @param id - The room module id to add.
+ *  @param max - The floor's room cap (the structure's `maxRoomsPerFloor`).
+ *  @returns The next Details state. */
+export function addRoom(d: BuildDetails, floor: number, id: string, max: number): BuildDetails {
+  if (!id) return d;
+  const rooms = d.rooms.map((r) => r.filter(Boolean));
+  while (rooms.length <= floor) rooms.push([]);
+  if (rooms[floor].length >= max) return d;
+  rooms[floor] = [...rooms[floor], id];
+  return { ...d, rooms };
+}
+
+/** Remove the room at `index` on a floor (the planner's add/remove model).
+ *  @param d - The current Details state.
+ *  @param floor - The 0-based floor index (bottom-up).
+ *  @param index - The position of the room to drop within that floor's list.
+ *  @returns The next Details state. */
+export function removeRoomAt(d: BuildDetails, floor: number, index: number): BuildDetails {
+  const rooms = d.rooms.map((r) => r.filter(Boolean));
+  if (!rooms[floor]) return d;
+  rooms[floor] = rooms[floor].filter((_, i) => i !== index);
+  return { ...d, rooms };
+}
+
 /** Set a structure-type param value, clearing any manual size override so the box
  *  re-derives (e.g. picking "2 floors + basement" auto-grows it).
  *  @param d - The current Details state.

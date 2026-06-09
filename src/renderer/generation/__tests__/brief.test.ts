@@ -13,7 +13,9 @@ import {
   floorRooms,
   formatElapsed,
   hasDetails,
+  maxRoomsForStructure,
   resolveDetailParams,
+  roomsOnFloor,
 } from '../brief';
 
 /** A minimal catalog: a storeyed `house` (floors + attic params), a non-storeyed
@@ -72,6 +74,24 @@ describe('floorRooms', () => {
     const d = details({ rooms: [['living']] });
     expect(floorRooms(d, 0)).toEqual(['living', '']);
     expect(floorRooms(d, 5)).toEqual(['', '']);
+  });
+});
+
+describe('roomsOnFloor', () => {
+  it('returns the floor\'s assigned ids, variable-length, empties stripped', () => {
+    const d = details({ rooms: [['living', '', 'kitchen']] });
+    expect(roomsOnFloor(d, 0)).toEqual(['living', 'kitchen']);
+    expect(roomsOnFloor(d, 5)).toEqual([]);
+  });
+});
+
+describe('maxRoomsForStructure', () => {
+  it('uses the structure\'s declared cap', () => {
+    expect(maxRoomsForStructure({ ...houseModule, maxRoomsPerFloor: 3 })).toBe(3);
+  });
+  it('falls back to the generic default (2) when undeclared', () => {
+    expect(maxRoomsForStructure(houseModule)).toBe(2);
+    expect(maxRoomsForStructure(undefined)).toBe(2);
   });
 });
 

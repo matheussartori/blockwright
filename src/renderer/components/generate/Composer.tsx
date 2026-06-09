@@ -16,22 +16,23 @@ interface Props {
   attachments: Attachment[];
   onAddFiles: (files: Iterable<File>) => void;
   onRemoveAttachment: (id: string) => void;
-  /** The Details section, when open (else null). Rendered above the textarea. */
-  detailsSlot: ReactNode;
+  /** Placeholder for the textarea. */
+  placeholder: string;
   /** The Floors section, when open (else null). */
   floorsSlot: ReactNode;
   busy: boolean;
   available: boolean | null;
   canSend: boolean;
   // Toolbar toggle state + handlers.
-  showDetails: boolean;
   showFloors: boolean;
+  /** Whether the Build Planner currently holds any picks (drives the "•" marker). */
   hasDetails: boolean;
   /** Whether the doc is file-backed (the Floors toggle only applies to an existing build). */
   isExisting: boolean;
   /** Defined-floor count, shown as a badge on the Floors toggle. */
   floorCount: number;
-  onToggleDetails: () => void;
+  /** Open the full-stage Build Planner. */
+  onOpenDetails: () => void;
   onToggleFloors: () => void;
   onCancel: () => void;
   t: T;
@@ -40,9 +41,9 @@ interface Props {
 export function Composer(props: Props) {
   const {
     input, onInput, onSubmit, attachments, onAddFiles, onRemoveAttachment,
-    detailsSlot, floorsSlot, busy, available, canSend,
-    showDetails, showFloors, hasDetails, isExisting, floorCount,
-    onToggleDetails, onToggleFloors, onCancel, t,
+    placeholder, floorsSlot, busy, available, canSend,
+    showFloors, hasDetails, isExisting, floorCount,
+    onOpenDetails, onToggleFloors, onCancel, t,
   } = props;
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -75,11 +76,10 @@ export function Composer(props: Props) {
           ))}
         </div>
       )}
-      {detailsSlot}
       {floorsSlot}
       <textarea
         className="gen-input"
-        placeholder={t('gen.inputPlaceholder')}
+        placeholder={placeholder}
         value={input}
         rows={3}
         disabled={busy || available === false}
@@ -122,9 +122,8 @@ export function Composer(props: Props) {
         <button
           className={`btn sm gen-details-toggle${hasDetails ? ' has-details' : ''}`}
           title={t('gen.detailsBtnTitle')}
-          aria-pressed={showDetails}
           disabled={busy || available === false}
-          onClick={onToggleDetails}
+          onClick={onOpenDetails}
         >
           {t('gen.detailsBtn')}{hasDetails ? ' •' : ''}
         </button>

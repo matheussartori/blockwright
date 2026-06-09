@@ -3,7 +3,9 @@ import { EMPTY_DETAILS, ROOMS_PER_FLOOR, type BuildDetails } from '../brief';
 import {
   SIZE_MAX,
   SIZE_MIN,
+  addRoom,
   assignRoom,
+  removeRoomAt,
   setDetailField,
   setDetailParam,
   setDetailSize,
@@ -80,6 +82,41 @@ describe('assignRoom', () => {
     const d = details({ rooms: [['living', '']] });
     const snapshot = JSON.stringify(d.rooms);
     assignRoom(d, 0, 1, 'kitchen');
+    expect(JSON.stringify(d.rooms)).toBe(snapshot);
+  });
+});
+
+describe('addRoom / removeRoomAt (planner model)', () => {
+  it('appends a room, growing the grid to the floor', () => {
+    const next = addRoom(EMPTY_DETAILS, 2, 'kitchen', 3);
+    expect(next.rooms).toHaveLength(3); // floors 0,1,2
+    expect(next.rooms[2]).toEqual(['kitchen']);
+    expect(next.rooms[0]).toEqual([]);
+  });
+
+  it('allows duplicates up to the cap, then stops', () => {
+    let d = addRoom(EMPTY_DETAILS, 0, 'bedroom', 2);
+    d = addRoom(d, 0, 'bedroom', 2);
+    expect(d.rooms[0]).toEqual(['bedroom', 'bedroom']);
+    const full = addRoom(d, 0, 'library', 2);
+    expect(full.rooms[0]).toEqual(['bedroom', 'bedroom']); // no-op when full
+  });
+
+  it('ignores an empty id', () => {
+    expect(addRoom(EMPTY_DETAILS, 0, '', 3)).toBe(EMPTY_DETAILS);
+  });
+
+  it('removes the room at an index and normalises padded rows', () => {
+    const d = details({ rooms: [['living', '', 'kitchen']] });
+    const next = removeRoomAt(d, 0, 0);
+    expect(next.rooms[0]).toEqual(['kitchen']); // '' stripped, living removed
+  });
+
+  it('does not mutate the input rooms grid', () => {
+    const d = details({ rooms: [['living']] });
+    const snapshot = JSON.stringify(d.rooms);
+    addRoom(d, 0, 'kitchen', 3);
+    removeRoomAt(d, 0, 0);
     expect(JSON.stringify(d.rooms)).toBe(snapshot);
   });
 });

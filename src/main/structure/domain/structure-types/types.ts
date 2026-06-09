@@ -117,6 +117,9 @@ export interface StructureType extends ModuleMeta {
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['stairs','chimney']`. */
   finalize?: FinalizePass[];
+  /** Max interior rooms a single floor of this type accepts in the build planner. Omit →
+   *  the generic default. A roomier archetype (a manor) raises it; a tight one lowers it. */
+  maxRoomsPerFloor?: number;
   /** When true, a FRESH AI build of this type is SEEDED with this type's code-built shell
    *  (compiled via `build()` at the requested size + decoration) instead of being left
    *  fully free-form — the model keeps the exterior massing and only furnishes/details it.

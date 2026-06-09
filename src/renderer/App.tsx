@@ -26,6 +26,7 @@ import { ModulesModal } from './components/ModulesModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
+import { BuildPlanner } from './components/generate/BuildPlanner';
 import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 
@@ -96,6 +97,7 @@ function Shell() {
           <ConsoleDock />
         </div>
         <InspectorDock availability={availability} />
+        <BuildPlanner />
       </div>
       <Statusbar />
       <SettingsModal />

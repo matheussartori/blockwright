@@ -74,6 +74,9 @@ export interface ModuleSummary {
   appliesTo?: string[];
   /** Tunable params (structure types only) → the Details controls. */
   params?: ModuleParam[];
+  /** Max interior rooms a single floor accepts (structure types only) → the planner's
+   *  per-floor room cap. Omit → the generic default. */
+  maxRoomsPerFloor?: number;
   /** Furnishing presets, tiered by floor space (room modules only) → the gallery's
    *  expandable per-room preset list + the composer brief's preset selection. */
   presets?: FurnishingPreset[];

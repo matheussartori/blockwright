@@ -6,6 +6,7 @@ import { store, type AppState } from '../state/store';
 import { settingsStore, type SettingsState } from '../state/settings';
 import { i18nStore, type I18nState } from '../state/i18n';
 import { windowsStore, type WindowsStore } from '../state/windows';
+import { plannerStore, type PlannerStore } from '../state/planner';
 import { logsStore, type LogsState } from '../state/logs';
 import {
   documentsStore,
@@ -37,6 +38,10 @@ export function useWindows<T>(selector: (s: WindowsStore) => T): T {
 
 export function useLogs<T>(selector: (s: LogsState) => T): T {
   return useStore(logsStore, selector);
+}
+
+export function usePlanner<T>(selector: (s: PlannerStore) => T): T {
+  return useStore(plannerStore, selector);
 }
 
 export function useI18n<T>(selector: (s: I18nState) => T): T {

@@ -40,7 +40,12 @@ export function structureTypeIds(): string[] {
 /** Every structure type, as a module summary (for the composer picker + gallery),
  *  carrying its tunable params so the Details controls are registry-driven. */
 export function listStructureTypes(): ModuleSummary[] {
-  return registry.all().map((t) => ({ ...toSummary(t), group: t.group, params: paramFields(t.params) }));
+  return registry.all().map((t) => ({
+    ...toSummary(t),
+    group: t.group,
+    params: paramFields(t.params),
+    maxRoomsPerFloor: t.maxRoomsPerFloor,
+  }));
 }
 
 /** Every structure module (for the knowledge loader / gallery preview). */

@@ -79,6 +79,25 @@ export function floorRooms(d: BuildDetails, i: number): string[] {
   return Array.from({ length: ROOMS_PER_FLOOR }, (_, s) => row[s] ?? '');
 }
 
+/** The room ids actually assigned to a floor (variable-length, '' stripped) — the
+ *  planner's add/remove model. Unlike {@link floorRooms} (fixed 2 slots) this is
+ *  uncapped on read; the per-floor cap is enforced when adding (see `addRoom`).
+ *  @param d - The current Details state.
+ *  @param i - The 0-based floor index (bottom-up).
+ *  @returns The floor's assigned room ids, in order. */
+export function roomsOnFloor(d: BuildDetails, i: number): string[] {
+  return (d.rooms[i] ?? []).filter(Boolean);
+}
+
+/** The max interior rooms a single floor of the chosen structure accepts: the
+ *  structure's declared `maxRoomsPerFloor`, else the generic default. Drives the
+ *  planner's per-floor cap so a roomier house allows more than a tight cabin.
+ *  @param struct - The chosen structure module (or undefined).
+ *  @returns The per-floor room cap (≥ 1). */
+export function maxRoomsForStructure(struct: GenerationModule | undefined): number {
+  return Math.max(1, struct?.maxRoomsPerFloor ?? ROOMS_PER_FLOOR);
+}
+
 /** The full param set for the chosen structure: the user's picks merged over each
  *  param's default — so the brief always names every structural param explicitly,
  *  never leaving floors/basement/attic to the model to infer.
@@ -161,7 +180,7 @@ export function buildRoomPlan(d: BuildDetails, catalog: GenerationCatalog | null
   const roomOf = (id: string) => catalog?.room.find((m) => m.id === id);
   const lines: string[] = [];
   for (let i = 0; i < n; i++) {
-    const ids = floorRooms(d, i).filter(Boolean);
+    const ids = roomsOnFloor(d, i);
     if (!ids.length) continue;
     const area = roomArea(size, ids.length);
     const tier = scaleForArea(area);
@@ -239,7 +258,7 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
   const n = floorCount(s, resolveDetailParams(d, s));
   const floors = Array.from({ length: n }, (_, i) => ({
     name: `Floor ${i + 1}`,
-    rooms: floorRooms(d, i).filter(Boolean).map((id) => lbl('room', id)),
+    rooms: roomsOnFloor(d, i).map((id) => lbl('room', id)),
   }));
   return {
     structure: s?.label ?? d.structureType,
