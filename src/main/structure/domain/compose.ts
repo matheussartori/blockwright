@@ -78,6 +78,10 @@ function decorationId(params: Record<string, unknown>): string {
  * @param deco - The active decoration (maps roles→blocks + the weathering function).
  * @param raw - The op's raw params; a key naming a Role is a per-op block override.
  * @param intern - The compiler's get-or-create palette intern.
+ * @param preferDefaults - When true, the module's own `defaults` win OVER the decoration's
+ *   block map (the decoration still supplies weathering/decay). Used for a BASEMENT: a
+ *   crypt/cellar is a self-contained stone vault, so a strong host decoration (e.g. the
+ *   gothic manor's dark-oak walls) must NOT re-skin its stone into timber.
  * @returns A {@link RolePalette} that interns a role's resolved (or weathered) block.
  */
 function makePalette(
@@ -85,11 +89,14 @@ function makePalette(
   deco: Decoration,
   raw: Record<string, unknown>,
   intern: Intern,
+  preferDefaults = false,
 ): RolePalette {
   const idOf = (role: Role): string => {
     const override = raw[role];
     if (typeof override === 'string' && override.includes(':')) return override;
-    return deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
+    return preferDefaults
+      ? defaults[role] ?? deco.blocks[role] ?? BASE_BLOCKS[role]
+      : deco.blocks[role] ?? defaults[role] ?? BASE_BLOCKS[role];
   };
   const weather = deco.weather ?? ((b: string) => b);
   return {
@@ -126,6 +133,39 @@ function seedFor(params: Record<string, unknown>, b: ReturnType<typeof box>): nu
   return typeof params.seed === 'number' && Number.isFinite(params.seed)
     ? Math.trunc(params.seed)
     : seed3(b.x0, b.y0, b.z0);
+}
+
+/** The selected basement MODULE id from raw params (the Details "Basement" slot rides
+ *  in as `params.basement` = a module id), or undefined when none/unknown. A structure
+ *  type that declares its OWN `basement` param (classic) handles burial itself, so the
+ *  central path is skipped for it (the caller checks `'basement' in type.params`). */
+function selectedBasement(params: Record<string, unknown>): string | undefined {
+  const id = params.basement;
+  if (typeof id !== 'string' || id === '' || id === 'none') return undefined;
+  return getBasement(id) ? id : undefined;
+}
+
+/** Below-grade height reserved at the BOTTOM of the box for a centrally-composed
+ *  basement: ~1/5 of the box, clamped so the vault has headroom but the above-ground
+ *  storeys keep theirs. */
+function basementHeight(H: number): number {
+  return Math.min(6, Math.max(4, Math.round(H * 0.2)));
+}
+
+/** A flush wall ladder linking a centrally-composed basement to the ground floor above
+ *  it: rungs from the vault floor up through the carved ground slab, in the back-left
+ *  interior corner backed by the rear (z1) wall, with a step-off opening so you climb out
+ *  onto the ground floor. Emitted LAST (after the type's foundation slab) so its carve
+ *  wins. The host palette supplies the ladder so its facing/material match the build. */
+function basementDescent(b: ReturnType<typeof box>, groundY: number, palette: RolePalette): AuthoringOp[] {
+  const lx = b.x0 + 1, lz = b.z1 - 1; // one in from the rear wall (the ladder's backing)
+  const ladder = palette.get('ladder', { facing: 'north' }); // back against the +z (z1) wall
+  const air = palette.air();
+  const ops: AuthoringOp[] = [];
+  for (let y = b.y0 + 1; y <= groundY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
+  ops.push({ op: 'block', pos: [lx, groundY + 1, lz], state: air }); // headroom at the top of the climb
+  ops.push({ op: 'block', pos: [lx, groundY, lz - 1], state: air }); // step-off onto the ground floor
+  return ops;
 }
 
 /** Run a module's generic `build()` then its host-specific integration (when `host`
@@ -167,7 +207,7 @@ function makeModuleComposer(
     applyDecorationDecay(subParams, deco, extra, rawParams);
     const palette = category === 'roof' || category === 'attic'
       ? hostPalette
-      : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern);
+      : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern, true);
     return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, composeModule: delegate });
   };
   return delegate;
@@ -209,6 +249,27 @@ export function composeStructure(
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry).
   const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
+
+  // Below-grade level: a type that declares its OWN `basement` param (classic) handles
+  // burial inside its build(); for every OTHER type we compose the selected basement
+  // CENTRALLY here — reserve the bottom of the box for the chosen module's vault, raise
+  // the type's massing onto the ground above it, then ladder the two together. So every
+  // structure type supports a basement with no per-type code (the fix for "I picked a
+  // crypt but the gothic shell built none").
+  const basement = 'basement' in type.params ? undefined : selectedBasement(params);
+  const bH = basementHeight(b.H);
+  if (basement && b.H - bH >= 6) {
+    const groundY = b.y0 + bH;
+    const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
+    return [
+      // The vault fills the footprint below grade (forced rect so it spans the whole base).
+      ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
+      // The type builds its full massing onto the ground slab at `groundY` (its new floor).
+      ...type.build({ box: buildBox, params: values, palette, seed, composeModule: composeModuleDelegate }),
+      // The descent carves through that slab last, so the stairwell opening survives.
+      ...basementDescent(b, groundY, palette),
+    ];
+  }
 
   return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
 }
@@ -252,7 +313,9 @@ export function composeModule(
   const values = resolveParams(module.params ?? {}, params);
   applyDecorationDecay(values, deco, params);
   const seed = seedFor(params, b);
-  const palette = makePalette(module.defaults ?? {}, deco, params, intern);
+  // A basement keeps its own stone kit over the decoration (see makePalette); a roof uses
+  // the decoration as normal (it's part of the host's exterior material story).
+  const palette = makePalette(module.defaults ?? {}, deco, params, intern, category === 'basement');
   const args: BuildArgs = {
     box: b, params: values, palette, seed, host,
     composeModule: makeModuleComposer(palette, seed, deco, params, host, intern),

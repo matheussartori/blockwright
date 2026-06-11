@@ -329,6 +329,22 @@ describe('compose: house roof form + determinism', () => {
     expect(half.length).toBeGreaterThan(full.length);
   });
 
+  it('composes a basement CENTRALLY for a seeded archetype that has no basement param (gothic)', () => {
+    // gothic declares no `basement` param, so composeStructure reserves the bottom of the
+    // box for the SELECTED basement module and ladders it to the ground floor — the fix
+    // for "I picked a crypt but the locked gothic shell built none".
+    const big: [number, number, number] = [16, 22, 14];
+    const base = { decoration: 'gothic', floors: 2, seed: 5 };
+    const withCrypt = composeStructure('gothic', from, big, { ...base, basement: 'crypt' }, stubIntern());
+    const noCrypt = composeStructure('gothic', from, big, { ...base, basement: 'none' }, stubIntern());
+    // The vault + its descent ladder add ops the no-basement build doesn't have.
+    expect(withCrypt.length).toBeGreaterThan(noCrypt.length);
+    // The chosen module (crypt) composes differently from another (cellar) — proves the
+    // SELECTED id is built, not a hardcoded one.
+    const withCellar = composeStructure('gothic', from, big, { ...base, basement: 'cellar' }, stubIntern());
+    expect(JSON.stringify(withCrypt)).not.toBe(JSON.stringify(withCellar));
+  });
+
   it('house params are deterministic for the same box + params + seed', () => {
     const big: [number, number, number] = [12, 18, 12];
     const p = { floors: 2, basement: 'half', attic: 'finished', balcony: 'side', seed: 3 };

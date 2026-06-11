@@ -28,6 +28,9 @@ export interface ShellSeedOptions {
   size?: [number, number, number];
   /** The selected roof-module id (gable/hip/flat), threaded so the shell honours it. */
   roof?: string;
+  /** The selected basement-module id (cellar/crypt/cult-temple), threaded so the shell
+   *  digs the chosen below-grade vault — composed centrally by `composeStructure`. */
+  basement?: string;
 }
 
 /** The result of {@link buildShellSeed}: the model-facing preamble plus — for a
@@ -49,7 +52,7 @@ export interface ShellSeed {
  * @returns A {@link ShellSeed}: the preamble, plus the lock cells for a `lockShell` type.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof } = opts;
+  const { structureType, decoration, size, roof, basement } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return { preamble: '' };
 
@@ -59,6 +62,9 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The roof-module id doubles as the structure's `roof` param value (gable/hip/flat), so
   // a Details roof pick (e.g. flat) flows straight into the seeded shell's massing.
   if (roof) params.roof = roof;
+  // The basement-module id rides in as `params.basement`; composeStructure reserves the
+  // bottom of the box for it and ladders it to the ground floor (central, per-type-free).
+  if (basement && basement !== 'none') params.basement = basement;
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size: [W, H, D],

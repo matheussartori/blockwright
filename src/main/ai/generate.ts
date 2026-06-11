@@ -118,6 +118,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       decoration: selection?.decoration,
       size: selection?.size,
       roof: selection?.roof,
+      basement: selection?.basement,
     }, session.dir);
     seed = shell.preamble;
     lockCells = shell.lockCells;
