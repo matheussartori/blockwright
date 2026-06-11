@@ -8,10 +8,11 @@ import { fillInteriorAir } from './fill-air';
 import { fixCirculation } from './fix-circulation';
 import { fixDoors } from './fix-doors';
 import { fixPlacement } from './placement';
+import { preserveShell } from './preserve-shell';
 import { rebuildStairwells } from './stairwells';
 import type { Pass, PassContext, PassResult } from './types';
 
-export type { Pass, PassContext, PassResult } from './types';
+export type { Pass, PassContext, PassResult, ShellLockCell } from './types';
 export { fixChimney } from './chimney';
 export { connectBlocks, connFamily } from './connect-blocks';
 export { computeEnvelope } from './envelope';
@@ -19,12 +20,14 @@ export { fillInteriorAir } from './fill-air';
 export { fixCirculation } from './fix-circulation';
 export { fixDoors } from './fix-doors';
 export { fixPlacement } from './placement';
+export { preserveShell } from './preserve-shell';
 export { rebuildStairwells } from './stairwells';
 
 /** Plain-language intent for each pass, used by the AI Console play-by-play so the
  *  code-side fine-tuning reads as "what is being repaired right now". Keyed by the
  *  pass reference (robust to bundler renaming, unlike `fn.name`). */
 const PASS_LABELS = new Map<Pass, string>([
+  [preserveShell, 'Shell lock: restoring any floor/roof/wall the build deleted from its code-built exterior'],
   [rebuildStairwells, 'Stairwells: rebuilding each interior staircase/ladder as a clean, climbable run'],
   [fixDoors, 'Doors: mirroring hinges and aligning the two door halves'],
   [connectBlocks, 'Connections: deriving fence/pane/wall/bar sides from their neighbours'],

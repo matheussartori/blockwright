@@ -4,6 +4,7 @@
 // drag/drop/paste image intake (calling `onAddFiles`); all other state lives on the
 // parent, which passes the section slots and handlers in.
 import { useRef, type ReactNode } from 'react';
+import { ImagePlus, SlidersHorizontal, Layers, ArrowUp, Square } from 'lucide-react';
 import { ACCEPTED_IMAGE, type Attachment, isAcceptedImage } from '../../generation/attachments';
 import type { MessageKey } from '@/shared/i18n';
 
@@ -112,20 +113,22 @@ export function Composer(props: Props) {
           }}
         />
         <button
-          className="btn sm gen-attach"
+          className="btn sm icon gen-attach"
           title={t('gen.attachTitle')}
+          aria-label={t('gen.attachTitle')}
           disabled={busy || available === false}
           onClick={() => fileInput.current?.click()}
         >
-          {t('gen.imageBtn')}
+          <ImagePlus size={15} strokeWidth={1.8} aria-hidden />
         </button>
         <button
           className={`btn sm gen-details-toggle${hasDetails ? ' has-details' : ''}`}
-          title={t('gen.detailsBtnTitle')}
+          title={t('gen.advancedBtnTitle')}
           disabled={busy || available === false}
           onClick={onOpenDetails}
         >
-          {t('gen.detailsBtn')}{hasDetails ? ' •' : ''}
+          <SlidersHorizontal size={14} strokeWidth={1.8} aria-hidden />
+          {t('gen.advancedBtn')}{hasDetails ? <span className="gen-dot" aria-hidden /> : null}
         </button>
         {isExisting && (
           <button
@@ -135,16 +138,17 @@ export function Composer(props: Props) {
             disabled={busy}
             onClick={onToggleFloors}
           >
+            <Layers size={14} strokeWidth={1.8} aria-hidden />
             {t('gen.floorsBtn')}{floorCount > 0 ? ` (${floorCount})` : ''}
           </button>
         )}
         {busy ? (
-          <button className="btn gen-send gen-cancel" onClick={onCancel}>
-            {t('gen.cancel')}
+          <button className="btn gen-send gen-cancel" onClick={onCancel} title={t('gen.cancel')} aria-label={t('gen.cancel')}>
+            <Square size={13} strokeWidth={2.2} aria-hidden />
           </button>
         ) : (
-          <button className="btn primary gen-send" onClick={onSubmit} disabled={!canSend}>
-            {t('gen.send')}
+          <button className="btn primary icon gen-send" onClick={onSubmit} disabled={!canSend} title={t('gen.send')} aria-label={t('gen.send')}>
+            <ArrowUp size={16} strokeWidth={2.4} aria-hidden />
           </button>
         )}
       </div>

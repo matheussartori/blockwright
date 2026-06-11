@@ -2,6 +2,7 @@
 // the active workspace's structures plus recent files / workspaces. Shown
 // whenever no structure is open. Scrolls when content is tall so nothing is cut.
 import { useEffect, useMemo, useState } from 'react';
+import { BookOpen } from 'lucide-react';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
 import { basename, dirname } from '../ui/path';
@@ -108,12 +109,18 @@ export function Welcome({
             </button>
           </div>
 
-          {hasPack !== null && (
-            <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
-              <span className="welcome-hint-dot" />
-              {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
-            </span>
-          )}
+          <div className="welcome-meta">
+            {hasPack !== null && (
+              <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
+                <span className="welcome-hint-dot" />
+                {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
+              </span>
+            )}
+            <button className="welcome-guide-link" onClick={() => store.getState().setGuideOpen(true)}>
+              <BookOpen size={14} strokeWidth={1.8} aria-hidden />
+              {t('welcome.guideLink')}
+            </button>
+          </div>
 
           {hasLists && (
             <div className="welcome-lists">

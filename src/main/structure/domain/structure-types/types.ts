@@ -140,6 +140,13 @@ export interface StructureType extends ModuleMeta {
    *  Used for archetypes the model can't reliably invent (the modern villa: flat roofs,
    *  stacked volumes, glass, pool). The house stays free-form (omit → no shell seed). */
   seedShell?: boolean;
+  /** When true, the code-built shell is LOCKED: a compile pass (`preserveShell`) restores
+   *  any shell cell the model deleted (turned to air), so the AI can't gut the exterior
+   *  (the "sem chão / sem telhado" defect — a deleted floor slab / stripped roof). The
+   *  model may still redecorate (solid→solid), glaze walls and furnish the interior; it
+   *  just can't leave a hole where the shell put structure. Implies `seedShell`. Opt-in
+   *  per type (gothic), so types that already finish well stay fully free to re-emit. */
+  lockShell?: boolean;
   /** Optional system-prompt fragment (wired into the generator prompt later). */
   prompt?: string;
 }

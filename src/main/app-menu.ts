@@ -15,6 +15,7 @@ import {
   notifyClose,
   notifyExportFile,
   notifyOpenCatalog,
+  notifyOpenGuide,
   notifyOpenModules,
   notifyOpenSettings,
   notifyNewStructure,
@@ -246,6 +247,16 @@ export function buildAppMenu(): void {
     { role: 'editMenu' },
     viewMenu,
     { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: mt('menu.guide'),
+          accelerator: 'CmdOrCtrl+Shift+/',
+          click: () => notifyOpenGuide(),
+        },
+      ],
+    },
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));

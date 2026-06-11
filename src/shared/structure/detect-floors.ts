@@ -35,6 +35,15 @@ const FLOOR_COVERAGE = 0.45;
 /** Two floor planes closer than this (in y) are treated as one storey's structure
  *  (a slab + its ceiling), so a storey is at least this tall. */
 const MIN_STOREY_HEIGHT = 3;
+/** A "room opens above a slab" when the layer above falls to at most this fraction of
+ *  the slab's own interior fill — a RELATIVE drop. The absolute {@link OPEN_ABOVE} test
+ *  alone rejected real (furnished) floors: a lived-in storey packs the layer just above
+ *  its slab with pillars/furniture (30-40% of the interior), so an absolute "<27% filled"
+ *  gate missed every furnished floor and only caught sparsely-dressed ones. A slab is
+ *  ~0.45-1.0 filled and the room above is always markedly emptier, so a relative drop is
+ *  the robust signal. (A pitched-roof taper never triggers it — roof layers fall below the
+ *  {@link FLOOR_COVERAGE} candidate gate, so they're never slabs to begin with.) */
+const OPEN_ABOVE_RATIO = 0.6;
 /** A storey's wall perimeter must be at least this OPEN (fraction of perimeter cells
  *  that are air — windows/doors) to read as above-grade, i.e. a candidate "ground". */
 const OPEN_PERIM = 0.03;
@@ -89,17 +98,21 @@ export function detectFloors(input: FloorDetectInput): FloorDef[] {
   const fullFrac = (y: number): number => (y >= 0 && y < Y ? Math.min(full[y], footprint) / footprint : 0);
 
   // A "floor plane" is a layer whose INTERIOR is substantially filled (a slab) AND has a
-  // ROOM opening clearly above it — the layer above must be mostly empty inside. That
+  // ROOM opening clearly above it — the layer above is markedly emptier than the slab. The
   // "clear opening" test (not just "less filled than below") is what keeps a sloped roof
   // from registering as several floors: a roof's interior fill TAPERS gradually, never
-  // dropping to an open room, so its bases don't qualify. We seed the lowest qualifying
-  // layer as the first floor and require storeys be at least MIN_STOREY_HEIGHT apart so a
-  // slab + its ceiling don't read as two.
+  // dropping to an open room, so its bases don't qualify. The opening is read EITHER as an
+  // absolute low fill (an undressed room) OR a large RELATIVE drop from the slab (a furnished
+  // room, where furniture/pillars keep the layer above well above the absolute gate — see
+  // OPEN_ABOVE_RATIO). We seed the lowest qualifying layer as the first floor and require
+  // storeys be at least MIN_STOREY_HEIGHT apart so a slab + its ceiling don't read as two.
   const OPEN_ABOVE = FLOOR_COVERAGE * 0.6;
   const planes: number[] = [];
   for (let y = 0; y < Y; y++) {
-    if (frac(y) < FLOOR_COVERAGE) continue;
-    const opensAbove = frac(y + 1) < OPEN_ABOVE;
+    const here = frac(y);
+    if (here < FLOOR_COVERAGE) continue;
+    const above = frac(y + 1);
+    const opensAbove = above < OPEN_ABOVE || above < here * OPEN_ABOVE_RATIO;
     const farEnough = planes.length === 0 || y - planes[planes.length - 1] >= MIN_STOREY_HEIGHT;
     if (!opensAbove || !farEnough) continue;
     planes.push(y);

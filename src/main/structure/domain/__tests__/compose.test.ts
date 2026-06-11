@@ -4,6 +4,7 @@ import { buildModulePreview, listModuleCatalog, selectedGuides, structureFinaliz
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import { compileStructure } from '../../authoring';
+import { resolveBlocks } from '../../authoring/ops';
 
 /** A throwaway intern that just hands out incrementing indices per distinct key. */
 function stubIntern(): Intern {
@@ -196,6 +197,20 @@ describe('composeModule: roof/basement module geometry runs through the compose 
     expect(() => compileStructure(cellar!)).not.toThrow();
     // Rooms are guidance-only → no gallery preview.
     expect(buildModulePreview('room', 'living')).toBeNull();
+  });
+
+  it('the gothic shell keeps an entrance door + a ground floor (regression: the central tower bay must not bury the door)', () => {
+    const W = 29, H = 17, D = 18;
+    const resolved = resolveBlocks({
+      DataVersion: 3955,
+      size: [W, H, D],
+      palette: [{ Name: 'minecraft:air' }],
+      ops: [{ op: 'template', name: 'gothic', from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params: { decoration: 'gothic', floors: 2 } }],
+    });
+    const doors = resolved.blocks.filter((b) => resolved.palette[b.state]?.Name?.includes('_door'));
+    expect(doors.length).toBeGreaterThanOrEqual(2); // a full door = lower + upper half
+    const ground = resolved.blocks.filter((b) => b.pos[1] === 0 && resolved.palette[b.state]?.Name !== 'minecraft:air');
+    expect(ground.length).toBeGreaterThan(W * D * 0.5); // a real ground-floor slab, not a sparse base
   });
 });
 

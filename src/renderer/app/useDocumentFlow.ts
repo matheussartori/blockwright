@@ -8,7 +8,7 @@ import { api } from '../api';
 import { basename } from '../ui/path';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
-import { windowsStore } from '../state/windows';
+import { plannerStore } from '../state/planner';
 import { documentsStore, activeDocument } from '../state/documents';
 import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
 import type { Viewer } from '../viewer/viewer';
@@ -122,11 +122,14 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     if (path) void openFile(path);
   }, [openFile]);
 
-  // A blank "Untitled" generate tab: nothing in the viewer, the chat panel open and
-  // ready for a prompt.
+  // A blank "Untitled" build tab: nothing in the viewer — the stage shows the Details-first
+  // NewBuildPanel (App renders it for an empty, non-busy doc). We deliberately DON'T force the
+  // chat dock open here: a fresh build starts in the planner, and `build()` reveals the chat
+  // (so you can watch progress + iterate) once generation kicks off. Reset the planner draft so
+  // a new tab starts from a clean slate, not a previous tab's half-configured build.
   const newDoc = useCallback(() => {
     const id = documentsStore.getState().newDoc();
-    windowsStore.getState().openPanel('generate');
+    plannerStore.getState().reset();
     void hydrateDoc(id);
   }, []);
 

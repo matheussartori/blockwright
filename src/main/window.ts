@@ -133,6 +133,11 @@ export function notifyOpenModules(): void {
   mainWindow?.webContents.send(IPC_EVENTS.openModules);
 }
 
+/** Ask the renderer to open the in-app user Guide modal (Help ▸ Guide). */
+export function notifyOpenGuide(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openGuide);
+}
+
 /** Push the new language to the renderer (it re-renders the UI in that locale). */
 export function notifyLanguageChanged(info: LanguageInfo): void {
   mainWindow?.webContents.send(IPC_EVENTS.languageChanged, info);

@@ -134,6 +134,8 @@ export const IPC_EVENTS = {
   openCatalog: 'open-catalog',
   /** Open the Module Gallery modal (View menu). */
   openModules: 'open-modules',
+  /** Open the in-app user Guide modal (Help ▸ Guide). */
+  openGuide: 'open-guide',
   /** The language changed in main (menu picker) — payload is the new LanguageInfo. */
   languageChanged: 'language-changed',
 } as const;

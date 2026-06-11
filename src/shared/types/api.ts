@@ -173,6 +173,8 @@ export interface BlockwrightApi {
   onOpenCatalog: (cb: () => void) => void;
   /** Notified when View ▸ Module Gallery is chosen. */
   onOpenModules: (cb: () => void) => void;
+  /** Notified when Help ▸ Guide is chosen. */
+  onOpenGuide: (cb: () => void) => void;
 }
 
 declare global {

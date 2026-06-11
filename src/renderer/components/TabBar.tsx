@@ -4,9 +4,9 @@
 // while its build is generating, so you can watch a background tab work while you
 // edit another. Always rendered (even with no docs) so the drag region and
 // traffic-light space persist on the welcome screen.
+import { House } from 'lucide-react';
 import { useDocuments, useT } from '../hooks/useStores';
 import { documentsStore } from '../state/documents';
-import { Logo } from './ui/Logo';
 
 export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: string) => void }) {
   const t = useT();
@@ -31,7 +31,7 @@ export function TabBar({ onNew, onClose }: { onNew: () => void; onClose: (id: st
         aria-label={t('tab.home')}
         onClick={() => documentsStore.getState().goHome()}
       >
-        <Logo size={20} />
+        <House size={17} strokeWidth={1.8} aria-hidden />
       </button>
       {documents.map((d) => (
         <div

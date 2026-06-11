@@ -1,17 +1,22 @@
-// The full-stage Build Planner. Opening ⚙ Details promotes the build configuration out of
-// the cramped chat dock into a dedicated workspace that takes over the stage: a roomy
-// config column on the left (the progressive DetailsSection + free-text notes) and a live
-// 3D size preview on the right (the build volume with a player figure for scale). On Build
-// it composes the same brief/selection the dock did and hands off to `runGeneration`, then
-// closes back to the viewer so the user watches it build live. State lives in the planner
-// store so the dock and this view share one source of truth.
+// The Build Planner — the unified, Details-first surface for STARTING a build. It renders
+// in two modes from one shared view (PlannerView):
+//   • INLINE (NewBuildPanel) — takes over the stage for a brand-new tab / Welcome ▸ Generate.
+//     This is the DEFAULT for new files: pick a structure + options, optionally describe the
+//     build, and hit Generate (text-only works — just type and go).
+//   • OVERLAY (BuildPlanner) — a dialog over an OPEN `.nbt` (the chat's "Advanced" button),
+//     so structured edits are available while the chat stays one click away.
+// Both compose the SAME brief/selection and hand off to `runGeneration`; state lives in the
+// planner store so the two modes share one source of truth. The roomy config column (the
+// progressive DetailsSection + a prominent description field) sits left; a live 3D size
+// preview (the build volume with a player figure for scale) sits right.
 import { useCallback, useEffect, useState } from 'react';
+import { Sparkles, RotateCcw, PencilLine } from 'lucide-react';
 import { store } from '../../state/store';
 import { plannerStore } from '../../state/planner';
 import { documentsStore } from '../../state/documents';
 import { windowsStore } from '../../state/windows';
 import { runGeneration } from '../../state/generation';
-import { usePlanner, useT, useLocale } from '../../hooks/useStores';
+import { usePlanner, useT, useLocale, useActiveDoc } from '../../hooks/useStores';
 import { api } from '../../api';
 import {
   buildBrief,
@@ -33,12 +38,14 @@ import { DetailsSection } from './DetailsSection';
 import { BuildScalePreview, PLAYER_H } from './BuildScalePreview';
 import type { GenerationCatalog } from '@/shared/types';
 
-export function BuildPlanner() {
+/** The shared planner UI, rendered inline (new build) or as an overlay (advanced edit). */
+function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => void }) {
   const t = useT();
   const locale = useLocale();
-  const open = usePlanner((s) => s.open);
   const details = usePlanner((s) => s.details);
   const notes = usePlanner((s) => s.notes);
+  const activeDoc = useActiveDoc();
+  const isEdit = !!activeDoc?.filePath; // an open .nbt → this build EDITS it
   const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
   const [available, setAvailable] = useState<boolean | null>(null);
 
@@ -46,20 +53,9 @@ export function BuildPlanner() {
     void api.generationCatalog().then(setCatalog);
   }, [locale]);
 
-  // Re-probe the AI credential each time the planner opens (it may have just been added).
   useEffect(() => {
-    if (open) void api.aiAvailable().then(setAvailable);
-  }, [open]);
-
-  // Esc closes the planner (it's a full-stage overlay).
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') plannerStore.getState().closePlanner();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
+    void api.aiAvailable().then(setAvailable);
+  }, []);
 
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
 
@@ -101,13 +97,13 @@ export function BuildPlanner() {
     const docId = ds.activeId ?? ds.newDoc();
     if (ds.documents.find((x) => x.id === docId)?.busy) return;
     // Model gets the notes + the plain-language brief; the chat shows the notes plus the
-    // presentable build card. Mirror the dock composer's send() so the two paths agree.
+    // presentable build card. One path for both modes so generate + edit stay in lock-step.
     const aiPrompt = note ? note + brief : brief ? `Generate a structure with these details:${brief}` : note;
     const selection = buildSelection(d, catalog);
     const summary = buildSummary(d, catalog);
     ps.closePlanner();
     ps.reset();
-    // Reveal the Generate chat so the build's transcript + progress are visible.
+    // Reveal the Generate chat so the build's transcript + live progress are visible.
     windowsStore.getState().openPanel('generate');
     await runGeneration(docId, {
       aiPrompt,
@@ -118,25 +114,27 @@ export function BuildPlanner() {
     });
   }, [catalog]);
 
-  if (!open) return null;
-
   const sz = details.structureType ? effectiveSize(details, selStruct) : null;
+  const title = inline ? (isEdit ? t('planner.advancedTitle') : t('planner.newTitle')) : t('planner.advancedTitle');
+  const cta = isEdit ? t('planner.generateEdit') : t('planner.generate');
 
   return (
-    <div className="planner" role="dialog" aria-label={t('planner.title')}>
+    <div className={`planner${inline ? ' planner-inline' : ''}`} role="dialog" aria-label={title}>
       <div className="planner-head">
         <span className="planner-title">
-          <span className="planner-title-icon">◳</span>
-          {t('planner.title')}
+          <Sparkles size={16} strokeWidth={1.8} className="planner-title-icon" aria-hidden />
+          {title}
         </span>
-        <button
-          className="planner-close"
-          title={t('planner.close')}
-          aria-label={t('planner.close')}
-          onClick={() => plannerStore.getState().closePlanner()}
-        >
-          ✕
-        </button>
+        {onClose && (
+          <button
+            className="planner-close"
+            title={t('planner.close')}
+            aria-label={t('planner.close')}
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {available === false && (
@@ -163,10 +161,13 @@ export function BuildPlanner() {
             onRemoveRoom={onRemoveRoom}
           />
           <div className="planner-notes">
-            <span className="gen-chip-label">{t('planner.notesLabel')}</span>
+            <span className="gen-chip-label">
+              <PencilLine size={13} strokeWidth={1.8} aria-hidden />
+              {isEdit ? t('planner.editLabel') : t('planner.describeLabel')}
+            </span>
             <textarea
               className="planner-notes-input"
-              placeholder={t('gen.notesPlaceholder')}
+              placeholder={isEdit ? t('planner.editPlaceholder') : t('gen.notesPlaceholder')}
               value={notes}
               rows={3}
               onChange={(e) => plannerStore.getState().setNotes(e.target.value)}
@@ -175,14 +176,16 @@ export function BuildPlanner() {
           </div>
           <div className="planner-actions">
             <button
-              className="btn sm"
+              className="btn sm planner-reset"
               disabled={!details.structureType && !notes}
               onClick={() => plannerStore.getState().reset()}
             >
+              <RotateCcw size={13} strokeWidth={1.8} aria-hidden />
               {t('planner.reset')}
             </button>
             <button className="btn primary planner-build" disabled={!canBuild} onClick={() => void build()}>
-              {t('planner.build')}
+              <Sparkles size={14} strokeWidth={2} aria-hidden />
+              {cta}
             </button>
           </div>
         </div>
@@ -206,4 +209,16 @@ export function BuildPlanner() {
       </div>
     </div>
   );
+}
+
+/** The OVERLAY planner (the chat's "Advanced" button) — a dialog over an open build. */
+export function BuildPlanner() {
+  const open = usePlanner((s) => s.open);
+  if (!open) return null;
+  return <PlannerView inline={false} onClose={() => plannerStore.getState().closePlanner()} />;
+}
+
+/** The INLINE planner — the Details-first stage for a brand-new build tab. */
+export function NewBuildPanel() {
+  return <PlannerView inline />;
 }

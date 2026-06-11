@@ -279,12 +279,23 @@ body {
   width: 20px;
   height: 20px;
 }
+.tab-home svg {
+  display: block;
+  color: var(--text-2);
+  transition: color 0.13s ease;
+}
 .tab-home:hover {
   background: var(--panel-strong);
+}
+.tab-home:hover svg {
+  color: var(--text);
 }
 .tab-home.active {
   background: var(--panel-strong);
   box-shadow: inset 0 0 0 1px var(--border);
+}
+.tab-home.active svg {
+  color: var(--accent);
 }
 
 @keyframes bw-spin {
@@ -4170,4 +4181,559 @@ body.row-resizing {
 }
 .image-preview-close:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+/* ============================================================================ */
+/* Generate refactor: icon buttons, build-progress bar, inline planner, the     */
+/* stage "building" card, and the in-app Guide modal.                           */
+/* ============================================================================ */
+
+/* Buttons that pair a lucide icon with a label sit on one baseline. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.btn svg {
+  flex: none;
+}
+.btn.icon {
+  gap: 0;
+}
+
+/* A small accent dot marking an active Advanced/Details selection. */
+.gen-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* The composer Send button as a round accent action. */
+.gen-composer-actions .gen-send.icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+.gen-composer-actions .gen-cancel {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+/* Spin utility for the lucide Loader2 spinner. */
+.spin {
+  animation: gen-spin 0.8s linear infinite;
+  color: var(--accent);
+}
+
+/* --- Live build-progress bar (chat dock + stage card) ---------------------- */
+.build-progress {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.build-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.build-progress-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.build-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.build-progress-pass {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.build-progress-pass::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--text-muted);
+}
+.build-progress-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  font-family: var(--mono, monospace);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.build-progress-track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+  overflow: hidden;
+}
+.build-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.build-progress-track.indeterminate .build-progress-fill {
+  width: 38%;
+  animation: bp-slide 1.25s ease-in-out infinite;
+}
+@keyframes bp-slide {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+.build-progress-steps {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.build-progress.block {
+  gap: 9px;
+}
+.build-progress.block .build-progress-track {
+  height: 8px;
+}
+
+/* --- Inline planner (the Details-first new-build stage) -------------------- */
+/* Reuses .planner (absolute, fills the stage). Inline tweaks only. */
+.planner-inline {
+  z-index: 6; /* above the empty viewport, below modals + floating panels */
+}
+.planner-inline .planner-head {
+  padding: 13px 18px;
+}
+.planner-title-icon {
+  color: var(--accent);
+}
+.planner-build svg,
+.planner-reset svg {
+  flex: none;
+}
+
+/* --- Stage "building" card (pre-first-emit gap) ---------------------------- */
+.stage-building {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, var(--panel));
+}
+.stage-building-card {
+  width: min(460px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 30px 26px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    var(--panel);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.stage-building-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.stage-building-mark svg {
+  animation: bw-pulse 2s ease-in-out infinite;
+}
+@keyframes bw-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.stage-building-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.stage-building-sub {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.stage-building-card .build-progress {
+  margin-top: 8px;
+}
+
+/* --- Welcome guide link ---------------------------------------------------- */
+.welcome-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+.welcome-guide-link {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.welcome-guide-link:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* --- Guide modal ----------------------------------------------------------- */
+.modal.guide-modal {
+  height: min(640px, calc(100vh - 80px));
+}
+.guide-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.guide-body {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+}
+.guide-nav {
+  flex: none;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 12px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--text) 2.5%, transparent);
+  overflow-y: auto;
+}
+.guide-nav-item {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--text-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.guide-nav-item svg {
+  flex: none;
+  color: var(--text-muted);
+  transition: color 0.12s ease;
+}
+.guide-nav-item:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+.guide-nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.guide-nav-item.active svg {
+  color: var(--accent);
+}
+.guide-nav-foot {
+  margin-top: auto;
+  padding: 12px 11px 4px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.guide-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 26px 30px 32px;
+  animation: guide-fade 0.22s ease;
+}
+@keyframes guide-fade {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+.guide-section {
+  max-width: 560px;
+}
+.guide-h {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.guide-h-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.guide-lead {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.guide-p {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.guide-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 4px 0 4px;
+}
+.guide-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.guide-card svg {
+  flex: none;
+  color: var(--accent);
+}
+.guide-steps {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: guide-step;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.guide-steps li {
+  position: relative;
+  padding-left: 38px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+  counter-increment: guide-step;
+}
+.guide-steps li::before {
+  content: counter(guide-step);
+  position: absolute;
+  left: 0;
+  top: -1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 50%;
+}
+.guide-steps li b {
+  color: var(--text);
+  font-weight: 600;
+}
+.guide-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.guide-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+.guide-list li svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.guide-list li b {
+  color: var(--text);
+  font-weight: 600;
+}
+.guide-tip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 20px 0 0;
+  padding: 11px 13px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.guide-tip svg {
+  flex: none;
+  color: var(--accent);
+}
+
+/* Inline SVG guide diagrams (themed via currentColor + CSS vars). */
+.guide-diagram {
+  width: 100%;
+  height: auto;
+  margin: 4px 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 72%),
+    var(--panel);
+  padding: 12px;
+}
+.gd-node {
+  fill: var(--panel-strong);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+.gd-node.accent {
+  fill: var(--accent-soft);
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.gd-node-label {
+  fill: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.gd-plus {
+  fill: var(--text-muted);
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.gd-arrow {
+  stroke: var(--text-muted);
+  stroke-width: 1.4;
+  fill: none;
+}
+.gd-arrow-head {
+  fill: var(--text-muted);
+}
+.gd-orbit {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 4;
+  fill: none;
+  opacity: 0.8;
+}
+.gd-cap {
+  fill: var(--text-muted);
+  font-size: 10px;
+  text-anchor: middle;
+}
+.gd-ground {
+  fill: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.gd-wall {
+  fill: color-mix(in srgb, var(--accent) 22%, var(--panel-strong));
+  stroke: var(--border-strong);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+.gd-wall.dim {
+  fill: color-mix(in srgb, var(--accent) 12%, var(--panel-strong));
+}
+.gd-roof {
+  fill: color-mix(in srgb, var(--accent) 44%, var(--panel-strong));
+  stroke: var(--border-strong);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+.gd-roof.dim {
+  fill: color-mix(in srgb, var(--accent) 30%, var(--panel-strong));
+}
+.gd-chip {
+  fill: var(--panel-strong);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.gd-chip-label {
+  fill: var(--text-2);
+  font-size: 10px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* Stack the planner columns on a narrow window so neither is crushed. */
+@media (max-width: 720px) {
+  .planner-body {
+    flex-direction: column;
+  }
+  .planner-config {
+    flex: 1 1 auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .guide-nav {
+    width: 168px;
+  }
 }

@@ -27,6 +27,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceCh
     api.onExportFile(() => void exportActive());
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
+    api.onOpenGuide(() => st.setGuideOpen(true));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));

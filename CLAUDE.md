@@ -80,8 +80,9 @@ src/
                            free-form) + four SEEDED archetypes with code-built shells (modern = flat-roofed
                            glass villa; farmhouse = L plan + cross-gable + veranda; sakura = pink cherry
                            cottage RAISED on a visible stone basement with an exterior stair to the upper
-                           entry; gothic = black+white manor with a front portico, mini corner tower + glass
-                           chapel wing) + types.ts (contract + Box/logProps + `seedShell`) + index.ts
+                           entry; gothic = black+white manor with a central frontispiece tower, balustraded
+                           front veranda, mini corner tower, glass chapel wing + ivy eaves) + types.ts
+                           (contract + Box/logProps + `seedShell`) + index.ts
                            (registry). A type emits ops in terms of roles; never names blocks, and delegates
                            roof/basement to modules. See "Seeded archetypes" below. (cabin/l-shaped retired;
                            the EXTERIOR category was removed — sakura/gothic are full structure types now.)
@@ -170,7 +171,11 @@ src/
       passes/             Post-processing pipeline: each Pass is (blocks,palette,ctx)→
                           {blocks,palette,fixes?,warnings?}; runPasses chains them, accumulating
                           fixes/warnings. ctx carries `size` + the selected `structureType`.
-                          ALWAYS-ON: rebuildStairwells (code OWNS vertical circulation — see below),
+                          ALWAYS-ON: preserveShell (runs FIRST; a no-op unless `ctx.lockCells` is
+                          supplied — for a `lockShell` structure (gothic) it restores any shell cell the
+                          model DELETED/aired-out, so the code-built exterior floor/roof/walls/tower can't
+                          be gutted; the model may still redecorate solid→solid, glaze walls and furnish),
+                          rebuildStairwells (code OWNS vertical circulation — see below),
                           connectBlocks (derive pane/bar/fence/wall sides from neighbours — the AI omits
                           north/south/east/west, so an isolated pane would render as the bare `_post`
                           column; splits palette per side combo), fixDoors, fixPlacement (also drops
@@ -214,18 +219,27 @@ src/
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
                           (Module Gallery: a host-first composition blueprint — pick a structure, see the
                           roof/attic/basement/room/decoration parts that link to it + 3D preview —
-                          store.modulesOpen), ConsoleDock (the full-width bottom log dock — see below).
-                          NewStructurePanel (the Generate chat) is a thin ORCHESTRATOR — it owns the
-                          composer's transient state + effects and composes the view from focused parts
-                          in components/generate/: ChatTranscript (empty state + messages + result stats +
-                          live progress), Composer (attachments + section slots + textarea + action
-                          toolbar), DetailsSection (the progressive ⚙ Details selects/params/size/per-floor
+                          store.modulesOpen), GuideModal (the in-app user Guide — store.guideOpen, opened
+                          from Help ▸ Guide / the welcome link: a sectioned modal with inline SVG diagrams
+                          + lucide icons), ConsoleDock (the full-width bottom log dock — see below).
+                          NewStructurePanel (the Generate CHAT, for editing an open build) is a thin
+                          ORCHESTRATOR — it owns the composer's transient state + effects and composes the
+                          view from focused parts in components/generate/: ChatTranscript (empty state +
+                          messages + result stats + live progress), Composer (attachments + section slots +
+                          textarea + an "Advanced" button that opens the planner overlay + icon action
+                          toolbar), DetailsSection (the progressive Details selects/params/size/per-floor
                           rooms — a PURE view), FloorsSection (the ▦ Floors editor), BuildCard (the chat
-                          build card). Opening ⚙ Details promotes the config out of the dock into the
-                          full-stage BuildPlanner (config column = DetailsSection + notes; right = a live
-                          BuildScalePreview of the build volume with a player figure) — its state lives in
-                          state/planner.ts so the dock + planner share one source of truth; both build the
-                          SAME brief/selection (generation/brief.ts) and hand off to runGeneration.
+                          build card), BuildProgress (the COMPACT live progress bar — phase + design-pass +
+                          a determinate fill from designStep/designSteps + elapsed/tokens, shared by the dock
+                          and the stage), StageBuilding (the centered "building…" card shown over an empty
+                          new-build tab in the gap before the first version loads). The BuildPlanner is the
+                          Details-FIRST surface in TWO modes from one shared PlannerView (config column =
+                          DetailsSection + a prominent description field; right = a live BuildScalePreview):
+                          INLINE (NewBuildPanel — the default stage for a brand-new tab / Welcome ▸ Generate;
+                          App renders it for an empty, non-busy doc) and OVERLAY (the chat's Advanced button,
+                          over an open `.nbt`). Both modes + the dock's free-text composer build the SAME
+                          brief/selection (generation/brief.ts) and hand off to runGeneration — generating and
+                          editing are one unified loop. State lives in state/planner.ts (the shared draft).
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
@@ -469,8 +483,9 @@ decoration, and a new module is one small file.
   cherry cottage RAISED on a VISIBLE stone-brick basement, the entry up on the raised floor reached by an
   exterior stone stair under the overhanging upper storey, a pink cherry-stair roof crowned with blossom
   cascades + an upper balcony; **gothic** = a black-with-white-detailing manor (pale belt courses) with a
-  covered front portico, a mini corner tower past the roofline + a glass chapel wing down one side, steep
-  slate roof. Each auto-pairs its identity decoration in Details (`details.ts` `PAIRED_DECORATION`:
+  central frontispiece tower projecting at the front and rising past the ridge (carrying the grand entrance),
+  a balustraded front veranda, a mini corner tower past the roofline, a glass chapel wing down one side + ivy
+  garlands over the eaves, steep slate roof. Each auto-pairs its identity decoration in Details (`details.ts` `PAIRED_DECORATION`:
   modern/farmhouse/sakura/gothic); classic stays free-form on cozy. (cabin/l-shaped were retired; the
   EXTERIOR category — sakura/gothic as skins over classic — was removed, since they're full types now.)
   - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
@@ -479,6 +494,16 @@ decoration, and a new module is one small file.
     (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
     `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
     model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety).
+  - **`lockShell: true`** (`StructureType`, implies `seedShell`; **gothic only** for now) hardens the seed
+    into a guarantee: a seed is only CONTEXT the model can ignore, and it does — it reliably deletes the
+    ground-floor slab + strips the roof (the "sem chão / sem telhado" defect), then strews furniture over
+    the hole (stripped as "unsupported" by `fixPlacement`). For a locked type, `buildShellSeed` returns the
+    compiled shell's solid cells as `lockCells`; `generate.ts` threads them into EVERY emit's compile
+    (`CompileOptions.lockCells`), and the `preserveShell` pass restores any the model deleted. The exterior
+    becomes code-OWNED (floor/roof/walls/tower can't be gutted) while the model still furnishes the interior
+    + may redecorate (solid→solid) and glaze walls (a hole→pane is solid, so it's kept). Other `seedShell`
+    types stay UNLOCKED (free to re-emit) — opt in per type. (Door note: gothic's central tower carries the
+    entrance, so the portico colonnade/veranda must skip the tower's central bay or a column buries the door.)
   - **Verify a shell visually with `BW_CAPTURE`** (compile a `template name:'<id>'` to `.nbt`, open it) —
     the geometry is real code, so screenshot it BEFORE relying on an AI run (which can't be verified
     locally). `domain/__tests__/compose.test.ts` also guards that each archetype compiles from its preview.
@@ -716,9 +741,16 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   (Cmd+Shift+B) + Module Gallery (Cmd+Shift+M) modals via their own divider group (they're modals,
   not window toggles, so they `notifyOpenCatalog/Modules` → `store.setCatalogOpen/ModulesOpen`).
 - **Home / tabs:** `activeId === null` (documents store) is the **Home** state — the Welcome screen
-  shows whenever there's no active doc, even with tabs still open. The title-bar logo button
-  (`TabBar`, `goHome()`) returns there; clicking a tab restores it. The Generate dock tab has no
-  close button (close it from View ▸ Generate, like Info/Versions).
+  shows whenever there's no active doc, even with tabs still open. The title-bar **House icon**
+  (`TabBar`, `goHome()`, a lucide `House` — not the logo anymore) returns there; clicking a tab
+  restores it. The Generate dock tab has no close button (close it from View ▸ Generate, like
+  Info/Versions). A brand-new tab (the "+" / File ▸ New / Welcome ▸ Generate) lands on the inline
+  NewBuildPanel (Details-first), NOT the chat dock — `newDoc` resets the planner draft + does not
+  force the dock open; `build()` reveals the chat once generation starts.
+- **Icons:** the UI uses **lucide-react** (modern stroke icons) — import the named icon directly
+  (`import { House } from 'lucide-react'`). Diagrams in the Guide are inline SVG themed via
+  `currentColor` + CSS vars (the `gd-*` classes). Help ▸ Guide (`Cmd+Shift+/`) opens GuideModal via
+  `notifyOpenGuide` → `IPC_EVENTS.openGuide` → `store.guideOpen`.
 - **About is one place:** there's a single About — Settings ▸ About (`SettingsModal` `AboutTab`,
   app version via `getAppVersion` IPC). The native macOS "About" menu item routes to it
   (`notifyOpenSettings('about')` → `store.settingsSection`), so the default Electron panel never

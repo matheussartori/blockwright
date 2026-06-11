@@ -6,27 +6,9 @@ import type { RefObject } from 'react';
 import { store } from '../../state/store';
 import { formatElapsed } from '../../generation/brief';
 import { BuildCard } from './BuildCard';
+import { BuildProgress } from './BuildProgress';
 import type { MessageKey } from '@/shared/i18n';
 import type { ChatMessage, GenerateProgress } from '@/shared/types';
-
-/** i18n label per live generation phase. */
-const PHASE_LABEL: Record<GenerateProgress['phase'], MessageKey> = {
-  thinking: 'gen.phase.thinking',
-  building: 'gen.phase.building',
-  compiling: 'gen.phase.compiling',
-  rendering: 'gen.phase.rendering',
-  reviewing: 'gen.phase.reviewing',
-};
-
-/** i18n label per design pass id (massing/roof/…), sent by main as `designPhase`. */
-const DESIGN_PHASE_LABEL: Record<string, MessageKey> = {
-  massing: 'gen.designPhase.massing',
-  roof: 'gen.designPhase.roof',
-  facade: 'gen.designPhase.facade',
-  interior: 'gen.designPhase.interior',
-  circulation: 'gen.designPhase.circulation',
-  audit: 'gen.designPhase.audit',
-};
 
 const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
@@ -85,7 +67,11 @@ export function ChatTranscript({ chat, busy, progress, elapsedMs, t, scrollRef, 
           {m.build && <BuildCard build={m.build} t={t} />}
         </div>
       ))}
-      {busy && <LiveProgress progress={progress} elapsedMs={elapsedMs} t={t} />}
+      {busy && (
+        <div className="gen-msg assistant gen-live">
+          <BuildProgress progress={progress} elapsedMs={elapsedMs} t={t} />
+        </div>
+      )}
     </div>
   );
 }
@@ -130,42 +116,3 @@ function ResultStats({ meta, t }: { meta: NonNullable<ChatMessage['meta']>; t: T
   );
 }
 
-/** The live in-flight block: the current phase + design-pass label and the running
- *  elapsed time / token counts. */
-function LiveProgress({ progress, elapsedMs, t }: { progress: GenerateProgress | null; elapsedMs: number; t: T }) {
-  return (
-    <div className="gen-msg assistant gen-live">
-      <div className="gen-progress-head">
-        <span className="gen-spinner" aria-hidden />
-        <span className="gen-phase">
-          {progress ? t(PHASE_LABEL[progress.phase]) : t('gen.phase.generating')}
-          {progress?.designPhase && (
-            <span className="gen-design-phase">
-              {' · '}
-              {DESIGN_PHASE_LABEL[progress.designPhase] ? t(DESIGN_PHASE_LABEL[progress.designPhase]) : progress.designPhase}
-              {progress.designStep ? ` (${progress.designStep}/${progress.designSteps})` : ''}
-            </span>
-          )}
-        </span>
-      </div>
-      <div className="gen-stats">
-        <span className="gen-stat" title={t('gen.elapsedTitle')}>
-          <span className="gen-stat-label">{t('gen.statTime')}</span>
-          <span className="gen-stat-value">{formatElapsed(elapsedMs)}</span>
-        </span>
-        {progress && progress.outputTokens > 0 && (
-          <>
-            <span className="gen-stat" title={t('gen.statInTitleLive')}>
-              <span className="gen-stat-label">{t('gen.statIn')}</span>
-              <span className="gen-stat-value">{progress.inputTokens.toLocaleString()}</span>
-            </span>
-            <span className="gen-stat" title={t('gen.statOutTitle')}>
-              <span className="gen-stat-label">{t('gen.statOut')}</span>
-              <span className="gen-stat-value">{progress.outputTokens.toLocaleString()}</span>
-            </span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}

@@ -34,6 +34,9 @@ export const gothic: Decoration = {
     door: 'minecraft:dark_oak_door',
     fence: 'minecraft:dark_oak_fence',
     light: 'minecraft:soul_lantern',
+    // Dark ivy/garland greenery softening the slate roof + tower (the leaves cascading
+    // over the eaves in the references) — the one spot of life on the brooding manor.
+    plant: 'minecraft:flowering_azalea_leaves',
   },
   // Crisp and intact (the manor is kept, not ruined): no decay, no weathering (identity).
   decay: 0,

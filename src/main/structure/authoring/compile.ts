@@ -7,7 +7,8 @@ import { gradeFromFloors, type FloorRange } from './floors';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
 import {
-  connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, rebuildStairwells, runPasses, type Pass,
+  connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, preserveShell, rebuildStairwells, runPasses,
+  type Pass, type ShellLockCell,
 } from './passes';
 import type { AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
@@ -31,6 +32,9 @@ export interface CompileOptions {
   /** Optional sink for the per-pass code-fix play-by-play (the AI Console dock).
    *  Omit for context-free compiles (catalog/module previews) so they stay quiet. */
   log?: (message: string) => void;
+  /** The protected SHELL cells for a `lockShell` structure (gothic) — `preserveShell`
+   *  restores any of these the model deleted. Omit for everything else (the pass no-ops). */
+  lockCells?: ShellLockCell[];
 }
 
 /** Build the pass pipeline for a build. Most passes are ALWAYS-ON; the only
@@ -43,13 +47,15 @@ export interface CompileOptions {
  *  `'stairs'` finalizer needed. It replaces the old inset/ladder/carve chain. */
 function pipelineFor(structureType?: string): Pass[] {
   const passes: Pass[] = [];
-  // Order matters: vertical circulation is rebuilt first (so the openings/landings it
+  // The shell lock runs FIRST (no-op unless `lockCells` is supplied): it re-asserts the
+  // code-built exterior the AI deleted, so the floor/roof/walls are whole BEFORE the rest.
+  // Order matters: vertical circulation is rebuilt next (so the openings/landings it
   // cuts are in place); door hinges are mirrored on the as-authored leaves; connection
   // sides are derived; placement is fixed against the real blocks (and drops orphan
   // door halves / floating railings); circulation cleanup (drop stray ladders / cap
   // orphan floor holes) runs once everything has settled; the interior air-fill runs
   // last so it doesn't interfere with neighbour/support lookups.
-  passes.push(rebuildStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
+  passes.push(preserveShell, rebuildStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
   if (structureFinalizers(structureType).includes('chimney')) passes.push(fixChimney);
   passes.push(fillInteriorAir);
   return passes;
@@ -65,7 +71,7 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
   // Grade (ground-floor level) for the air-fill: the user's Floor plan wins when
   // defined, else the storeys the model labelled in the build itself.
   const grade = gradeFromFloors(opts?.floors?.length ? opts.floors : s.floors);
-  const ctx = { size, structureType: opts?.structureType, grade, log: opts?.log };
+  const ctx = { size, structureType: opts?.structureType, grade, log: opts?.log, lockCells: opts?.lockCells };
   const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
     dataVersion: s.DataVersion ?? 3955,

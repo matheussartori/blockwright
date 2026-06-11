@@ -24,7 +24,7 @@ export const dataPtBR: Record<string, string> = {
     'Um chalé das cerejeiras erguido sobre um porão de tijolos de pedra visível: a entrada fica no andar principal elevado, alcançada por uma escada externa de pedra que sobe por baixo do andar superior em balanço. Revestimento de madeira de cerejeira em rosa suave, um telhado de duas águas rosa coroado por cascatas de flores, floreiras frondosas e uma sacada frontal superior. Romântica e primaveril.',
   'mod.structure.gothic.label': 'Gótica',
   'mod.structure.gothic.desc':
-    'Uma mansão gótica sombria: paredes enegrecidas de madeira e blackstone realçadas por cordões de pedra clara, um telhado íngreme de ardósia, um pórtico frontal coberto, uma mini torre de canto que se ergue acima da linha do telhado até um remate pontiagudo e uma ala-capela de vidro com altas janelas cinzas em um dos lados. Soturna, vertical e assimétrica — iluminada por almas e senhorial.',
+    'Uma mansão gótica sombria: paredes enegrecidas de madeira e blackstone realçadas por cordões de pedra clara, um telhado íngreme de ardósia, uma torre central de fachada que se projeta à frente e se ergue acima da cumeeira até um remate pontiagudo, uma varanda frontal com balaustrada, uma mini torre de canto, uma ala-capela de vidro com altas janelas cinzas e heras pendendo dos beirais. Soturna, vertical e assimétrica — iluminada por almas e senhorial.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',

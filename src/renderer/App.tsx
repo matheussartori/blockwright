@@ -9,7 +9,7 @@ import { useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
-import { useActiveDoc, useT } from './hooks/useStores';
+import { useActiveDoc } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
 import { useAiRenderBridge } from './app/useAiRenderBridge';
 import { useAppIpc } from './app/useAppIpc';
@@ -26,12 +26,13 @@ import { ModulesModal } from './components/ModulesModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
-import { BuildPlanner } from './components/generate/BuildPlanner';
+import { BuildPlanner, NewBuildPanel } from './components/generate/BuildPlanner';
+import { StageBuilding } from './components/generate/StageBuilding';
 import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
+import { GuideModal } from './components/GuideModal';
 
 function Shell() {
-  const t = useT();
   const viewer = useViewer();
   const captureViewer = useCaptureViewer();
   const activeDoc = useActiveDoc();
@@ -77,12 +78,11 @@ function Shell() {
                 />
               )}
               {activeDoc && !fileOpen && !activeDoc.loading && (
-                <div className="empty-tab">
-                  <p>{t('emptyTab.title')}</p>
-                  <p className="empty-tab-hint">
-                    {t('emptyTab.hintPre')}<code>.nbt</code>{t('emptyTab.hintPost')}
-                  </p>
-                </div>
+                activeDoc.busy ? (
+                  <StageBuilding progress={activeDoc.progress ?? null} startedAt={activeDoc.startedAt ?? null} />
+                ) : (
+                  <NewBuildPanel />
+                )
               )}
               <FloatingPanels availability={availability} />
               <WorkspaceBadge />
@@ -104,6 +104,7 @@ function Shell() {
       <CatalogModal />
       <ModulesModal />
       <VersionSelectModal />
+      <GuideModal />
       <ImagePreview />
     </>
   );

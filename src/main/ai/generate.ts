@@ -29,7 +29,7 @@ import { RunLog } from './gen-log';
 import { buildReviewContent } from './review-content';
 import { TokenMeter, type TokenTotals } from './token-meter';
 import type { DriverProgress, EmitToolResult } from './providers/types';
-import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport } from '../structure/authoring';
+import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport, type ShellLockCell } from '../structure/authoring';
 
 /** Render a just-emitted version and return screenshot(s) of it (or an error),
  *  so the model can see its own build and refine it. Supplied by the IPC layer,
@@ -107,14 +107,20 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // code-built exterior shell, so the model finishes a guaranteed-modern silhouette
   // instead of inventing one (and reliably reverting to a pitched box). Falls through
   // to the normal edit/free-form seed for every other case.
+  // The LOCKED shell cells of a `lockShell` archetype (gothic): re-asserted on every
+  // emit's compile so the AI can't gut the code-built exterior. Empty for every other
+  // build (so `preserveShell` no-ops and other archetypes are unaffected).
+  let lockCells: ShellLockCell[] | undefined;
   let seed = await buildSeed(resumable, session, basePath);
   if (!seed && session.version === 0) {
-    seed = await buildShellSeed({
+    const shell = await buildShellSeed({
       structureType: selection?.structureType,
       decoration: selection?.decoration,
       size: selection?.size,
       roof: selection?.roof,
     }, session.dir);
+    seed = shell.preamble;
+    lockCells = shell.lockCells;
   }
   const effectivePrompt = seed + prompt;
 
@@ -246,6 +252,8 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
         structureType: selection?.structureType,
         // The user's Floor plan (UI) overrides the model's declared storeys for grade.
         floors: floors?.length ? floors : undefined,
+        // Re-assert a locked archetype's shell (gothic) so its exterior can't be gutted.
+        lockCells,
         log: run.fix,
       });
       await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));

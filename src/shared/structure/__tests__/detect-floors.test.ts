@@ -25,6 +25,19 @@ function windowed(y: number): [number, number, number][] {
   return walls(y).filter((c) => !(c[0] === 0 && (c[2] === 2 || c[2] === 3)));
 }
 
+/** A FURNISHED storey layer at y: the wall ring PLUS interior furniture/pillars filling a
+ *  chunk of the inside (every other interior column here ≈ a third of the footprint), the
+ *  way a lived-in floor packs the layer just above its slab. The point of the fixture is
+ *  that this is well above the absolute "open above" gate, so only the relative-drop test
+ *  detects the slab below it. */
+function furnished(y: number): [number, number, number][] {
+  const out = walls(y);
+  for (let x = 1; x < X - 1; x++) for (let z = 1; z < Z - 1; z++) {
+    if ((x + z) % 2 === 0) out.push([x, y, z]);
+  }
+  return out;
+}
+
 /** A centered square ring at y, inset `margin` cells from the edge — stack these with a
  *  growing margin to get a roof whose cross-section shrinks toward the ridge. */
 function ring(y: number, margin: number): [number, number, number][] {
@@ -103,6 +116,21 @@ describe('detectFloors', () => {
     ];
     const floors = detectFloors({ size: [X, 13, Z], solids });
     expect(floors.map((f) => f.role)).toEqual(['basement', 'ground', 'upper']);
+  });
+
+  it('detects FURNISHED floors (furniture above a slab must not hide the storey)', () => {
+    // Two slabs, each topped by a heavily-furnished layer (pillars/furniture) that exceeds
+    // the absolute "open above" gate. The relative drop from the full slab to the furnished
+    // room must still split them into two storeys — the real-world defect where a gothic
+    // manor's lived-in floors went undetected and the viewer bands missed the lower storeys.
+    const solids = [
+      ...slab(0), ...furnished(1), ...furnished(2), ...furnished(3),
+      ...slab(4), ...furnished(5), ...furnished(6), ...furnished(7),
+    ];
+    const floors = detectFloors({ size: [X, 9, Z], solids });
+    expect(floors).toHaveLength(2);
+    expect(floors[0]).toMatchObject({ from: 0, to: 3 });
+    expect(floors[1]).toMatchObject({ from: 4, to: 8 });
   });
 
   it('numbers floors bottom-up, ignoring any prior name', () => {
