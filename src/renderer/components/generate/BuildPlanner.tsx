@@ -33,6 +33,8 @@ import {
   setDetailField,
   setDetailParam,
   setDetailSize,
+  setFloorHeight,
+  setHeightMode,
 } from '../../generation/details';
 import { DetailsSection } from './DetailsSection';
 import { BuildScalePreview, PLAYER_H } from './BuildScalePreview';
@@ -70,6 +72,19 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
   const onSize = useCallback(
     (axis: keyof SizeBox, value: number, base: SizeBox) =>
       plannerStore.getState().setDetails((d) => setDetailSize(d, axis, value, base)),
+    [],
+  );
+  const onHeightMode = useCallback(
+    (mode: 'total' | 'floors') => {
+      const ps = plannerStore.getState();
+      const struct = catalog?.structure.find((m) => m.id === ps.details.structureType);
+      ps.setDetails((d) => setHeightMode(d, mode, struct));
+    },
+    [catalog],
+  );
+  const onFloorHeight = useCallback(
+    (index: number, value: number, linked: boolean) =>
+      plannerStore.getState().setDetails((d) => setFloorHeight(d, index, value, linked)),
     [],
   );
   const onAddRoom = useCallback(
@@ -157,6 +172,8 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onField={onField}
             onParam={onParam}
             onSize={onSize}
+            onHeightMode={onHeightMode}
+            onFloorHeight={onFloorHeight}
             onAddRoom={onAddRoom}
             onRemoveRoom={onRemoveRoom}
           />
@@ -193,7 +210,7 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
         <div className="planner-preview">
           {sz ? (
             <>
-              <BuildScalePreview size={sz} />
+              <BuildScalePreview size={sz} floors={details.floorHeights} />
               <div className="planner-preview-caption">
                 <span className="planner-dims">
                   {sz.w} × {sz.d} × {sz.h}

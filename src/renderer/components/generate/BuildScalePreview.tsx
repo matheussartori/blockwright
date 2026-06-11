@@ -20,6 +20,11 @@ export interface ScaleSize {
   h: number;
 }
 
+/** Distinct per-floor band colours (cycled) — used when the planner is in "per floor"
+ *  height mode, so each storey reads as its own coloured slab in the preview. Chosen to
+ *  stay legible on both light and dark backgrounds. */
+const FLOOR_COLORS = [0x4a8cff, 0x35c4a3, 0xf5a623, 0xb06ef0, 0xff6b81, 0x6ad36a, 0xff8f4a, 0x49c7e8];
+
 /** Read a CSS custom property off :root as a THREE color (so the preview tracks theme). */
 function cssColor(name: string, fallback: number): THREE.Color {
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -53,7 +58,9 @@ function makePlayer(skin: THREE.Color): THREE.Group {
   return g;
 }
 
-export function BuildScalePreview({ size }: { size: ScaleSize | null }) {
+export function BuildScalePreview({ size, floors }: { size: ScaleSize | null; floors?: number[] | null }) {
+  // Stable dependency key for the (otherwise unstable) heights array.
+  const floorsKey = floors && floors.length ? floors.join(',') : '';
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -138,20 +145,37 @@ export function BuildScalePreview({ size }: { size: ScaleSize | null }) {
 
     const content = new THREE.Group();
 
-    // The build volume — faint fill + crisp wireframe, base sitting on the ground.
-    const boxGeo = new THREE.BoxGeometry(w, h, d);
-    const fillMesh = new THREE.Mesh(
-      boxGeo,
-      new THREE.MeshStandardMaterial({ color: accent, transparent: true, opacity: 0.1, depthWrite: false }),
-    );
-    fillMesh.position.set(0, h / 2, 0);
-    content.add(fillMesh);
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(boxGeo),
-      new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.85 }),
-    );
-    edges.position.set(0, h / 2, 0);
-    content.add(edges);
+    // A faint fill + crisp wireframe slab spanning [y, y+height], base on the ground.
+    const addSlab = (y: number, height: number, color: THREE.Color, fillOpacity: number, edgeOpacity: number) => {
+      if (height <= 0.001) return;
+      const geo = new THREE.BoxGeometry(w, height, d);
+      const fill = new THREE.Mesh(
+        geo,
+        new THREE.MeshStandardMaterial({ color, transparent: true, opacity: fillOpacity, depthWrite: false }),
+      );
+      fill.position.set(0, y + height / 2, 0);
+      content.add(fill);
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: edgeOpacity }),
+      );
+      edge.position.set(0, y + height / 2, 0);
+      content.add(edge);
+    };
+
+    // Per-floor mode: one COLOURED slab per storey, stacked from the ground, with the
+    // leftover (roof / overhead) shown as a faint accent cap. Otherwise: one accent box.
+    const floorList = floorsKey ? floorsKey.split(',').map(Number) : null;
+    if (floorList && floorList.length) {
+      let y = 0;
+      floorList.forEach((fh, i) => {
+        addSlab(y, Math.max(0.001, fh), new THREE.Color(FLOOR_COLORS[i % FLOOR_COLORS.length]), 0.26, 0.85);
+        y += fh;
+      });
+      addSlab(y, h - y, accent, 0.07, 0.4); // the roof / non-storey cap above the top floor
+    } else {
+      addSlab(0, h, accent, 0.1, 0.85);
+    }
 
     // Player beside the box for scale.
     const player = makePlayer(skin);
@@ -176,7 +200,7 @@ export function BuildScalePreview({ size }: { size: ScaleSize | null }) {
     scene.add(wrap);
     contentRef.current = wrap;
     frameCamera(cameraRef.current, dims);
-  }, [size?.w, size?.d, size?.h]);
+  }, [size?.w, size?.d, size?.h, floorsKey]);
 
   return <div className="scale-preview-canvas" ref={mountRef} />;
 }

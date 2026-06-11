@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_DETAILS, ROOMS_PER_FLOOR, type BuildDetails } from '../brief';
+import { EMPTY_DETAILS, MIN_STOREY_H, ROOMS_PER_FLOOR, type BuildDetails } from '../brief';
 import {
   SIZE_MAX,
   SIZE_MIN,
@@ -9,16 +9,19 @@ import {
   setDetailField,
   setDetailParam,
   setDetailSize,
+  setFloorHeight,
+  setHeightMode,
 } from '../details';
 
 const details = (over: Partial<BuildDetails>): BuildDetails => ({ ...EMPTY_DETAILS, ...over });
 
 describe('setDetailField', () => {
-  it('switching structure clears params, size, roof, basement and rooms', () => {
+  it('switching structure clears params, size, heights, roof, basement and rooms', () => {
     const d = details({
       structureType: 'house',
       params: { floors: 2 },
       size: { w: 10, d: 10, h: 12 },
+      floorHeights: [5, 6],
       roof: 'gable',
       basement: 'cellar',
       rooms: [['kitchen', '']],
@@ -28,6 +31,7 @@ describe('setDetailField', () => {
       structureType: 'tower',
       params: {},
       size: null,
+      floorHeights: null,
       roof: '',
       basement: '',
       rooms: [],
@@ -39,11 +43,11 @@ describe('setDetailField', () => {
     expect(next).toMatchObject({ structureType: 'modern', decoration: 'modern' });
   });
 
-  it('choosing a basement re-derives the size (clears manual override)', () => {
+  it('choosing a basement preserves an explicit size (no auto-reset)', () => {
     const d = details({ structureType: 'house', size: { w: 9, d: 9, h: 9 } });
     const next = setDetailField(d, 'basement', 'cellar');
     expect(next.basement).toBe('cellar');
-    expect(next.size).toBeNull();
+    expect(next.size).toEqual({ w: 9, d: 9, h: 9 });
   });
 
   it('setting decoration or roof leaves other fields untouched', () => {
@@ -122,11 +126,48 @@ describe('addRoom / removeRoomAt (planner model)', () => {
 });
 
 describe('setDetailParam', () => {
-  it('merges the param and clears the size override', () => {
+  it('merges the param and PRESERVES the explicit size (no reset)', () => {
     const d = details({ params: { decoration: 'cozy' }, size: { w: 9, d: 9, h: 9 } });
     const next = setDetailParam(d, 'floors', 3);
     expect(next.params).toEqual({ decoration: 'cozy', floors: 3 });
-    expect(next.size).toBeNull();
+    expect(next.size).toEqual({ w: 9, d: 9, h: 9 });
+  });
+
+  it('resizes the per-floor heights when the floor count changes (copies the top storey)', () => {
+    const d = details({ floorHeights: [6, 5] });
+    expect(setDetailParam(d, 'floors', 4).floorHeights).toEqual([6, 5, 5, 5]);
+    expect(setDetailParam(d, 'floors', 1).floorHeights).toEqual([6]);
+  });
+
+  it('leaves per-floor heights untouched for a non-floor param', () => {
+    const d = details({ floorHeights: [6, 5] });
+    expect(setDetailParam(d, 'balcony', 'front').floorHeights).toEqual([6, 5]);
+  });
+});
+
+describe('setHeightMode / setFloorHeight', () => {
+  it("clears per-floor heights when switching back to 'total'", () => {
+    const d = details({ floorHeights: [6, 5] });
+    expect(setHeightMode(d, 'total', undefined).floorHeights).toBeNull();
+  });
+
+  it("seeds per-floor heights from the size when switching to 'floors'", () => {
+    // No struct → floorCount falls to 1; a uniform storey is seeded from the box.
+    const d = details({ structureType: 'house', size: { w: 9, d: 9, h: 12 } });
+    const next = setHeightMode(d, 'floors', undefined);
+    expect(next.floorHeights).not.toBeNull();
+    expect(next.floorHeights?.every((h) => h >= MIN_STOREY_H)).toBe(true);
+  });
+
+  it('linked edit moves every floor; unlinked edits one', () => {
+    const d = details({ floorHeights: [5, 5, 5] });
+    expect(setFloorHeight(d, 1, 8, true).floorHeights).toEqual([8, 8, 8]);
+    expect(setFloorHeight(d, 1, 8, false).floorHeights).toEqual([5, 8, 5]);
+  });
+
+  it('clamps a floor height and is a no-op without per-floor heights', () => {
+    expect(setFloorHeight(details({ floorHeights: [5] }), 0, 999, false).floorHeights).toEqual([32]);
+    expect(setFloorHeight(EMPTY_DETAILS, 0, 8, false)).toBe(EMPTY_DETAILS);
   });
 });
 

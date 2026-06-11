@@ -8,6 +8,9 @@ import type { ReactNode } from 'react';
 export interface ChipOption {
   id: string;
   label: string;
+  /** Optional short explanation (e.g. a room module's summary) — surfaced when the option
+   *  is rendered in a {@link Select} dropdown. */
+  description?: string;
 }
 
 export function Chip({

@@ -20,8 +20,8 @@ export const gable: RoofModule = {
     'triangular gable wall closing each end. The most common cottage/house roof — simple, ' +
     'steep enough to read as a proper pitch, and the easy home for an attic in the void.',
   knowledge: 'nbt/modules/roof/gable.md',
-  // The pitched houses (NOT modern, which is flat-roofed by definition).
-  appliesTo: ['classic', 'farmhouse', 'sakura', 'gothic'],
+  // Every house type — modern included (it defaults to flat, but can take a low pitch).
+  appliesTo: ['classic', 'farmhouse', 'sakura', 'gothic', 'modern'],
   preview: { size: [9, 9, 7] },
   // `ridge` picks the ridge axis; 'auto' (default) runs it along the longer axis. A host
   // that has already chosen an orientation (e.g. the house's seeded gx/gz) passes 'x'/'z'.

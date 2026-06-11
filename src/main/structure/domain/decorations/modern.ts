@@ -30,8 +30,10 @@ export const modern: Decoration = {
     trim: 'minecraft:smooth_quartz_slab',
     beam: 'minecraft:polished_blackstone',
     pillar: 'minecraft:polished_blackstone',
-    // A FLAT roof: a quartz slab lid, not a pitched material (the modern form has no gable).
-    roof: 'minecraft:smooth_quartz_slab',
+    // The PITCHED-roof material (white quartz stairs) for when the user picks a gable/hip
+    // roof on the modern house. The DEFAULT flat roof doesn't use this role at all — the
+    // flat deck is `ceiling` + the parapet is `trim` — so the modern flat villa is unchanged.
+    roof: 'minecraft:smooth_quartz_stairs',
     window: 'minecraft:glass_pane',
     glass: 'minecraft:glass',
     door: 'minecraft:dark_oak_door',

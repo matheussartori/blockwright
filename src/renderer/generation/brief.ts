@@ -24,8 +24,15 @@ export type BuildDetails = Record<ModuleSlotKey, string> & {
    *  the param's default when the brief is built. */
   params: Record<string, string | number>;
   /** Explicit build size [W, D, H]. `null` = use the size derived from the params
-   *  (so picking floors/basement/attic auto-sizes the box); set when the user edits. */
+   *  (so picking floors/basement/attic auto-sizes the box); set when the user edits.
+   *  Editing a param/slot now PRESERVES this (it no longer snaps back to auto). */
   size: { w: number; d: number; h: number } | null;
+  /** Per-floor interior storey heights (index = above-ground floor, bottom-up), or `null`
+   *  for "total height" mode (the single H field drives every storey equally). When set,
+   *  the total build height is DERIVED from these + the roof/basement overhead, so the
+   *  user can make a tall ground floor over a low upper one. Length tracks the `floors`
+   *  param (see `setDetailParam`). */
+  floorHeights: number[] | null;
   /** Interior room modules assigned per floor (index = floor, 0-based, bottom-up). Each
    *  floor holds up to 2 room ids; '' marks an empty slot. Only meaningful for a storeyed
    *  structure (one with a `floors` param). */
@@ -41,8 +48,15 @@ export const EMPTY_DETAILS: BuildDetails = {
   ...EMPTY_SLOTS,
   params: {},
   size: null,
+  floorHeights: null,
   rooms: [],
 };
+
+/** Storey-height bounds for the per-floor height controls (interior cells). */
+export const MIN_STOREY_H = 3;
+export const MAX_STOREY_H = 32;
+/** The neutral per-storey height used when seeding the per-floor editor with no better hint. */
+export const DEFAULT_STOREY_H = 5;
 
 /** "m:ss" from a millisecond duration.
  *  @param ms - Elapsed time in milliseconds.
@@ -134,9 +148,59 @@ export function derivedSize(
   return { w, d, h };
 }
 
+/** The resolved structure params with the basement/attic SLOTS folded in (they're their
+ *  own selects now, not house params, but still drive the derived height). */
+function paramsWithSlots(d: BuildDetails, struct: GenerationModule | undefined): Record<string, string | number> {
+  return { ...resolveDetailParams(d, struct), basement: d.basement || 'none', attic: d.attic || 'none' };
+}
+
+/** The non-storey height a storeyed box needs on top of its floors: the roof pitch reserve
+ *  (~half the smaller footprint) + a ceiling course, the buried basement level, and the
+ *  attic headroom. Kept in step with {@link derivedSize} so total-from-floors agrees with
+ *  the auto box. */
+function heightOverhead(params: Record<string, string | number>, w: number, d: number): number {
+  const basement = params.basement && params.basement !== 'none' ? 5 : 0;
+  const attic = params.attic && params.attic !== 'none' ? 2 : 0;
+  return basement + Math.floor(Math.min(w, d) / 2) + 1 + attic;
+}
+
+/** The total build height implied by explicit per-floor storey heights: their sum plus the
+ *  roof/basement/attic overhead. The inverse of "split a total H across N equal storeys".
+ *  @param floorHeights - The interior storey heights, bottom-up.
+ *  @param params - The resolved params (basement/attic drive the overhead).
+ *  @param w - Build width (roof reserve scales with the footprint).
+ *  @param d - Build depth.
+ *  @returns The total box height. */
+export function totalHeightFromFloors(
+  floorHeights: number[],
+  params: Record<string, string | number>,
+  w: number,
+  d: number,
+): number {
+  const sum = floorHeights.reduce((a, b) => a + b, 0);
+  return sum + heightOverhead(params, w, d);
+}
+
+/** Seed the per-floor height editor: a uniform storey height for every above-ground floor,
+ *  back-derived from the currently-effective total so switching into per-floor mode keeps
+ *  the same overall height. Clamped to [{@link MIN_STOREY_H}, {@link MAX_STOREY_H}].
+ *  @param d - The current Details state.
+ *  @param struct - The chosen structure module.
+ *  @returns One height per floor (all equal), length = the resolved floor count (≥ 1). */
+export function defaultFloorHeights(d: BuildDetails, struct: GenerationModule | undefined): number[] {
+  const params = paramsWithSlots(d, struct);
+  const n = Math.max(1, floorCount(struct, params));
+  const base = d.size ?? derivedSize(struct, params);
+  const storeys = base.h - heightOverhead(params, base.w, base.d);
+  const each = Math.round(storeys / n) || DEFAULT_STOREY_H;
+  const clamped = Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, each));
+  return Array.from({ length: n }, () => clamped);
+}
+
 /** The effective size: the user's override, else the derived default. The selected
  *  basement module (now its own select, not a house param) is folded back in so a
- *  basement still auto-grows the box.
+ *  basement still auto-grows the box. When per-floor heights are set, the total height is
+ *  computed from them (W/D still come from the explicit/derived box).
  *  @param d - The current Details state (an explicit `size` wins).
  *  @param struct - The chosen structure module (drives the derived fallback).
  *  @returns The build box `{ w, d, h }` to use. */
@@ -144,8 +208,12 @@ export function effectiveSize(
   d: BuildDetails,
   struct: GenerationModule | undefined,
 ): { w: number; d: number; h: number } {
-  const params = { ...resolveDetailParams(d, struct), basement: d.basement || 'none', attic: d.attic || 'none' };
-  return d.size ?? derivedSize(struct, params);
+  const params = paramsWithSlots(d, struct);
+  const base = d.size ?? derivedSize(struct, params);
+  if (d.floorHeights && d.floorHeights.length) {
+    return { w: base.w, d: base.d, h: totalHeightFromFloors(d.floorHeights, params, base.w, base.d) };
+  }
+  return base;
 }
 
 /** The interior floor area (cells) one room gets on a storey: the build's interior
@@ -237,10 +305,17 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     .filter((slot) => slot.brief && d[slot.key])
     .map((slot) => slot.brief!(catalog?.[slot.key].find((m) => m.id === d[slot.key])?.label ?? d[slot.key]))
     .join('');
+  // Explicit per-floor interior heights, when the user set them — so a tall ground floor
+  // over a low upper one carries through (it isn't expressible from the total H alone).
+  const heightLine =
+    d.floorHeights && d.floorHeights.length > 1 && new Set(d.floorHeights).size > 1
+      ? `- Floor heights (interior, bottom-up): ${d.floorHeights.map((h, i) => `floor ${i + 1} = ${h}`).join(', ')} blocks. Give each storey its own ceiling height accordingly.\n`
+      : '';
   return (
     `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +
     `- Build a ${label}${decoClause}, roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D).\n` +
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
+    heightLine +
     slotLines +
     buildRoomPlan(d, catalog) +
     `- Make it distinctive: design the footprint, massing, roofline and openings to fit the user's description above — every build should read as its own structure, never a generic stamped shell.`

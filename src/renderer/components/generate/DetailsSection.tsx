@@ -7,18 +7,24 @@
 // the structure's own `maxRoomsPerFloor`). So the binding "choose a structure → see what it
 // pulls in" is visible, not a wall of greyed selects. A pure view: the parent owns
 // `BuildDetails` and passes the reducers in (generation/details.ts).
+import { useState } from 'react';
+import { Link2, Unlink } from 'lucide-react';
 import { store } from '../../state/store';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { modulesConflict } from '@/shared/domain/conflicts';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import {
   type BuildDetails,
+  MAX_STOREY_H,
+  MIN_STOREY_H,
   effectiveSize,
   floorCount,
   maxRoomsForStructure,
 } from '../../generation/brief';
 import type { DetailField, SizeBox } from '../../generation/details';
-import { Chip, ChipRow, ChipSelect, type ChipOption } from './chips';
+import type { ChipOption } from './chips';
+import { Select, type SelectOption } from '../ui/Select';
+import { Segmented } from '../ui/Segmented';
 import { FloorStack } from './FloorStack';
 import type { TFunction } from '@/shared/i18n';
 import type { GenerationCatalog, GenerationModule } from '@/shared/types';
@@ -33,11 +39,29 @@ interface Props {
   onField: (key: DetailField, value: string) => void;
   onParam: (name: string, value: string | number) => void;
   onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
+  onHeightMode: (mode: 'total' | 'floors') => void;
+  onFloorHeight: (index: number, value: number, linked: boolean) => void;
   onAddRoom: (floor: number, id: string) => void;
   onRemoveRoom: (floor: number, index: number) => void;
 }
 
-export function DetailsSection({ details, catalog, busy, t, onField, onParam, onSize, onAddRoom, onRemoveRoom }: Props) {
+export function DetailsSection({
+  details,
+  catalog,
+  busy,
+  t,
+  onField,
+  onParam,
+  onSize,
+  onHeightMode,
+  onFloorHeight,
+  onAddRoom,
+  onRemoveRoom,
+}: Props) {
+  // Whether the per-floor height inputs move together (the chain affordance). Local —
+  // it's an editing convenience, not part of the build model; resets when the cascade
+  // re-mounts on a structure change (see the `key` below).
+  const [linked, setLinked] = useState(true);
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
   const galleryLink = (
     <button className="link gen-gallery-link" onClick={() => store.getState().setModulesOpen(true)} disabled={busy}>
@@ -46,39 +70,31 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
   );
 
   // STEP 1 — no structure yet: just the structure chooser. Everything else hangs off
-  // this pick, so showing it alone keeps the first decision clear.
+  // this pick, so showing it alone keeps the first decision clear. The choices carry a
+  // short description (the module's own summary), shown under each option in the dropdown.
   if (!details.structureType) {
-    const groups = catalog?.groups ?? [];
-    const all = catalog?.structure ?? [];
-    const inGroup = (g: string) => all.filter((m) => m.group === g);
-    const ungrouped = all.filter((m) => !m.group || !groups.some((g) => g.id === m.group));
+    const structOptions: SelectOption[] = (catalog?.structure ?? []).map((m) => ({
+      value: m.id,
+      label: m.label,
+      description: m.description,
+    }));
     return (
       <div className="gen-details">
         <div className="gen-pick-head">
           <span className="gen-pick-title">{t('gen.detailsStartTitle')}</span>
           <span className="gen-pick-hint">{t('gen.detailsStartHint')}</span>
         </div>
-        {groups.map((g) => {
-          const items = inGroup(g.id);
-          return items.length ? (
-            <ChipRow key={g.id} label={g.label}>
-              {items.map((m) => (
-                <Chip key={m.id} on={false} busy={busy} onPick={() => onField('structureType', m.id)}>
-                  {m.label}
-                </Chip>
-              ))}
-            </ChipRow>
-          ) : null;
-        })}
-        {ungrouped.length > 0 && (
-          <ChipRow label={groups.length ? t('gen.fieldStructure') : undefined}>
-            {ungrouped.map((m) => (
-              <Chip key={m.id} on={false} busy={busy} onPick={() => onField('structureType', m.id)}>
-                {m.label}
-              </Chip>
-            ))}
-          </ChipRow>
-        )}
+        <div className="gen-chip-group">
+          <span className="gen-chip-label">{t('gen.fieldStructure')}</span>
+          <Select
+            value=""
+            placeholder={t('gen.structurePlaceholder')}
+            options={structOptions}
+            onChange={(id) => onField('structureType', id)}
+            disabled={busy}
+            ariaLabel={t('gen.fieldStructure')}
+          />
+        </div>
         <p className="gen-details-foot">{galleryLink}</p>
       </div>
     );
@@ -90,9 +106,9 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
   const fits = (m: GenerationModule): boolean =>
     moduleAppliesTo(m.appliesTo, details.structureType || undefined, selStruct?.group);
   const nFloors = floorCount(selStruct, details.params);
-  const roomOptions: ChipOption[] = (catalog?.room ?? []).filter(fits).map((m) => ({ id: m.id, label: m.label }));
-  const opts = (modules: GenerationModule[]): ChipOption[] =>
-    modules.map((m) => ({ id: m.id, label: m.label }));
+  const roomOptions: ChipOption[] = (catalog?.room ?? [])
+    .filter(fits)
+    .map((m) => ({ id: m.id, label: m.label, description: m.description }));
 
   // The currently-selected module in each slot, so a conflicting OPTION in another slot
   // (e.g. an attic when the flat roof is picked) can be greyed with a reason — the SAME
@@ -121,26 +137,30 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
         </button>
       </div>
 
-      {/* One select per single-select module slot, in registry order. A filtered slot with
+      {/* One dropdown per single-select module slot, in registry order. A filtered slot with
           nothing applicable to this structure is hidden (e.g. an attic on a cabin). */}
       {MODULE_SLOTS.map((slot) => {
         const all = catalog?.[slot.key] ?? [];
         const options = slot.filtered ? all.filter(fits) : all;
         if (slot.filtered && options.length === 0) return null;
+        const selectOpts: SelectOption[] = [
+          { value: '', label: t(slot.neutral) },
+          ...options.map((m) => {
+            const reason = conflictReason(m);
+            return { value: m.id, label: m.label, description: m.description, disabled: !!reason, title: reason };
+          }),
+        ];
         return (
-          <ChipSelect
-            key={slot.key}
-            label={t(slot.fieldLabel)}
-            value={details[slot.key]}
-            neutral={{ id: '', label: t(slot.neutral) }}
-            options={opts(options)}
-            busy={busy}
-            onPick={(id) => onField(slot.key, id)}
-            disabledFor={(id) => {
-              const o = options.find((m) => m.id === id);
-              return o ? conflictReason(o) : undefined;
-            }}
-          />
+          <div className="gen-chip-group" key={slot.key}>
+            <span className="gen-chip-label">{t(slot.fieldLabel)}</span>
+            <Select
+              value={details[slot.key]}
+              options={selectOpts}
+              onChange={(id) => onField(slot.key, id)}
+              disabled={busy}
+              ariaLabel={t(slot.fieldLabel)}
+            />
+          </div>
         );
       })}
 
@@ -164,43 +184,31 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
             </div>
           </div>
         ) : (
-          <ChipSelect
-            key={p.name}
-            label={p.label}
-            value={String(details.params[p.name] ?? p.default)}
-            options={p.options.map((o) => ({ id: o.value, label: o.label }))}
-            busy={busy}
-            onPick={(id) => onParam(p.name, id)}
-          />
+          <div className="gen-chip-group" key={p.name}>
+            <span className="gen-chip-label">{p.label}</span>
+            <Select
+              value={String(details.params[p.name] ?? p.default)}
+              options={p.options.map((o) => ({ value: o.value, label: o.label }))}
+              onChange={(id) => onParam(p.name, id)}
+              disabled={busy}
+              ariaLabel={p.label}
+            />
+          </div>
         ),
       )}
 
-      <div className="gen-chip-group">
-        <span className="gen-chip-label">
-          {t('gen.sizeLabel')}
-          {details.size ? '' : t('gen.autoSuffix')}
-        </span>
-        <div className="gen-size">
-          {(['w', 'd', 'h'] as const).map((axis) => {
-            const sz = effectiveSize(details, selStruct);
-            const label = axis === 'w' ? t('gen.width') : axis === 'd' ? t('gen.depth') : t('gen.height');
-            return (
-              <label key={axis} className="gen-size-axis">
-                <span>{label[0]}</span>
-                <input
-                  type="number"
-                  min={3}
-                  max={64}
-                  value={sz[axis]}
-                  disabled={busy}
-                  title={label}
-                  onChange={(e) => onSize(axis, Math.trunc(Number(e.target.value)) || sz[axis], sz)}
-                />
-              </label>
-            );
-          })}
-        </div>
-      </div>
+      <SizeSection
+        details={details}
+        sz={effectiveSize(details, selStruct)}
+        nFloors={nFloors}
+        linked={linked}
+        setLinked={setLinked}
+        busy={busy}
+        t={t}
+        onSize={onSize}
+        onHeightMode={onHeightMode}
+        onFloorHeight={onFloorHeight}
+      />
 
       {nFloors > 0 && roomOptions.length > 0 && (
         <FloorStack
@@ -216,6 +224,119 @@ export function DetailsSection({ details, catalog, busy, t, onField, onParam, on
       )}
 
       <p className="gen-details-foot">{galleryLink}</p>
+    </div>
+  );
+}
+
+/** The build-size controls: the W/D/H box plus — for a storeyed structure — a Total ⇄ Per
+ *  floor height switch. In "per floor" mode the single H field is replaced by one input per
+ *  storey with a chain toggle (linked = raise one, raise all); the total height then reads
+ *  out as the derived sum. */
+function SizeSection({
+  details,
+  sz,
+  nFloors,
+  linked,
+  setLinked,
+  busy,
+  t,
+  onSize,
+  onHeightMode,
+  onFloorHeight,
+}: {
+  details: BuildDetails;
+  sz: SizeBox;
+  nFloors: number;
+  linked: boolean;
+  setLinked: (v: boolean) => void;
+  busy: boolean;
+  t: T;
+  onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
+  onHeightMode: (mode: 'total' | 'floors') => void;
+  onFloorHeight: (index: number, value: number, linked: boolean) => void;
+}) {
+  const heights = details.floorHeights;
+  const perFloor = !!heights && heights.length > 0;
+  // The switch shows for any multi-storey build (and stays available while per-floor is on,
+  // so the user can always return to Total). A single-storey build is just a height field.
+  const showToggle = nFloors >= 2 || perFloor;
+  const axes: (keyof SizeBox)[] = perFloor ? ['w', 'd'] : ['w', 'd', 'h'];
+  const axisLabel = (a: keyof SizeBox) => (a === 'w' ? t('gen.width') : a === 'd' ? t('gen.depth') : t('gen.height'));
+
+  return (
+    <div className="gen-chip-group">
+      <div className="gen-size-head">
+        <span className="gen-chip-label">
+          {t('gen.sizeLabel')}
+          {details.size || perFloor ? '' : t('gen.autoSuffix')}
+        </span>
+        {showToggle && (
+          <Segmented
+            value={perFloor ? 'floors' : 'total'}
+            options={[
+              { value: 'total', label: t('gen.heightTotalMode') },
+              { value: 'floors', label: t('gen.heightFloorsMode') },
+            ]}
+            onChange={(m) => onHeightMode(m as 'total' | 'floors')}
+            ariaLabel={t('gen.height')}
+          />
+        )}
+      </div>
+
+      <div className="gen-size">
+        {axes.map((axis) => (
+          <label key={axis} className="gen-size-axis">
+            <span>{axisLabel(axis)[0]}</span>
+            <input
+              type="number"
+              min={3}
+              max={64}
+              value={sz[axis]}
+              disabled={busy}
+              title={axisLabel(axis)}
+              onChange={(e) => onSize(axis, Math.trunc(Number(e.target.value)) || sz[axis], sz)}
+            />
+          </label>
+        ))}
+      </div>
+
+      {perFloor && heights && (
+        <div className="gen-floor-heights">
+          <div className="gen-floor-heights-head">
+            <span className="gen-chip-label">{t('gen.height')}</span>
+            <button
+              type="button"
+              className={`gen-link-toggle${linked ? ' on' : ''}`}
+              aria-pressed={linked}
+              disabled={busy}
+              title={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
+              aria-label={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
+              onClick={() => setLinked(!linked)}
+            >
+              {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
+            </button>
+          </div>
+          {heights.map((h, i) => (
+            <label key={i} className="gen-floor-height">
+              <span className="gen-floor-height-tag">
+                {t('gen.roomFloor')} {i + 1}
+              </span>
+              <input
+                type="number"
+                min={MIN_STOREY_H}
+                max={MAX_STOREY_H}
+                value={h}
+                disabled={busy}
+                onChange={(e) => onFloorHeight(i, Math.trunc(Number(e.target.value)) || h, linked)}
+              />
+            </label>
+          ))}
+          <div className="gen-floor-heights-total">
+            <span>{t('gen.totalHeightLabel')}</span>
+            <span className="gen-floor-heights-total-val">{sz.h}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

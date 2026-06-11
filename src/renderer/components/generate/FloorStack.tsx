@@ -6,6 +6,7 @@
 // just grows the chip's own affordances — the layout doesn't change. A pure view: the
 // parent owns the rooms model + the add/remove reducers (generation/details.ts).
 import type { ChipOption } from './chips';
+import { Select } from '../ui/Select';
 import type { MessageKey } from '@/shared/i18n';
 
 type T = (key: MessageKey) => string;
@@ -59,23 +60,15 @@ export function FloorStack({ nFloors, rooms, options, max, busy, t, onAdd, onRem
                 </span>
               ))}
               {!full && (
-                <select
-                  className="gen-room-add"
+                <Select
+                  className="bw-select-action"
                   value=""
+                  placeholder={t('gen.addRoom')}
+                  ariaLabel={t('gen.addRoom')}
                   disabled={busy}
-                  aria-label={t('gen.addRoom')}
-                  onChange={(e) => {
-                    if (e.target.value) onAdd(i, e.target.value);
-                    e.target.value = ''; // reset to the placeholder so it can be reused
-                  }}
-                >
-                  <option value="">{t('gen.addRoom')}</option>
-                  {options.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  options={options.map((o) => ({ value: o.id, label: o.label, description: o.description }))}
+                  onChange={(id) => id && onAdd(i, id)}
+                />
               )}
               {full && <span className="gen-floor-full">{t('gen.roomsFull')}</span>}
             </div>

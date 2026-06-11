@@ -14,16 +14,37 @@ import type { Box, FloorPlanEntry, StructureType } from './types';
 
 /** The modern villa's vertical levels for a box + floor count — the single source of its
  *  storey math, shared by `build()` (which needs the deck Ys) and `floors()` (which needs
- *  the walkable storeys). `gTop` is the lower roof/upper-floor deck; `uTop` the upper roof. */
-function modernLevels(y0: number, y1: number, H: number, floors: number): {
+ *  the walkable storeys). `gTop` is the lower roof/upper-floor deck; `uTop` the upper roof.
+ *  `roofReserve` keeps that many cells free at the box top for a PITCHED roof (0 for the
+ *  default flat roof, which caps the walls directly), so a gable/hip cap isn't clipped. */
+function modernLevels(y0: number, y1: number, H: number, floors: number, roofReserve = 0): {
   gTop: number; twoStorey: boolean; uH: number; uTop: number;
 } {
-  const gH = Math.max(4, Math.min(6, Math.floor((H - 1) / (floors >= 2 ? 2 : 1))));
+  const top = y1 - roofReserve; // the highest wall course; the roof sits above it
+  const availH = top - y0;
+  const gH = Math.max(4, Math.min(6, Math.floor(availH / (floors >= 2 ? 2 : 1))));
   const gTop = y0 + gH;
-  const twoStorey = floors >= 2 && y1 - gTop >= 5;
-  const uH = twoStorey ? Math.max(4, Math.min(6, y1 - gTop - 1)) : 0;
+  const twoStorey = floors >= 2 && top - gTop >= 5;
+  const uH = twoStorey ? Math.max(4, Math.min(6, top - gTop - 1)) : 0;
   const uTop = twoStorey ? gTop + uH : gTop;
   return { gTop, twoStorey, uH, uTop };
+}
+
+/** The set-back of the upper volume (front depth, one side) — derived from the footprint
+ *  alone, so it's known before the storey split. Shared by `build()` (geometry) and the
+ *  roof reserve. */
+function upperSetback(box: Box): { fs: number; ss: number } {
+  const fs = Math.min(4, Math.max(2, Math.floor((box.D - 1) / 3))); // front set-back depth
+  const ss = box.W >= 9 ? Math.min(3, Math.floor(box.W / 5)) : 0; // side set-back (one side)
+  return { fs, ss };
+}
+
+/** Cells to reserve at the box top for a pitched roof over the (set-back) upper volume:
+ *  the gable/hip rise is half the smaller upper-footprint span. 0 when flat. */
+function modernRoofReserve(box: Box, pitched: boolean): number {
+  if (!pitched) return 0;
+  const { fs, ss } = upperSetback(box);
+  return Math.max(2, Math.floor(Math.min(box.W - ss, box.D - fs) / 2));
 }
 
 /** Lay a glass CURTAIN WALL along one face: glass fill between full-height dark accent
@@ -77,6 +98,13 @@ export const modern: StructureType = {
   seedShell: true,
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
+    // Surfaced as the "Roof" module select (category 'roof'), so it's hidden from the
+    // type's own Details controls (`module: 'roof'`). Default FLAT keeps the modern villa's
+    // identity; gable/hip crown the upper volume with a low white-quartz pitch.
+    roof: {
+      kind: 'enum', default: 'flat', values: ['flat', 'gable', 'hip'], label: 'Roof',
+      labels: { flat: 'Flat', gable: 'Gable', hip: 'Hip' }, module: 'roof',
+    },
     decay: { kind: 'unit', default: 0 }, // modern is always crisp
   },
   // A white-concrete / quartz / dark-accent / glass kit (used when the decoration is sparse;
@@ -91,7 +119,9 @@ export const modern: StructureType = {
     pillar: 'minecraft:polished_blackstone',
     beam: 'minecraft:polished_blackstone',
     trim: 'minecraft:smooth_quartz_slab',
-    roof: 'minecraft:smooth_quartz_slab',
+    // Only used when the user picks a gable/hip roof (the flat default caps with `ceiling`
+    // + `trim`); a white-quartz pitch keeps the modern look. The decoration overrides it.
+    roof: 'minecraft:smooth_quartz_stairs',
     window: 'minecraft:glass_pane',
     glass: 'minecraft:glass',
     door: 'minecraft:dark_oak_door',
@@ -99,9 +129,12 @@ export const modern: StructureType = {
     water: 'minecraft:water',
     light: 'minecraft:sea_lantern',
   },
-  build({ box, params, palette }) {
-    const { x0, y0, z0, x1, y1, z1, W, H } = box;
+  build({ box, params, palette, composeModule }) {
+    const { x0, y0, z0, x1, y1, z1, H } = box;
     const floors = params.floors as number;
+    const roofShape = (params.roof as string) ?? 'flat';
+    const pitched = roofShape === 'gable' || roofShape === 'hip';
+    const roofReserve = modernRoofReserve(box, pitched);
 
     const air = palette.air();
     const white = palette.get('wall');
@@ -121,7 +154,7 @@ export const modern: StructureType = {
     const hz0 = z0; // the house's front wall
 
     // --- Storey heights (shared with floors() via modernLevels) ---------------------
-    const { gTop, twoStorey, uTop } = modernLevels(y0, y1, H, floors);
+    const { gTop, twoStorey, uTop } = modernLevels(y0, y1, H, floors, roofReserve);
 
     // --- Lower volume (full house footprint) ----------------------------------------
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: found });   // floor base
@@ -149,8 +182,7 @@ export const modern: StructureType = {
 
     // --- Upper volume (set back from the front → a roof terrace) ---------------------
     if (twoStorey) {
-      const fs = Math.min(4, Math.max(2, Math.floor((z1 - hz0) / 3))); // front set-back depth
-      const ss = W >= 9 ? Math.min(3, Math.floor(W / 5)) : 0;          // side set-back (one side)
+      const { fs, ss } = upperSetback(box);
       const ux0 = x0, ux1 = x1 - ss;
       const uz0 = hz0 + fs, uz1 = z1;
       ops.push({ op: 'fill', from: [ux0, gTop, uz0], to: [ux1, gTop, uz1], state: quartz }); // upper floor
@@ -165,15 +197,22 @@ export const modern: StructureType = {
         curtainWall(ops, 'z', ux0, uz0 + 1, uz1 - 1, uLo, uHi, glass, dark);
         curtainWall(ops, 'z', ux1, uz0 + 1, uz1 - 1, uLo, uHi, glass, dark);
       }
-      ops.push({ op: 'fill', from: [ux0, uTop, uz0], to: [ux1, uTop, uz1], state: deck }); // upper flat roof
+      ops.push({ op: 'fill', from: [ux0, uTop, uz0], to: [ux1, uTop, uz1], state: deck }); // upper ceiling (deck under a pitch, or the flat roof)
       // Glass rail around the open terrace (the lower roof NOT under the upper volume).
       roofRail(ops, x0, x1, hz0, z1, gTop + 1, rail);
       // A doorway from the upper room out onto the terrace (open the front-centre pane).
       ops.push({ op: 'fill', from: [cx, gTop + 1, uz0], to: [cx, gTop + 2, uz0], state: air });
-      // Parapet rail around the upper roof.
-      roofRail(ops, ux0, ux1, uz0, uz1, uTop + 1, rail);
+      if (pitched) {
+        // A low pitched cap over the upper volume — the modern villa "honours" the roof pick.
+        ops.push(...composeModule('roof', roofShape, [ux0, uTop + 1, uz0], [ux1, y1, uz1]));
+      } else {
+        roofRail(ops, ux0, ux1, uz0, uz1, uTop + 1, rail); // parapet rail around the flat upper roof
+      }
+    } else if (pitched) {
+      // Single storey + a pitched pick: cap the whole footprint instead of a terrace.
+      ops.push(...composeModule('roof', roofShape, [x0, gTop + 1, hz0], [x1, y1, z1]));
     } else {
-      // Single storey: the lower roof is the main terrace — rail its whole rim.
+      // Single storey, flat: the lower roof is the main terrace — rail its whole rim.
       roofRail(ops, x0, x1, hz0, z1, gTop + 1, rail);
     }
 
@@ -187,7 +226,9 @@ export const modern: StructureType = {
   // flat-roofed villa's floors exactly, instead of the geometric detector mistaking its
   // stacked flat decks for extra storeys.
   floors(box: Box, params: ParamValues): FloorPlanEntry[] {
-    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number);
+    const roofShape = (params.roof as string) ?? 'flat';
+    const reserve = modernRoofReserve(box, roofShape === 'gable' || roofShape === 'hip');
+    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number, reserve);
     if (twoStorey) {
       return [
         { from: box.y0, to: gTop - 1, role: 'ground' },

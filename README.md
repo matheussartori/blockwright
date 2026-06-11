@@ -44,9 +44,8 @@ refines through an emit → render → review loop — previewed live in the vie
   that refines the build live — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT
   Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
   to trade quality for spend, configured in Settings ▸ AI
-- Composable generation domain — pick a structure type (classic / modern / cabin / L-shaped), a
-  decoration, a roof, a basement, an in-roof attic, an exterior finishing style (farmhouse / sakura /
-  gothic — the house's outside cladding + signature volumes) and per-floor interior rooms (living
+- Composable generation domain — pick a structure type (classic / modern / farmhouse / sakura /
+  gothic), a decoration, a roof, a basement, an in-roof attic and per-floor interior rooms (living
   room, kitchen, library, bedroom, shared bedrooms, storage) in the full-stage Build Planner (browse
   every part with live 3D previews in the Module Gallery); the selection guides the build and loads
   only the relevant knowledge, and registered structure × decoration modules also cross at compile
@@ -89,10 +88,11 @@ screen.
 **File ▸ New Structure** opens a chat where you describe a build (optionally attaching a reference
 image). Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer,
 iterating through a visual review loop. The optional **⚙ Details** opens the full-stage **Build
-Planner**, where you pick a structure type, decoration, roof, basement, in-roof attic and exterior
-style to steer the build — and, for a multi-storey house, assign up to two interior rooms to each
-floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) — alongside a live 3D
-preview of the build volume. Your picks are shown back as a tidy build card in the chat. Browse every
+Planner**, where you pick a structure type, decoration, roof, basement and in-roof attic to steer the
+build — and, for a multi-storey house, assign up to two interior rooms to each floor (e.g. _Floor 1:
+living room + kitchen, Floor 2: bedrooms + library_) and set the build size (one total height, or a
+height per floor) — alongside a live 3D preview of the build volume. Your picks are shown back as a
+tidy build card in the chat. Browse every
 module with live 3D previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical
 levels. Pick an AI provider and model in **Settings ▸ AI** first.
 

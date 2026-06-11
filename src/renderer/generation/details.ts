@@ -6,8 +6,17 @@
 //
 // The `BuildDetails` model itself + the brief/selection/summary builders live in
 // `brief.ts`; this module only mutates the model.
-import { type BuildDetails, EMPTY_SLOTS, ROOMS_PER_FLOOR } from './brief';
-import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
+import {
+  type BuildDetails,
+  DEFAULT_STOREY_H,
+  EMPTY_SLOTS,
+  MAX_STOREY_H,
+  MIN_STOREY_H,
+  ROOMS_PER_FLOOR,
+  defaultFloorHeights,
+} from './brief';
+import type { ModuleSlotKey } from '@/shared/domain/module-slots';
+import type { GenerationModule } from '@/shared/types';
 
 /** Structures whose look is part of their identity, auto-paired with a decoration when
  *  picked: the modern villa is white-and-glass; the farmhouse is warm oak + a dark slate
@@ -41,10 +50,11 @@ export const SIZE_MIN = 3;
 export const SIZE_MAX = 64;
 
 /** Set one of the single-value Details selects, applying the dependent-field rules:
- *  switching STRUCTURE drops the old type's params + size and clears roof/basement/rooms
- *  (the compatible set is structure-specific) — and pairs the Modern decoration with the
- *  modern house; choosing a BASEMENT re-derives the size (clears any manual override) so a
- *  cellar auto-grows the box.
+ *  switching STRUCTURE drops the old type's params/size/heights and clears roof/basement/
+ *  rooms (the compatible set is structure-specific) — and pairs the identity decoration
+ *  (modern/farmhouse/…). Editing any OTHER slot now PRESERVES the user's explicit size — a
+ *  basement/attic still auto-grows the box only while the size is on auto (it derives them
+ *  in via `effectiveSize`), so the box never snaps back under the user's typed dimensions.
  *  @param d - The current Details state.
  *  @param key - Which select changed.
  *  @param value - The new id ('' = none/auto).
@@ -52,14 +62,21 @@ export const SIZE_MAX = 64;
 export function setDetailField(d: BuildDetails, key: DetailField, value: string): BuildDetails {
   if (key === 'structureType') {
     // Switching structure clears every slot (the compatible set is structure-specific) +
-    // the params/size/rooms. A structure with an identity look (modern, farmhouse) pairs its
-    // decoration by default so its materials + guide come along.
+    // the params/size/heights/rooms. A structure with an identity look (modern, farmhouse)
+    // pairs its decoration by default so its materials + guide come along.
     const decoration = PAIRED_DECORATION[value] ?? '';
-    return { ...d, ...EMPTY_SLOTS, decoration, structureType: value, params: {}, size: null, rooms: [] };
+    return {
+      ...d,
+      ...EMPTY_SLOTS,
+      decoration,
+      structureType: value,
+      params: {},
+      size: null,
+      floorHeights: null,
+      rooms: [],
+    };
   }
-  const slot = MODULE_SLOTS.find((s) => s.key === key);
   const next: BuildDetails = { ...d, [key]: value };
-  if (slot?.affectsSize) next.size = null; // a basement/attic grows the box → re-derive
   // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
   // two can't be selected together (mirrors the attic module's `incompatibleWith: ['flat']`).
   if (key === 'roof' && value === FLAT_ROOF) next.attic = '';
@@ -112,14 +129,63 @@ export function removeRoomAt(d: BuildDetails, floor: number, index: number): Bui
   return { ...d, rooms };
 }
 
-/** Set a structure-type param value, clearing any manual size override so the box
- *  re-derives (e.g. picking "2 floors + basement" auto-grows it).
+/** Set a structure-type param value, PRESERVING the user's explicit size (a param change
+ *  no longer snaps the box back to auto — the bug where typing floors wiped the dimensions).
+ *  When the FLOORS count changes and per-floor heights are active, the heights array is
+ *  resized to match (new floors copy the top storey's height; removed floors drop off) so
+ *  the total height grows/shrinks with the floor count, like a linked stack.
  *  @param d - The current Details state.
  *  @param name - The param name.
  *  @param value - The new value.
  *  @returns The next Details state. */
 export function setDetailParam(d: BuildDetails, name: string, value: string | number): BuildDetails {
-  return { ...d, params: { ...d.params, [name]: value }, size: null };
+  const params = { ...d.params, [name]: value };
+  let floorHeights = d.floorHeights;
+  if (name === 'floors' && floorHeights) {
+    const n = Math.max(1, Math.trunc(Number(value)) || 1);
+    floorHeights = resizeHeights(floorHeights, n);
+  }
+  return { ...d, params, floorHeights };
+}
+
+/** Grow/shrink a per-floor height array to `n` entries: extra floors copy the last
+ *  storey's height (or the default), removed floors drop off the top. */
+function resizeHeights(heights: number[], n: number): number[] {
+  if (n === heights.length) return heights;
+  if (n < heights.length) return heights.slice(0, n);
+  const fill = heights[heights.length - 1] ?? DEFAULT_STOREY_H;
+  return [...heights, ...Array.from({ length: n - heights.length }, () => fill)];
+}
+
+/** Switch the build's height control between "total" (a single H field driving every storey
+ *  equally) and "per floor" (one height per above-ground storey, optionally linked). Entering
+ *  per-floor mode seeds each storey from the current effective height so the build doesn't
+ *  jump; leaving it clears the per-floor heights (the total H takes back over).
+ *  @param d - The current Details state.
+ *  @param mode - 'total' or 'floors'.
+ *  @param struct - The chosen structure module (seeds the per-floor heights).
+ *  @returns The next Details state. */
+export function setHeightMode(d: BuildDetails, mode: 'total' | 'floors', struct: GenerationModule | undefined): BuildDetails {
+  if (mode === 'total') return { ...d, floorHeights: null };
+  if (d.floorHeights && d.floorHeights.length) return d; // already per-floor
+  return { ...d, floorHeights: defaultFloorHeights(d, struct) };
+}
+
+/** Set one floor's interior height (clamped to [{@link MIN_STOREY_H}, {@link MAX_STOREY_H}]).
+ *  When `linked`, every floor moves to the same value (the chain/link affordance — raise the
+ *  ground floor and the whole stack follows); otherwise only `index` changes.
+ *  @param d - The current Details state (a no-op unless per-floor heights are active).
+ *  @param index - The 0-based floor to edit (bottom-up).
+ *  @param value - The requested height (clamped).
+ *  @param linked - Move every floor together when true.
+ *  @returns The next Details state. */
+export function setFloorHeight(d: BuildDetails, index: number, value: number, linked: boolean): BuildDetails {
+  if (!d.floorHeights) return d;
+  const v = Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_STOREY_H));
+  const floorHeights = linked
+    ? d.floorHeights.map(() => v)
+    : d.floorHeights.map((h, i) => (i === index ? v : h));
+  return { ...d, floorHeights };
 }
 
 /** Set one axis of the explicit build size (switching the box from auto to manual),

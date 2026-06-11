@@ -19,7 +19,7 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'menu.jigsaw', 'menu.console', 'menu.layout', 'panel.jigsaw', 'inspector.jigsaws', 'jigsaw.seed',
   'console.title', 'catalog.namespace', 'workspace.label', 'modules.presetsCount', 'modules.universal',
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',
-  'gen.autoSuffix',
+  'gen.autoSuffix', 'gen.heightTotalMode',
 ]);
 
 describe('i18n chrome coverage', () => {

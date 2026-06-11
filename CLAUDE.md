@@ -78,7 +78,9 @@ src/
                            (selectedGuides/promptGuides), buildModulePreview (gallery)
         structure-types/   Category "structure": one file per archetype — classic (pitched storeyed home,
                            free-form) + four SEEDED archetypes with code-built shells (modern = flat-roofed
-                           glass villa; farmhouse = L plan + cross-gable + veranda; sakura = pink cherry
+                           glass villa by default, but HONORS the Roof pick — a gable/hip crowns the upper
+                           volume in white quartz stairs, reserving the pitch height; farmhouse = L plan +
+                           cross-gable + veranda; sakura = pink cherry
                            cottage RAISED on a visible stone basement with an exterior stair to the upper
                            entry; gothic = black+white manor with a central frontispiece tower, balustraded
                            front veranda, mini corner tower, glass chapel wing + ivy eaves) + types.ts
@@ -227,8 +229,10 @@ src/
                           view from focused parts in components/generate/: ChatTranscript (empty state +
                           messages + result stats + live progress), Composer (attachments + section slots +
                           textarea + an "Advanced" button that opens the planner overlay + icon action
-                          toolbar), DetailsSection (the progressive Details selects/params/size/per-floor
-                          rooms — a PURE view), FloorsSection (the ▦ Floors editor), BuildCard (the chat
+                          toolbar), DetailsSection (the progressive Details — a PURE view: the structure
+                          pick + every single-select slot/enum param render as the themed `ui/Select`
+                          dropdown (NOT chip groups), plus the size box with a Total ⇄ Per-floor height
+                          switch + per-floor rooms), FloorsSection (the ▦ Floors editor), BuildCard (the chat
                           build card), BuildProgress (the COMPACT live progress bar — phase + design-pass +
                           a determinate fill from designStep/designSteps + elapsed/tokens, shared by the dock
                           and the stage), StageBuilding (the centered "building…" card shown over an empty
@@ -240,16 +244,26 @@ src/
                           over an open `.nbt`). Both modes + the dock's free-text composer build the SAME
                           brief/selection (generation/brief.ts) and hand off to runGeneration — generating and
                           editing are one unified loop. State lives in state/planner.ts (the shared draft).
-    components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Logo
+    components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Select
+                          (the themed single-select dropdown — portal-rendered in `position:fixed` so it's
+                          never clipped by a scrolling column, keyboard-navigable, options carry an optional
+                          one-line `description` clamped with ellipsis + the full text on hover; the OPAQUE
+                          `--elevated` token backs the menu, never the translucent `--panel`), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
-                          Build dialogs/controls from these so fonts/spacing/styles stay consistent.
+                          Build dialogs/controls from these so fonts/spacing/styles stay consistent. Prefer
+                          `Select` over a native `<select>` or a fresh single-select chip group.
     generation/           Pure (no-React, no-IO) helpers behind the Generate composer, extracted from
                           NewStructurePanel/state so they're unit-testable: brief.ts (BuildDetails →
                           the model's "[Build details]" brief + BuildSelection + the BuildBrief chat
-                          card + size/floor helpers), details.ts (pure reducers over BuildDetails — the
-                          Details field/room/param/size edits), attachments.ts (reference-image intake)
-                          and floors.ts (normalizeFloor + buildFloorPlan).
+                          card + size/floor helpers — incl. `effectiveSize`/`totalHeightFromFloors`/
+                          `defaultFloorHeights` for the per-floor-height model: `BuildDetails.floorHeights`
+                          (null = one Total Y; else a height per above-ground storey, total derived from
+                          their sum + roof/basement overhead)), details.ts (pure reducers over BuildDetails —
+                          field/room/param/size edits + `setHeightMode`/`setFloorHeight`; NOTE editing a
+                          param or slot PRESERVES an explicit `size` now — it no longer snaps back to auto,
+                          and a `floors` change resizes the per-floor heights), attachments.ts (reference-
+                          image intake) and floors.ts (normalizeFloor + buildFloorPlan).
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
@@ -478,8 +492,12 @@ decoration, and a new module is one small file.
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
   any advisory guide text — so styles the model can't reliably invent are NOT guidance; they're STRUCTURE
   TYPES that OWN their massing in code. Each archetype's `build()` emits its silhouette: **modern** =
-  stacked offset white-concrete volumes, FLAT roofs, glass curtain walls with dark mullions, set-back upper
-  floor + railed roof terrace; **farmhouse** = L plan + cross-gable + veranda/gallery; **sakura** = a pink
+  stacked offset white-concrete volumes, glass curtain walls with dark mullions, set-back upper floor +
+  railed roof terrace, FLAT roofs by default but it HONORS the Roof slot (a `roof` param flat/gable/hip,
+  marked `module:'roof'` like the house's; gable/hip cap the upper volume with a low white-quartz pitch and
+  `modernRoofReserve` keeps the height for it; gable/hip `appliesTo` now include 'modern', and the modern
+  decoration's `roof` role is a stairs material — the flat default uses `ceiling`/`trim`, so it's unchanged);
+  **farmhouse** = L plan + cross-gable + veranda/gallery; **sakura** = a pink
   cherry cottage RAISED on a VISIBLE stone-brick basement, the entry up on the raised floor reached by an
   exterior stone stair under the overhanging upper storey, a pink cherry-stair roof crowned with blossom
   cascades + an upper balcony; **gothic** = a black-with-white-detailing manor (pale belt courses) with a

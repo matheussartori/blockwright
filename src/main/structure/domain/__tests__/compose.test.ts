@@ -235,13 +235,14 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
   });
 
   it('a roof guide loads only for the structures it fits', () => {
-    // gable applies to the PITCHED houses (classic/farmhouse/sakura/gothic) — it loads for
-    // those, but NOT for the flat-roofed modern (which excludes it).
-    for (const structureType of ['classic', 'farmhouse', 'sakura', 'gothic']) {
+    // gable applies to every house type — including modern (which defaults to flat but can
+    // take a low pitch) — so its guide loads when picked.
+    for (const structureType of ['classic', 'farmhouse', 'sakura', 'gothic', 'modern']) {
       const guides = selectedGuides({ structureType, roof: 'gable' });
       expect(guides, structureType).toContain('nbt/modules/roof/gable.md');
     }
-    expect(selectedGuides({ structureType: 'modern', roof: 'gable' })).not.toContain('nbt/modules/roof/gable.md');
+    // hip is offered on the pitched houses + modern, but NOT sakura (gable-identity).
+    expect(selectedGuides({ structureType: 'sakura', roof: 'hip' })).not.toContain('nbt/modules/roof/hip.md');
     // The flat roof applies to the whole house group, including modern.
     expect(selectedGuides({ structureType: 'modern', roof: 'flat' })).toContain('nbt/modules/roof/flat.md');
   });
