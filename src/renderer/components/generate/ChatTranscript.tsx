@@ -3,6 +3,7 @@
 // and the live in-flight status block. A pure view — the parent owns the scroll ref
 // + effects and the generation state; this just renders what it's given.
 import type { RefObject } from 'react';
+import { Sparkles } from 'lucide-react';
 import { store } from '../../state/store';
 import { formatElapsed } from '../../generation/brief';
 import { BuildCard } from './BuildCard';
@@ -31,10 +32,14 @@ export function ChatTranscript({ chat, busy, progress, elapsedMs, t, scrollRef, 
     <div className="gen-messages" ref={scrollRef}>
       {chat.length === 0 && (
         <div className="gen-empty">
+          <span className="gen-empty-icon" aria-hidden>
+            <Sparkles size={20} strokeWidth={1.7} />
+          </span>
           <p>
             {t('gen.emptyDescPre')}<code>.nbt</code>{t('gen.emptyDescPost')}
           </p>
           <p className="gen-hint">{t('gen.emptyHint')}</p>
+          <span className="gen-examples-label">{t('gen.examplesLabel')}</span>
           <ul className="gen-examples">
             {EXAMPLES.map((ex) => (
               <li key={ex}>

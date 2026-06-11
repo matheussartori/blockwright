@@ -26,7 +26,7 @@ function makeLabel(text: string): THREE.Sprite {
   canvas.width = w;
   canvas.height = h;
   ctx.font = font;
-  ctx.fillStyle = 'rgba(20,24,32,0.78)';
+  ctx.fillStyle = 'rgba(20,24,32,0.62)';
   ctx.beginPath();
   ctx.roundRect(0, 0, w, h, 12);
   ctx.fill();
@@ -36,11 +36,14 @@ function makeLabel(text: string): THREE.Sprite {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  // Quieter caption: the whole sprite (chip + text) rides at a reduced opacity so the
+  // bands inform without dominating the build.
   const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }),
+    new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.7, depthTest: false, depthWrite: false }),
   );
-  // Scale to world units (~1 unit tall), preserving the canvas aspect.
-  sprite.scale.set((w / h) * 1.1, 1.1, 1);
+  // Scale to world units, preserving the canvas aspect — ~30% smaller than before so
+  // the labels read as secondary annotations, not headlines.
+  sprite.scale.set((w / h) * 0.78, 0.78, 1);
   return sprite;
 }
 
@@ -118,7 +121,7 @@ export class FloorRegionsOverlay {
         new THREE.MeshBasicMaterial({
           color,
           transparent: true,
-          opacity: 0.1,
+          opacity: 0.06,
           depthWrite: false,
           side: THREE.DoubleSide,
         }),
@@ -128,7 +131,7 @@ export class FloorRegionsOverlay {
 
       const edges = new THREE.LineSegments(
         new THREE.EdgesGeometry(box.geometry),
-        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 }),
+        new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 }),
       );
       edges.position.copy(box.position);
       group.add(edges);

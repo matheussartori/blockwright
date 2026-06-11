@@ -8,6 +8,7 @@
 import { useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
+import { plannerStore } from './state/planner';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import { useActiveDoc } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
@@ -41,9 +42,11 @@ function Shell() {
   const availability = {
     inspector: fileOpen,
     jigsaw: structure !== null && structure.jigsaws.length > 0,
-    // Generate is always available — you can author from scratch or iterate on
-    // whatever .nbt the active tab holds.
-    generate: true,
+    // Generate is the ITERATION chat — it shows only once there's something to iterate on:
+    // an open structure, a build in flight, or a tab that already produced versions. A
+    // brand-new blank build tab shows ONLY the inline planner, and Home shows neither — so
+    // the dock is never a redundant second Generate surface beside the planner/hero card.
+    generate: fileOpen || (activeDoc?.busy ?? false) || (activeDoc?.versions.length ?? 0) > 0,
     // Versions is available once this tab has at least one generated build.
     versions: (activeDoc?.versions.length ?? 0) > 0,
   };
@@ -75,6 +78,12 @@ function Shell() {
                   onLoad={(p) => void flow.openFile(p)}
                   onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
                   onGenerate={flow.newDoc}
+                  onExample={(text) => {
+                    // Start a fresh build pre-filled with the example prompt: newDoc resets
+                    // the planner draft, so set the notes AFTER it lands on the planner.
+                    flow.newDoc();
+                    plannerStore.getState().setNotes(text);
+                  }}
                 />
               )}
               {activeDoc && !fileOpen && !activeDoc.loading && (

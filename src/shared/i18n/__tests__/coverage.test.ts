@@ -17,6 +17,7 @@ import { moduleKey, paramKey, paramOptionKey, groupKey, presetKey, aiProviderKey
  *  nouns, loanwords, or words spelled the same in both languages. */
 const CHROME_IDENTICAL_OK = new Set<string>([
   'menu.jigsaw', 'menu.console', 'menu.layout', 'panel.jigsaw', 'inspector.jigsaws', 'jigsaw.seed',
+  'statusbar.jigsawLabel',
   'console.title', 'catalog.namespace', 'workspace.label', 'modules.presetsCount', 'modules.universal',
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',
   'gen.autoSuffix', 'gen.heightTotalMode',

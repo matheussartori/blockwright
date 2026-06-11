@@ -2,7 +2,8 @@
 // the active workspace's structures plus recent files / workspaces. Shown
 // whenever no structure is open. Scrolls when content is tall so nothing is cut.
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, FileBox, FolderOpen, LayoutGrid, Sparkles } from 'lucide-react';
+import type { MessageKey } from '@/shared/i18n';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
 import { basename, dirname } from '../ui/path';
@@ -10,38 +11,22 @@ import { useApp, useT } from '../hooks/useStores';
 import { store } from '../state/store';
 import { Logo } from './ui/Logo';
 
-/** Minimal stroke icons for the action cards (no icon-font dependency). */
-const ICONS = {
-  spark: (
-    <path
-      d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5 10.2 7.7 12 3z"
-      fill="currentColor"
-      stroke="none"
-    />
-  ),
-  file: <path d="M13 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V9l-6-6z M13 3v6h6" />,
-  folder: <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h7A1.5 1.5 0 0 1 19 9v8.5A1.5 1.5 0 0 1 17.5 19h-13A1.5 1.5 0 0 1 3 17.5v-11z" />,
-  grid: <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />,
-} as const;
-
-function ActionIcon({ name }: { name: keyof typeof ICONS }) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" aria-hidden>
-      {ICONS[name]}
-    </svg>
-  );
-}
+/** The example prompts surfaced on the landing — clicking one starts a pre-filled build. */
+const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
 export function Welcome({
   onOpen,
   onLoad,
   onActivateWorkspace,
   onGenerate,
+  onExample,
 }: {
   onOpen: () => void;
   onLoad: (path: string) => void;
   onActivateWorkspace: (ws: Workspace) => void;
   onGenerate: () => void;
+  /** Start a fresh build pre-filled with the given example prompt. */
+  onExample: (text: string) => void;
 }) {
   const t = useT();
   const recents = useApp((s) => s.recents);
@@ -80,33 +65,45 @@ export function Welcome({
 
           <div className="welcome-actions">
             <button className="action-card accent" onClick={onGenerate}>
-              <span className="action-ic"><ActionIcon name="spark" /></span>
+              <span className="action-ic"><Sparkles size={20} strokeWidth={1.8} aria-hidden /></span>
               <span className="action-body">
                 <span className="action-title">{t('welcome.generateTitle')}</span>
                 <span className="action-sub">{t('welcome.generateSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={onOpen}>
-              <span className="action-ic"><ActionIcon name="file" /></span>
+              <span className="action-ic"><FileBox size={20} strokeWidth={1.8} aria-hidden /></span>
               <span className="action-body">
                 <span className="action-title">{t('welcome.openTitle')}</span>
                 <span className="action-sub">{t('welcome.openSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={() => void api.openWorkspace()}>
-              <span className="action-ic"><ActionIcon name="folder" /></span>
+              <span className="action-ic"><FolderOpen size={20} strokeWidth={1.8} aria-hidden /></span>
               <span className="action-body">
                 <span className="action-title">{t('welcome.workspaceTitle')}</span>
                 <span className="action-sub">{t('welcome.workspaceSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={() => store.getState().setCatalogOpen(true)}>
-              <span className="action-ic"><ActionIcon name="grid" /></span>
+              <span className="action-ic"><LayoutGrid size={20} strokeWidth={1.8} aria-hidden /></span>
               <span className="action-body">
                 <span className="action-title">{t('welcome.catalogTitle')}</span>
                 <span className="action-sub">{t('welcome.catalogSub')}</span>
               </span>
             </button>
+          </div>
+
+          <div className="welcome-examples">
+            <span className="welcome-examples-label">{t('gen.examplesLabel')}</span>
+            <div className="welcome-examples-list">
+              {EXAMPLES.map((ex) => (
+                <button key={ex} className="welcome-example" onClick={() => onExample(t(ex))}>
+                  <Sparkles size={14} strokeWidth={1.7} aria-hidden />
+                  <span>{t(ex)}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="welcome-meta">

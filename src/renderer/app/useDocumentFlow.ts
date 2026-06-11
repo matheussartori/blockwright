@@ -9,6 +9,7 @@ import { basename } from '../ui/path';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
 import { plannerStore } from '../state/planner';
+import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
 import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
 import type { Viewer } from '../viewer/viewer';
@@ -99,6 +100,10 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
       const existing = ds.documents.find((d) => d.filePath === path);
       const id = ds.openDoc(path); // focuses an existing tab or creates a new one
       if (existing && existing.structure) return; // already open + loaded — just focus it
+      // Opening a file is a VIEW action — default the dock to Info, not whatever tab
+      // (often Generate) was last left selected. The new-build/generate flow sets its
+      // own tab in `build()`, so this only affects opening an existing structure.
+      windowsStore.getState().setActiveTab('inspector');
       await hydrateDoc(id);
       // If this file has AI generation history, resume on its LATEST version so
       // reopening lands exactly where the user left off (and the viewer matches the

@@ -220,11 +220,29 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
               </div>
             </>
           ) : (
-            <div className="planner-preview-empty">{t('planner.previewEmpty')}</div>
+            <div className="planner-preview-empty">
+              <GhostBuild />
+              <span>{t('planner.previewEmpty')}</span>
+            </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** A faint isometric block-cube wireframe for the preview empty state — hints at WHAT
+ *  will appear (the build's massing) before a structure is picked, instead of bare text. */
+function GhostBuild() {
+  return (
+    <svg className="planner-ghost" width="116" height="116" viewBox="0 0 120 120" fill="none" aria-hidden>
+      {/* top face (rhombus) */}
+      <path d="M60 20 L99 43 L60 66 L21 43 Z" />
+      {/* vertical edges */}
+      <path d="M21 43 V83 M60 66 V106 M99 43 V83" />
+      {/* lower visible edges */}
+      <path d="M21 83 L60 106 L99 83" />
+    </svg>
   );
 }
 
