@@ -14,7 +14,7 @@ import type { BasementModule } from './types';
 
 export type { BasementModule } from './types';
 
-const registry = createRegistry<BasementModule>([cellar, crypt, cultTemple]);
+export const registry = createRegistry<BasementModule>([cellar, crypt, cultTemple]);
 
 /** Look up a basement module by id (undefined if unknown). */
 export function getBasement(id: string): BasementModule | undefined {

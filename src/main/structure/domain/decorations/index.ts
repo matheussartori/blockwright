@@ -13,7 +13,7 @@ import type { Decoration } from './types';
 
 export type { Decoration, DecorationTheme } from './types';
 
-const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic]);
+export const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic]);
 
 /** The decoration used when a `template` op doesn't name one. */
 export const DEFAULT_DECORATION = cozy.id;

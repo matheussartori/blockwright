@@ -19,7 +19,7 @@ import type { RoomModule } from './types';
 
 export type { RoomModule } from './types';
 
-const registry = createRegistry<RoomModule>([living, kitchen, library, bedroom, dormitory, storage]);
+export const registry = createRegistry<RoomModule>([living, kitchen, library, bedroom, dormitory, storage]);
 
 /** Look up a room module by id (undefined if unknown). */
 export function getRoom(id: string): RoomModule | undefined {

@@ -15,7 +15,7 @@ import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-const registry = createRegistry<StructureType>([classic, modern, farmhouse, sakura, gothic]);
+export const registry = createRegistry<StructureType>([classic, modern, farmhouse, sakura, gothic]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {

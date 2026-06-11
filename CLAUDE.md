@@ -70,6 +70,13 @@ src/
         registry.ts        createRegistry<T extends ModuleMeta> — the shared factory (get/has/ids/
                            all/list) every category's index.ts is built on, so the per-category
                            lookup boilerplate exists once.
+        categories.ts      The registry-of-registries: REGISTRIES (category→Registry) + getModule
+                           (category,id) and getGeometryModule (roof/basement/attic→GeometryModule),
+                           so a dynamic lookup is ONE map access, not a `category==='roof'?…` ternary
+                           repeated across compose/preview/slot resolution.
+        geometry-module.ts GeometryModule — the build shape (params/defaults/build/integrations)
+                           shared by RoofModule/BasementModule/AtticModule (they extend it + narrow
+                           category/appliesTo), declared ONCE instead of three identical copies.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
         params.ts          ParamSpec/ParamDef + resolveParams + paramFields (single per-type param decl)
         compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
@@ -84,7 +91,10 @@ src/
                            cottage RAISED on a visible stone basement with an exterior stair to the upper
                            entry; gothic = black+white manor with a central frontispiece tower, balustraded
                            front veranda, mini corner tower, glass chapel wing + ivy eaves) + types.ts
-                           (contract + Box/logProps + `seedShell`) + index.ts
+                           (contract + Box/logProps + `seedShell`) + stair-core.ts (addStairCore — the
+                           shared switchback stair core every code-built house lays, taking the build's
+                           RolePalette; a `parts` helper so gothic/sakura/farmhouse reuse it WITHOUT
+                           importing classic) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts
                            (registry). A type emits ops in terms of roles; never names blocks, and delegates
                            roof/basement to modules. See "Seeded archetypes" below. (cabin/l-shaped retired;
                            the EXTERIOR category was removed — sakura/gothic are full structure types now.)
@@ -123,9 +133,14 @@ src/
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     ai/                     AI structure generation (File ▸ New Structure)
-      generate.ts           Provider-agnostic orchestrator: owns sessions, the emit→compile→render→
-                            review handler, round budget + progress; dispatches to a provider driver.
-                            `generateStructure(GenerateStructureOptions)` takes an options object.
+      generate.ts           Provider-agnostic orchestrator: owns sessions, the round budget + live
+                            progress, and the shared EmitRunState; wires the per-emit handler and
+                            dispatches to a provider driver. `generateStructure(GenerateStructureOptions)`
+                            takes an options object.
+      emit-handler.ts       createEmitHandler(deps) — the per-emit validate→compile→mirror→render→review
+                            step, extracted from the orchestrator so it's its own (testable) module. It
+                            ADVANCES the shared EmitRunState each emit; the orchestrator reads it after
+                            the driver run to assemble the result.
       review-content.ts     buildReviewContent(...) — pure: assembles the content blocks (status +
                             fix/warning notes + reference target + screenshots) returned to the model
                             after each emit so it can review its own build. Tested in __tests__/.
@@ -431,13 +446,14 @@ decoration, and a new module is one small file.
   which is the grouped first pick, nor rooms, which are per-floor multi-select). This one list is
   the single source the brief (`buildBrief`/`buildSelection`/`buildSummary`/`hasDetails`), the
   Details selects (`DetailsSection` loops it), the build-card chips (`BuildCard`), and the
-  knowledge gating (`selectedGuides` loops it via `getSlotModule`) all iterate — so a category is
-  ONE slot entry, not edits in ~10 files. `ModuleSlotKey` is also the key set that DERIVES the
-  per-slot fields of `BuildDetails`/`BuildSelection`/`BuildBrief` (`Partial<Record<ModuleSlotKey,…>>`),
-  so adding the union member adds those fields for free. **Add a single-select category:** the
-  module's category files (contract + registry, as below) + its array on `GenerationCatalog` +
-  a `listX()` line in `listModuleCatalog` + a `getSlotModule` case + a `MODULE_SLOTS` entry
-  (label/neutral/`filtered`/optional `affectsSize`+`brief`) + its `gen.fieldX` i18n labels.
+  knowledge gating (`selectedGuides` loops it, resolving each via `getModule(slot.key, id)`) all
+  iterate — so a category is ONE slot entry, not edits in ~10 files. `ModuleSlotKey` is also the key
+  set that DERIVES the per-slot fields of `BuildDetails`/`BuildSelection`/`BuildBrief`
+  (`Partial<Record<ModuleSlotKey,…>>`), so adding the union member adds those fields for free.
+  **Add a single-select category:** the module's category files (contract + registry, as below) +
+  its array on `GenerationCatalog` + a `listX()` line in `listModuleCatalog` + a `categories.ts`
+  registry entry (`REGISTRIES`, so `getModule`/`getGeometryModule` resolve it) + a `MODULE_SLOTS`
+  entry (label/neutral/`filtered`/optional `affectsSize`+`brief`) + its `gen.fieldX` i18n labels.
 - **basement/roof modules carry geometry + knowledge** (`basements/`: cellar/crypt/cult-temple;
   `roofs/`: gable/hip): each is a module (label/description/`appliesTo`/`knowledge` + optional
   `build`/`params`/`defaults`/`integrations`/`preview`), surfaced in the composer Details + the gallery.

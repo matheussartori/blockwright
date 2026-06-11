@@ -12,7 +12,7 @@
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own gothic kit.
 import type { AuthoringOp } from '../../authoring/types';
-import { addStairCore } from './classic';
+import { addStairCore } from './stair-core';
 import { box as mkBox, logProps, type StructureType } from './types';
 
 export const gothic: StructureType = {
@@ -293,7 +293,7 @@ export const gothic: StructureType = {
     if (floors >= 2) {
       const slabYs: number[] = [];
       for (let f = 0; f < floors; f++) slabYs.push(y0 + f * storeyH);
-      addStairCore(ops, mkBox([x0, y0, hz0], [x1, y1, z1]), slabYs, storeyH, false, wallTop, palette.get('roof'), floorIdx, air, 0, 0, () => palette.get('ladder', { facing: 'west' }));
+      addStairCore({ ops, box: mkBox([x0, y0, hz0], [x1, y1, z1]), slabYs, storeyH, palette });
     }
     return ops;
   },

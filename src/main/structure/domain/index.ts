@@ -6,14 +6,15 @@
 import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../authoring/types';
 import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
-import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
+import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import { composeModulePreview } from './compose';
+import { getModule } from './categories';
 import { resolveParams } from './params';
 import { box } from './structure-types/types';
 import { DEFAULT_DECORATION, decorationModules, getDecoration, listDecorations } from './decorations';
-import { basementModules, getBasement, listBasements } from './basements';
-import { getRoof, listRoofs, roofModules } from './roofs';
-import { atticModules, getAttic, listAttics } from './attics';
+import { basementModules, listBasements } from './basements';
+import { listRoofs, roofModules } from './roofs';
+import { atticModules, listAttics } from './attics';
 import { getRoom, listRooms, roomModules } from './rooms';
 import type { ModuleCategory, ModuleMeta } from './modules';
 import {
@@ -138,18 +139,6 @@ export type ModuleSelection = Omit<BuildSelection, 'size'>;
 // for existing importers of the domain barrel.
 export { moduleAppliesTo };
 
-/** Resolve a single-select slot's module by category — the one place that maps a
- *  {@link ModuleSlotKey} to its registry getter (the exhaustive switch makes adding a
- *  slot a compile error until it's wired here). */
-function getSlotModule(key: ModuleSlotKey, id: string): ModuleMeta | undefined {
-  switch (key) {
-    case 'decoration': return getDecoration(id);
-    case 'roof': return getRoof(id);
-    case 'basement': return getBasement(id);
-    case 'attic': return getAttic(id);
-  }
-}
-
 /** The module guides to include for an explicit selection (paths relative to the
  *  knowledge dir, e.g. `nbt/modules/structure/house.md`). One guide per selected
  *  module — a slot guide loads only when that module is chosen AND it applies to the
@@ -170,7 +159,7 @@ export function selectedGuides(sel: ModuleSelection): string[] {
   add(sel.structureType ? getStructureType(sel.structureType) : undefined);
   for (const slot of MODULE_SLOTS) {
     const id = sel[slot.key];
-    if (id) gatedAdd(getSlotModule(slot.key, id));
+    if (id) gatedAdd(getModule(slot.key, id));
   }
   for (const id of sel.rooms ?? []) gatedAdd(getRoom(id));
   return out;
@@ -210,7 +199,7 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
   // inside its host roof void, so the gallery shows a placeholder for it like rooms).
   if (category === 'room' || category === 'attic') return null;
   if (category === 'roof' || category === 'basement') {
-    const meta = category === 'roof' ? getRoof(id) : getBasement(id);
+    const meta = getModule(category, id);
     if (!meta?.preview) return null;
     const [w, h, d] = meta.preview.size;
     const palette: AuthoringPaletteEntry[] = [];

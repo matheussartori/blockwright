@@ -14,7 +14,7 @@ import type { RoofModule } from './types';
 
 export type { RoofModule } from './types';
 
-const registry = createRegistry<RoofModule>([gable, hip, flat]);
+export const registry = createRegistry<RoofModule>([gable, hip, flat]);
 
 /** Look up a roof module by id (undefined if unknown). */
 export function getRoof(id: string): RoofModule | undefined {

@@ -14,9 +14,9 @@ import {
   type Decoration,
 } from './decorations';
 import { getBasement } from './basements';
-import { getAttic } from './attics';
+import { getGeometryModule } from './categories';
+import type { GeometryModule } from './geometry-module';
 import { resolveParams, type ParamValues } from './params';
-import { getRoof } from './roofs';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
 import { seed3 } from './rng';
 import {
@@ -26,13 +26,6 @@ import {
   type RolePalette,
 } from './structure-types';
 import { box, type BuildArgs } from './structure-types/types';
-
-/** The geometry-bearing shape shared by roof + basement modules (a structural subset of
- *  RoofModule/BasementModule), so the run helper doesn't care which registry it came from. */
-type GeometryModule = {
-  build?: (args: BuildArgs) => AuthoringOp[];
-  integrations?: Partial<Record<string, (args: BuildArgs) => AuthoringOp[]>>;
-};
 
 type Vec3 = [number, number, number];
 
@@ -200,7 +193,7 @@ function makeModuleComposer(
 ): BuildArgs['composeModule'] {
   // A const arrow that references itself, so a delegated module can delegate again.
   const delegate: BuildArgs['composeModule'] = (category, id, from, to, extra = {}) => {
-    const module = category === 'roof' ? getRoof(id) : category === 'attic' ? getAttic(id) : getBasement(id);
+    const module = getGeometryModule(category, id);
     if (!module) throw new Error(`unknown ${category} module "${id}"`);
     const subBox = box(from, to);
     const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
@@ -302,7 +295,7 @@ export function composeModule(
   intern: Intern,
   host?: string,
 ): AuthoringOp[] {
-  const module = category === 'roof' ? getRoof(id) : getBasement(id);
+  const module = getGeometryModule(category, id);
   if (!module) {
     throw new Error(`unknown ${category} module "${id}"`);
   }
@@ -348,7 +341,7 @@ export function composeModulePreview(
 
   // Roof: a low wall box for it to sit on, then the roof over the remaining height.
   const deco = resolveDecoration(params);
-  const palette = makePalette(getRoof(id)?.defaults ?? {}, deco, params, intern);
+  const palette = makePalette(getGeometryModule('roof', id)?.defaults ?? {}, deco, params, intern);
   const wallTop = b.y0 + Math.max(2, Math.floor(b.H * 0.45));
   return [
     { op: 'fill', from: [b.x0, b.y0, b.z0], to: [b.x1, b.y0, b.z1], state: palette.get('floor') },

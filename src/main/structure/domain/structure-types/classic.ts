@@ -13,8 +13,9 @@
 // under a sparse decoration.
 import type { AuthoringOp } from '../../authoring/types';
 import { mulberry32 } from '../rng';
-import type { Box, StructureType } from './types';
+import type { StructureType } from './types';
 import { logProps } from './types';
+import { addStairCore } from './stair-core';
 
 export const classic: StructureType = {
   id: 'classic',
@@ -88,7 +89,6 @@ export const classic: StructureType = {
     const floorIdx = palette.get('floor');
     const found = palette.get('foundation');
     const win = palette.get('window');
-    const stair = palette.get('roof'); // interior stairs reuse the roof's *_stairs block
     const mossy = palette.weather('wall');
     const lantern = palette.get('light', { hanging: 'true' });
 
@@ -288,11 +288,16 @@ export const classic: StructureType = {
 
     // --- Stair core: a 2-wide switchback in the back-right corner linking every
     // WALKABLE storey (basement→ground→upper floors). The attic is reached by a
-    // ladder (below) so no flight ever pierces the roof. Emitted LAST so each
-    // flight's `clear` carves the stairwell hole through the slab above. ----------
-    const ladderW = hasAttic ? palette.get('ladder', { facing: 'west' }) : 0;
-    const ladderN = hasAttic ? palette.get('ladder', { facing: 'north' }) : 0;
-    addStairCore(ops, { x0, y0, z0, x1, y1, z1, W, D, H }, slabYs, storeyH, hasAttic, wallTop, stair, floorIdx, air, ladderW, ladderN, () => palette.get('ladder', { facing: 'west' }));
+    // ladder (inside addStairCore) so no flight ever pierces the roof. Emitted LAST so
+    // each flight's `clear` carves the stairwell hole through the slab above. ---------
+    addStairCore({
+      ops,
+      box: { x0, y0, z0, x1, y1, z1, W, D, H },
+      slabYs,
+      storeyH,
+      palette,
+      atticWallTop: hasAttic ? wallTop : undefined,
+    });
 
     // --- Decay (cozy keeps this at 0): punch holes + weather, sparing frame ------
     // Reuses the seeded `rnd` stream from the variety choices above (still per-seed
@@ -327,90 +332,4 @@ function symmetricBand(lo: number, hi: number, center: number): number[] {
     }
   }
   return out.sort((a, b) => a - b);
-}
-
-/** Stair core: a **2-wide switchback** in the back-right corner linking each
- *  consecutive walkable storey in `slabYs`. Flights alternate between two
- *  adjacent perpendicular rows so the up- and down-flights sit SIDE BY SIDE with
- *  a 1-cell landing at each turn (full headroom — never the 1-wide stacked well
- *  that blocked the turn). `clear` carves the stairwell hole + headroom through
- *  the slab each flight passes. When `hasAttic`, a ladder climbs from the top
- *  floor through a hole in the attic floor — so no flight ever pierces the roof.
- *  Falls back to a carved vertical shaft when the footprint is too small.
- *  Exported so other code-built houses (e.g. the farmhouse's main wing) reuse the
- *  same proven circulation instead of relying on the stairwell pass, which only
- *  REBUILDS broken flights and does not invent one for a hint-less shell. */
-export function addStairCore(
-  ops: AuthoringOp[],
-  box: Box,
-  slabYs: number[],
-  storeyH: number,
-  hasAttic: boolean,
-  wallTop: number,
-  stair: number,
-  fill: number,
-  air: number,
-  ladderW: number,
-  ladderN: number,
-  /** Lazily intern a WEST-facing ladder (backed by the x1 wall) — used only for the
-   *  no-space fallback so the rule "prefer a stair; if it can't fit, a ladder" holds
-   *  even on a footprint too tight for a 45° flight. Omit → the legacy bare shaft. */
-  makeLadder?: () => number,
-): void {
-  const { x0, z0, x1, z1 } = box;
-  const run = storeyH - 1; // horizontal cells = vertical rise (45° flight)
-  // A 2-wide well needs `run` along one axis and 2 cells on the perpendicular.
-  const fitX = run <= x1 - x0 - 1 && z1 - z0 >= 3;
-  const fitZ = !fitX && run <= z1 - z0 - 1 && x1 - x0 >= 3;
-
-  if (!fitX && !fitZ) {
-    // No room for a stair → a CONTINUOUS wall ladder (rule: stair if it fits, else a
-    // ladder — never a bare fall-through shaft). Hung on the x1 wall (faces west), it runs
-    // unbroken from the lowest floor to the top, punching the floor opening at each storey;
-    // the stairwell pass then refines it. Legacy callers (no `makeLadder`) keep the shaft.
-    const lx = x1 - 1, lz = z1 - 1;
-    const topY = slabYs[slabYs.length - 1];
-    if (makeLadder) {
-      const ladder = makeLadder();
-      for (let y = slabYs[0] + 1; y <= topY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
-      ops.push({ op: 'fill', from: [lx - 1, topY, lz], to: [lx - 1, topY + 1, lz], state: air }); // step-off + headroom
-    } else {
-      for (let i = 1; i < slabYs.length; i++) {
-        ops.push({ op: 'fill', from: [lx, slabYs[i] - 1, lz], to: [lx, slabYs[i], lz], state: air });
-      }
-    }
-    return;
-  }
-
-  for (let k = 0; k < slabYs.length - 1; k++) {
-    const by = slabYs[k] + 1; // bottom step
-    const ty = slabYs[k + 1]; // top step lands on the upper floor
-    const fwd = k % 2 === 0; // alternate direction + row → a side-by-side switchback
-    if (fitX) {
-      const lo = x1 - 1 - run, hi = x1 - 1;
-      const row = fwd ? z1 - 1 : z1 - 2;
-      ops.push({ op: 'stairs', from: [fwd ? lo : hi, by, row], to: [fwd ? hi : lo, ty, row], state: stair, fill, clear: air });
-    } else {
-      const lo = z1 - 1 - run, hi = z1 - 1;
-      const row = fwd ? x1 - 1 : x1 - 2;
-      ops.push({ op: 'stairs', from: [row, by, fwd ? lo : hi], to: [row, ty, fwd ? hi : lo], state: stair, fill, clear: air });
-    }
-  }
-
-  // Attic access: a ladder up through the attic floor, against a side wall just
-  // outside the stair rows. Vertical → it never carves the roof. A step-off hole
-  // is carved in the attic floor IN FRONT of the ladder so its top rung faces open
-  // (else the placement pass strips a "buried" fixture) and you can climb out.
-  if (hasAttic) {
-    const top = slabYs[slabYs.length - 1];
-    if (fitX && z1 - 3 >= z0 + 1) {
-      const lx = x1 - 1, lz = z1 - 3; // backed by the x1 wall (faces west)
-      for (let y = top + 1; y <= wallTop; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladderW });
-      ops.push({ op: 'block', pos: [lx - 1, wallTop, lz], state: air }); // step-off hole
-    } else if (x1 - 3 >= x0 + 1) {
-      const lz = z1 - 1, lx = x1 - 3; // backed by the z1 wall (faces north)
-      for (let y = top + 1; y <= wallTop; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladderN });
-      ops.push({ op: 'block', pos: [lx, wallTop, lz - 1], state: air }); // step-off hole
-    }
-  }
 }

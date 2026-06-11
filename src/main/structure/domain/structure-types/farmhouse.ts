@@ -8,7 +8,7 @@
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own farmhouse kit.
 import type { AuthoringOp } from '../../authoring/types';
-import { addStairCore } from './classic';
+import { addStairCore } from './stair-core';
 import { dormers, frontVeranda } from './farmhouse-parts';
 import { box, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
@@ -183,7 +183,7 @@ export const farmhouse: StructureType = {
       const slabYs: number[] = [];
       for (let f = 0; f < floors; f++) slabYs.push(y0 + f * storeyH);
       const mainWing = box([x0, y0, z0], [mainX1, y1, z1]);
-      addStairCore(ops, mainWing, slabYs, storeyH, false, wallTop, palette.get('roof'), floorIdx, palette.air(), 0, 0, () => palette.get('ladder', { facing: 'west' }));
+      addStairCore({ ops, box: mainWing, slabYs, storeyH, palette });
     }
 
     return ops;

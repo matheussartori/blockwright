@@ -13,7 +13,7 @@ import type { AtticModule } from './types';
 
 export type { AtticModule } from './types';
 
-const registry = createRegistry<AtticModule>([storage, bedroom]);
+export const registry = createRegistry<AtticModule>([storage, bedroom]);
 
 /** Look up an attic module by id (undefined if unknown). */
 export function getAttic(id: string): AtticModule | undefined {
