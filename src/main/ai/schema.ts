@@ -1,17 +1,11 @@
 // The provider-agnostic contract for the structure generator: the system prompt
-// (instructions + knowledge base) and the `emit_structure` tool's schema, in the
-// two dialects the drivers need.
-//
-//  • emitJsonSchema  — a rich JSON Schema (free-form maps for Properties/params/
-//    nbt). Anthropic and OpenAI accept this directly as a tool's input schema.
-//  • emitStringSchema — a flat schema whose `structure` is a JSON *string*. Gemini
-//    function declarations and Codex structured-output can't express arbitrary
-//    maps, so those drivers take the authoring JSON as a string and we parse it.
-//
-// Both resolve to the same EmitArgs the orchestrator's handler consumes.
-import { type AuthoringStructure, OP_NAMES } from '../structure/authoring';
+// (instructions + knowledge base) plus the `EmitArgs` shape every driver normalises a
+// model emit to. Each backend owns its OWN tool/output schema next to its driver — the
+// Claude Agent SDK builds a zod schema in claude-sdk.ts, Codex declares its `OUTPUT_SCHEMA`
+// in codex.ts — so there is no shared schema object here; they all resolve to `EmitArgs`.
+import type { AuthoringStructure } from '../structure/authoring';
 import { loadKnowledge, type ModuleSelection } from './knowledge';
-import { AUDIT_CHECK_IDS, PHASE_IDS, phaseOverview } from './phases';
+import { phaseOverview } from './phases';
 
 export const EMIT_TOOL_NAME = 'emit_structure';
 export const EMIT_TOOL_DESCRIPTION =
@@ -29,141 +23,6 @@ export interface EmitArgs {
    *  orchestrator gates the stop on every item being ok. */
   audit?: { check: string; ok: boolean; note?: string }[];
 }
-
-const SUMMARY_DESC =
-  'A 1-3 sentence note for the user: chosen size, front orientation, material palette, notable features, and any interpretation/assumptions.';
-const MODE_DESC =
-  'full = a COMPLETE structure (the first emit, a large rework, OR ANY change that grows "size" / re-anchors existing geometry — e.g. enlarging a basement, adding rooms, widening a footprint). patch = ONLY new geometry appended onto your PREVIOUS version to fix specific problems cheaply (later ops overwrite earlier cells); in a patch, size/DataVersion are inherited, palette lists ONLY new entries (appended after existing ones), and ops/blocks reference existing palette indices as-is. A patch CANNOT change the bounding box or MOVE cells already placed, so it cannot expand/re-centre the build — use full for that. Prefer patch for localized fixes that fit inside the current footprint.';
-const STRUCTURE_DESC =
-  'The authoring JSON: { DataVersion, size:[sx,sy,sz], palette:[{Name,Properties?}], ops (preferred bulk geometry: fill/hollow/walls/line/block/mirror/rotate/repeat/roof/stairs/template), blocks (per-block detail overlay), entities, floors }. 0-indexed positions; property values are strings; first palette entry is air by convention; omit air blocks. ALWAYS include "floors" on a full emit: an array of storeys, each { name?, role: basement|ground|upper|roof, from, to } over an inclusive y range covering the whole height — mark every below-ground storey "basement". The compiler reads it to keep the basement surround as terrain (structure_void) while interior + above-grade facade/balcony become air.';
-const PHASE_DESC =
-  'The design pass you just completed: "massing", "roof", "facade", "interior", "circulation" or "audit" (see "Design passes"). Optional — informational only.';
-const AUDIT_DESC =
-  'On the final Audit pass, your verdict for EACH checklist item (see "Design passes"): an array of { check (the item id), ok (true/false), note (what you see) }. Patch every item you mark not ok and re-report; you are only done when all are ok.';
-const auditSchema = {
-  type: 'array',
-  items: {
-    type: 'object',
-    properties: {
-      check: { type: 'string', enum: AUDIT_CHECK_IDS },
-      ok: { type: 'boolean' },
-      note: { type: 'string' },
-    },
-    required: ['check', 'ok'],
-    additionalProperties: false,
-  },
-} as const;
-
-/** A single op entry, shared by both schema dialects (rich JSON Schema form). */
-const opSchema = {
-  type: 'object',
-  properties: {
-    op: { type: 'string', enum: OP_NAMES },
-    from: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] corner.' },
-    to: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] opposite corner.' },
-    pos: { type: 'array', items: { type: 'integer' }, description: '[x,y,z] — for the "block" op only.' },
-    name: { type: 'string', description: 'template op: which preset to expand.' },
-    params: { type: 'object', additionalProperties: true, description: 'template op: preset parameters.' },
-    state: { type: 'integer', description: 'Palette index. Required for fill/hollow/walls/line/block/roof/stairs (stairs: a *_stairs block).' },
-    axis: { type: 'string', enum: ['x', 'y', 'z'] },
-    turns: { type: 'integer', description: 'rotate: clockwise quarter-turns (1,2,3).' },
-    pivot: { type: 'array', items: { type: 'integer' }, description: 'rotate: [x,z] pivot.' },
-    step: { type: 'integer', description: 'repeat: cells to advance per copy.' },
-    count: { type: 'integer', description: 'repeat: total instances incl. the original.' },
-    style: { type: 'string', enum: ['gable', 'hip'], description: 'roof style.' },
-    ridge: { type: 'string', enum: ['x', 'z'], description: 'roof gable ridge axis.' },
-    fill: { type: 'integer', description: 'roof: palette index to plug the gap under each step. stairs: palette index for a solid support block under each tread.' },
-    clear: { type: 'integer', description: 'stairs: AIR palette index — carves 2 blocks of headroom above each tread (cuts the stairwell hole through the floor above).' },
-    nbt: { type: 'object', additionalProperties: true, description: 'Block-entity NBT — "block" op only.' },
-  },
-  required: ['op'],
-  additionalProperties: false,
-} as const;
-
-/** The rich authoring-structure JSON Schema (free-form maps allowed). */
-const structureJsonSchema = {
-  type: 'object',
-  properties: {
-    DataVersion: { type: 'integer', description: 'Always 3955 for 1.21.1. Omit in a patch.' },
-    size: { type: 'array', items: { type: 'integer' }, description: '[sx,sy,sz] bounding box.' },
-    palette: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          Name: { type: 'string' },
-          Properties: { type: 'object', additionalProperties: { type: 'string' } },
-        },
-        required: ['Name'],
-        additionalProperties: false,
-      },
-    },
-    ops: { type: 'array', items: opSchema },
-    blocks: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          state: { type: 'integer' },
-          pos: { type: 'array', items: { type: 'integer' } },
-          nbt: { type: 'object', additionalProperties: true },
-        },
-        required: ['state', 'pos'],
-        additionalProperties: false,
-      },
-    },
-    entities: { type: 'array', items: {} },
-    floors: {
-      type: 'array',
-      description:
-        'The storeys of the build, each a role-tagged inclusive y range. REQUIRED on a full emit so the ' +
-        'compiler knows the ground-floor level: it keeps exterior space BELOW grade (around/under a basement) ' +
-        'as structure_void so placement preserves the surrounding terrain, while interior and at/above-grade ' +
-        'exterior (the recessed facade, a balcony) clear to air. Mark every below-ground storey as "basement". ' +
-        'Cover the whole height bottom→top; a patch inherits the previous floors if omitted.',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Optional label, e.g. "Cellar", "Ground floor".' },
-          role: { type: 'string', enum: ['basement', 'ground', 'upper', 'roof'], description: 'basement = below grade; everything else is at/above grade.' },
-          from: { type: 'integer', description: 'Lowest y of the storey (inclusive).' },
-          to: { type: 'integer', description: 'Highest y of the storey (inclusive).' },
-        },
-        required: ['role', 'from', 'to'],
-        additionalProperties: false,
-      },
-    },
-  },
-  additionalProperties: false,
-} as const;
-
-/** Rich schema for Anthropic / OpenAI tool calls. */
-export const emitJsonSchema = {
-  type: 'object',
-  properties: {
-    summary: { type: 'string', description: SUMMARY_DESC },
-    mode: { type: 'string', enum: ['full', 'patch'], description: MODE_DESC },
-    phase: { type: 'string', enum: PHASE_IDS, description: PHASE_DESC },
-    audit: { ...auditSchema, description: AUDIT_DESC },
-    structure: { ...structureJsonSchema, description: STRUCTURE_DESC },
-  },
-  required: ['structure'],
-  additionalProperties: false,
-} as const;
-
-/** Flat schema for Gemini function declarations / Codex structured output, whose
- *  `structure` is the authoring JSON encoded as a string (parsed by the driver). */
-export const emitStringSchema = {
-  type: 'object',
-  properties: {
-    summary: { type: 'string', description: SUMMARY_DESC },
-    mode: { type: 'string', enum: ['full', 'patch'], description: MODE_DESC },
-    phase: { type: 'string', enum: PHASE_IDS, description: PHASE_DESC },
-    audit: { ...auditSchema, description: AUDIT_DESC },
-    structure: { type: 'string', description: `${STRUCTURE_DESC} Provide it as a JSON string.` },
-  },
-  required: ['structure'],
-} as const;
 
 /** Coerce a model-supplied `mode` to the union (defaulting to "full"). */
 export function normalizeMode(mode: unknown): 'full' | 'patch' {
