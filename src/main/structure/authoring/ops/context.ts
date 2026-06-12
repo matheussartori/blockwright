@@ -10,4 +10,8 @@ export interface OpCtx {
   palette: AuthoringPaletteEntry[];
   intern: Intern;
   size: Vec3;
+  /** Collector for expansion warnings (e.g. a template that had to SKIP its selected
+   *  basement because the box is too short) — surfaced in the compile report so the
+   *  model/user learns why a pick didn't materialise instead of it vanishing silently. */
+  warnings?: string[];
 }

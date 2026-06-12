@@ -103,6 +103,65 @@ describe('resolveBlocks — volumetric ops', () => {
     for (const b of r.blocks) expect(r.palette[b.state].Name).toMatch(/_stairs$|_slab$/);
   });
 
+  it('roof defaults the ridge to the LONGER axis (a low pitch over the short span)', () => {
+    // 15 wide × 7 deep: the ridge must run along x, so the slopes climb the 7-deep
+    // span and top out at y=3 — not climb the 15-wide span to y=7 (the old inversion).
+    const r = resolveBlocks({
+      size: [15, 10, 7],
+      palette: [{ Name: 'minecraft:oak_stairs' }],
+      ops: [{ op: 'roof', from: [0, 0, 0], to: [14, 9, 6], state: 0 }],
+    });
+    expect(Math.max(...r.blocks.map((b) => b.pos[1]))).toBe(3);
+  });
+
+  it('hip roof stays inside the hip envelope on a non-square plan (no fin over the ridge)', () => {
+    // 11×7: a proper hip tops out at half the SHORTER span (y=3, a ridge line along x).
+    // Every cell must satisfy y <= min(distance to each eave) — no stair may float
+    // above the pitch (the old version climbed the long span to y=5).
+    const r = resolveBlocks({
+      size: [11, 8, 7],
+      palette: [{ Name: 'minecraft:oak_stairs' }],
+      ops: [{ op: 'roof', from: [0, 0, 0], to: [10, 7, 6], state: 0, style: 'hip' }],
+    });
+    expect(Math.max(...r.blocks.map((b) => b.pos[1]))).toBe(3);
+    for (const b of r.blocks) {
+      const [x, y, z] = b.pos;
+      expect(y).toBeLessThanOrEqual(Math.min(x, 10 - x, z, 6 - z));
+    }
+  });
+
+  it('roof pitch is clamped to the op box top (never overwrites geometry above it)', () => {
+    // The roof box only reaches y=1, but the 7-wide pitch would climb to y=3 — it must
+    // stop at the box top instead of overwriting the block stacked above the roof.
+    const r = resolveBlocks({
+      size: [7, 10, 7],
+      palette: [{ Name: 'minecraft:oak_stairs' }, { Name: 'minecraft:stone' }],
+      ops: [
+        { op: 'block', pos: [3, 3, 3], state: 1 },
+        { op: 'roof', from: [0, 0, 0], to: [6, 1, 6], state: 0, ridge: 'z' },
+      ],
+    });
+    const stone = r.blocks.find((b) => r.palette[b.state].Name === 'minecraft:stone');
+    expect(stone?.pos).toEqual([3, 3, 3]);
+    const roofYs = r.blocks.filter((b) => b !== stone).map((b) => b.pos[1]);
+    expect(Math.max(...roofYs)).toBeLessThanOrEqual(1);
+  });
+
+  it('stairs run along the axis matching the rise — a flight wider than long is not rotated', () => {
+    // Rise 2 matches |dx|=2 (the run); |dz|=4 is the WIDTH. The old longer-axis pick
+    // would have silently run this flight along z instead.
+    const r = resolveBlocks({
+      size: [4, 4, 6],
+      palette: [{ Name: 'minecraft:oak_stairs' }],
+      ops: [{ op: 'stairs', from: [0, 0, 0], to: [2, 2, 4], state: 0 }],
+    });
+    expect(r.blocks).toHaveLength(15); // 3 steps × 5 wide
+    for (const b of r.blocks) {
+      expect(b.pos[1]).toBe(b.pos[0]); // climbs with x
+      expect(r.palette[b.state].Properties?.facing).toBe('east');
+    }
+  });
+
   it('dedupes identical palette interns', () => {
     const r = resolveBlocks({
       size: [2, 1, 1],

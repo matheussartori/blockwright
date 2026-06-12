@@ -28,7 +28,8 @@ import { validateEmit } from './emit-validate';
 import { buildReviewContent } from './review-content';
 import type { RunLog } from './gen-log';
 import type { TokenMeter } from './token-meter';
-import { writeStructureFile, resolveBlocks, type AuthoringStructure, type CompileReport, type ShellLockCell } from '../structure/authoring';
+import { writeStructureFile, type AuthoringStructure, type CompileReport, type ShellLockCell } from '../structure/authoring';
+import { isAir } from '../structure/authoring/palette';
 
 /** The successful result shape captured as the model emits — the `ok: true` arm of
  *  {@link GenerateResult}. Held in a mutable box so the orchestrator can read it after
@@ -182,8 +183,11 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
     if (session.library.dir) run.attach(session.library.dir);
 
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
-    const resolved = resolveBlocks(authoring);
-    const blockCount = resolved.blocks.length;
+    // The compile report carries the FINAL post-pass blocks (what the .nbt actually
+    // contains), so stats/metadata reflect the build as fixed up — explicit air cells
+    // are the interior carve, not geometry, so they're excluded.
+    const solidBlocks = report.blocks.filter((b) => !isAir(report.palette[b.state]?.Name ?? ''));
+    const blockCount = solidBlocks.length;
 
     // Write/refresh the `.bw.json` sidecar beside the library build, so a later edit
     // has the size, dominant palette and recognised storeys to work from. Storeys come
@@ -194,8 +198,8 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
     // writing beside it and removing the temp copy.
     if (session.library.latest) {
       const counts = new Map<string, number>();
-      for (const b of resolved.blocks) {
-        const nm = resolved.palette[b.state]?.Name ?? '';
+      for (const b of solidBlocks) {
+        const nm = report.palette[b.state]?.Name ?? '';
         if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
       }
       const authoritative = !floors?.length && selection?.structureType
@@ -205,7 +209,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
         source: session.library.latest,
         size,
-        solids: resolved.blocks.map((b) => b.pos),
+        solids: solidBlocks.map((b) => b.pos),
         paletteCounts: counts,
         floors: floors?.length ? floors : authoritative.length ? authoritative : undefined,
       });

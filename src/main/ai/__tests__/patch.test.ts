@@ -35,6 +35,32 @@ describe('mergePatch', () => {
     expect(out.blocks).toHaveLength(2);
   });
 
+  it('dedupes a re-sent palette entry and remaps the patch indices onto the existing one', () => {
+    // Models routinely re-send entries the base already has. Entry 0 of the patch
+    // duplicates prev[1] (oak_planks); the patch addresses it as prev.length + 0 = 2.
+    // It must intern back onto index 1, never append a shifted duplicate.
+    const patch: AuthoringStructure = {
+      palette: [{ Name: 'minecraft:oak_planks' }, { Name: 'minecraft:glass' }],
+      ops: [
+        { op: 'fill', from: [0, 1, 0], to: [9, 1, 5], state: 2 },              // the dup → 1
+        { op: 'stairs', from: [0, 1, 0], to: [2, 3, 0], state: 3, fill: 2, clear: 0 }, // glass + dup + base air
+      ],
+      blocks: [{ pos: [0, 2, 0], state: 3 }],                                   // glass
+    };
+    const out = mergePatch(prev, patch);
+    expect(out.palette).toEqual([
+      { Name: 'minecraft:air' },
+      { Name: 'minecraft:oak_planks' },
+      { Name: 'minecraft:glass' },
+    ]);
+    expect((out.ops?.[1] as { state: number }).state).toBe(1);
+    const stairsOp = out.ops?.[2] as { state: number; fill: number; clear: number };
+    expect(stairsOp.state).toBe(2); // glass → its interned slot
+    expect(stairsOp.fill).toBe(1);  // dup → the existing planks entry
+    expect(stairsOp.clear).toBe(0); // a base-palette reference passes through
+    expect(out.blocks?.[1].state).toBe(2);
+  });
+
   it('inherits size / DataVersion / floors / entities when the patch omits them', () => {
     const out = mergePatch(prev, { palette: [], ops: [] });
     expect(out.size).toEqual([10, 8, 6]);

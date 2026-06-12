@@ -33,4 +33,22 @@ describe('nbt encode → decode round-trip', () => {
     expect(stair).toBeDefined();
     expect((back.palette ?? [])[stair!.state].Properties?.facing).toBe('east');
   });
+
+  it('encodes mixed-type arrays in free-form block nbt as homogeneous NBT lists', async () => {
+    // NBT lists are homogeneous: [1, 1.5] must promote to all-double; ['a', 2] keeps
+    // only the string elements — never a corrupt list with values under the wrong tag.
+    const s: AuthoringStructure = {
+      size: [1, 1, 1],
+      palette: [{ Name: 'minecraft:chest' }],
+      blocks: [{ state: 0, pos: [0, 0, 0], nbt: { Weights: [1, 1.5], Tags: ['a', 2] } }],
+    };
+    const file = path.join(os.tmpdir(), `bw-mixed-list-${Date.now()}.nbt`);
+    await writeStructureFile(s, file);
+    const back = await readAuthoring(file);
+    await fs.unlink(file);
+
+    const chest = (back.blocks ?? [])[0];
+    expect(chest?.nbt?.Weights).toEqual([1, 1.5]);
+    expect(chest?.nbt?.Tags).toEqual(['a']);
+  });
 });

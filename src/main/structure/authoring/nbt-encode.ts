@@ -39,7 +39,17 @@ function inferTag(value: unknown): Tag | null {
   if (Array.isArray(value)) {
     const tags = value.map(inferTag).filter((t): t is Tag => t !== null);
     if (tags.length === 0) return { type: 'list', value: { type: 'end', value: [] } };
+    // NBT lists are homogeneous. A mixed int/double array promotes to all-double
+    // (e.g. [1, 1.5]); any other mix keeps only the elements matching the first
+    // element's type — never write values under a tag type they don't fit.
     const elemType = tags[0].type;
+    if (tags.some((t) => t.type !== elemType)) {
+      if (tags.every((t) => t.type === 'int' || t.type === 'double')) {
+        return { type: 'list', value: { type: 'double', value: tags.map((t) => Number(t.value)) } };
+      }
+      const kept = tags.filter((t) => t.type === elemType);
+      return { type: 'list', value: { type: elemType, value: kept.map((t) => t.value) } };
+    }
     return { type: 'list', value: { type: elemType, value: tags.map((t) => t.value) } };
   }
   if (typeof value === 'object') return inferCompound(value as Record<string, unknown>);

@@ -360,6 +360,67 @@ describe('fixPlacement — orphan door halves', () => {
   });
 });
 
+describe('fixPlacement — doorway carve shell protection', () => {
+  const doorPalette: AuthoringPaletteEntry[] = [
+    { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'lower' } },
+    { Name: 'minecraft:spruce_door', Properties: { facing: 'south', half: 'upper' } },
+    { Name: 'minecraft:stone_bricks' },
+  ];
+
+  it('never carves a doorway through a LOCKED shell cell (lockShell archetype)', () => {
+    // The same blocked-doorway scene the pass normally repairs — but the plug belongs
+    // to a lockShell structure's code-built exterior, so it must survive untouched.
+    const lockedCtx = {
+      size: [16, 16, 16] as [number, number, number],
+      lockCells: [
+        { pos: [5, 1, 4] as [number, number, number], entry: { Name: 'minecraft:stone_bricks' } },
+        { pos: [5, 2, 4] as [number, number, number], entry: { Name: 'minecraft:stone_bricks' } },
+      ],
+    };
+    const r = fixPlacement(
+      [
+        { state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] },
+        { state: 2, pos: [5, 1, 4] }, { state: 2, pos: [5, 2, 4] },
+      ],
+      doorPalette,
+      lockedCtx,
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:stone_bricks')).toHaveLength(2);
+    expect((r.fixes ?? []).join(' ')).not.toMatch(/doorway/);
+  });
+
+  it('does not carve a blind niche into a double-thick shell wall', () => {
+    // The door faces a TWO-deep wall: carving the first layer would only expose the
+    // second (a blind niche in the building's skin), so the shell stays whole.
+    const r = fixPlacement(
+      [
+        { state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] },
+        { state: 2, pos: [5, 1, 6] }, { state: 2, pos: [5, 2, 6] }, // first wall layer
+        { state: 2, pos: [5, 1, 7] }, { state: 2, pos: [5, 2, 7] }, // second wall layer
+      ],
+      doorPalette,
+      ctx,
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:stone_bricks')).toHaveLength(4);
+    expect((r.fixes ?? []).join(' ')).not.toMatch(/doorway/);
+  });
+
+  it('still opens a single-layer plug that completes an entrance to the outside', () => {
+    // One shell block in front of the door with open air beyond: carving it finishes
+    // a usable entrance, so the repair still applies.
+    const r = fixPlacement(
+      [
+        { state: 0, pos: [5, 1, 5] }, { state: 1, pos: [5, 2, 5] },
+        { state: 2, pos: [5, 1, 6] }, { state: 2, pos: [5, 2, 6] },
+      ],
+      doorPalette,
+      ctx,
+    );
+    expect(r.blocks.filter((b) => nameOf(r, b) === 'minecraft:stone_bricks')).toHaveLength(0);
+    expect((r.fixes ?? []).join(' ')).toMatch(/doorway/);
+  });
+});
+
 describe('fixPlacement — floating connecting blocks', () => {
   it('removes a line of iron bars hovering with no solid support (railing over a roof)', () => {
     // A 1-cell air gap below the bars; nothing solid touches the group anywhere.

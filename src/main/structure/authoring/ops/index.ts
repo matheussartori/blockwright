@@ -22,7 +22,8 @@ export function applyOp(op: AuthoringOp, ctx: OpCtx): void {
     // block name) and apply them in order, exactly as if the model had authored them.
     const internByName = (name: string, props?: Record<string, string>): number =>
       intern({ Name: name, Properties: props });
-    for (const inner of composeStructure(op.name, op.from, op.to, op.params ?? {}, internByName)) {
+    const warn = (message: string): void => { ctx.warnings?.push(message); };
+    for (const inner of composeStructure(op.name, op.from, op.to, op.params ?? {}, internByName, warn)) {
       applyOp(inner, ctx);
     }
     return;
@@ -98,19 +99,23 @@ export function applyOp(op: AuthoringOp, ctx: OpCtx): void {
 
 /** Expand `ops` (in order) then overlay explicit `blocks`, dropping air cells.
  *  Transform/roof ops can intern new palette entries (rotated stairs, slab ridge,
- *  …), so this returns the possibly-extended palette alongside the blocks.
+ *  …), so this returns the possibly-extended palette alongside the blocks, plus any
+ *  expansion `warnings` (e.g. a template that skipped its selected basement).
  *  `validateAuthoring` must pass first (it bounds-checks the inputs). */
-export function resolveBlocks(s: AuthoringStructure): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] } {
+export function resolveBlocks(
+  s: AuthoringStructure,
+): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[]; warnings: string[] } {
   const palette = (s.palette ?? []).slice();
   const intern = makeIntern(palette);
   const size = (s.size ?? [0, 0, 0]) as [number, number, number];
   const cells = new Map<string, AuthoringBlock>();
-  const ctx: OpCtx = { cells, palette, intern, size };
+  const warnings: string[] = [];
+  const ctx: OpCtx = { cells, palette, intern, size, warnings };
   for (const op of s.ops ?? []) applyOp(op, ctx);
   for (const b of s.blocks ?? []) cells.set(posKey(...b.pos), b);
   const out: AuthoringBlock[] = [];
   for (const b of cells.values()) {
     if (!isAir(palette[b.state]?.Name ?? '')) out.push(b);
   }
-  return { blocks: out, palette };
+  return { blocks: out, palette, warnings };
 }

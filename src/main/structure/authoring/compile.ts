@@ -10,14 +10,19 @@ import {
   connectBlocks, fillInteriorAir, fixChimney, fixCirculation, fixDoors, fixPlacement, preserveShell, rebuildStairwells, runPasses,
   type Pass, type ShellLockCell,
 } from './passes';
-import type { AuthoringStructure } from './types';
+import type { AuthoringBlock, AuthoringPaletteEntry, AuthoringStructure } from './types';
 import { validateAuthoring } from './validate';
 
-/** Informational result of the post-processing passes: auto-applied `fixes` (shown
- *  to the user/model) and `warnings` (left for the model to address next emit). */
+/** Informational result of a compile: auto-applied `fixes` (shown to the user/model),
+ *  `warnings` (left for the model to address next emit — op-expansion warnings like a
+ *  skipped basement, then pass warnings), and the FINAL post-pass `blocks`/`palette`
+ *  exactly as encoded into the `.nbt` (including the explicit interior-air cells) — so
+ *  a caller needing stats or metadata never re-expands the ops. */
 export interface CompileReport {
   fixes: string[];
   warnings: string[];
+  blocks: AuthoringBlock[];
+  palette: AuthoringPaletteEntry[];
 }
 
 /** Options threaded into compilation — notably the SELECTED structure-type id, so the
@@ -50,14 +55,17 @@ function pipelineFor(structureType?: string): Pass[] {
   // The shell lock runs FIRST (no-op unless `lockCells` is supplied): it re-asserts the
   // code-built exterior the AI deleted, so the floor/roof/walls are whole BEFORE the rest.
   // Order matters: vertical circulation is rebuilt next (so the openings/landings it
-  // cuts are in place); door hinges are mirrored on the as-authored leaves; connection
-  // sides are derived; placement is fixed against the real blocks (and drops orphan
-  // door halves / floating railings); circulation cleanup (drop stray ladders / cap
-  // orphan floor holes) runs once everything has settled; the interior air-fill runs
-  // last so it doesn't interfere with neighbour/support lookups.
-  passes.push(preserveShell, rebuildStairwells, fixDoors, connectBlocks, fixPlacement, fixCirculation);
+  // cuts are in place); door hinges are mirrored on the as-authored leaves; placement
+  // is fixed against the real blocks (and drops orphan door halves / floating
+  // railings); circulation cleanup (drop stray ladders / cap orphan floor holes) runs
+  // once everything has settled. Connection sides are derived AFTER every pass that
+  // adds/removes blocks (placement carves, circulation caps, the chimney rebuilds its
+  // flue) so no pane/fence/wall is left with a baked side pointing at a removed
+  // neighbour; the interior air-fill runs last so it doesn't interfere with
+  // neighbour/support lookups.
+  passes.push(preserveShell, rebuildStairwells, fixDoors, fixPlacement, fixCirculation);
   if (structureFinalizers(structureType).includes('chimney')) passes.push(fixChimney);
-  passes.push(fillInteriorAir);
+  passes.push(connectBlocks, fillInteriorAir);
   return passes;
 }
 
@@ -80,7 +88,15 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
     blocks: result.blocks,
     entities: s.entities ?? [],
   });
-  return { buffer, report: { fixes: result.fixes ?? [], warnings: result.warnings ?? [] } };
+  return {
+    buffer,
+    report: {
+      fixes: result.fixes ?? [],
+      warnings: [...resolved.warnings, ...(result.warnings ?? [])],
+      blocks: result.blocks,
+      palette: result.palette,
+    },
+  };
 }
 
 /** Compile to a gzip-compressed `.nbt` buffer (Java big-endian). */

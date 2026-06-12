@@ -78,9 +78,15 @@ export interface Flight {
 /** Walk every climbing flight in the block list: each run of same-facing bottom stairs
  *  stepping one block up the ascent diagonal. Decorative single stairs (chairs/desks —
  *  chains shorter than 2) and open roof slopes are excluded, so callers only ever see a
- *  real, traversable flight. */
-export function findFlights(blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[]): Flight[] {
-  const ceilY = topCeilingY(blocks, palette);
+ *  real, traversable flight. `opts.ignoreCeiling` disables the roof-slope exclusion —
+ *  for diagnostics that need to SEE every climbing run even when the ceiling-plane
+ *  heuristic itself is what failed (the stairwell pass's silent-bail warning). */
+export function findFlights(
+  blocks: AuthoringBlock[],
+  palette: AuthoringPaletteEntry[],
+  opts?: { ignoreCeiling?: boolean },
+): Flight[] {
+  const ceilY = opts?.ignoreCeiling ? Infinity : topCeilingY(blocks, palette);
   const at = new Map<string, AuthoringBlock>();
   for (const b of blocks) at.set(posKey(...b.pos), b);
   const stairAt = (x: number, y: number, z: number, facing: string): boolean => {

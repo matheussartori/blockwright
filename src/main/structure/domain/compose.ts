@@ -129,13 +129,18 @@ function seedFor(params: Record<string, unknown>, b: ReturnType<typeof box>): nu
 }
 
 /** The selected basement MODULE id from raw params (the Details "Basement" slot rides
- *  in as `params.basement` = a module id), or undefined when none/unknown. A structure
- *  type that declares its OWN `basement` param (classic) handles burial itself, so the
- *  central path is skipped for it (the caller checks `'basement' in type.params`). */
-function selectedBasement(params: Record<string, unknown>): string | undefined {
+ *  in as `params.basement` = a module id), or undefined when none/unknown — an unknown
+ *  id is reported through `warn` instead of vanishing silently. A structure type that
+ *  declares its OWN `basement` param (classic) handles burial itself, so the central
+ *  path is skipped for it (the caller checks `'basement' in type.params`). */
+function selectedBasement(params: Record<string, unknown>, warn?: (message: string) => void): string | undefined {
   const id = params.basement;
   if (typeof id !== 'string' || id === '' || id === 'none') return undefined;
-  return getBasement(id) ? id : undefined;
+  if (!getBasement(id)) {
+    warn?.(`Unknown basement module "${id}" — the basement was skipped. Use one of the known basement ids.`);
+    return undefined;
+  }
+  return id;
 }
 
 /** Below-grade height reserved at the BOTTOM of the box for a centrally-composed
@@ -217,6 +222,9 @@ function makeModuleComposer(
  *   overrides, a `seed`, and the type's own shape/behaviour knobs.
  * @param intern - The compiler's get-or-create palette intern, so the composed build
  *   interns into the same palette.
+ * @param warn - Optional sink for non-fatal composition warnings (a skipped basement,
+ *   an unknown basement id) — surfaced in the compile report so a silently-dropped
+ *   pick is visible to the model/user.
  * @returns The volumetric ops the type's `build()` emits for the box.
  * @throws If `name` is not a known structure type or `params` names an unknown decoration
  *   (so validate/compile surfaces an actionable error to the generator).
@@ -227,6 +235,7 @@ export function composeStructure(
   to: Vec3,
   params: Record<string, unknown>,
   intern: Intern,
+  warn?: (message: string) => void,
 ): AuthoringOp[] {
   const type = getStructureType(name);
   if (!type) {
@@ -249,19 +258,28 @@ export function composeStructure(
   // the type's massing onto the ground above it, then ladder the two together. So every
   // structure type supports a basement with no per-type code (the fix for "I picked a
   // crypt but the gothic shell built none").
-  const basement = 'basement' in type.params ? undefined : selectedBasement(params);
+  const basement = 'basement' in type.params ? undefined : selectedBasement(params, warn);
   const bH = basementHeight(b.H);
-  if (basement && b.H - bH >= 6) {
-    const groundY = b.y0 + bH;
-    const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
-    return [
-      // The vault fills the footprint below grade (forced rect so it spans the whole base).
-      ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
-      // The type builds its full massing onto the ground slab at `groundY` (its new floor).
-      ...type.build({ box: buildBox, params: values, palette, seed, composeModule: composeModuleDelegate }),
-      // The descent carves through that slab last, so the stairwell opening survives.
-      ...basementDescent(b, groundY, palette),
-    ];
+  if (basement) {
+    if (b.H - bH >= 6) {
+      const groundY = b.y0 + bH;
+      const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
+      return [
+        // The vault fills the footprint below grade (forced rect so it spans the whole base).
+        ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
+        // The type builds its full massing onto the ground slab at `groundY` (its new floor).
+        ...type.build({ box: buildBox, params: values, palette, seed, composeModule: composeModuleDelegate }),
+        // The descent carves through that slab last, so the stairwell opening survives.
+        ...basementDescent(b, groundY, palette),
+      ];
+    }
+    // The pick can't fit — say so instead of silently building without it (the user
+    // chose a crypt and got none, with nothing explaining why).
+    warn?.(
+      `Skipped the selected "${basement}" basement: the ${b.H}-block-tall build box is too short to `
+      + `bury a ${bH}-block vault and keep livable storeys above it (needs a height of at least ${bH + 6}). `
+      + `Raise the build box or drop the basement.`,
+    );
   }
 
   return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });

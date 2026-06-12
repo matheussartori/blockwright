@@ -153,6 +153,26 @@ describe('rebuildStairwells', () => {
     expect(at(r, 5, 5, 3)?.Name).not.toBe('minecraft:oak_planks');
   });
 
+  it('cuts the stairwell opening through a DOUBLE-THICK floor (both slabs are carvable)', () => {
+    // The upper floor is two slabs thick (planks at y=5 AND y=6; walk surface y=6).
+    // The lower slab must read as carvable FLOOR, not as a protected wall — otherwise
+    // no stair or ladder can ever pierce a double floor and the pass bails with the
+    // model's broken flight left intact.
+    const blocks = storeyShell(11, 7, [0, 5, 6]);
+    blocks.push(
+      { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] },
+      { state: 3, pos: [4, 3, 3] }, { state: 3, pos: [5, 4, 3] },
+    );
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(r.warnings ?? []).toHaveLength(0);
+    expect(r.fixes?.join(' ')).toMatch(/staircase|ladder/);
+    // The run reaches the WALK surface (y=6) — the top tread sits on the upper slab level.
+    expect(isStair(at(r, 7, 6, 3))).toBe(true);
+    // Both slabs were pierced where the run crosses them (no plank left in the shaft).
+    expect(at(r, 6, 5, 3)?.Name).not.toBe('minecraft:oak_planks');
+    expect(at(r, 6, 6, 3)?.Name).not.toBe('minecraft:oak_planks');
+  });
+
   it('leaves a single-storey build (one floor plane) untouched', () => {
     const blocks: AuthoringBlock[] = [
       ...storeyShell(9, 7, [0]),
@@ -160,6 +180,35 @@ describe('rebuildStairwells', () => {
     ];
     const r = rebuildStairwells(blocks, palette, ctx);
     expect(r.blocks).toBe(blocks); // no-op (same reference)
+  });
+
+  it('warns instead of bailing silently when a real climb exists but storey planes were not recognised', () => {
+    // One dominant 16×16 ground slab; a small 5×4 upper deck falls under the 60% plane
+    // cut, so detection sees ONE plane — but the model clearly built a storey climb
+    // (a 1-wide flight rising 4). The pass must surface the miss, not vanish quietly.
+    const blocks: AuthoringBlock[] = [];
+    for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) blocks.push({ state: 2, pos: [x, 0, z] });
+    for (let x = 2; x < 7; x++) for (let z = 2; z < 6; z++) blocks.push({ state: 2, pos: [x, 5, z] });
+    blocks.push(
+      { state: 3, pos: [8, 1, 3] }, { state: 3, pos: [9, 2, 3] },
+      { state: 3, pos: [10, 3, 3] }, { state: 3, pos: [11, 4, 3] }, { state: 3, pos: [12, 5, 3] },
+    );
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(r.blocks).toBe(blocks); // geometry untouched
+    expect((r.warnings ?? []).join(' ')).toMatch(/floor planes/);
+  });
+
+  it('does not warn on a single-storey cottage whose only climb is its stair ROOF', () => {
+    // One floor plane + a WIDE bank of parallel same-facing chains rising 4 (a gable
+    // slope, not a staircase) — the silent-bail warning must not fire on a roof.
+    const blocks: AuthoringBlock[] = [];
+    for (let x = 0; x < 9; x++) for (let z = 0; z < 7; z++) blocks.push({ state: 2, pos: [x, 0, z] });
+    for (let z = 0; z < 7; z++) {
+      for (let i = 0; i < 5; i++) blocks.push({ state: 3, pos: [i, 4 + i, z] });
+    }
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(r.warnings).toBeUndefined();
+    expect(r.blocks).toBe(blocks);
   });
 
   it('ignores a roof slope built from stairs (it tops out above the ceiling)', () => {

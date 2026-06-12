@@ -21,7 +21,12 @@ export function applyStairs(op: Extract<AuthoringOp, { op: 'stairs' }>, ctx: OpC
   const [ax, ay, az] = op.from;
   const [bx, by, bz] = op.to;
   const dx = bx - ax, dz = bz - az, dy = by - ay;
-  const runX = Math.abs(dx) >= Math.abs(dz); // run along x, else along z
+  // The run axis is the horizontal axis whose span matches the rise (45°: one block
+  // up per cell — validate enforces that one of them does); the other axis is the
+  // flight's width. A plain longer-axis pick would silently rotate a flight that is
+  // wider than it is long. Tie (a square diagonal) → x, the historical choice.
+  const rise = Math.abs(dy);
+  const runX = Math.abs(dx) === rise ? true : Math.abs(dz) === rise ? false : Math.abs(dx) >= Math.abs(dz);
   const runLen = runX ? Math.abs(dx) : Math.abs(dz);
   const steps = runLen + 1; // inclusive of both ends
   const runSign = (runX ? Math.sign(dx) : Math.sign(dz)) || 1;

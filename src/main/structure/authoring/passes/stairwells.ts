@@ -37,23 +37,32 @@ import type { Pass } from './types';
  *  spans most of the footprint. A real floor covers ~the whole plan, while interior
  *  partitions/furniture and a tapering gable roof fall below the 60%-of-busiest cut.
  *  Runs of consecutive plane-ys (a double-thick floor) collapse to their top y — the
- *  block you actually walk on. Returned ascending. */
-function floorPlanes(blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[]): number[] {
+ *  block you actually walk on — in `planes` (ascending); `runTop` maps EVERY member y
+ *  of a run to that top, so a connector knows the lower slab of a double-thick floor
+ *  is still carvable floor (not a protected wall) when it cuts its opening. */
+function floorPlanes(
+  blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[],
+): { planes: number[]; runTop: Map<number, number> } {
   const perY = new Map<number, number>();
   for (const b of blocks) {
     if (!isStructuralFull(palette, b.state)) continue;
     perY.set(b.pos[1], (perY.get(b.pos[1]) ?? 0) + 1);
   }
-  if (perY.size === 0) return [];
+  if (perY.size === 0) return { planes: [], runTop: new Map() };
   const max = Math.max(...perY.values());
   const raw = [...perY.entries()].filter(([, c]) => c >= 0.6 * max).map(([y]) => y).sort((a, b) => a - b);
   // Collapse consecutive ys to the top of each run (the walkable surface block).
   const planes: number[] = [];
+  const runTop = new Map<number, number>();
+  let run: number[] = [];
   for (let i = 0; i < raw.length; i++) {
+    run.push(raw[i]);
     if (i + 1 < raw.length && raw[i + 1] === raw[i] + 1) continue;
     planes.push(raw[i]);
+    for (const y of run) runTop.set(y, raw[i]);
+    run = [];
   }
-  return planes;
+  return { planes, runTop };
 }
 
 /** The dominant (most common) full block of each given plane — its real floor
@@ -130,8 +139,30 @@ interface GapWork { hints: Hint[]; strip: Set<string>; }
 const DIRS: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export const rebuildStairwells: Pass = (blocks, palette) => {
-  const planes = floorPlanes(blocks, palette);
-  if (planes.length < 2) return { blocks, palette }; // single storey — nothing to connect
+  const { planes, runTop } = floorPlanes(blocks, palette);
+  if (planes.length < 2) {
+    // Single storey — nothing to connect. But if the build carries a REAL storey climb
+    // (a narrow flight or a ladder rising ≥3) the plane detection itself likely failed
+    // (one dominant slab dwarfing the real floors under the 60% cut) — say so instead
+    // of bailing mutely and leaving broken circulation untouched.
+    if (hasUnservedClimb(blocks, palette)) {
+      return {
+        blocks, palette,
+        warnings: [
+          'A staircase/ladder climbs 3+ blocks but no two storey floor planes were recognised, so '
+          + 'vertical circulation was left as authored. If this build has real storeys, give each one '
+          + 'a (mostly) full floor slab spanning the footprint so the storey planes are detectable.',
+        ],
+      };
+    }
+    return { blocks, palette };
+  }
+
+  // The output palette is declared up front so every lookup below reads it: it shares
+  // the input palette's indices (append-only via `intern`), so blocks PLACED by an
+  // earlier connector — whose states may be new entries — still resolve for later gaps.
+  const outPalette = palette.slice();
+  const intern = makeIntern(outPalette);
 
   const planeSet = new Set(planes);
   const at = new Map<string, AuthoringBlock>();
@@ -145,13 +176,13 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   }
   const nameAt = (x: number, y: number, z: number): string | undefined => {
     const b = at.get(posKey(x, y, z));
-    return b ? palette[b.state]?.Name : undefined;
+    return b ? outPalette[b.state]?.Name : undefined;
   };
   // Is there a solid, structural-full block at this exact cell? (Used to tell a real
   // floor surface from a WALL column that merely passes through the floor level.)
   const structuralAt = (x: number, y: number, z: number): boolean => {
     const b = at.get(posKey(x, y, z));
-    return !!b && !isAir(palette[b.state]?.Name ?? '') && isStructuralFull(palette, b.state);
+    return !!b && !isAir(outPalette[b.state]?.Name ?? '') && isStructuralFull(outPalette, b.state);
   };
   const mats = planeMaterials(blocks, palette, planeSet);
   // A stair material to reuse for a DERIVED stair (one the model gave only a ladder
@@ -181,7 +212,9 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     for (const t of f.chain) {
       const [sx, sy, sz] = [t.pos[0], t.pos[1] - 1, t.pos[2]];
       const below = at.get(posKey(sx, sy, sz));
-      if (below && !planeSet.has(sy) && isStructuralFull(palette, below.state)) strip.push(posKey(sx, sy, sz));
+      // `runTop` (not the collapsed tops) so the lower slab of a double-thick floor is
+      // recognised as floor, never stripped as a stringer.
+      if (below && !runTop.has(sy) && isStructuralFull(palette, below.state)) strip.push(posKey(sx, sy, sz));
     }
     addHint({ x: bottom[0], z: bottom[2], dir: f.dir, stairState: f.chain[0].state, rise: top[1] - bottom[1] }, strip, gap);
   }
@@ -199,8 +232,6 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   if (byGap.size === 0) return { blocks, palette }; // no real storey climb to rebuild
 
   // ── Rebuild one clean connector per gap ─────────────────────────────────────────
-  const outPalette = palette.slice();
-  const intern = makeIntern(outPalette);
   const reserved = new Set<string>(); // every cell any connector occupies — never overlap
   const stripKeys = new Set<string>();
   const removeKeys = new Set<string>(); // existing cells to carve (the floor opening / thin decor)
@@ -220,19 +251,22 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     if (reserved.has(k)) return 'reserved';
     const b = at.get(k);
     if (!b) return 'air';
-    if (isAir(palette[b.state]?.Name ?? '')) return 'air';
-    if (planeSet.has(y)) {
+    if (isAir(outPalette[b.state]?.Name ?? '')) return 'air';
+    if (runTop.has(y)) {
       // On a floor plane a structural-full block is the walkable FLOOR — carving it IS the
       // stairwell opening — BUT the exterior shell and interior partition WALLS also cross
       // the floor level as structural blocks, and those must NEVER be broken (the recurring
       // "stairs destroyed the external wall" defect). Tell them apart by what sits directly
-      // above: open room space → a real floor surface ('plane', carvable); another solid
-      // block → a WALL column passing through this level ('wall', protected). A non-structural
+      // above the TOP of this floor's slab run (a double-thick floor is one run, so its
+      // lower slab doesn't read as "wall" just because the upper slab sits on it): open
+      // room space → a real floor surface ('plane', carvable); another solid block → a
+      // WALL column passing through this level ('wall', protected). A non-structural
       // block on the plane (a carpet/rug) stays carvable.
-      if (isStructuralFull(palette, b.state) && structuralAt(x, y + 1, z)) return 'wall';
+      const top = runTop.get(y) as number;
+      if (isStructuralFull(outPalette, b.state) && structuralAt(x, top + 1, z)) return 'wall';
       return 'plane';
     }
-    if (!isStructuralFull(palette, b.state)) return 'thin';
+    if (!isStructuralFull(outPalette, b.state)) return 'thin';
     return 'wall';
   };
   const passable = (x: number, y: number, z: number): boolean => {
@@ -280,7 +314,7 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       // Stringer under each tread so the run never floats (only fill empty/thin gaps,
       // never the floor plane and never atop an existing wall/support).
       const sy = y - 1;
-      if (floorMat !== undefined && !planeSet.has(sy)) {
+      if (floorMat !== undefined && !runTop.has(sy)) {
         const below = cellKind(x, sy, z);
         if (below === 'air' || below === 'thin') {
           place.push({ state: intern(outPalette[floorMat]), pos: [x, sy, z] });
@@ -405,10 +439,13 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     }
     // SUCCESS → strip every flight/ladder the model placed for this gap (rule 4: no
     // doubles, no remnants), carve the opening, reserve the connector's cells, and lay it.
-    for (const k of work.strip) stripKeys.add(k);
-    for (const k of plan.carve) removeKeys.add(k);
+    // The occupancy map is updated in place so the NEXT gap plans against the rebuilt
+    // geometry — not the pre-rebuild snapshot (a ladder must never hang on a backing
+    // block a lower connector already carved away).
+    for (const k of work.strip) { stripKeys.add(k); at.delete(k); }
+    for (const k of plan.carve) { removeKeys.add(k); at.delete(k); }
     for (const k of plan.occupy) reserved.add(k);
-    for (const b of plan.place) added.push(b);
+    for (const b of plan.place) { added.push(b); at.set(posKey(...b.pos), b); }
     if (plan.kind === 'stair') stairs++; else ladders++;
   }
 
@@ -528,6 +565,27 @@ function patchOrphanHoles(
     }
   }
   return fill.length ? { blocks: blocks.concat(fill), filled: fill.length } : { blocks, filled: 0 };
+}
+
+/** Whether the build carries a climb that LOOKS like real storey circulation — a ladder
+ *  rising ≥3, or a NARROW stair flight rising ≥3 (≤3 parallel rows; a roof slope is a
+ *  WIDE bank of parallel same-facing chains, a staircase is 1–3 wide). Used only for the
+ *  silent-bail warning, so the ceiling-plane roof exclusion (which depends on the very
+ *  plane detection that failed) is deliberately bypassed. */
+function hasUnservedClimb(blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[]): boolean {
+  if (findLadderRuns(blocks, palette).some((r) => r.cells.length >= 4)) return true;
+  // Group climbing chains by (facing, bottom y, bottom along-axis coord): the parallel
+  // rows of one slope/flight land in the same group, so the group size is its width.
+  const widths = new Map<string, number>();
+  for (const f of findFlights(blocks, palette, { ignoreCeiling: true })) {
+    const rise = f.chain[f.chain.length - 1].pos[1] - f.chain[0].pos[1];
+    if (rise < 3) continue;
+    const [x, y, z] = f.chain[0].pos;
+    const along = f.dir[0] !== 0 ? x : z;
+    const key = `${f.facing}|${y}|${along}`;
+    widths.set(key, (widths.get(key) ?? 0) + 1);
+  }
+  return [...widths.values()].some((w) => w <= 3);
 }
 
 /** The `facing` a stair ascends toward, from its ascent unit (dx,dz). */

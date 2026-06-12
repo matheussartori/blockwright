@@ -35,6 +35,20 @@ describe('validateAuthoring', () => {
     })).toThrow(/stairs must change height/);
   });
 
+  it('rejects a staircase whose rise does not match the run on either axis', () => {
+    // Rise 3 over a run of 8: not a 45° flight — applyStairs would silently build an
+    // 8-block rise overshooting to.y, so this must be rejected with feedback instead.
+    expect(() => validateAuthoring({
+      ...ok, size: [9, 9, 9], ops: [{ op: 'stairs', from: [0, 0, 0], to: [8, 3, 0], state: 0 }],
+    })).toThrow(/45°/);
+  });
+
+  it('accepts a wide staircase (the rise matches one axis; the other is the width)', () => {
+    expect(() => validateAuthoring({
+      ...ok, size: [9, 9, 9], ops: [{ op: 'stairs', from: [0, 0, 0], to: [2, 2, 4], state: 0 }],
+    })).not.toThrow();
+  });
+
   it('rejects an unknown op kind', () => {
     expect(() => validateAuthoring({ ...ok, ops: [{ op: 'frobnicate' } as never] })).toThrow(/op must be one of/);
   });

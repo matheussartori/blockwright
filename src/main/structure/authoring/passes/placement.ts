@@ -19,6 +19,7 @@ import { posKey } from '../geometry';
 import { bareId, isAir, makeIntern } from '../palette';
 import type { AuthoringBlock } from '../types';
 import { connFamily } from './connect-blocks';
+import { computeEnvelope } from './envelope';
 import {
   FACINGS, isCandle, isFloorHead, isFloorTorch, isLantern, isSolidSupport, needsGroundBelow, wallFixtureKind,
 } from './placement-rules';
@@ -74,7 +75,7 @@ function floatingConnectors(
   return floating;
 }
 
-export const fixPlacement: Pass = (blocks, palette) => {
+export const fixPlacement: Pass = (blocks, palette, ctx) => {
   // Frozen lookup of the structure as authored, for support tests.
   const nameAt = new Map<string, string>();
   for (const b of blocks) nameAt.set(posKey(...b.pos), palette[b.state]?.Name ?? '');
@@ -100,6 +101,15 @@ export const fixPlacement: Pass = (blocks, palette) => {
   // Cells to delete after the per-block pass: decoration sitting on a chest lid, and
   // wall blocks plugging a doorway. Collected by position so order doesn't matter.
   const carve = new Set<string>();
+  // The exterior envelope + the lockShell cells, for the doorway carve: an interior
+  // blocker is always carvable, but a block on the watertight outer SKIN may only be
+  // opened where the passage completes to the outside (finishing an entrance) — never
+  // a code-owned locked shell block, and never a carve that leaves a blind niche in a
+  // double-thick wall or breaches a sealed interior through the facade.
+  const env = computeEnvelope(blocks, palette);
+  const locked = new Set(
+    (ctx?.lockCells ?? []).filter((c) => !isAir(c.entry.Name)).map((c) => posKey(c.pos[0], c.pos[1], c.pos[2])),
+  );
 
   const out: AuthoringBlock[] = [];
   for (const b of blocks) {
@@ -243,7 +253,11 @@ export const fixPlacement: Pass = (blocks, palette) => {
 
     // A door must be walkable: the cells in line with its facing (front and back, both
     // door halves) must be passable. If a solid wall plugs one, carve it so the door
-    // actually leads somewhere instead of opening into a wall.
+    // actually leads somewhere instead of opening into a wall. A LOCKED shell cell is
+    // never carved; a blocker on the exterior SKIN is carved only when the cell beyond
+    // it is open outside (the carve completes an entrance) — carving any other shell
+    // cell would leave a blind niche in a double-thick wall, or punch the facade
+    // through into a sealed interior.
     if (id.endsWith('_door') && props.half === 'lower') {
       const dir = FACINGS.find((d) => d.facing === props.facing);
       if (dir) {
@@ -251,7 +265,11 @@ export const fixPlacement: Pass = (blocks, palette) => {
         for (const s of [1, -1]) {        // front (+facing), back (−facing)
           for (const dy of [0, 1]) {       // both door halves
             const cx = x + s * dir.dx, cy = y + dy, cz = z + s * dir.dz;
-            if (isSolidSupport(at(cx, cy, cz))) { carve.add(posKey(cx, cy, cz)); opened = true; }
+            if (!isSolidSupport(at(cx, cy, cz))) continue;
+            if (locked.has(posKey(cx, cy, cz))) continue;
+            if (env.isShell(cx, cy, cz) && !env.isOutside(x + 2 * s * dir.dx, cy, z + 2 * s * dir.dz)) continue;
+            carve.add(posKey(cx, cy, cz));
+            opened = true;
           }
         }
         if (opened) openedDoorways++;

@@ -69,6 +69,18 @@ export function validateAuthoring(s: AuthoringStructure): void {
       if (op.fill !== undefined) checkState(op.fill, `ops[${i}].fill`);
       if (op.clear !== undefined) checkState(op.clear, `ops[${i}].clear`);
       if (op.from[1] === op.to[1]) throw new Error(`ops[${i}] stairs must change height (from.y !== to.y) — a flat row is not a staircase`);
+      // A flight climbs at 45° (one block up per cell of run), so the rise must match
+      // the run on exactly one horizontal axis; the other axis is the flight's WIDTH.
+      // Without this gate a mismatched box builds a silently different staircase
+      // (overshooting `to.y`, or rotated 90° when the width exceeds the run).
+      const rise = Math.abs(op.to[1] - op.from[1]);
+      const runDx = Math.abs(op.to[0] - op.from[0]), runDz = Math.abs(op.to[2] - op.from[2]);
+      if (rise !== runDx && rise !== runDz) {
+        throw new Error(
+          `ops[${i}] stairs climb at 45°: the rise |to.y - from.y| (${rise}) must equal the horizontal `
+          + `run on one axis (got |dx|=${runDx}, |dz|=${runDz}); spread the OTHER axis for a wider flight`,
+        );
+      }
     }
     if (op.op === 'mirror' && op.axis !== 'x' && op.axis !== 'z') {
       throw new Error(`ops[${i}].axis must be "x" or "z"`);
