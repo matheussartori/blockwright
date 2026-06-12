@@ -87,12 +87,12 @@ describe('rebuildStairwells', () => {
     expect(at(r, 3, 5, 3)?.Name).not.toBe('minecraft:oak_planks'); // +3 opened (was floor)
   });
 
-  it('never breaks a STRUCTURE block to fit a stair — a wall in the path forces a ladder', () => {
+  it('never breaks a STRUCTURE block to fit a stair — the climb reroutes around the wall', () => {
     // A flight 0→5 climbing +x at z=3, but a stone PILLAR (state 1, structural) blocks the
-    // headroom over a middle tread. Every straight-run direction from that column runs into
-    // a wall or the pillar, so a clean stair can't fit. The pass must NOT gouge the wall to
-    // make room (the recurring "stairs destroying the structure" defect) — it falls back to
-    // a continuous ladder, and the blocking wall survives untouched.
+    // headroom over a middle tread. The pass must NOT gouge the wall to make room (the
+    // recurring "stairs destroying the structure" defect) — it reroutes the connector to a
+    // clear column nearby (a clean stair one row over beats a ladder, rule 1), and the
+    // blocking wall survives untouched.
     const blocks = storeyShell(9, 7, [0, 5, 10]);
     blocks.push(
       { state: 3, pos: [2, 1, 3] }, { state: 3, pos: [3, 2, 3] },
@@ -101,8 +101,13 @@ describe('rebuildStairwells', () => {
     );
     const r = rebuildStairwells(blocks, palette, ctx);
     expect(at(r, 4, 4, 3)?.Name).toBe('minecraft:stone'); // the wall was never carved
-    expect(r.blocks.some((b) => r.palette[b.state]?.Name === 'minecraft:ladder')).toBe(true);
-    expect(r.fixes?.join(' ')).toMatch(/ladder/);
+    // A connector still serves the gap — a rerouted stair or, failing that, a ladder.
+    const climbs = r.blocks.filter((b) => {
+      const n = r.palette[b.state]?.Name ?? '';
+      return n === 'minecraft:ladder' || (n.endsWith('_stairs') && b.pos[1] <= 5);
+    });
+    expect(climbs.length).toBeGreaterThanOrEqual(5);
+    expect(r.fixes?.join(' ')).toMatch(/staircase|ladder/);
   });
 
   it('never carves a WALL that passes through the upper floor — the stairwell opening only eats true floor', () => {
@@ -212,15 +217,67 @@ describe('rebuildStairwells', () => {
   });
 
   it('ignores a roof slope built from stairs (it tops out above the ceiling)', () => {
-    // Two floors + a gable roof of stairs above the top floor: the roof must not be
-    // mistaken for a flight and rebuilt.
+    // Two floors + a full gable roof of stairs over the top floor: the roof must not be
+    // mistaken for a flight and rebuilt — but the storey gap UNDER the gable (an attic
+    // with covered standing room) that the model never served still gets a connector
+    // ADDED (rule 5: every storey gap gets one).
     const blocks = storeyShell(9, 7, [0, 6]);
     for (let z = 0; z < 7; z++) {
-      blocks.push({ state: 3, pos: [0, 7, z] }, { state: 3, pos: [1, 8, z] }, { state: 3, pos: [2, 9, z] });
+      for (let i = 0; i < 5; i++) {
+        blocks.push({ state: 3, pos: [i, 7 + i, z] });
+        if (i < 4) blocks.push({ state: 3, pos: [8 - i, 7 + i, z] });
+      }
     }
     const r = rebuildStairwells(blocks, palette, ctx);
-    // No hint inside a storey → nothing rebuilt; the roof stairs are still there.
+    // The roof slopes are untouched — never stripped as a flight.
     expect(isStair(at(r, 1, 8, 3))).toBe(true);
-    expect(r.blocks).toBe(blocks);
+    expect(isStair(at(r, 0, 7, 0))).toBe(true);
+    expect(isStair(at(r, 7, 8, 6))).toBe(true);
+    expect(r.fixes?.join(' ')).toMatch(/added .* missing/);
+  });
+
+  it('ADDS a connector for a storey gap the model never attempted (every gap gets one)', () => {
+    // Two real storeys (people live above floor y=5 — there is a floor at y=10 over it)
+    // and NO climb anywhere: the old pass silently did nothing and the upper floor was
+    // unreachable. Now the gap is planned from scratch — a stair if one fits, else a
+    // flush wall ladder — and reaches the upper floor.
+    const blocks = storeyShell(9, 7, [0, 5, 10]);
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(r.fixes?.join(' ')).toMatch(/added .* missing/);
+    const names = r.blocks.map((b) => r.palette[b.state]?.Name ?? '');
+    expect(names.some((n) => n === 'minecraft:ladder' || n.endsWith('_stairs'))).toBe(true);
+  });
+
+  it('does NOT force a ladder up to a bare ceiling deck (no standing room above it)', () => {
+    // One storey under a flat ceiling deck with nothing above it: the topmost "gap" leads
+    // nowhere a player could stand, so no connector is forced — a cottage must not grow a
+    // ladder to its own roof.
+    const blocks = storeyShell(9, 7, [0, 5]);
+    const r = rebuildStairwells(blocks, palette, ctx);
+    expect(r.blocks).toBe(blocks); // untouched
+  });
+
+  it('keeps each storey served when ONE continuous ladder spans several gaps (v6 farmhouse defect)', () => {
+    // The real-world failure: the model laid a single wall ladder from the cellar all the
+    // way past floor 2 (one run crossing THREE gaps). The old pass attributed the whole
+    // run to the bottom gap, rebuilt the cellar connector, and rule 4 then stripped the
+    // ENTIRE run — deleting the only climb serving floors 1→2. Each gap must keep a
+    // climbable connector after the rebuild.
+    const blocks = storeyShell(9, 7, [0, 5, 10, 15])
+      // Open the shaft through each upper floor at the ladder column (the model punched it).
+      .filter((b) => ![posKey(1, 5, 3), posKey(1, 10, 3), posKey(1, 15, 3)].includes(posKey(...b.pos)));
+    const ladder: AuthoringPaletteEntry = { Name: 'minecraft:ladder', Properties: { facing: 'east' } };
+    const pal = [...palette, ladder];
+    for (let y = 1; y <= 15; y++) blocks.push({ state: 4, pos: [1, y, 3] });
+    const r = rebuildStairwells(blocks, pal, ctx);
+    // Every storey gap (0→5, 5→10, 10→15) still has a connector rising through it.
+    for (const [lo, hi] of [[0, 5], [5, 10], [10, 15]] as const) {
+      const served = r.blocks.some((b) => {
+        const n = r.palette[b.state]?.Name ?? '';
+        const y = b.pos[1];
+        return y > lo && y <= hi && (n === 'minecraft:ladder' || n.endsWith('_stairs'));
+      });
+      expect(served, `gap y=${lo}→${hi} must keep a climb`).toBe(true);
+    }
   });
 });

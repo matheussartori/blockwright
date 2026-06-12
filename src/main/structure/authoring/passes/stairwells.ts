@@ -16,6 +16,10 @@
 //   4. NO REMNANTS / NO DOUBLES. Every flight + ladder the model placed for a gap is
 //      stripped before the single clean connector is laid, so two climbs can never
 //      survive side by side and no broken stub is ever left behind.
+//   5. EVERY STOREY GAP GETS A CONNECTOR — even one the model never attempted a climb
+//      for (planned from scratch, stacked over the connector below). The only gap not
+//      forced is a topmost one whose upper plane is a bare ceiling deck with no
+//      standing room above it (no attic to reach).
 //
 // The fit test is AIR-BASED, not shell-based: it asks "is this cell empty (or a thin
 // decoration / the floor plane I'm opening)?", never "is this the exterior skin?".
@@ -132,13 +136,34 @@ interface Hint {
   rise: number;
 }
 
+/** Split one continuous climb across every storey gap it rises through. A single
+ *  ladder from the cellar to the attic serves SEVERAL gaps, and each gap must get
+ *  its own hint + strip segment — attributing the whole run to its bottom gap let
+ *  the cellar rebuild strip the run wholesale and DELETE the upper floors' only
+ *  climb (the "no stairs between floor 1 and 2" defect on tall builds). Cells
+ *  below the lowest plane fold into the first gap; cells above the top plane are
+ *  dropped (roof decor, never storey circulation). */
+function segmentByGap<T extends { pos: [number, number, number] }>(
+  cells: T[], planes: number[],
+): { gap: { lowerY: number; upperY: number }; cells: T[] }[] {
+  const segs = new Map<number, { gap: { lowerY: number; upperY: number }; cells: T[] }>();
+  for (const c of cells) {
+    const gap = gapFor(planes, Math.max(c.pos[1] - 1, planes[0]));
+    if (!gap) continue;
+    const s = segs.get(gap.lowerY) ?? { gap, cells: [] };
+    s.cells.push(c);
+    segs.set(gap.lowerY, s);
+  }
+  return [...segs.values()];
+}
+
 /** All the model's circulation geometry that serves one storey-gap: every hint
  *  (a column the player might climb at) plus the union of every cell to strip. */
 interface GapWork { hints: Hint[]; strip: Set<string>; }
 
 const DIRS: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-export const rebuildStairwells: Pass = (blocks, palette) => {
+export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   const { planes, runTop } = floorPlanes(blocks, palette);
   if (planes.length < 2) {
     // Single storey — nothing to connect. But if the build carries a REAL storey climb
@@ -166,13 +191,14 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
 
   const planeSet = new Set(planes);
   const at = new Map<string, AuthoringBlock>();
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, maxY = -Infinity;
   for (const b of blocks) {
     if (isAir(palette[b.state]?.Name ?? '')) continue;
     at.set(posKey(...b.pos), b);
-    const [x, , z] = b.pos;
+    const [x, y, z] = b.pos;
     if (x < minX) minX = x; if (x > maxX) maxX = x;
     if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    if (y > maxY) maxY = y;
   }
   const nameAt = (x: number, y: number, z: number): string | undefined => {
     const b = at.get(posKey(x, y, z));
@@ -193,8 +219,12 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   const byGap = new Map<number, GapWork>();
   const addHint = (h: Hint, strip: string[], gap: { lowerY: number; upperY: number }): void => {
     const H = gap.upperY - gap.lowerY;
-    if (H < 3) return;                       // not a real storey (mezzanine/thin gap)
-    if (h.rise < Math.max(2, H - 3)) return; // a decorative stub, not a storey climb
+    if (H < 3) return; // not a real storey (mezzanine/thin gap)
+    // A hint must have climbed MOST of its gap — but in a very tall storey a PARTIAL
+    // climb (the model ran out of steam) is still clearly a circulation attempt, never
+    // decor, so the bar is capped: 6 treads for a stair, 4 rungs for a ladder. Short
+    // decorative stubs (porch steps, a bunk-bed ladder) stay below it.
+    if (h.rise < Math.min(Math.max(2, H - 3), h.dir ? 6 : 4)) return;
     const w = byGap.get(gap.lowerY) ?? { hints: [], strip: new Set<string>() };
     w.hints.push(h);
     for (const k of strip) w.strip.add(k);
@@ -202,41 +232,71 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   };
 
   for (const f of findFlights(blocks, palette)) {
-    const bottom = f.chain[0].pos;
-    const top = f.chain[f.chain.length - 1].pos;
-    const gap = gapFor(planes, bottom[1] - 1);
-    if (!gap) continue;
-    const strip = f.chain.map((t) => posKey(...t.pos));
-    // Strip each tread's stringer too (the solid cell directly beneath it, if it's an
-    // interior support and not the floor) so a shifted rebuild leaves no diagonal.
-    for (const t of f.chain) {
-      const [sx, sy, sz] = [t.pos[0], t.pos[1] - 1, t.pos[2]];
-      const below = at.get(posKey(sx, sy, sz));
-      // `runTop` (not the collapsed tops) so the lower slab of a double-thick floor is
-      // recognised as floor, never stripped as a stringer.
-      if (below && !runTop.has(sy) && isStructuralFull(palette, below.state)) strip.push(posKey(sx, sy, sz));
+    for (const seg of segmentByGap(f.chain, planes)) {
+      const bottom = seg.cells[0].pos;
+      const top = seg.cells[seg.cells.length - 1].pos;
+      const strip = seg.cells.map((t) => posKey(...t.pos));
+      // Strip each tread's stringer too (the solid cell directly beneath it, if it's an
+      // interior support and not the floor) so a shifted rebuild leaves no diagonal.
+      for (const t of seg.cells) {
+        const [sx, sy, sz] = [t.pos[0], t.pos[1] - 1, t.pos[2]];
+        const below = at.get(posKey(sx, sy, sz));
+        // `runTop` (not the collapsed tops) so the lower slab of a double-thick floor is
+        // recognised as floor, never stripped as a stringer.
+        if (below && !runTop.has(sy) && isStructuralFull(palette, below.state)) strip.push(posKey(sx, sy, sz));
+      }
+      addHint({ x: bottom[0], z: bottom[2], dir: f.dir, stairState: seg.cells[0].state, rise: top[1] - bottom[1] }, strip, seg.gap);
     }
-    addHint({ x: bottom[0], z: bottom[2], dir: f.dir, stairState: f.chain[0].state, rise: top[1] - bottom[1] }, strip, gap);
   }
   for (const run of findLadderRuns(blocks, palette)) {
-    const bottom = run.cells[0].pos;
-    const top = run.cells[run.cells.length - 1].pos;
-    const gap = gapFor(planes, bottom[1] - 1);
-    if (!gap) continue;
-    addHint(
-      { x: bottom[0], z: bottom[2], rise: top[1] - bottom[1] },
-      run.cells.map((c) => posKey(...c.pos)), gap,
-    );
+    for (const seg of segmentByGap(run.cells, planes)) {
+      const bottom = seg.cells[0].pos;
+      const top = seg.cells[seg.cells.length - 1].pos;
+      addHint(
+        { x: bottom[0], z: bottom[2], rise: top[1] - bottom[1] },
+        seg.cells.map((c) => posKey(...c.pos)), seg.gap,
+      );
+    }
   }
 
-  if (byGap.size === 0) return { blocks, palette }; // no real storey climb to rebuild
+  // ── EVERY storey gap must end with a connector (the invariant) ──────────────────
+  // A gap the model never attempted ANY climb for still gets an entry — planned from
+  // scratch by the column scan in `planConnector` — instead of being silently skipped
+  // (storeys with no stairs at all were left unreachable). The TOPMOST gap is only
+  // forced when there is real standing room above its upper plane (a usable attic);
+  // otherwise that plane is just the ceiling deck and a cottage would get a ladder to
+  // its own roof.
+  const habitableAbove = (py: number): boolean => {
+    let floor = 0, standing = 0;
+    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+      const b = at.get(posKey(x, py, z));
+      if (!b || !isStructuralFull(outPalette, b.state)) continue;
+      floor++;
+      if (at.has(posKey(x, py + 1, z)) || at.has(posKey(x, py + 2, z))) continue; // no headroom
+      // ENCLOSED standing room only: some structure higher up the column (a roof over an
+      // attic). An uncovered deck is the build's rooftop — open sky doesn't count, or a
+      // flat-roofed cottage would grow a ladder to its own roof.
+      let covered = false;
+      for (let y = py + 3; y <= maxY && !covered; y++) covered = at.has(posKey(x, y, z));
+      if (covered) standing++;
+    }
+    return floor > 0 && standing >= 0.3 * floor;
+  };
+  for (let i = 0; i + 1 < planes.length; i++) {
+    const lowerY = planes[i], upperY = planes[i + 1];
+    if (upperY - lowerY < 3 || byGap.has(lowerY)) continue;
+    if (upperY === planes[planes.length - 1] && !habitableAbove(upperY)) continue;
+    byGap.set(lowerY, { hints: [], strip: new Set() });
+  }
+
+  if (byGap.size === 0) return { blocks, palette }; // no storey gap needs a connector
 
   // ── Rebuild one clean connector per gap ─────────────────────────────────────────
   const reserved = new Set<string>(); // every cell any connector occupies — never overlap
   const stripKeys = new Set<string>();
   const removeKeys = new Set<string>(); // existing cells to carve (the floor opening / thin decor)
   const added: AuthoringBlock[] = [];
-  let stairs = 0, ladders = 0;
+  let stairs = 0, ladders = 0, addedStairs = 0, addedLadders = 0;
   const warnings: string[] = [];
 
   // What a cell is, from the connector's point of view. A connector may freely occupy
@@ -247,6 +307,10 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   //   wall  — a structural full block off a floor plane, OR a wall column passing THROUGH a
   //           floor plane (solid above it) → must never be broken
   const cellKind = (x: number, y: number, z: number): 'air' | 'plane' | 'thin' | 'wall' | 'reserved' => {
+    // Outside the structure's box = impassable: an absent cell out there reads as "air",
+    // and a derived run happily climbed out through a window into the void (treads at
+    // x=-21 on the v6 farmhouse). Treat it like a wall so no plan can ever leave the box.
+    if (x < 0 || y < 0 || z < 0 || x >= ctx.size[0] || y >= ctx.size[1] || z >= ctx.size[2]) return 'wall';
     const k = posKey(x, y, z);
     if (reserved.has(k)) return 'reserved';
     const b = at.get(k);
@@ -306,9 +370,13 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       Properties: { facing: ascentFacing(fx, fz), half: 'bottom', shape: 'straight', waterlogged: 'false' },
     });
     const floorMat = mats.get(lowerY);
+    // Treads, landing and arrival must stay strictly INSIDE the build's footprint: the
+    // perimeter line is the wall — a "passable" cell there is a window/door opening,
+    // and a run threading through one would march off into the garden.
+    const inside = (x: number, z: number): boolean => x > minX && x < maxX && z > minZ && z < maxZ;
     for (let i = 0; i < steps; i++) {
       const x = ax + fx * i, y = lowerY + 1 + i, z = az + fz * i;
-      if (!passable(x, y, z)) return null;         // the tread would land in a wall
+      if (!inside(x, z) || !passable(x, y, z)) return null; // the tread would land in/past a wall
       occupy.push(posKey(x, y, z));
       place.push({ state: stairIdx, pos: [x, y, z] });
       // Stringer under each tread so the run never floats (only fill empty/thin gaps,
@@ -331,14 +399,16 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       soften(x, y + 3, z);
     }
     // Bottom landing: one cell back of the bottom tread, body + head (+ a soft 3rd).
+    if (!inside(ax - fx, az - fz)) return null;
     if (!claim(ax - fx, lowerY + 1, az - fz) || !claim(ax - fx, lowerY + 2, az - fz)) return null;
     soften(ax - fx, lowerY + 3, az - fz);
     // Top arrival: one cell forward of the top tread, body + head (you step off here) +
     // a soft 3rd so the head clears the ceiling as you walk off onto the upper floor.
     const tx = ax + fx * (steps - 1), ty = upperY, tz = az + fz * (steps - 1);
+    if (!inside(tx + fx, tz + fz)) return null;
     if (!claim(tx + fx, ty + 1, tz + fz) || !claim(tx + fx, ty + 2, tz + fz)) return null;
     soften(tx + fx, ty + 3, tz + fz);
-    return { place, carve, occupy, kind: 'stair' as const };
+    return { place, carve, occupy, kind: 'stair' as const, arrive: [tx + fx, tz + fz] as [number, number] };
   };
 
   // Plan a CONTINUOUS wall ladder rising lowerY→upperY at column (bx,bz). Returns the
@@ -384,12 +454,14 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       occupy.push(k);
       if (occupied(sx, sy, sz)) carve.push(k);
     }
-    return { place, carve, occupy, kind: 'ladder' as const };
+    return { place, carve, occupy, kind: 'ladder' as const, arrive: [bx, bz] as [number, number] };
   };
 
   type Plan = NonNullable<ReturnType<typeof planStair>> | NonNullable<ReturnType<typeof planLadder>> | null;
-  // Build the single best connector for a gap, preferring a stair (rule 1).
-  const planConnector = (work: GapWork, lowerY: number, upperY: number): Plan => {
+  // Build the single best connector for a gap, preferring a stair (rule 1). `near` is
+  // the column the gap below's connector arrives at — a hint-less gap stacks its climb
+  // there so the route between storeys stays compact.
+  const planConnector = (work: GapWork, lowerY: number, upperY: number, near: { x: number; z: number } | null): Plan => {
     const hints = [...work.hints].sort((a, b) => b.rise - a.rise);
     // 1) The model's own stair flights, strongest first (known-good column + facing).
     for (const h of hints) {
@@ -408,27 +480,37 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
       const p = planLadder(h.x, h.z, lowerY, upperY);
       if (p) return p;
     }
-    // 4) Last resort: scan interior columns (those standing on this storey's floor) for
-    //    any column a clean ladder fits, nearest to a hint — so we never bail and leave
-    //    the model's broken geometry behind.
-    const anchor = hints[0];
-    let best: Plan = null, bestD = Infinity;
+    // 4) Scan every interior column standing on this storey's floor, nearest the anchor
+    //    first (the model's strongest hint, else the connector below, else the footprint
+    //    centre): a derived STAIR wherever one fits — rule 1 holds even for a gap the
+    //    model never attempted — else a flush wall ladder. So a gap is never left
+    //    without a connector while any column can host one.
+    const anchor = hints[0] ?? near ?? { x: Math.round((minX + maxX) / 2), z: Math.round((minZ + maxZ) / 2) };
+    const cols: { x: number; z: number; d: number }[] = [];
     for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) {
       if (cellKind(x, lowerY, z) !== 'plane') continue; // must stand on this floor
-      const d = Math.abs(x - anchor.x) + Math.abs(z - anchor.z);
-      if (d >= bestD) continue;
-      const p = planLadder(x, z, lowerY, upperY);
-      if (p) { best = p; bestD = d; }
+      cols.push({ x, z, d: Math.abs(x - anchor.x) + Math.abs(z - anchor.z) });
     }
-    return best;
+    cols.sort((a, b) => a.d - b.d);
+    for (const c of cols) for (const d of DIRS) {
+      const p = planStair(c.x, c.z, d, fallbackStairName, lowerY, upperY);
+      if (p) return p;
+    }
+    for (const c of cols) {
+      const p = planLadder(c.x, c.z, lowerY, upperY);
+      if (p) return p;
+    }
+    return null;
   };
 
-  // Process gaps bottom-up so a lower connector reserves its cells before a higher one.
+  // Process gaps bottom-up so a lower connector reserves its cells before a higher one
+  // (and so a hint-less gap can stack its climb over the connector just laid below).
+  let prevArrival: { x: number; z: number } | null = null;
   for (const lowerY of [...byGap.keys()].sort((a, b) => a - b)) {
     const work = byGap.get(lowerY) as GapWork;
     const gap = gapFor(planes, lowerY);
     if (!gap) continue;
-    const plan = planConnector(work, gap.lowerY, gap.upperY);
+    const plan = planConnector(work, gap.lowerY, gap.upperY, prevArrival);
     if (!plan) {
       warnings.push(
         `Could not fit a clean staircase or wall ladder between the floors at y=${gap.lowerY} and `
@@ -446,10 +528,14 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
     for (const k of plan.carve) { removeKeys.add(k); at.delete(k); }
     for (const k of plan.occupy) reserved.add(k);
     for (const b of plan.place) { added.push(b); at.set(posKey(...b.pos), b); }
-    if (plan.kind === 'stair') stairs++; else ladders++;
+    if (work.hints.length === 0) { if (plan.kind === 'stair') addedStairs++; else addedLadders++; }
+    else if (plan.kind === 'stair') stairs++; else ladders++;
+    prevArrival = { x: plan.arrive[0], z: plan.arrive[1] };
   }
 
-  if (stairs === 0 && ladders === 0 && warnings.length === 0) return { blocks, palette };
+  if (stairs === 0 && ladders === 0 && addedStairs === 0 && addedLadders === 0 && warnings.length === 0) {
+    return { blocks, palette };
+  }
 
   // Apply: drop the stripped/carved cells, then lay the rebuilt connectors. A placed
   // cell wins over a stripped/carved one at the same position.
@@ -474,6 +560,8 @@ export const rebuildStairwells: Pass = (blocks, palette) => {
   const fixes: string[] = [];
   if (stairs) fixes.push(`rebuilt ${stairs} staircase(s) as a clean climbable flight (full top step, headroom, landings, sized stairwell opening)`);
   if (ladders) fixes.push(`rebuilt ${ladders} cramped staircase(s)/ladder(s) as a continuous flush wall ladder`);
+  if (addedStairs) fixes.push(`added ${addedStairs} missing staircase(s) between storeys the build left unconnected`);
+  if (addedLadders) fixes.push(`added ${addedLadders} missing wall ladder(s) between storeys the build left unconnected`);
   if (patched.filled) fixes.push(`floored over ${patched.filled} orphan stairwell-remnant hole(s) left where the old climb was removed`);
   return { blocks: result, palette: outPalette, fixes, warnings: warnings.length ? warnings : undefined };
 };
