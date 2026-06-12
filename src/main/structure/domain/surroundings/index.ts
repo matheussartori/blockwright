@@ -8,14 +8,16 @@
 // around a specific massing, so the list is explicit — start with `['modern']`).
 import { surroundMargins } from '@/shared/domain/surroundings';
 import type { ModuleSummary } from '../modules';
+import type { ParamValues } from '../params';
 import { createRegistry } from '../registry';
 import { box, type Box } from '../structure-types/types';
+import { garden } from './garden';
 import { modern } from './modern';
 import type { SurroundingsModule } from './types';
 
 export type { SurroundingsModule } from './types';
 
-export const registry = createRegistry<SurroundingsModule>([modern]);
+export const registry = createRegistry<SurroundingsModule>([modern, garden]);
 
 /** Look up a surroundings module by id (undefined if unknown). */
 export function getSurroundings(id: string): SurroundingsModule | undefined {
@@ -44,4 +46,18 @@ export function insetHouseBox(b: Box, id: string | undefined): Box {
   const m = surroundMargins(id);
   if (!m) return b;
   return box([b.x0 + m.side, b.y0, b.z0 + m.front], [b.x1 - m.side, b.y1, b.z1 - m.back]);
+}
+
+/** The selected surroundings-ring id when it genuinely fits (the inset still leaves a
+ *  livable house footprint), else null. Shared by every host type's `build()` and
+ *  `floors()` so the massing and the storey math always agree on which box the HOUSE
+ *  occupies — the standard first line of a yard-aware structure type.
+ *  @param outer - The full (already expanded) build box.
+ *  @param params - The type's resolved params (reads the `surroundings` value).
+ *  @returns The ring's module id, or null for none / a too-tight inset. */
+export function yardFor(outer: Box, params: ParamValues): string | null {
+  const id = typeof params.surroundings === 'string' ? params.surroundings : 'none';
+  if (id === 'none') return null;
+  const inner = insetHouseBox(outer, id);
+  return inner.W >= 7 && inner.D >= 7 ? id : null;
 }

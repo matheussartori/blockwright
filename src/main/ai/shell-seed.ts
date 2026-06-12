@@ -64,7 +64,12 @@ export interface ShellSeed {
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
   const { structureType, decoration, size, roof, basement, surroundings, floorHeights } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
-  if (!type?.seedShell) return { preamble: '' };
+  // A picked surroundings ring is CODE-BUILT geometry — it can only exist if the shell
+  // is compiled and seeded, so a yard pick promotes even a free-form type (the classic
+  // house) into a seeded, locked shell for this build. Otherwise only `seedShell`
+  // archetypes seed; the plain classic stays free-form.
+  const wantsYard = !!surroundings && surroundings !== 'none';
+  if (!type || (!type.seedShell && !wantsYard)) return { preamble: '' };
 
   const [W, H, D] = size ?? DEFAULT_SIZE;
   const params: Record<string, unknown> = {};

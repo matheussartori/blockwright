@@ -15,6 +15,7 @@ import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
 import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { insetHouseBox, yardFor } from '../surroundings';
 import { box as mkBox, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
 /** The manor's plan lines for a box + params — ONE source shared by `build()` and
@@ -58,6 +59,12 @@ export const gothic: StructureType = {
       kind: 'enum', default: 'gable', values: ['gable', 'hip', 'flat'], label: 'Roof',
       labels: { gable: 'Gable', hip: 'Hip', flat: 'Flat' }, module: 'roof',
     },
+    // Surfaced as the "Surroundings" module select (hidden from the type's own Details
+    // controls like `roof`); a pick insets the house and delegates the yard ring.
+    surroundings: {
+      kind: 'enum', default: 'none', values: ['none', 'garden'], label: 'Surroundings',
+      labels: { none: 'None', garden: 'Garden' }, module: 'surroundings',
+    },
     decay: { kind: 'unit', default: 0 },
   },
   // Black timber + blackstone, pale stone accents (the white detailing), a dark slate roof.
@@ -79,7 +86,11 @@ export const gothic: StructureType = {
     light: 'minecraft:soul_lantern',
     plant: 'minecraft:flowering_azalea_leaves', // ivy/garland greenery on the roof + tower
   },
-  build({ box, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, composeModule }) {
+    // A picked surroundings ring reserves the box's outer margins for the yard: the
+    // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
+    const yard = yardFor(outer, params);
+    const box = yard ? insetHouseBox(outer, yard) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
 
@@ -101,6 +112,11 @@ export const gothic: StructureType = {
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
     const cz = Math.floor((z0 + z1) / 2);
+
+    // The yard first (it never overlaps the inset house, so order is cosmetic).
+    if (yard) {
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+    }
 
     // --- Plan lines (shared with floors() via plan()) ----------------------------------
     const roofShape = (params.roof as string) ?? 'gable';
@@ -293,7 +309,10 @@ export const gothic: StructureType = {
   },
   // Authoritative storeys, from the SAME plan() build() uses — so the viewer bands,
   // the metadata sidecar and the stairwell pass see exactly the planes the shell laid.
-  floors(b: Box, params, floorHeights): FloorPlanEntry[] {
+  floors(outer: Box, params, floorHeights): FloorPlanEntry[] {
+    // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
+    const yard = yardFor(outer, params);
+    const b = yard ? insetHouseBox(outer, yard) : outer;
     const { slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
     return storeyEntries(slabYs, wallTop);
   },

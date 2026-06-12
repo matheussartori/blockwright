@@ -11,7 +11,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import type { ParamValues } from '../params';
-import { insetHouseBox } from '../surroundings';
+import { insetHouseBox, yardFor } from '../surroundings';
 import type { Box, FloorPlanEntry, StructureType } from './types';
 
 /** The modern villa's vertical levels for a box + floor count — the single source of its
@@ -45,16 +45,6 @@ function modernLevels(y0: number, y1: number, H: number, floors: number, roofRes
   const uH = twoStorey ? Math.max(4, Math.min(6, top - gTop - 1)) : 0;
   const uTop = twoStorey ? gTop + uH : gTop;
   return { gTop, twoStorey, uH, uTop };
-}
-
-/** The selected surroundings-ring id when it genuinely fits (the inset still leaves a
- *  livable house footprint), else null. Shared by `build()` and `floors()` so the
- *  massing and the storey math always agree on which box the HOUSE occupies. */
-function yardFor(outer: Box, params: ParamValues): string | null {
-  const id = typeof params.surroundings === 'string' ? params.surroundings : 'none';
-  if (id === 'none') return null;
-  const inner = insetHouseBox(outer, id);
-  return inner.W >= 7 && inner.D >= 7 ? id : null;
 }
 
 /** The set-back of the upper volume (front depth, one side) — derived from the footprint

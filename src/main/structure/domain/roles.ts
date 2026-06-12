@@ -27,12 +27,17 @@ export type Role =
   | 'water' // a fluid for pools/ponds (modern houses); decorations rarely remap it
   | 'plant' // decorative foliage/blossom (e.g. an exterior's roof-edge garland, window box)
   | 'ground' // outdoor terrain surface (a surroundings ring's lawn) — grass, not flooring
+  | 'path' // a walkable outdoor trail cut into the lawn (dirt path/gravel), distinct from `floor`
+  | 'soil' // tilled planting ground (farmland) for a yard's crop plots
+  | 'crop' // what grows on `soil` (a crop block, placed ripe)
+  | 'flower' // a small ground flower on grass (a yard's beds/parterres) — not foliage like `plant`
   | 'light';
 
 /** Every role, as a runtime set — the single source for `isRole`. */
 export const ROLES: readonly Role[] = [
   'air', 'wall', 'floor', 'ceiling', 'foundation', 'corner', 'accent', 'trim',
-  'beam', 'pillar', 'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'ground', 'light',
+  'beam', 'pillar', 'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'ground',
+  'path', 'soil', 'crop', 'flower', 'light',
 ];
 
 const ROLE_SET = new Set<string>(ROLES);
@@ -68,5 +73,9 @@ export const BASE_BLOCKS: Record<Role, string> = {
   water: 'minecraft:water',
   plant: 'minecraft:oak_leaves',
   ground: 'minecraft:grass_block',
+  path: 'minecraft:dirt_path',
+  soil: 'minecraft:farmland',
+  crop: 'minecraft:wheat',
+  flower: 'minecraft:poppy',
   light: 'minecraft:lantern',
 };

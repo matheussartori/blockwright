@@ -80,6 +80,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.surroundings.modern.label': 'Moderno',
   'mod.surroundings.modern.desc':
     'O terreno da vila contemporânea envolvendo a casa: um terraço de quartzo branco na frente com uma piscina rebaixada iluminada por lanternas, um caminho de entrada alinhado com a porta (bordas escuras, luzes embutidas, um degrau de soleira na borda da rua), floreiras brancas, uma cerca viva aparada em volta de todo o quintal, e arbustos + balizadores de luz nos gramados. A caixa da construção cresce além do casco da casa para abrigar o anel.',
+  'mod.surroundings.garden.label': 'Jardim',
+  'mod.surroundings.garden.desc':
+    'Um jardim de chácara cercado envolvendo a casa: um muro baixo de pedra coroado por uma cerca de madeira com postes de lampião em pedra, um portão de porta dupla alinhado com a entrada, um caminho de terra até a porta mais uma trilha contornando a casa, canteiros de flores ao longo da fachada, e uma mistura sorteada de elementos pelos gramados — uma fonte ou um poço de pedra, hortas aradas, um canteiro ornamental e arbustos aparados. O contorno da cerca varia a cada semente. A caixa da construção cresce além do casco da casa para abrigar o quintal.',
 
   // --- tunable params -------------------------------------------------------
   'param.floors.label': 'Andares',

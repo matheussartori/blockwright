@@ -22,13 +22,13 @@ const SHELL: [number, number, number] = [15, 13, 13];
 const m = SURROUND_MARGINS.modern;
 const SIZE: [number, number, number] = [SHELL[0] + m.side * 2, SHELL[1], SHELL[2] + m.front + m.back];
 
-/** Expand a modern template at `size` to named blocks (+ compose warnings). */
-function expand(size: [number, number, number], params: Record<string, unknown>) {
+/** Expand a structure template at `size` to named blocks (+ compose warnings). */
+function expand(size: [number, number, number], params: Record<string, unknown>, name = 'modern') {
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size,
     palette: [{ Name: 'minecraft:air' }],
-    ops: [{ op: 'template', name: 'modern', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params }],
+    ops: [{ op: 'template', name, from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params }],
   };
   const resolved = resolveBlocks(authoring);
   const at = new Map<string, { name: string; props?: Record<string, unknown> }>();
@@ -132,6 +132,98 @@ describe('modern surroundings geometry (template expansion)', () => {
   });
 });
 
+describe('garden surroundings geometry (template expansion)', () => {
+  const g = SURROUND_MARGINS.garden;
+  const GSHELL: [number, number, number] = [13, 13, 11];
+  const GSIZE: [number, number, number] = [GSHELL[0] + g.side * 2, GSHELL[1], GSHELL[2] + g.front + g.back];
+  const { at, warnings } = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 11 }, 'classic');
+  const outer = box([0, 0, 0], [GSIZE[0] - 1, GSIZE[1] - 1, GSIZE[2] - 1]);
+  const inner = insetHouseBox(outer, 'garden');
+  const cx = Math.floor((GSIZE[0] - 1) / 2);
+  const inRing = (x: number, z: number) => x < inner.x0 || x > inner.x1 || z < inner.z0 || z > inner.z1;
+
+  it('composes with no module-respect warnings (the ring was actually built)', () => {
+    expect(warnings).toEqual([]);
+  });
+
+  it('rings the yard with a stone course topped by a wooden fence, lamp posts lit', () => {
+    const cells = [...at.entries()].map(([k, c]) => ({ pos: k.split(',').map(Number), c }));
+    const fences = cells.filter(({ c }) => c.name === 'minecraft:oak_fence');
+    expect(fences.length).toBeGreaterThan(20);
+    // Every fence sits on a stone base (y=2 over y=1), out in the ring — the perimeter
+    // course is cobblestone; the well's crank posts stand on its stone-brick rim.
+    for (const { pos: [x, y, z] } of fences) {
+      expect(y, `fence at ${x},${y},${z}`).toBe(2);
+      expect(inRing(x, z), `fence at ${x},${z} must be in the ring`).toBe(true);
+      expect(['minecraft:cobblestone', 'minecraft:stone_bricks']).toContain(at.get(`${x},1,${z}`)?.name);
+    }
+    // Stone lamp posts carry the yard's lanterns at y=3.
+    const lanterns = cells.filter(({ c, pos }) => c.name === 'minecraft:lantern' && pos[1] === 3 && inRing(pos[0], pos[2]));
+    expect(lanterns.length).toBeGreaterThan(2);
+  });
+
+  it('every corner is chamfered (the outline varies — never the plain rectangle)', () => {
+    for (const [x, z] of [[0, 0], [GSIZE[0] - 1, 0], [0, GSIZE[2] - 1], [GSIZE[0] - 1, GSIZE[2] - 1]]) {
+      expect(isSolid(at.get(`${x},1,${z}`)), `corner ${x},${z} must be cut`).toBe(false);
+    }
+  });
+
+  it('seeds vary the outline (two seeds disagree on some fence cells)', () => {
+    const other = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 12 }, 'classic');
+    const fenceSet = (m: typeof at) => new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:oak_fence').map(([k]) => k));
+    const a = fenceSet(at), b = fenceSet(other.at);
+    expect([...a].some((k) => !b.has(k)) || [...b].some((k) => !a.has(k))).toBe(true);
+  });
+
+  it('hangs a double door in the front gate, on a stone threshold', () => {
+    for (const x of [cx, cx + 1]) {
+      expect(at.get(`${x},1,0`)?.name, `gate lower at x=${x}`).toBe('minecraft:oak_door');
+      expect(at.get(`${x},2,0`)?.name, `gate upper at x=${x}`).toBe('minecraft:oak_door');
+      expect(at.get(`${x},0,0`)?.name).toBe('minecraft:cobblestone');
+    }
+  });
+
+  it('cuts a walk from the gate to the door, distinct from the lawn', () => {
+    for (let z = 1; z <= inner.z0 - 1; z++) {
+      expect(at.get(`${cx},0,${z}`)?.name, `walk at z=${z}`).toBe('minecraft:dirt_path');
+    }
+    expect([...at.values()].some((c) => c.name === 'minecraft:grass_block')).toBe(true);
+  });
+
+  it('plants the working garden: crops on farmland, water, flowers and bushes', () => {
+    const names = new Set([...at.entries()].filter(([k]) => {
+      const [x, , z] = k.split(',').map(Number);
+      return inRing(x, z);
+    }).map(([, c]) => c.name));
+    expect(names.has('minecraft:farmland')).toBe(true);
+    expect(names.has('minecraft:wheat')).toBe(true);
+    expect(names.has('minecraft:water')).toBe(true);
+    expect(names.has('minecraft:poppy')).toBe(true);
+    expect(names.has('minecraft:flowering_azalea_leaves')).toBe(true);
+  });
+
+  it('keeps the ring LOW — landscaping, never construction (max 3 cells above ground)', () => {
+    for (const [k, c] of at) {
+      const [x, y, z] = k.split(',').map(Number);
+      if (inRing(x, z) && isSolid(c)) expect(y, `ring block at ${k} (${c.name})`).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('insets the house to the shell footprint (walls at the inner bounds, none beyond)', () => {
+    expect(isSolid(at.get(`${inner.x0},5,${inner.z0 + 2}`))).toBe(true);
+    expect(isSolid(at.get(`${inner.x1},5,${inner.z1 - 2}`))).toBe(true);
+  });
+
+  it('every garden host composes the yard with zero warnings', () => {
+    for (const host of ['farmhouse', 'sakura', 'gothic']) {
+      const size: [number, number, number] = [15 + g.side * 2, 14, 13 + g.front + g.back];
+      const r = expand(size, { surroundings: 'garden', floors: 2, seed: 5 }, host);
+      expect(r.warnings, host).toEqual([]);
+      expect([...r.at.values()].some((c) => c.name === 'minecraft:oak_fence'), `${host} fence`).toBe(true);
+    }
+  });
+});
+
 describe('modern surroundings survives the compile pass pipeline', () => {
   it('keeps the pool water and the hedge through writeStructureFile (the in-game .nbt)', async () => {
     const authoring: AuthoringStructure = {
@@ -150,6 +242,34 @@ describe('modern surroundings survives the compile pass pipeline', () => {
       expect(blocks.some((b) => names.get(b.state) === 'minecraft:water')).toBe(true);
       expect(blocks.some((b) => names.get(b.state) === 'minecraft:oak_leaves')).toBe(true);
       expect(blocks.some((b) => names.get(b.state) === 'minecraft:grass_block')).toBe(true);
+    } finally {
+      fs.rmSync(file, { force: true });
+    }
+  });
+
+  it('keeps the garden fence, gate doors and crops through writeStructureFile', async () => {
+    const g = SURROUND_MARGINS.garden;
+    const size: [number, number, number] = [13 + g.side * 2, 13, 11 + g.front + g.back];
+    const authoring: AuthoringStructure = {
+      DataVersion: 3955,
+      size,
+      palette: [{ Name: 'minecraft:air' }],
+      ops: [{ op: 'template', name: 'classic', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params: { surroundings: 'garden', floors: 2, seed: 11 } }],
+    };
+    const file = path.join(os.tmpdir(), `bw-garden-${Date.now()}.nbt`);
+    try {
+      await writeStructureFile(authoring, file, { structureType: 'classic' });
+      const out = await readAuthoring(file);
+      const names = new Map<number, string>();
+      out.palette?.forEach((p, i) => names.set(i, p.Name));
+      const blocks = out.blocks ?? [];
+      const count = (n: string) => blocks.filter((b) => names.get(b.state) === n).length;
+      expect(count('minecraft:oak_fence')).toBeGreaterThan(20);
+      expect(count('minecraft:oak_door')).toBeGreaterThanOrEqual(4); // the double gate survives fixDoors/fixPlacement
+      expect(count('minecraft:farmland')).toBeGreaterThan(0);
+      expect(count('minecraft:wheat')).toBeGreaterThan(0);
+      expect(count('minecraft:dirt_path')).toBeGreaterThan(0);
+      expect(count('minecraft:lantern')).toBeGreaterThan(2);
     } finally {
       fs.rmSync(file, { force: true });
     }

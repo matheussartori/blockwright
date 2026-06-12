@@ -46,7 +46,9 @@ refines through an emit → render → review loop — previewed live in the vie
   to trade quality for spend, configured in Settings ▸ AI
 - Composable generation domain — pick a structure type (classic / modern / farmhouse / sakura /
   gothic), a decoration, a roof, a basement, an in-roof attic, the surroundings (a code-built yard
-  ring — pool, entry walk, hedges — laid outside the house shell) and per-floor interior rooms (living
+  laid outside the house shell: a fenced **cottage garden** for the classic houses — stone-and-fence
+  perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop
+  plots and a well or fountain — or a **pool terrace** for the modern villa) and per-floor interior rooms (living
   room, kitchen, library, bedroom, shared bedrooms, storage) in the full-stage Build Planner (browse
   every part with live 3D previews in the Module Gallery); the selection guides the build and loads
   only the relevant knowledge, and registered structure × decoration modules also cross at compile
@@ -88,8 +90,9 @@ screen.
 
 **File ▸ New Structure** opens the full-stage **Build Planner**, where you describe the build
 (optionally attaching a reference image) and pick a structure type, decoration, roof, basement,
-in-roof attic and surroundings (a yard ring wrapping the house — the W×D you set is the building
-shell; the compiled box grows around it) to steer it — and, for a multi-storey house, assign up to two interior rooms to each
+in-roof attic and surroundings (a yard wrapping the house — a fenced cottage garden or a modern
+pool terrace; the W×D you set is the building shell, and the compiled box grows around it) to
+steer it — and, for a multi-storey house, assign up to two interior rooms to each
 floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) and set the build size
 (one total height, or a height per floor) — alongside a live 3D preview of the build volume.
 Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer, iterating

@@ -131,19 +131,31 @@ src/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
-        surroundings/      Category "surroundings": one file per yard typology (modern) + types.ts
-                           (SurroundingsModule, required `appliesTo`) + index.ts (registry +
-                           `insetHouseBox`). A GROUND-LEVEL landscaping RING laid OUTSIDE the building
+        surroundings/      Category "surroundings": one file per yard typology (modern, garden) +
+                           types.ts (SurroundingsModule, required `appliesTo`) + index.ts (registry +
+                           `insetHouseBox` + the shared `yardFor` every host's build()/floors() opens
+                           with). A GROUND-LEVEL landscaping RING laid OUTSIDE the building
                            shell: the user's W×D is the SHELL, the compiled box grows by the shared
                            `SURROUND_MARGINS` (`shared/domain/surroundings.ts` — same constants on both
                            sides of IPC), the host structure INSETS its massing and delegates the ring
                            via `composeModule('surroundings', …)`. The module re-derives the house
                            footprint from the same margins, so host and ring always agree. Own palette
-                           over the decoration (like a basement — a lawn stays a lawn); ring stays ≤2
-                           cells tall (landscaping, never construction); leaves placed persistent.
+                           over the decoration (like a basement — a lawn stays a lawn); ring stays ≤3
+                           cells tall (landscaping, never construction — the cap is the lamp-post
+                           lantern); leaves placed persistent.
                            modern = pool terrace + stepped entry walk aligned with the door + hedge rim
                            + planters + seeded bushes/bollards; `appliesTo: ['modern']` (the villa
                            declares the `surroundings` param, marked `module:'surroundings'`).
+                           garden = the cottage homestead yard for every NON-modern house
+                           (`appliesTo: ['classic','farmhouse','sakura','gothic']`, all four declare
+                           the param): a cobble-course + oak-fence perimeter whose corners are cut by
+                           SEEDED stepped chamfers (the outline varies every build), stone lamp posts,
+                           a double-door front gate aligned with the house door, a dirt walk + a loop
+                           path around the house, facade flower beds, and seeded features (fountain or
+                           stone well, hydrated crop plots, flower parterre, bushes). Uses the garden
+                           roles (`path`/`soil`/`crop`/`flower` in roles.ts). A garden pick on the
+                           free-form classic PROMOTES the build to a seeded, locked shell (the ring is
+                           code-built geometry — see ai/shell-seed.ts).
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -541,19 +553,29 @@ decoration, and a new module is one small file.
   in the always-on core guide `14-furnishing-by-space.md`, so a room guide never repeats it (no wasted tokens).
   **Add a room:** new `defineRoom({...})` file in `rooms/` + register in its `index.ts` + a
   `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
-- **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern): a
-  required single-select slot defaulting to **None**. The user's W×D stays the BUILDING SHELL —
-  a pick grows the compiled box by the module's `SURROUND_MARGINS` (shared constants in
-  `shared/domain/surroundings.ts`, so the renderer's `buildBoxSize` and the main-side inset can't
-  drift); the host structure lays its massing in `insetHouseBox(...)` and delegates the ring via
-  `composeModule('surroundings', …)` (module-respect verified). The ring is landscaping (≤2 cells
-  tall, open-air, persistent leaves) and ships with the seeded shell, so it's LOCKED like the rest
-  of the exterior; the model only adds outdoor detail (its knowledge guide spells the rules out).
+- **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern,
+  garden): a required single-select slot defaulting to **None**. The user's W×D stays the
+  BUILDING SHELL — a pick grows the compiled box by the module's `SURROUND_MARGINS` (shared
+  constants in `shared/domain/surroundings.ts`, so the renderer's `buildBoxSize` and the
+  main-side inset can't drift); the host structure lays its massing in `insetHouseBox(...)` and
+  delegates the ring via `composeModule('surroundings', …)` (module-respect verified) — every
+  host's `build()`/`floors()` opens with the shared `yardFor` so massing and storey math agree.
+  The ring is landscaping (≤3 cells tall — the lamp-post lantern cap — open-air, persistent
+  leaves) and ships with the seeded shell, so it's LOCKED like the rest of the exterior; the
+  model only adds outdoor detail (its knowledge guide spells the rules out). A yard pick on a
+  NON-`seedShell` type (the free-form classic) PROMOTES that build to a seeded, locked shell
+  (`ai/shell-seed.ts` — a code-built ring can only exist if the shell is compiled), and the
+  central-basement descent ladder targets the INSET house box so it never lands on the lawn.
   Designed for in-world placement by a mod: the yard carries its own ground layer, so pair the
   structure with `terrain_adaptation` (beard) at worldgen — true terrain conformity is a worldgen
   concern, not an NBT one. **Add a surroundings module:** new file + register in its `index.ts`,
-  a `SURROUND_MARGINS` entry, `appliesTo` + a host structure that declares the `surroundings`
+  a `SURROUND_MARGINS` entry, `appliesTo` + each host structure declares the `surroundings`
   param value, + a `knowledge/nbt/modules/surroundings/<id>.md` guide.
+  `modern` (hosts: modern) = pool terrace + entry walk + hedge + planters; `garden` (hosts:
+  classic/farmhouse/sakura/gothic) = the cottage homestead yard — cobble + oak-fence perimeter
+  with SEEDED chamfered corners (the outline varies every build), stone lamp posts, a
+  double-door gate aligned with the door, dirt walk + house loop path, facade flower beds, and
+  seeded fountain/well/crop-plot/parterre features (uses the `path`/`soil`/`crop`/`flower` roles).
 - **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: modern,
   farmhouse, sakura, gothic): the fix for "the style keeps coming out as a wooden pitched box." A
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
@@ -578,7 +600,9 @@ decoration, and a new module is one small file.
     requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
     (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
     `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
-    model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety).
+    model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety) — with ONE
+    exception: a picked SURROUNDINGS ring is code-built geometry, so a yard pick (the classic's `garden`)
+    promotes that build to a seeded, locked shell too (`wantsYard` in `buildShellSeed`).
   - **Every seeded shell is LOCKED** (no separate flag — `seedShell` implies the lock): a seed is only
     CONTEXT the model can ignore, and it does — it deletes the ground-floor slab + strips the roof (the
     "sem chão / sem telhado" defect) or emits a furniture-only delta that "keeps" the exterior by not
@@ -725,9 +749,10 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with
   registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic), **Decoration**
   (cozy/haunted/modern/farmhouse/sakura/gothic), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
-  cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern — required pick,
-  defaults to None; a non-None pick EXPANDS the compiled box beyond the user's W×D shell via
-  `buildBoxSize`, the composer size fields keep SHELL semantics) — plus, for a
+  cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern/garden — required
+  pick, defaults to None, filtered by the chosen structure's hosts; a non-None pick EXPANDS the
+  compiled box beyond the user's W×D shell via `buildBoxSize`, the composer size fields keep
+  SHELL semantics) — plus, for a
   storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
   room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
   are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per

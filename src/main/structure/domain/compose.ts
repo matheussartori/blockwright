@@ -26,6 +26,7 @@ import {
   structureTypeIds,
   type RolePalette,
 } from './structure-types';
+import { insetHouseBox, yardFor } from './surroundings';
 import { box, type BuildArgs } from './structure-types/types';
 
 type Vec3 = [number, number, number];
@@ -311,13 +312,18 @@ export function composeStructure(
     if (b.H - bH >= 6) {
       const groundY = b.y0 + bH;
       const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
+      // With a surroundings ring the type insets its massing — the descent must land
+      // INSIDE the house, not out on the yard's lawn, so it targets the same inset
+      // (the shared yardFor, so a too-tight inset the type ignored is ignored here too).
+      const yard = yardFor(b, values);
+      const houseB = yard ? insetHouseBox(b, yard) : b;
       const ops = [
         // The vault fills the footprint below grade (forced rect so it spans the whole base).
         ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
         ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate }),
         // The descent carves through that slab last, so the stairwell opening survives.
-        ...basementDescent(b, groundY, palette),
+        ...basementDescent(houseB, groundY, palette),
       ];
       verifyModuleRespect(type, values, invoked, warn);
       return ops;

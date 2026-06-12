@@ -19,6 +19,9 @@ export interface SurroundMargins {
  *  own footprint = one entry here (the geometry file imports the same constants). */
 export const SURROUND_MARGINS: Record<string, SurroundMargins> = {
   modern: { front: 8, back: 4, side: 4 },
+  // The cottage homestead yard is deliberately ROOMY — the front holds the showcase
+  // (fountain/well + parterre beside the entry walk), the back holds the crop plots.
+  garden: { front: 9, back: 7, side: 7 },
 };
 
 /** The margins for a picked surroundings module, or null for none/'none'/unknown.

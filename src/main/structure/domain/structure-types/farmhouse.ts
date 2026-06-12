@@ -12,6 +12,7 @@ import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
 import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, storeyEntries } from './shell-kit';
 import { dormers, frontVeranda } from './farmhouse-parts';
+import { insetHouseBox, yardFor } from '../surroundings';
 import { box, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
 /** The L split + storey lines for a box+params — shared by `build()` and `floors()` so the
@@ -55,6 +56,12 @@ export const farmhouse: StructureType = {
       kind: 'enum', default: 'gable', values: ['gable', 'hip', 'flat'], label: 'Roof',
       labels: { gable: 'Gable', hip: 'Hip', flat: 'Flat' }, module: 'roof',
     },
+    // Surfaced as the "Surroundings" module select (hidden from the type's own Details
+    // controls like `roof`); a pick insets the house and delegates the yard ring.
+    surroundings: {
+      kind: 'enum', default: 'none', values: ['none', 'garden'], label: 'Surroundings',
+      labels: { none: 'None', garden: 'Garden' }, module: 'surroundings',
+    },
     decay: { kind: 'unit', default: 0 },
   },
   // Warm oak boards crossed by dark stripped-log framing, a dark slate roof, a stone base.
@@ -75,11 +82,18 @@ export const farmhouse: StructureType = {
     fence: 'minecraft:oak_fence',
     light: 'minecraft:lantern',
   },
-  floors(b, params, floorHeights): FloorPlanEntry[] {
+  floors(outer, params, floorHeights): FloorPlanEntry[] {
+    // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
+    const yard = yardFor(outer, params);
+    const b = yard ? insetHouseBox(outer, yard) : outer;
     const { slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
     return storeyEntries(slabYs, wallTop);
   },
-  build({ box: b, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, composeModule }) {
+    // A picked surroundings ring reserves the box's outer margins for the yard: the
+    // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
+    const yard = yardFor(outer, params);
+    const b = yard ? insetHouseBox(outer, yard) : outer;
     const { x0, y0, z0, x1, y1, z1 } = b;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'gable';
@@ -96,6 +110,11 @@ export const farmhouse: StructureType = {
     const lantern = palette.get('light', { hanging: 'true' });
 
     const ops: AuthoringOp[] = [];
+
+    // The yard first (it never overlaps the inset house, so order is cosmetic).
+    if (yard) {
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+    }
 
     // --- Foundation + per-storey floor slabs over the L union (main ∪ back wing) -------
     const slab = (y: number, st: number): void => {

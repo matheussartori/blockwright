@@ -15,6 +15,7 @@ import type { AuthoringOp } from '../../authoring/types';
 import { DEFAULT_STOREY_H, planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
 import type { ParamValues } from '../params';
+import { insetHouseBox, yardFor } from '../surroundings';
 import type { Box, FloorPlanEntry, StructureType } from './types';
 import { logProps } from './types';
 import { addStairCore } from './stair-core';
@@ -94,6 +95,13 @@ export const classic: StructureType = {
       kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip', 'flat'], label: 'Roof',
       labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip', flat: 'Flat' }, module: 'roof',
     },
+    // Surfaced as the "Surroundings" module select (hidden from the type's own Details
+    // controls like `roof`). A non-'none' pick INSETS the house by the shared ring
+    // margins and delegates the yard geometry to that surroundings module.
+    surroundings: {
+      kind: 'enum', default: 'none', values: ['none', 'garden'], label: 'Surroundings',
+      labels: { none: 'None', garden: 'Garden' }, module: 'surroundings',
+    },
     decay: { kind: 'unit', default: 0.2 },
   },
   defaults: {
@@ -109,7 +117,11 @@ export const classic: StructureType = {
     fence: 'minecraft:spruce_fence',
     light: 'minecraft:lantern',
   },
-  build({ box, params, palette, seed, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, seed, floorHeights, composeModule }) {
+    // A picked surroundings ring reserves the box's outer margins for the yard: the
+    // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
+    const yard = yardFor(outer, params);
+    const box = yard ? insetHouseBox(outer, yard) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
     const basement = params.basement as string;
@@ -148,6 +160,12 @@ export const classic: StructureType = {
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
     const cz = Math.floor((z0 + z1) / 2);
+
+    // The yard first (it never overlaps the inset house, so order is cosmetic — laying
+    // it first means any future overlap resolves in the house's favour).
+    if (yard) {
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+    }
 
     // --- Level plan (shared with floors() via plan()) ---------------------------
     const canPitch = palette.idOf('roof').endsWith('_stairs');
@@ -314,7 +332,10 @@ export const classic: StructureType = {
   },
   // Authoritative storeys, from the SAME plan() build() uses (basement → ground →
   // uppers) — so the viewer bands / sidecar / stairwell pass see the laid planes.
-  floors(b: Box, params, floorHeights): FloorPlanEntry[] {
+  floors(outer: Box, params, floorHeights): FloorPlanEntry[] {
+    // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
+    const yard = yardFor(outer, params);
+    const b = yard ? insetHouseBox(outer, yard) : outer;
     const { hasBasement, slabYs, wallTop } = plan(b, params, floorHeights);
     const entries = storeyEntries(slabYs, wallTop);
     return hasBasement
