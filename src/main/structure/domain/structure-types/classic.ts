@@ -235,12 +235,14 @@ export const classic: StructureType = {
         for (const c of winCells(z, wy, x1, 'z')) ops.push({ op: 'block', pos: c, state: win });
       }
     }
-    // A half-submerged basement gets a high clerestory window band for daylight.
+    // A half-submerged basement gets a high clerestory band for daylight — barred
+    // (iron bars, never glass: the below-grade opening rule applies to code shells too).
     if (hasBasement && basement === 'half' && groundY - 1 > y0 + 1) {
       const wy = groundY - 1;
+      const bars = palette.get('bars');
       for (const x of winX) {
-        ops.push({ op: 'block', pos: [x, wy, z0], state: win });
-        ops.push({ op: 'block', pos: [x, wy, z1], state: win });
+        ops.push({ op: 'block', pos: [x, wy, z0], state: bars });
+        ops.push({ op: 'block', pos: [x, wy, z1], state: bars });
       }
     }
 

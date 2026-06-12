@@ -75,24 +75,32 @@ export function frontVeranda(box: Box, palette: RolePalette, plan: Plan): Author
   ops.push({ op: 'line', from: [Math.min(right, cx + 2), y0 + 1, z0], to: [right, y0 + 1, z0], state: fence });
   if (hasGallery) ops.push({ op: 'line', from: [left, upperFloorY! + 1, z0], to: [right, upperFloorY! + 1, z0], state: fence });
 
-  // 3. Colonnade: timber posts at the front edge running the full porch/gallery height
-  //    (the centre bay stays clear for the entry). A beam lintel ties the portal jambs.
-  const frontPosts = new Set<number>([left, right, cx - 2, cx + 2]);
-  for (let x = left; x <= right; x += 3) frontPosts.add(x);
-  frontPosts.delete(cx); // keep the doorway clear
+  // 3. Colonnade: the host's corner posts are the ends; between them, the two portal
+  //    jambs (cx±2) + evenly spaced intermediates so every bay is a REGULAR 2–4 cells —
+  //    never a doubled post or a 1-wide sliver (the "random timber" facade defect).
+  //    A beam lintel ties the portal jambs.
+  const jambL = cx - 2, jambR = cx + 2;
+  const frontPosts = new Set<number>([jambL, jambR]);
+  for (const [a, b] of [[x0, jambL], [jambR, x1]] as [number, number][]) {
+    const k = Math.ceil((b - a) / 5) - 1; // intermediates so no bay exceeds 4 cells
+    for (let i = 1; i <= k; i++) frontPosts.add(a + Math.round((i * (b - a)) / (k + 1)));
+  }
   for (const x of frontPosts) {
     if (x > x0 && x < x1) ops.push({ op: 'fill', from: [x, y0 + 1, z0], to: [x, postTop, z0], state: post });
   }
-  ops.push({ op: 'line', from: [cx - 2, groundTop, z0], to: [cx + 2, groundTop, z0], state: beam }); // portal lintel
+  ops.push({ op: 'line', from: [jambL, groundTop, z0], to: [jambR, groundTop, z0], state: beam }); // portal lintel
 
-  // 4. The front door + flanking big windows, re-seated on the new inner facade.
+  // 4. The front door + a window centred in each side bay of the new inner facade (in
+  //    the open span between posts, never hidden behind one).
   ops.push(...door(palette, cx, y0 + 1, innerZ));
-  for (const dx of [-2, 2]) {
-    const wx = cx + dx;
-    if (wx > left && wx < right) {
-      ops.push({ op: 'block', pos: [wx, y0 + 1, innerZ], state: win });
-      ops.push({ op: 'block', pos: [wx, y0 + 2, innerZ], state: win });
-    }
+  const cols = [x0, ...[...frontPosts].filter((x) => x > x0 && x < x1).sort((p, q) => p - q), x1];
+  for (let i = 0; i + 1 < cols.length; i++) {
+    const a = cols[i], b = cols[i + 1];
+    if (a >= jambL && b <= jambR) continue; // the portal bay keeps the doorway clear
+    if (b - a < 3) continue; // no open cell wide enough for a framed window
+    const wx = Math.floor((a + b) / 2);
+    ops.push({ op: 'block', pos: [wx, y0 + 1, innerZ], state: win });
+    ops.push({ op: 'block', pos: [wx, y0 + 2, innerZ], state: win });
   }
 
   // 5. Porch comforts: stair "chairs" facing the yard + lanterns hung from the porch roof.

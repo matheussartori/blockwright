@@ -97,14 +97,17 @@ export const sakura: StructureType = {
     const isFlat = roofShape === 'flat';
     const { baseH, mainY, slabYs, wallTop } = plan(box, floors, isFlat, floorHeights);
 
-    // --- Visible stone basement (ground slab + plinth ring + small windows) -----------
+    // --- Visible stone basement (ground slab + plinth ring + barred vents) ------------
+    // Basement openings are ALWAYS iron bars, never glass — a pane in a cellar wall
+    // reads wrong (the below-grade rule in 05-building-houses applies to code shells too).
+    const bars = palette.get('bars');
     ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, z1], state: base });          // ground slab
     ops.push({ op: 'walls', from: [x0, y0, z0], to: [x1, mainY, z1], state: base });        // plinth ring
     ops.push({ op: 'fill', from: [x0, mainY, z0], to: [x1, mainY, z1], state: floorIdx });   // raised floor
     const bwy = y0 + Math.max(1, Math.floor(baseH / 2));
-    ops.push({ op: 'block', pos: [x0, bwy, cz], state: win });
-    ops.push({ op: 'block', pos: [x1, bwy, cz], state: win });
-    ops.push({ op: 'block', pos: [cx, bwy, z1], state: win });
+    ops.push({ op: 'block', pos: [x0, bwy, cz], state: bars });
+    ops.push({ op: 'block', pos: [x1, bwy, cz], state: bars });
+    ops.push({ op: 'block', pos: [cx, bwy, z1], state: bars });
 
     // --- Cherry living shell over the base (kit: posts + storey slabs) ------------------
     ops.push({ op: 'walls', from: [x0, mainY, z0], to: [x1, wallTop, z1], state: wall });
@@ -119,6 +122,9 @@ export const sakura: StructureType = {
     // --- Raised front entry reached by an exterior stone stair -------------------------
     // The cherry upper storey overhangs the stair, so the entry is covered + recessed
     // (the move that reads "sakura" — the climb up to a raised door, like the references).
+    // The recess is a SEALED exterior alcove: side walls, stone backing below the door
+    // and a soffit close the bay off from the rooms, so the door is the real in/out
+    // boundary — never a freestanding stub the interior can walk around.
     const run = Math.max(1, Math.min(baseH, D - 3));
     const entryZ = z0 + run; // the recessed entry facade plane
     if (W >= 5 && entryZ < z1) {
@@ -126,11 +132,17 @@ export const sakura: StructureType = {
       for (let i = 0; i < run; i++) {
         ops.push({ op: 'fill', from: [cx - 1, y0 + i, z0 + i], to: [cx + 1, y0 + i, z0 + i], state: base }); // stone steps climbing inward
       }
+      for (const sx of [cx - 2, cx + 2]) { // alcove side walls: stone shaft below, cherry above
+        ops.push({ op: 'fill', from: [sx, y0 + 1, z0 + 1], to: [sx, mainY - 1, entryZ], state: base });
+        ops.push({ op: 'fill', from: [sx, mainY, z0 + 1], to: [sx, mainY + 3, entryZ], state: wall });
+      }
+      ops.push({ op: 'fill', from: [cx - 1, y0 + 1, entryZ], to: [cx + 1, mainY - 1, entryZ], state: base }); // seal the cellar behind the climb
+      ops.push({ op: 'fill', from: [cx - 1, mainY + 3, z0 + 1], to: [cx + 1, mainY + 3, entryZ], state: floorIdx }); // alcove soffit
       ops.push({ op: 'fill', from: [cx - 1, mainY, entryZ], to: [cx + 1, mainY + 2, entryZ], state: wall }); // recessed facade
       ops.push({ op: 'fill', from: [cx, mainY + 1, entryZ], to: [cx, mainY + 2, entryZ], state: air });      // door slot
       ops.push(...seatDoor(palette, cx, mainY + 1, entryZ));
       for (const px of [cx - 1, cx + 1]) ops.push({ op: 'fill', from: [px, mainY, z0], to: [px, mainY + 2, z0], state: post }); // overhang posts
-      ops.push({ op: 'block', pos: [cx, Math.min(mainY + 3, wallTop), z0 + 1], state: lantern });
+      if (run >= 2) ops.push({ op: 'block', pos: [cx, mainY + 2, entryZ - 1], state: lantern }); // hung from the soffit, over the landing
     } else {
       ops.push(...seatDoor(palette, cx, mainY + 1, z0));
     }

@@ -19,6 +19,7 @@ export type Role =
   | 'pillar'
   | 'roof' // a *_stairs block (the roof op climbs it)
   | 'window'
+  | 'bars' // a barred opening (basement/below-grade vents) — iron bars, never glass
   | 'glass'
   | 'door'
   | 'fence' // a *_fence block (balcony/landing rails; the connect pass joins its sides)
@@ -30,7 +31,7 @@ export type Role =
 /** Every role, as a runtime set — the single source for `isRole`. */
 export const ROLES: readonly Role[] = [
   'air', 'wall', 'floor', 'ceiling', 'foundation', 'corner', 'accent', 'trim',
-  'beam', 'pillar', 'roof', 'window', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'light',
+  'beam', 'pillar', 'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'light',
 ];
 
 const ROLE_SET = new Set<string>(ROLES);
@@ -58,6 +59,7 @@ export const BASE_BLOCKS: Record<Role, string> = {
   pillar: 'minecraft:oak_log',
   roof: 'minecraft:oak_stairs',
   window: 'minecraft:glass_pane',
+  bars: 'minecraft:iron_bars',
   glass: 'minecraft:glass',
   door: 'minecraft:oak_door',
   fence: 'minecraft:oak_fence',
