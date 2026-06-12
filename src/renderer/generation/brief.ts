@@ -13,12 +13,13 @@ import {
   MIN_STOREY_H,
   heightOverhead,
 } from '@/shared/domain/storeys';
+import { expandSizeForSurroundings } from '@/shared/domain/surroundings';
 
 /** Max interior rooms a single floor can be assigned in the composer. */
 export const ROOMS_PER_FLOOR = 2;
 
 /** The build modules the user picked for a fresh build: a structure type, one id per
- *  single-select module SLOT (decoration/roof/basement/attic/exterior — the per-slot
+ *  single-select module SLOT (decoration/roof/basement/attic/surroundings — the per-slot
  *  fields DERIVE from {@link ModuleSlotKey}, so a new category needs no edit here), the
  *  structure's tunable params, an optional size override, and the per-floor rooms. They
  *  describe WHAT to build as plain-language guidance AND ride along as a structured
@@ -223,6 +224,23 @@ export function effectiveSize(
   return base;
 }
 
+/** The compiled BUILD BOX for the picked details: the {@link effectiveSize} building
+ *  SHELL expanded by the selected surroundings ring's margins (identity when none is
+ *  picked). The composer's size fields keep SHELL semantics — the user's W×D is the
+ *  house — so the expansion happens only where the box is consumed: the structured
+ *  selection (the shell seed compiles at this size) and the brief/card.
+ *  @param d - The current Details state.
+ *  @param struct - The chosen structure module.
+ *  @returns The compiled box `{ w, d, h }` (≥ the shell on every axis). */
+export function buildBoxSize(
+  d: BuildDetails,
+  struct: GenerationModule | undefined,
+): { w: number; d: number; h: number } {
+  const sz = effectiveSize(d, struct);
+  const grown = expandSizeForSurroundings(sz.w, sz.d, d.surroundings);
+  return { w: grown.w, d: grown.d, h: sz.h };
+}
+
 /** The interior floor area (cells) one room gets on a storey: the build's interior
  *  footprint (W−2)×(D−2), split between the rooms that share the floor. This is what
  *  tiers the furnishing density (`scaleForArea`), so a big floor reads "grand" and a
@@ -297,8 +315,15 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
   const s = catalog?.structure.find((m) => m.id === d.structureType);
   const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
   const sz = effectiveSize(d, s);
+  const bx = buildBoxSize(d, s);
   const label = s?.label ?? d.structureType;
   const decoClause = deco ? ` with the "${deco.label}" decoration (its materials and mood)` : '';
+  // With a surroundings ring, the user's dimensions are the BUILDING SHELL — the
+  // compiled box is larger, and the outer margin belongs to the yard, not the house.
+  const sizeClause = bx.w !== sz.w || bx.d !== sz.d
+    ? `with a building shell of roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D) inside a ${bx.w}×${bx.h}×${bx.d} box — ` +
+      `the outer margin is the surroundings ring, NOT more house`
+    : `roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D)`;
   // Plain-language characteristics from the per-type params (floors/attic/…),
   // skipping internal-only knobs the user never sets as design intent.
   const traits = Object.entries(resolveDetailParams(d, s))
@@ -329,7 +354,7 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
   }
   return (
     `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +
-    `- Build a ${label}${decoClause}, roughly ${sz.w}×${sz.h}×${sz.d} (W×H×D).\n` +
+    `- Build a ${label}${decoClause}, ${sizeClause}.\n` +
     (traits ? `- Desired characteristics: ${traits}.\n` : '') +
     heightLine +
     slotLines +
@@ -348,13 +373,13 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
   const s = catalog?.structure.find((m) => m.id === d.structureType);
   const lbl = (cat: keyof GenerationCatalog, id: string) =>
     catalog?.[cat].find((m) => m.id === id)?.label ?? id;
-  const sz = effectiveSize(d, s);
+  const sz = buildBoxSize(d, s); // the card shows the compiled box (what actually gets built)
   const n = floorCount(s, resolveDetailParams(d, s));
   const floors = Array.from({ length: n }, (_, i) => ({
     name: `Floor ${i + 1}`,
     rooms: roomsOnFloor(d, i).map((id) => lbl('room', id)),
   }));
-  // One label per picked slot (decoration/roof/basement/attic/exterior) — generic over
+  // One label per picked slot (decoration/roof/basement/attic/surroundings) — generic over
   // MODULE_SLOTS so a new category's chip appears on the card automatically.
   const slotLabels: Partial<Record<ModuleSlotKey, string>> = {};
   for (const slot of MODULE_SLOTS) if (d[slot.key]) slotLabels[slot.key] = lbl(slot.key, d[slot.key]);
@@ -375,7 +400,9 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
 export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | null): BuildSelection {
   const rooms = [...new Set(d.rooms.flat().filter(Boolean))];
   const s = d.structureType ? catalog?.structure.find((m) => m.id === d.structureType) : undefined;
-  const sz = d.structureType ? effectiveSize(d, s) : undefined;
+  // The selection's size is the COMPILED box (shell + surroundings margins) — it's what
+  // a shell-seeded archetype compiles its starting shell at.
+  const sz = d.structureType ? buildBoxSize(d, s) : undefined;
   // One id per picked slot, generic over MODULE_SLOTS (only the set ones ride along, so an
   // unused module's guide is never loaded).
   const slots: Partial<Record<ModuleSlotKey, string>> = {};

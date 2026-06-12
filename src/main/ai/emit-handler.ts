@@ -230,6 +230,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       const authoritative = !floors?.length && selection?.structureType
         ? structureFloorPlan(selection.structureType, size, {
             roof: selection.roof,
+            surroundings: selection.surroundings,
             floorHeights: selection.floorHeights,
           })
         : [];

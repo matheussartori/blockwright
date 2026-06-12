@@ -31,6 +31,10 @@ export interface ShellSeedOptions {
   /** The selected basement-module id (cellar/crypt/cult-temple), threaded so the shell
    *  digs the chosen below-grade vault — composed centrally by `composeStructure`. */
   basement?: string;
+  /** The selected surroundings-module id, threaded so the shell wraps the house in its
+   *  yard ring (the `size` already includes the ring margins — see
+   *  `shared/domain/surroundings.ts`; the type insets its massing by the same margins). */
+  surroundings?: string;
   /** The user's explicit per-floor storey heights (slab-to-slab, bottom-up), threaded so
    *  the shell's storey ladder lays its decks at exactly those heights. */
   floorHeights?: number[];
@@ -58,7 +62,7 @@ export interface ShellSeed {
  * @returns A {@link ShellSeed}: the preamble plus the locked shell cells.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof, basement, floorHeights } = opts;
+  const { structureType, decoration, size, roof, basement, surroundings, floorHeights } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return { preamble: '' };
 
@@ -71,6 +75,9 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The basement-module id rides in as `params.basement`; composeStructure reserves the
   // bottom of the box for it and ladders it to the ground floor (central, per-type-free).
   if (basement && basement !== 'none') params.basement = basement;
+  // The surroundings-module id doubles as the structure's `surroundings` param value, so
+  // the type insets its massing and delegates the yard ring around it.
+  if (surroundings && surroundings !== 'none') params.surroundings = surroundings;
   // The user's per-floor heights ride in as a raw array param; composeStructure sanitizes
   // them and the type's storey ladder lays its decks at exactly those heights.
   if (floorHeights?.length) params.floorHeights = floorHeights;

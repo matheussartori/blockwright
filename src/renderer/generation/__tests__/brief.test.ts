@@ -3,6 +3,7 @@ import type { GenerationCatalog } from '@/shared/types';
 import {
   type BuildDetails,
   EMPTY_DETAILS,
+  buildBoxSize,
   buildBrief,
   buildRoomPlan,
   buildSelection,
@@ -41,6 +42,10 @@ const catalog: GenerationCatalog = {
   room: [
     { id: 'living', label: 'Living Room', category: 'room', description: '', hasPreview: false },
     { id: 'kitchen', label: 'Kitchen', category: 'room', description: '', hasPreview: false },
+  ],
+  // `modern` matches a real SURROUND_MARGINS entry so the box-expansion math is exercised.
+  surroundings: [
+    { id: 'modern', label: 'Modern', category: 'surroundings', description: '', hasPreview: true, appliesTo: ['house'] },
   ],
   groups: [{ id: 'house', label: 'House' }],
 };
@@ -139,6 +144,21 @@ describe('effectiveSize', () => {
     const d = details({ structureType: 'house', roof: 'flat', params: { floors: 2 }, floorHeights: [7, 4] });
     expect(effectiveSize(d, houseModule).h).toBe(7 + 4 + 2); // storeys + flat deck/parapet
   });
+  it('keeps SHELL semantics — a surroundings pick never inflates the user-facing size', () => {
+    const d = details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } });
+    expect(effectiveSize(d, houseModule)).toEqual({ w: 15, d: 13, h: 13 });
+  });
+});
+
+describe('buildBoxSize', () => {
+  it('is the effective size when no surroundings ring is picked', () => {
+    const d = details({ structureType: 'house', size: { w: 15, d: 13, h: 13 } });
+    expect(buildBoxSize(d, houseModule)).toEqual({ w: 15, d: 13, h: 13 });
+  });
+  it('expands the shell footprint by the ring margins (modern: +8 W, +12 D), height untouched', () => {
+    const d = details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } });
+    expect(buildBoxSize(d, houseModule)).toEqual({ w: 23, d: 25, h: 13 });
+  });
 });
 
 describe('buildBrief', () => {
@@ -169,6 +189,16 @@ describe('buildBrief', () => {
   it('omits the storey-height line in total-height mode (floorHeights null)', () => {
     const out = buildBrief(details({ structureType: 'house', params: { floors: 2 } }), catalog);
     expect(out).not.toContain('Storey heights');
+  });
+  it('with a surroundings pick, distinguishes the building SHELL from the larger box', () => {
+    const out = buildBrief(
+      details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } }),
+      catalog,
+    );
+    expect(out).toContain('building shell of roughly 15×13×13');
+    expect(out).toContain('inside a 23×13×25 box');
+    expect(out).toContain('Surroundings: a "Modern" yard');
+    expect(out).toContain('OPEN-AIR');
   });
 });
 
@@ -244,6 +274,12 @@ describe('buildSelection', () => {
     expect(buildSelection(details({ structureType: 'house' }), catalog).size).toHaveLength(3);
     // No structure picked → size is moot and must not drag a shell into a free-form build.
     expect(buildSelection(details({ structureType: '' }), catalog).size).toBeUndefined();
+  });
+  it('threads the EXPANDED box (shell + surroundings margins) as the selection size', () => {
+    const d = details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } });
+    const sel = buildSelection(d, catalog);
+    expect(sel.surroundings).toBe('modern');
+    expect(sel.size).toEqual([23, 13, 25]); // [W, H, D] — the shell seed compiles at this box
   });
   it('threads the per-floor heights only alongside a structure', () => {
     const d = details({ structureType: 'house', params: { floors: 2 }, floorHeights: [7, 4] });

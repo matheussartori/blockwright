@@ -11,6 +11,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import type { ParamValues } from '../params';
+import { insetHouseBox } from '../surroundings';
 import type { Box, FloorPlanEntry, StructureType } from './types';
 
 /** The modern villa's vertical levels for a box + floor count — the single source of its
@@ -44,6 +45,16 @@ function modernLevels(y0: number, y1: number, H: number, floors: number, roofRes
   const uH = twoStorey ? Math.max(4, Math.min(6, top - gTop - 1)) : 0;
   const uTop = twoStorey ? gTop + uH : gTop;
   return { gTop, twoStorey, uH, uTop };
+}
+
+/** The selected surroundings-ring id when it genuinely fits (the inset still leaves a
+ *  livable house footprint), else null. Shared by `build()` and `floors()` so the
+ *  massing and the storey math always agree on which box the HOUSE occupies. */
+function yardFor(outer: Box, params: ParamValues): string | null {
+  const id = typeof params.surroundings === 'string' ? params.surroundings : 'none';
+  if (id === 'none') return null;
+  const inner = insetHouseBox(outer, id);
+  return inner.W >= 7 && inner.D >= 7 ? id : null;
 }
 
 /** The set-back of the upper volume (front depth, one side) — derived from the footprint
@@ -121,6 +132,13 @@ export const modern: StructureType = {
       kind: 'enum', default: 'flat', values: ['flat', 'gable', 'hip'], label: 'Roof',
       labels: { flat: 'Flat', gable: 'Gable', hip: 'Hip' }, module: 'roof',
     },
+    // Surfaced as the "Surroundings" module select (hidden from the type's own Details
+    // controls like `roof`). A non-'none' pick INSETS the house by the shared ring
+    // margins and delegates the yard geometry to that surroundings module.
+    surroundings: {
+      kind: 'enum', default: 'none', values: ['none', 'modern'], label: 'Surroundings',
+      labels: { none: 'None', modern: 'Modern' }, module: 'surroundings',
+    },
     decay: { kind: 'unit', default: 0 }, // modern is always crisp
   },
   // A white-concrete / quartz / dark-accent / glass kit (used when the decoration is sparse;
@@ -145,7 +163,11 @@ export const modern: StructureType = {
     water: 'minecraft:water',
     light: 'minecraft:sea_lantern',
   },
-  build({ box, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, composeModule }) {
+    // A picked surroundings ring reserves the box's outer margins for the yard: the
+    // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
+    const yard = yardFor(outer, params);
+    const box = yard ? insetHouseBox(outer, yard) : outer;
     const { x0, y0, z0, x1, y1, z1, H } = box;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'flat';
@@ -164,6 +186,12 @@ export const modern: StructureType = {
 
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
+
+    // The yard first (it never overlaps the inset house, so order is cosmetic — laying
+    // it first means any future overlap resolves in the house's favour).
+    if (yard) {
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+    }
 
     // The house volume fills the whole footprint (the front pool yard was removed — a
     // water feature will return later as a separate, opt-in element).
@@ -242,15 +270,19 @@ export const modern: StructureType = {
   // flat-roofed villa's floors exactly, instead of the geometric detector mistaking its
   // stacked flat decks for extra storeys.
   floors(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[] {
+    // The SAME house-box inset build() applies: a surroundings ring narrows the footprint,
+    // and the pitched-roof reserve scales with the HOUSE's spans, not the full box's.
+    const yard = yardFor(box, params);
+    const b = yard ? insetHouseBox(box, yard) : box;
     const roofShape = (params.roof as string) ?? 'flat';
-    const reserve = modernRoofReserve(box, roofShape === 'gable' || roofShape === 'hip');
-    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number, reserve, floorHeights);
+    const reserve = modernRoofReserve(b, roofShape === 'gable' || roofShape === 'hip');
+    const { gTop, twoStorey } = modernLevels(b.y0, b.y1, b.H, params.floors as number, reserve, floorHeights);
     if (twoStorey) {
       return [
-        { from: box.y0, to: gTop - 1, role: 'ground' },
-        { from: gTop, to: box.y1, role: 'upper' },
+        { from: b.y0, to: gTop - 1, role: 'ground' },
+        { from: gTop, to: b.y1, role: 'upper' },
       ];
     }
-    return [{ from: box.y0, to: box.y1, role: 'ground' }];
+    return [{ from: b.y0, to: b.y1, role: 'ground' }];
   },
 };

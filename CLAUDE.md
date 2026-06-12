@@ -57,8 +57,8 @@ src/
       domain/              Composable generation: MODULES by CATEGORY (structure × decoration
                            crossed by the `template` op in the authoring compiler — the model emits
                            one op, the code produces the geometry — plus geometry-bearing roof/
-                           basement/attic modules and guidance-only interior `room` modules assigned
-                           per floor). See "Composable generation domain" below.
+                           basement/attic/surroundings modules and guidance-only interior `room`
+                           modules assigned per floor). See "Composable generation domain" below.
         modules.ts         ModuleMeta (id/label/category/description/knowledge/keywords/preview) — the
                            RICH build-bearing contract shared by every module + toSummary (project to the
                            wire shape). The renderer-facing shapes (`ModuleCategory`, `ModuleParam`,
@@ -70,12 +70,12 @@ src/
                            all/list) every category's index.ts is built on, so the per-category
                            lookup boilerplate exists once.
         categories.ts      The registry-of-registries: REGISTRIES (category→Registry) + getModule
-                           (category,id) and getGeometryModule (roof/basement/attic→GeometryModule),
+                           (category,id) and getGeometryModule (roof/basement/attic/surroundings→GeometryModule),
                            so a dynamic lookup is ONE map access, not a `category==='roof'?…` ternary
                            repeated across compose/preview/slot resolution.
         geometry-module.ts GeometryModule — the build shape (params/defaults/build/integrations)
-                           shared by RoofModule/BasementModule/AtticModule (they extend it + narrow
-                           category/appliesTo), declared ONCE instead of three identical copies.
+                           shared by RoofModule/BasementModule/AtticModule/SurroundingsModule (they extend
+                           it + narrow category/appliesTo), declared ONCE instead of N identical copies.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
         params.ts          ParamSpec/ParamDef + resolveParams + paramFields (single per-type param decl)
         compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
@@ -131,6 +131,19 @@ src/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
+        surroundings/      Category "surroundings": one file per yard typology (modern) + types.ts
+                           (SurroundingsModule, required `appliesTo`) + index.ts (registry +
+                           `insetHouseBox`). A GROUND-LEVEL landscaping RING laid OUTSIDE the building
+                           shell: the user's W×D is the SHELL, the compiled box grows by the shared
+                           `SURROUND_MARGINS` (`shared/domain/surroundings.ts` — same constants on both
+                           sides of IPC), the host structure INSETS its massing and delegates the ring
+                           via `composeModule('surroundings', …)`. The module re-derives the house
+                           footprint from the same margins, so host and ring always agree. Own palette
+                           over the decoration (like a basement — a lawn stays a lawn); ring stays ≤2
+                           cells tall (landscaping, never construction); leaves placed persistent.
+                           modern = pool terrace + stepped entry walk aligned with the door + hedge rim
+                           + planters + seeded bushes/bollards; `appliesTo: ['modern']` (the villa
+                           declares the `surroundings` param, marked `module:'surroundings'`).
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -418,8 +431,8 @@ relevant data is reachable (an active workspace, or the vanilla pack for `minecr
 ### Composable generation domain
 
 `structure/domain/` is the data-driven model behind the authoring `template` op. Everything
-is a **module** in one of six **categories** (`structure`, `decoration`, `basement`, `roof`,
-`attic`, `room` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
+is a **module** in one of seven **categories** (`structure`, `decoration`, `basement`, `roof`,
+`attic`, `room`, `surroundings` — `modules.ts` defines `ModuleCategory` + the shared `ModuleMeta`: id/label/description/
 knowledge/keywords/preview). The two live growth axes — **structure types** × **decorations**
 — combine without N×M code. A **StructureType** (`house`; more can be added) owns only the *massing*
 (shell, openings, structural detail) and emits ops in terms of **semantic roles** (`wall`,
@@ -467,7 +480,7 @@ decoration, and a new module is one small file.
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
   (the structure ids it pairs with — a growing link; omit = applies to all).
 - **The single-select module SLOTS are registry-driven** (`shared/domain/module-slots.ts`,
-  `MODULE_SLOTS` + `ModuleSlotKey` = decoration/roof/basement/attic — NOT structure,
+  `MODULE_SLOTS` + `ModuleSlotKey` = decoration/roof/basement/attic/surroundings — NOT structure,
   which is the grouped first pick, nor rooms, which are per-floor multi-select). This one list is
   the single source the brief (`buildBrief`/`buildSelection`/`buildSummary`/`hasDetails`), the
   Details selects (`DetailsSection` loops it), the build-card chips (`BuildCard`), and the
@@ -528,6 +541,19 @@ decoration, and a new module is one small file.
   in the always-on core guide `14-furnishing-by-space.md`, so a room guide never repeats it (no wasted tokens).
   **Add a room:** new `defineRoom({...})` file in `rooms/` + register in its `index.ts` + a
   `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
+- **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern): a
+  required single-select slot defaulting to **None**. The user's W×D stays the BUILDING SHELL —
+  a pick grows the compiled box by the module's `SURROUND_MARGINS` (shared constants in
+  `shared/domain/surroundings.ts`, so the renderer's `buildBoxSize` and the main-side inset can't
+  drift); the host structure lays its massing in `insetHouseBox(...)` and delegates the ring via
+  `composeModule('surroundings', …)` (module-respect verified). The ring is landscaping (≤2 cells
+  tall, open-air, persistent leaves) and ships with the seeded shell, so it's LOCKED like the rest
+  of the exterior; the model only adds outdoor detail (its knowledge guide spells the rules out).
+  Designed for in-world placement by a mod: the yard carries its own ground layer, so pair the
+  structure with `terrain_adaptation` (beard) at worldgen — true terrain conformity is a worldgen
+  concern, not an NBT one. **Add a surroundings module:** new file + register in its `index.ts`,
+  a `SURROUND_MARGINS` entry, `appliesTo` + a host structure that declares the `surroundings`
+  param value, + a `knowledge/nbt/modules/surroundings/<id>.md` guide.
 - **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: modern,
   farmhouse, sakura, gothic): the fix for "the style keeps coming out as a wooden pitched box." A
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
@@ -699,13 +725,15 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with
   registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic), **Decoration**
   (cozy/haunted/modern/farmhouse/sakura/gothic), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
-  cult-temple) and **Attic** (storage/bedroom) — plus, for a
+  cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern — required pick,
+  defaults to None; a non-None pick EXPANDS the compiled box beyond the user's W×D shell via
+  `buildBoxSize`, the composer size fields keep SHELL semantics) — plus, for a
   storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
   room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
   are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per
   floor (`buildRoomPlan`) — (NOT a `template` op for the FREE-FORM house; a seeded archetype instead seeds
   its shell, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
-  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`rooms`/`size`, the rooms deduped across
+  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`surroundings`/`rooms`/`size`, the rooms deduped across
   floors) so the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype
   compile its shell at the right box. Roof/Basement are enabled once a structure is chosen and are FILTERED

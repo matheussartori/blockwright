@@ -186,8 +186,9 @@ function runModuleGeometry(module: GeometryModule, host: string | undefined, arg
  *  - **roof** + **attic** reuse the caller's `hostPalette` — both are part of the host's
  *    material story (the house's roof should match its trim; the attic floor should match
  *    the house, since it's reached from inside it).
- *  - **basement** gets its OWN palette from the module's `defaults` (over the decoration) —
- *    a cellar is a self-contained stone space, independent of the host's (e.g. timber) walls.
+ *  - **basement** + **surroundings** get their OWN palette from the module's `defaults`
+ *    (over the decoration) — a cellar is a self-contained stone space and a yard is
+ *    landscaping (a lawn stays a lawn), independent of the host's walls.
  *  `rawParams`/`deco`/`intern` let the module resolve its param spec + palette consistently. */
 function makeModuleComposer(
   hostPalette: RolePalette,
@@ -196,7 +197,7 @@ function makeModuleComposer(
   rawParams: Record<string, unknown>,
   host: string | undefined,
   intern: Intern,
-  onInvoke?: (category: 'roof' | 'basement' | 'attic', id: string) => void,
+  onInvoke?: (category: 'roof' | 'basement' | 'attic' | 'surroundings', id: string) => void,
 ): BuildArgs['composeModule'] {
   // A const arrow that references itself, so a delegated module can delegate again.
   const delegate: BuildArgs['composeModule'] = (category, id, from, to, extra = {}) => {
@@ -220,18 +221,22 @@ function makeModuleComposer(
  *  visible compile warning instead of a quietly ignored pick. Checks the categories a
  *  type delegates by contract: a PITCHED roof pick (a flat cap can be a type's own
  *  identity geometry — the modern villa's terraces — so 'flat' isn't gated here; the
- *  shell kit's `roofFormFor` guarantees flat caps), the type's own `attic`/`basement`
- *  params. The centrally-composed basement path warns separately when it can't fit. */
+ *  shell kit's `roofFormFor` guarantees flat caps), the type's own `attic`/`basement`/
+ *  `surroundings` params. The centrally-composed basement path warns separately when it
+ *  can't fit. */
 function verifyModuleRespect(
   type: { id: string; params: Record<string, unknown> },
   values: ParamValues,
   invoked: ReadonlySet<string>,
   warn?: (message: string) => void,
 ): void {
-  const wanted: ['roof' | 'basement' | 'attic', string][] = [];
+  const wanted: ['roof' | 'basement' | 'attic' | 'surroundings', string][] = [];
   if (values.roof === 'gable' || values.roof === 'hip') wanted.push(['roof', values.roof]);
   if ('attic' in type.params && typeof values.attic === 'string' && values.attic !== 'none') wanted.push(['attic', values.attic]);
   if ('basement' in type.params && typeof values.basement === 'string' && values.basement !== 'none') wanted.push(['basement', values.basement]);
+  if ('surroundings' in type.params && typeof values.surroundings === 'string' && values.surroundings !== 'none') {
+    wanted.push(['surroundings', values.surroundings]);
+  }
   for (const [category, id] of wanted) {
     if (![...invoked].some((k) => k.startsWith(`${category}:`))) {
       warn?.(

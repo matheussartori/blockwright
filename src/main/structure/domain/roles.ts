@@ -26,12 +26,13 @@ export type Role =
   | 'ladder' // vertical access (e.g. into an attic) — a wall fixture, needs solid backing
   | 'water' // a fluid for pools/ponds (modern houses); decorations rarely remap it
   | 'plant' // decorative foliage/blossom (e.g. an exterior's roof-edge garland, window box)
+  | 'ground' // outdoor terrain surface (a surroundings ring's lawn) — grass, not flooring
   | 'light';
 
 /** Every role, as a runtime set — the single source for `isRole`. */
 export const ROLES: readonly Role[] = [
   'air', 'wall', 'floor', 'ceiling', 'foundation', 'corner', 'accent', 'trim',
-  'beam', 'pillar', 'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'light',
+  'beam', 'pillar', 'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'ground', 'light',
 ];
 
 const ROLE_SET = new Set<string>(ROLES);
@@ -66,5 +67,6 @@ export const BASE_BLOCKS: Record<Role, string> = {
   ladder: 'minecraft:ladder',
   water: 'minecraft:water',
   plant: 'minecraft:oak_leaves',
+  ground: 'minecraft:grass_block',
   light: 'minecraft:lantern',
 };

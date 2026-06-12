@@ -19,7 +19,7 @@ import type { ModuleSlotKey } from '@/shared/domain/module-slots';
 import type { GenerationModule } from '@/shared/types';
 
 /** The single-value Details selects driven by `setDetailField`: the structure pill plus
- *  every single-select module slot (decoration/roof/basement/attic/exterior). */
+ *  every single-select module slot (decoration/roof/basement/attic/surroundings). */
 export type DetailField = 'structureType' | ModuleSlotKey;
 
 /** The roof id that leaves no roof void, so it cannot host an attic (see the `flat` roof

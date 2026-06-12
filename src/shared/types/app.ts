@@ -56,7 +56,7 @@ export interface CatalogBlock {
 }
 
 /** The generation module categories. */
-export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room';
+export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room' | 'surroundings';
 
 /** A structure type's tunable param, projected for the composer's Details controls. */
 export type ModuleParam =
@@ -117,6 +117,8 @@ export interface GenerationCatalog {
   attic: GenerationModule[];
   /** Interior room modules (living/kitchen/library/…) assigned per floor. */
   room: GenerationModule[];
+  /** Surroundings modules (yard/pool/landscaping rings laid OUTSIDE the shell). */
+  surroundings: GenerationModule[];
   /** Structure families, for the gallery rail headers + Details optgroups. */
   groups: GenerationGroup[];
 }

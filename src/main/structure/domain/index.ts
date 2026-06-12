@@ -17,6 +17,7 @@ import { basementModules, listBasements } from './basements';
 import { listRoofs, roofModules } from './roofs';
 import { atticModules, listAttics } from './attics';
 import { getRoom, listRooms, roomModules } from './rooms';
+import { getSurroundings, listSurroundings, surroundingsModules } from './surroundings';
 import type { ModuleCategory, ModuleMeta } from './modules';
 import {
   getStructureType,
@@ -60,6 +61,7 @@ export { listBasements, getBasement, type BasementModule } from './basements';
 export { listRoofs, getRoof, type RoofModule } from './roofs';
 export { listAttics, getAttic, type AtticModule } from './attics';
 export { listRooms, getRoom, type RoomModule } from './rooms';
+export { listSurroundings, getSurroundings, insetHouseBox, type SurroundingsModule } from './surroundings';
 export { ROLES, isRole, type Role } from './roles';
 export { paramFields } from './params';
 export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpec } from './modules';
@@ -82,6 +84,7 @@ export function listModuleCatalog(): ModuleCatalog {
     roof: listRoofs(),
     attic: listAttics(),
     room: listRooms(),
+    surroundings: listSurroundings(),
     groups: STRUCTURE_GROUPS,
   };
 }
@@ -126,6 +129,7 @@ function allModules(): ModuleMeta[] {
     ...basementModules(),
     ...atticModules(),
     ...roomModules(),
+    ...surroundingsModules(),
   ];
 }
 
@@ -207,6 +211,30 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     const palette: AuthoringPaletteEntry[] = [];
     const ops: AuthoringOp[] = composeModulePreview(category, id, [0, 0, 0], [w - 1, h - 1, d - 1], localIntern(palette));
     return { DataVersion: 3955, size: [w, h, d], palette, ops };
+  }
+  if (category === 'surroundings') {
+    // A yard only reads in context: render the module's first applicable host STRUCTURE
+    // with the ring selected, via a normal `template` op (the host insets itself and
+    // delegates the ring, exactly as a real build would).
+    const meta = getSurroundings(id);
+    if (!meta?.preview) return null;
+    const host = meta.appliesTo.map(getStructureType).find((t) => t !== undefined);
+    if (!host) return null;
+    const [w, h, d] = meta.preview.size;
+    return {
+      DataVersion: 3955,
+      size: [w, h, d],
+      palette: [{ Name: 'minecraft:air' }],
+      ops: [
+        {
+          op: 'template',
+          name: host.id,
+          from: [0, 0, 0],
+          to: [w - 1, h - 1, d - 1],
+          params: { decoration: host.pairedDecoration ?? DEFAULT_DECORATION, surroundings: id, ...meta.preview.params },
+        },
+      ],
+    };
   }
 
   let meta: ModuleMeta | undefined;

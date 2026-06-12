@@ -17,7 +17,7 @@ import type { MessageKey } from '../i18n';
 /** The single-select module categories, by field key. Adding a category = add it here,
  *  add a `MODULE_SLOTS` entry, add the `GenerationCatalog` array + the registry, and ship
  *  the module — the brief/selection/card/Details/guides then pick it up automatically. */
-export type ModuleSlotKey = 'decoration' | 'roof' | 'basement' | 'attic';
+export type ModuleSlotKey = 'decoration' | 'roof' | 'basement' | 'attic' | 'surroundings';
 
 /** One single-select module category's presentation + behaviour, consumed by every
  *  generic loop over the slots. */
@@ -70,5 +70,16 @@ export const MODULE_SLOTS: ModuleSlot[] = [
     filtered: true,
     affectsSize: true,
     brief: (l) => `- Attic: a ${l} in the roof void (see its module guide).\n`,
+  },
+  {
+    key: 'surroundings',
+    fieldLabel: 'gen.fieldSurroundings',
+    neutral: 'gen.optNone',
+    filtered: true,
+    affectsSize: true,
+    brief: (l) =>
+      `- Surroundings: a "${l}" yard wraps the building OUTSIDE its walls (code-built: pool, ` +
+      `entry path, hedges, planting). Keep that ring OPEN-AIR — never roof, wall in or floor over ` +
+      `it, never fill the pool — and only ADD outdoor detail there (loungers, potted plants, lights).\n`,
   },
 ];

@@ -10,7 +10,7 @@ export interface GenerateImage {
 }
 
 /** The modules the user picked in the composer Details: a structure type plus one id per
- *  single-select module SLOT (decoration/roof/basement/attic/exterior — the per-slot
+ *  single-select module SLOT (decoration/roof/basement/attic/surroundings — the per-slot
  *  fields are DERIVED from {@link ModuleSlotKey}, so adding a category adds the field
  *  here automatically). Threaded into generation as STRUCTURED data — separate from the
  *  prompt text — so the system prompt loads only the selected modules' knowledge guides. */

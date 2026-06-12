@@ -14,6 +14,7 @@ describe('category dispatch (registry-of-registries)', () => {
       ['basement', 'cellar'],
       ['attic', 'storage'],
       ['room', 'kitchen'],
+      ['surroundings', 'modern'],
     ];
     for (const [cat, id] of cases) {
       const m = getModule(cat, id);
@@ -29,7 +30,7 @@ describe('category dispatch (registry-of-registries)', () => {
   });
 
   it('every catalog module is reachable through getModule (dispatch ⇄ catalog parity)', () => {
-    const categories: ModuleCategory[] = ['structure', 'decoration', 'roof', 'basement', 'attic', 'room'];
+    const categories: ModuleCategory[] = ['structure', 'decoration', 'roof', 'basement', 'attic', 'room', 'surroundings'];
     for (const cat of categories) {
       for (const m of catalog[cat]) {
         expect(getModule(cat, m.id)?.id, `${cat}/${m.id}`).toBe(m.id);
@@ -38,7 +39,7 @@ describe('category dispatch (registry-of-registries)', () => {
   });
 
   it('getGeometryModule exposes the build hooks for geometry categories', () => {
-    const geom: GeometryCategory[] = ['roof', 'basement', 'attic'];
+    const geom: GeometryCategory[] = ['roof', 'basement', 'attic', 'surroundings'];
     for (const cat of geom) {
       const first = catalog[cat][0];
       const m = getGeometryModule(cat, first.id);

@@ -76,6 +76,11 @@ export const dataPtBR: Record<string, string> = {
   'mod.attic.bedroom.desc':
     'Um sótão-quarto acabado no vão do telhado: o espaço da empena assoalhado com tábuas de verdade como um aconchegante quarto no andar de cima — uma cama sob a inclinação, um tapete e uma mesa de apoio — acessado por uma escada de mão do último andar. Precisa de um telhado inclinado (fica no vão por baixo).',
 
+  // --- surroundings ----------------------------------------------------------
+  'mod.surroundings.modern.label': 'Moderno',
+  'mod.surroundings.modern.desc':
+    'O terreno da vila contemporânea envolvendo a casa: um terraço de quartzo branco na frente com uma piscina rebaixada iluminada por lanternas, um caminho de entrada alinhado com a porta (bordas escuras, luzes embutidas, um degrau de soleira na borda da rua), floreiras brancas, uma cerca viva aparada em volta de todo o quintal, e arbustos + balizadores de luz nos gramados. A caixa da construção cresce além do casco da casa para abrigar o anel.',
+
   // --- tunable params -------------------------------------------------------
   'param.floors.label': 'Andares',
   'param.balcony.label': 'Varanda',

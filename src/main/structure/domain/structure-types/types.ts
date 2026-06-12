@@ -77,14 +77,15 @@ export interface BuildArgs {
    *  Undefined for a structure type building itself, or a context-free preview. */
   host?: string;
   /**
-   * Delegate a region's geometry to a roof/basement MODULE — so a structure type
-   * OWNS placement (where the roof/basement box is) while the module OWNS the geometry
-   * (the single source of that typology's shape). The module runs against THIS build's
-   * palette + seed with the calling structure as `host`, so its materials match the
-   * structure's kit + decoration and its host-specific integration (e.g. gable-end
+   * Delegate a region's geometry to a roof/basement/surroundings MODULE — so a structure
+   * type OWNS placement (where the roof/basement/yard box is) while the module OWNS the
+   * geometry (the single source of that typology's shape). The module runs against THIS
+   * build's palette + seed with the calling structure as `host`, so its materials match
+   * the structure's kit + decoration and its host-specific integration (e.g. gable-end
    * vents) is included. Injected by the compose layer (see `composeStructure`).
    *
-   * @param category - 'roof', 'basement' or 'attic' (which module registry to resolve `id`).
+   * @param category - 'roof', 'basement', 'attic' or 'surroundings' (which module
+   *   registry to resolve `id`).
    * @param id - The module id (e.g. 'gable', 'cellar', 'bedroom').
    * @param from - One corner of the box the module builds into [x, y, z].
    * @param to - The opposite corner of that box [x, y, z].
@@ -94,7 +95,7 @@ export interface BuildArgs {
    *   is unknown / has no geometry.
    */
   composeModule(
-    category: 'roof' | 'basement' | 'attic',
+    category: 'roof' | 'basement' | 'attic' | 'surroundings',
     id: string,
     from: [number, number, number],
     to: [number, number, number],
