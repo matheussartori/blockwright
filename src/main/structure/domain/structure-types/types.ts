@@ -156,8 +156,11 @@ export interface StructureType extends ModuleMeta {
   /** When true, a FRESH AI build of this type is SEEDED with this type's code-built shell
    *  (compiled via `build()` at the requested size + decoration) instead of being left
    *  fully free-form — the model keeps the exterior massing and only furnishes/details it.
-   *  Used for archetypes the model can't reliably invent (the modern villa: flat roofs,
-   *  stacked volumes, glass, pool). The house stays free-form (omit → no shell seed).
+   *  The model can't reliably invent a silhouette from prose (the modern villa: flat
+   *  roofs, stacked volumes, glass, pool), so EVERY house type opts in — the classic
+   *  included, whose variety comes from its own seeded shell (windows/corners/roof/
+   *  chimney vary per seed), not from free-form. Free-form remains the path when no
+   *  structure is selected at all (omit → no shell seed).
    *
    *  Every seeded shell is also LOCKED: a compile pass (`preserveShell`) restores any
    *  shell cell the model deleted (turned to air), so the AI can't gut the exterior. The

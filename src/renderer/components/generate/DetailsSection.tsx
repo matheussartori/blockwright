@@ -71,12 +71,16 @@ export function DetailsSection({
 
   // STEP 1 — no structure yet: just the structure chooser. Everything else hangs off
   // this pick, so showing it alone keeps the first decision clear. The choices carry a
-  // short description (the module's own summary), shown under each option in the dropdown.
+  // short description (the module's own summary), shown under each option in the dropdown,
+  // and their FAMILY (the structure group, e.g. "House") — the menu headers each group
+  // and a search result keeps the group name on the row.
   if (!details.structureType) {
+    const groupLabel = (gid?: string) => catalog?.groups?.find((g) => g.id === gid)?.label;
     const structOptions: SelectOption[] = (catalog?.structure ?? []).map((m) => ({
       value: m.id,
       label: m.label,
       description: m.description,
+      group: groupLabel(m.group),
     }));
     return (
       <div className="gen-details">
@@ -93,6 +97,9 @@ export function DetailsSection({
             onChange={(id) => onField('structureType', id)}
             disabled={busy}
             ariaLabel={t('gen.fieldStructure')}
+            searchable
+            searchPlaceholder={t('gen.selectSearch')}
+            noResultsLabel={t('gen.selectNoResults')}
           />
         </div>
         <p className="gen-details-foot">{galleryLink}</p>

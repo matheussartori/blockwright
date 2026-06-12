@@ -4,17 +4,21 @@
 // stair threshold at the street edge), white-concrete PLANTERS flanking the approach,
 // a manicured HEDGE rim around the whole yard, and seeded bushes + light bollards over
 // the side/back lawns. Everything stays at ground level (max 2 cells tall) so the ring
-// reads as landscaping, never as construction.
+// reads as landscaping, never as construction. The yard's corners are cut by SEEDED
+// chamfers (see outline.ts) and the lawn/terrace are clipped to that outline, so the
+// grounds are never a plain rectangle and no two builds share a footprint.
 //
 // The geometry covers the RING ONLY: the host structure insets its massing by the shared
-// `SURROUND_MARGINS` and hands over the FULL box, so this module re-derives the house
-// footprint from the same constants — both sides agree by construction, no extras needed.
-// All blocks are semantic roles; the module's own kit wins over the decoration (like a
-// basement) so the lawn/hedge survive any look.
+// scaled margins and hands over the FULL box, so this module re-derives the house
+// footprint from the same function — both sides agree by construction, no extras needed.
+// The margins SCALE with the house (`shared/domain/surroundings.ts`): a bigger villa
+// earns wider grounds. All blocks are semantic roles; the module's own kit wins over the
+// decoration (like a basement) so the lawn/hedge survive any look.
 import type { AuthoringOp } from '../../authoring/types';
-import { SURROUND_MARGINS } from '@/shared/domain/surroundings';
+import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import { mulberry32 } from '../rng';
 import type { Box, RolePalette } from '../structure-types/types';
+import { inCut, rimCells, seededChamfers } from './outline';
 import type { SurroundingsModule } from './types';
 
 /** Hedges/bushes must not despawn in-game — every leaf is placed persistent. */
@@ -43,7 +47,8 @@ function poolRect(b: Box, cx: number, hz0: number): { x0: number; x1: number; z0
 }
 
 /** Seeded bush scatter over a lawn strip: low leaf clumps (some 2-high), inset one
- *  cell from the box rim so they never merge into the perimeter hedge. */
+ *  cell from the box rim so they never merge into the perimeter hedge, and never in
+ *  a cut corner (no lawn there). */
 function scatterBushes(
   ops: AuthoringOp[],
   b: Box,
@@ -51,10 +56,11 @@ function scatterBushes(
   gy: number,
   bush: number,
   rnd: () => number,
+  cut: (x: number, z: number) => boolean,
 ): void {
   for (let x = Math.max(strip.x0, b.x0 + 1); x <= Math.min(strip.x1, b.x1 - 1); x++) {
     for (let z = Math.max(strip.z0, b.z0 + 1); z <= Math.min(strip.z1, b.z1 - 1); z++) {
-      if (rnd() >= 0.1) continue;
+      if (rnd() >= 0.1 || cut(x, z)) continue;
       ops.push({ op: 'block', pos: [x, gy + 1, z], state: bush });
       if (rnd() < 0.3) ops.push({ op: 'block', pos: [x, gy + 2, z], state: bush });
     }
@@ -76,6 +82,8 @@ export const modern: SurroundingsModule = {
     'front with a recessed, lantern-lit pool, a stepped entry walk aligned with the door ' +
     '(dark edging, in-floor lights, a stair threshold at the street edge), white planters, ' +
     'a manicured hedge around the whole yard, and bushes + light bollards over the lawns. ' +
+    'The grounds scale with the house — a bigger villa earns a wider ring — and the ' +
+    'hedge outline is chamfered by seed, so the yard is never a plain rectangle. ' +
     'The build box grows beyond the house shell to fit the ring.',
   knowledge: 'nbt/modules/surroundings/modern.md',
   appliesTo: ['modern'],
@@ -94,10 +102,11 @@ export const modern: SurroundingsModule = {
     water: 'minecraft:water',
     light: 'minecraft:sea_lantern',
   },
-  // GENERIC over the FULL box: the house footprint is re-derived from the shared margins
-  // (the host inset itself by the same constants), the ring around it is the yard.
+  // GENERIC over the FULL box: the house footprint is re-derived from the shared scaled
+  // margins (the host inset itself by the same function), the ring around it is the yard.
   build({ box: b, palette, seed }): AuthoringOp[] {
-    const m = SURROUND_MARGINS.modern;
+    const m = surroundMarginsForOuter('modern', b.W, b.D);
+    if (!m) return [];
     const hx0 = b.x0 + m.side, hx1 = b.x1 - m.side;
     const hz0 = b.z0 + m.front, hz1 = b.z1 - m.back;
     if (hx1 - hx0 < 2 || hz1 - hz0 < 2) return []; // no house footprint left — nothing to wrap
@@ -110,21 +119,37 @@ export const modern: SurroundingsModule = {
     const hedge = palette.get('plant', LEAF);
     const water = palette.get('water');
     const light = palette.get('light');
-    const air = palette.air();
     const ops: AuthoringOp[] = [];
+    const rnd = mulberry32(seed);
 
-    // --- Lawn base: the whole ring at ground level ------------------------------------
+    // The seeded chamfered outline — scaled with the ring's margins. Cells beyond it
+    // get NOTHING, so the grounds' footprint is never the plain rectangle.
+    const ch = seededChamfers(rnd, m, 2, 4);
+    const cut = (x: number, z: number): boolean => inCut(b, ch, x, z);
+
+    // --- Lawn base: the ring at ground level, clipped to the chamfered outline --------
     const strips = lawnStrips(b, hx0, hx1, hz0, hz1);
-    for (const s of strips) ops.push({ op: 'fill', from: [s.x0, gy, s.z0], to: [s.x1, gy, s.z1], state: lawn });
-
-    // --- Front terrace: a quartz deck across the entry face (inside the hedge row) ----
-    if (hz0 - 1 >= b.z0 + 1) {
-      ops.push({ op: 'fill', from: [b.x0 + 1, gy, b.z0 + 1], to: [b.x1 - 1, gy, hz0 - 1], state: deck });
+    for (const s of strips) {
+      for (let x = s.x0; x <= s.x1; x++) {
+        for (let z = s.z0; z <= s.z1; z++) {
+          if (!cut(x, z)) ops.push({ op: 'block', pos: [x, gy, z], state: lawn });
+        }
+      }
     }
 
-    // --- Perimeter hedge: a clipped leaf rim around the whole yard, gapped at the walk -
-    ops.push({ op: 'walls', from: [b.x0, gy + 1, b.z0], to: [b.x1, gy + 1, b.z1], state: hedge });
-    ops.push({ op: 'fill', from: [cx - 1, gy + 1, b.z0], to: [cx + 1, gy + 1, b.z0], state: air });
+    // --- Front terrace: a quartz deck across the entry face (inside the hedge row) ----
+    for (let x = b.x0 + 1; x <= b.x1 - 1; x++) {
+      for (let z = b.z0 + 1; z <= hz0 - 1; z++) {
+        if (!cut(x, z)) ops.push({ op: 'block', pos: [x, gy, z], state: deck });
+      }
+    }
+
+    // --- Perimeter hedge: a clipped leaf rim following the chamfered outline, gapped
+    // at the entry walk's mouth.
+    for (const p of rimCells(b, ch)) {
+      if (p.z === b.z0 && Math.abs(p.x - cx) <= 1) continue; // the walk's mouth stays open
+      ops.push({ op: 'block', pos: [p.x, gy + 1, p.z], state: hedge });
+    }
 
     // --- Entry walk: threshold steps at the street edge, dark lit edging to the door --
     const step = palette.get('roof', { facing: 'south', half: 'bottom' }); // ascends toward the house
@@ -143,7 +168,7 @@ export const modern: SurroundingsModule = {
         [pool.x0 - 1, pool.z0 - 1], [pool.x1 + 1, pool.z0 - 1],
         [pool.x0 - 1, pool.z1 + 1], [pool.x1 + 1, pool.z1 + 1],
       ] as [number, number][]) {
-        ops.push({ op: 'block', pos: [px, gy, pz], state: light });
+        if (!cut(px, pz)) ops.push({ op: 'block', pos: [px, gy, pz], state: light });
       }
     }
 
@@ -156,8 +181,7 @@ export const modern: SurroundingsModule = {
     }
 
     // --- Side/back garden: seeded bushes + a pair of light bollards -------------------
-    const rnd = mulberry32(seed);
-    for (const s of strips.slice(1)) scatterBushes(ops, b, s, gy, hedge, rnd); // skip the front (terrace)
+    for (const s of strips.slice(1)) scatterBushes(ops, b, s, gy, hedge, rnd, cut); // skip the front (terrace)
     if (b.z1 - 2 > hz1) {
       ops.push({ op: 'block', pos: [cx - 3, gy + 1, b.z1 - 2], state: light });
       ops.push({ op: 'block', pos: [cx + 3, gy + 1, b.z1 - 2], state: light });

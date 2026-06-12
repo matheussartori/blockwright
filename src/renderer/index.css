@@ -3706,6 +3706,63 @@ body.row-resizing {
   from { opacity: 0; transform: translateY(4px) scale(0.98); }
   to { opacity: 1; transform: none; }
 }
+/* The search box pinned at the top of a `searchable` menu. Sticky inside the popup's own
+   scroll; the negative margins stretch it over the popup padding so rows scroll UNDER it. */
+.bw-select-search {
+  position: sticky;
+  top: -5px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -5px -5px 3px;
+  padding: 8px 11px;
+  background: var(--elevated);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.bw-select-search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 0;
+}
+.bw-select-search input::placeholder { color: var(--text-muted); }
+/* Group (family) header — opens each run of same-group options; a divider rules off
+   the previous group. The eyebrow style matches the planner's section labels. */
+.bw-select-group-head {
+  padding: 7px 9px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bw-select-group-head:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.bw-select-search + .bw-select-group-head { border-top: 0; margin-top: 0; }
+/* The inline group tag a search result carries (the headers are gone while filtering,
+   so the row itself names its family). */
+.bw-select-option-group {
+  margin-left: 7px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.bw-select-empty {
+  padding: 10px 9px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .bw-select-option {
   -webkit-app-region: no-drag;
   display: flex;

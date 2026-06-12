@@ -1,12 +1,12 @@
 // Surroundings registry (category "surroundings"). Each yard/landscaping typology is
 // one module file carrying its own `build()` geometry — the SINGLE source of that ring's
 // shape, run via `composeModule` when a structure type DELEGATES its grounds (the modern
-// villa does: it insets its massing by the shared `SURROUND_MARGINS` and hands the full
+// villa does: it insets its massing by the shared scaled margins and hands the full
 // box over). A selected surroundings module also rides into generation as plain-language
 // guidance + its own knowledge guide (loaded ONLY when selected), and is listed in the
 // gallery. Each links to the structures it fits via `appliesTo` (a yard is composed
 // around a specific massing, so the list is explicit — start with `['modern']`).
-import { surroundMargins } from '@/shared/domain/surroundings';
+import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import type { ModuleSummary } from '../modules';
 import type { ParamValues } from '../params';
 import { createRegistry } from '../registry';
@@ -35,15 +35,16 @@ export function surroundingsModules(): SurroundingsModule[] {
 }
 
 /** The HOUSE footprint inside a build box that reserves a surroundings ring: the box
- *  inset by the module's shared margins (the ring is horizontal only — the full height
- *  is kept). Identity for 'none'/unknown ids. The structure type lays its massing in
- *  this inner box; the module re-derives the same bounds from the same constants, so
- *  the two always agree on where the house ends and the yard begins.
+ *  inset by the module's shared margins — derived from the OUTER box, scaled to the
+ *  house (the ring is horizontal only — the full height is kept). Identity for
+ *  'none'/unknown ids. The structure type lays its massing in this inner box; the
+ *  module re-derives the same bounds from the same function, so the two always agree
+ *  on where the house ends and the yard begins.
  *  @param b - The full (already expanded) build box.
  *  @param id - The selected surroundings-module id ('none'/'' = no ring).
  *  @returns The inner house {@link Box} (== `b` when no ring applies). */
 export function insetHouseBox(b: Box, id: string | undefined): Box {
-  const m = surroundMargins(id);
+  const m = surroundMarginsForOuter(id, b.W, b.D);
   if (!m) return b;
   return box([b.x0 + m.side, b.y0, b.z0 + m.front], [b.x1 - m.side, b.y1, b.z1 - m.back]);
 }

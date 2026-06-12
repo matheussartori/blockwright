@@ -7,7 +7,9 @@
 
 ## What is already there (do not remove or cover)
 
-The build box is LARGER than the house: the outer margin all around is the yard, laid at
+The build box is LARGER than the house: the outer margin all around is the yard — it
+SCALES with the house (a bigger home gets wider grounds) and the lawn is clipped to the
+chamfered fence outline, so the plot is never a plain rectangle. Everything is laid at
 ground level (y=0 of the box, or the ground-floor level over a basement podium):
 
 - A **perimeter wall** following a varied (chamfered-corner) outline: a cobblestone

@@ -11,7 +11,9 @@ afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
 describe('buildShellSeed', () => {
   it('every seedShell archetype seeds a shell AND locks it (no unlocked seeds — the sakura "skeleton" defect)', async () => {
     const seeded = structureTypeIds().filter((id) => getStructureType(id)?.seedShell);
-    expect(seeded).toEqual(expect.arrayContaining(['modern', 'farmhouse', 'sakura', 'gothic']));
+    // EVERY house type seeds now — the classic included (its variety is in the shell's
+    // own seed, not in free-form).
+    expect(seeded).toEqual(expect.arrayContaining(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']));
     for (const id of seeded) {
       const shell = await buildShellSeed(
         { structureType: id, size: [15, 14, 13] },
@@ -24,8 +26,8 @@ describe('buildShellSeed', () => {
     }
   });
 
-  it('a free-form type (classic) seeds nothing and locks nothing', async () => {
-    const shell = await buildShellSeed({ structureType: 'classic', size: [11, 13, 9] }, path.join(tmp, 'classic'));
+  it('no structure selected → no seed (free-form is the no-pick path)', async () => {
+    const shell = await buildShellSeed({ size: [11, 13, 9] }, path.join(tmp, 'no-pick'));
     expect(shell.preamble).toBe('');
     expect(shell.lockCells).toBeUndefined();
   });

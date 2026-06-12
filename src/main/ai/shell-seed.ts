@@ -1,10 +1,11 @@
-// The code-built STARTING SHELL seed. Some archetypes have a silhouette the model can't
-// reliably invent from prose alone (the modern villa: flat roofs, stacked offset volumes,
-// glass curtain walls, a pool; the farmhouse: an L plan + cross-gable + wraparound veranda).
-// For those, a FRESH build is seeded with the structure type's OWN compiled geometry — the
+// The code-built STARTING SHELL seed. The model can't reliably invent a silhouette from
+// prose alone (the modern villa: flat roofs, stacked offset volumes, glass curtain walls,
+// a pool; the farmhouse: an L plan + cross-gable + wraparound veranda) — so a FRESH build
+// with a selected structure type is seeded with that type's OWN compiled geometry; the
 // model then keeps that exterior and only furnishes / details it (see `shellPreamble`).
-// Gated by the structure type's `seedShell` flag, so a plain house stays free-form and only
-// an opted-in type stamps a starting shell.
+// Gated by the structure type's `seedShell` flag — every house type opts in (the classic
+// included: its variety comes from the seeded shell itself, not from free-form). Free-form
+// remains the path for a build with NO structure selected.
 import fs from 'node:fs';
 import path from 'node:path';
 import { getStructureType } from '../structure/domain';
@@ -64,12 +65,7 @@ export interface ShellSeed {
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
   const { structureType, decoration, size, roof, basement, surroundings, floorHeights } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
-  // A picked surroundings ring is CODE-BUILT geometry — it can only exist if the shell
-  // is compiled and seeded, so a yard pick promotes even a free-form type (the classic
-  // house) into a seeded, locked shell for this build. Otherwise only `seedShell`
-  // archetypes seed; the plain classic stays free-form.
-  const wantsYard = !!surroundings && surroundings !== 'none';
-  if (!type || (!type.seedShell && !wantsYard)) return { preamble: '' };
+  if (!type || !type.seedShell) return { preamble: '' };
 
   const [W, H, D] = size ?? DEFAULT_SIZE;
   const params: Record<string, unknown> = {};

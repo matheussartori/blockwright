@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SURROUND_MARGINS, expandSizeForSurroundings } from '@/shared/domain/surroundings';
+import { SURROUND_SCALE, expandSizeForSurroundings, surroundMargins, surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import { readAuthoring, writeStructureFile } from '../../authoring';
 import { resolveBlocks } from '../../authoring/ops';
 import type { AuthoringStructure } from '../../authoring/types';
@@ -19,7 +19,7 @@ import { moduleAppliesTo } from '@/shared/domain/applies-to';
 
 /** The modern shell (15×13×13) expanded by the modern ring's margins. */
 const SHELL: [number, number, number] = [15, 13, 13];
-const m = SURROUND_MARGINS.modern;
+const m = surroundMargins('modern', SHELL[0], SHELL[2])!;
 const SIZE: [number, number, number] = [SHELL[0] + m.side * 2, SHELL[1], SHELL[2] + m.front + m.back];
 
 /** Expand a structure template at `size` to named blocks (+ compose warnings). */
@@ -48,7 +48,7 @@ describe('surroundings module contract', () => {
       expect(mod.appliesTo.length, `${id}.appliesTo`).toBeGreaterThan(0);
       expect(mod.knowledge, `${id}.knowledge`).toMatch(/^nbt\/modules\/surroundings\//);
       expect(mod.preview, `${id}.preview`).toBeTruthy();
-      expect(SURROUND_MARGINS[id], `${id} must declare its shared ring margins`).toBeTruthy();
+      expect(SURROUND_SCALE[id], `${id} must declare its shared ring scaling`).toBeTruthy();
       // At least one declared host is a real structure type whose param spec offers this module.
       const hosts = mod.appliesTo.map(getStructureType).filter((t) => t !== undefined);
       expect(hosts.length, `${id} hosts`).toBeGreaterThan(0);
@@ -73,6 +73,31 @@ describe('surroundings module contract', () => {
     expect([inner.W, inner.H, inner.D]).toEqual(SHELL);
     expect(inner.z0).toBe(m.front); // the front margin is the entry/pool side
     expect(insetHouseBox(outer, 'none')).toEqual(outer);
+  });
+
+  it('margins SCALE with the house: a bigger shell earns a wider ring, capped at the max', () => {
+    for (const id of Object.keys(SURROUND_SCALE)) {
+      const small = surroundMargins(id, 11, 11)!;
+      const big = surroundMargins(id, 27, 27)!;
+      const huge = surroundMargins(id, 99, 99)!;
+      expect(small).toEqual(SURROUND_SCALE[id].base); // at/below the reference: the base
+      for (const k of ['front', 'back', 'side'] as const) {
+        expect(big[k], `${id}.${k} grows`).toBeGreaterThan(small[k]);
+        expect(big[k], `${id}.${k} capped`).toBeLessThanOrEqual(SURROUND_SCALE[id].max[k]);
+      }
+      expect(huge).toEqual(SURROUND_SCALE[id].max); // a mansion hits the cap, not infinity
+    }
+  });
+
+  it('inset round-trips the expansion exactly at every shell size (both sides agree)', () => {
+    for (const id of Object.keys(SURROUND_SCALE)) {
+      for (const [w, d] of [[9, 9], [15, 13], [19, 17], [25, 21], [33, 29], [48, 40]]) {
+        const grown = expandSizeForSurroundings(w, d, id);
+        expect(surroundMarginsForOuter(id, grown.w, grown.d), `${id} ${w}x${d}`).toEqual(surroundMargins(id, w, d));
+        const inner = insetHouseBox(box([0, 0, 0], [grown.w - 1, 9, grown.d - 1]), id);
+        expect([inner.W, inner.D], `${id} ${w}x${d} shell`).toEqual([w, d]);
+      }
+    }
   });
 });
 
@@ -121,6 +146,21 @@ describe('modern surroundings geometry (template expansion)', () => {
     expect(isSolid(at.get(`${cx},1,0`))).toBe(false);
   });
 
+  it('cuts every yard corner (the grounds are never the plain rectangle)', () => {
+    for (const [x, z] of [[0, 0], [SIZE[0] - 1, 0], [0, SIZE[2] - 1], [SIZE[0] - 1, SIZE[2] - 1]]) {
+      expect(isSolid(at.get(`${x},0,${z}`)), `corner ${x},${z} must be cut`).toBe(false);
+      expect(isSolid(at.get(`${x},1,${z}`)), `corner hedge ${x},${z} must be cut`).toBe(false);
+    }
+  });
+
+  it('seeds vary the outline (two seeds disagree on some hedge cells)', () => {
+    const other = expand(SIZE, { surroundings: 'modern', floors: 2, seed: 8 });
+    const hedgeSet = (m: typeof at) =>
+      new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:oak_leaves').map(([k]) => k));
+    const a = hedgeSet(at), b2 = hedgeSet(other.at);
+    expect([...a].some((k) => !b2.has(k)) || [...b2].some((k) => !a.has(k))).toBe(true);
+  });
+
   it('builds the plain full-footprint villa when surroundings is none (no yard leaks in)', () => {
     const plain = expand(SIZE, { floors: 2, seed: 7 });
     expect(plain.warnings).toEqual([]);
@@ -133,8 +173,8 @@ describe('modern surroundings geometry (template expansion)', () => {
 });
 
 describe('garden surroundings geometry (template expansion)', () => {
-  const g = SURROUND_MARGINS.garden;
   const GSHELL: [number, number, number] = [13, 13, 11];
+  const g = surroundMargins('garden', GSHELL[0], GSHELL[2])!;
   const GSIZE: [number, number, number] = [GSHELL[0] + g.side * 2, GSHELL[1], GSHELL[2] + g.front + g.back];
   const { at, warnings } = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 11 }, 'classic');
   const outer = box([0, 0, 0], [GSIZE[0] - 1, GSIZE[1] - 1, GSIZE[2] - 1]);
@@ -224,6 +264,27 @@ describe('garden surroundings geometry (template expansion)', () => {
   });
 });
 
+describe('the ring scales with the house (big-shell template expansion)', () => {
+  it.each([
+    ['modern', 'modern', 25, 21],
+    ['garden', 'classic', 25, 21],
+  ] as const)('%s ring around a %s at 25×21 grows beyond the base and composes warning-free', (id, host, w, d) => {
+    const gm = surroundMargins(id, w, d)!;
+    expect(gm.side).toBeGreaterThan(SURROUND_SCALE[id].base.side);
+    expect(gm.front).toBeGreaterThan(SURROUND_SCALE[id].base.front);
+    const size: [number, number, number] = [w + gm.side * 2, 14, d + gm.front + gm.back];
+    const r = expand(size, { surroundings: id, floors: 2, seed: 3 }, host);
+    expect(r.warnings).toEqual([]);
+    // The house still lands exactly on the user's shell inside the wider ring.
+    const inner = insetHouseBox(box([0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]), id);
+    expect([inner.W, inner.D]).toEqual([w, d]);
+    // The ring's signature landscaping made it in.
+    const names = new Set([...r.at.values()].map((c) => c.name));
+    expect(names.has(id === 'garden' ? 'minecraft:oak_fence' : 'minecraft:oak_leaves')).toBe(true);
+    expect(names.has('minecraft:grass_block')).toBe(true);
+  });
+});
+
 describe('modern surroundings survives the compile pass pipeline', () => {
   it('keeps the pool water and the hedge through writeStructureFile (the in-game .nbt)', async () => {
     const authoring: AuthoringStructure = {
@@ -248,7 +309,7 @@ describe('modern surroundings survives the compile pass pipeline', () => {
   });
 
   it('keeps the garden fence, gate doors and crops through writeStructureFile', async () => {
-    const g = SURROUND_MARGINS.garden;
+    const g = surroundMargins('garden', 13, 11)!;
     const size: [number, number, number] = [13 + g.side * 2, 13, 11 + g.front + g.back];
     const authoring: AuthoringStructure = {
       DataVersion: 3955,

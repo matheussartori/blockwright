@@ -174,6 +174,8 @@ export const ptBR: Messages = {
   'gen.detailsHintLink': 'galeria de módulos',
   'gen.detailsHintPost': ' para ver o que cada um constrói.',
   'gen.structurePlaceholder': 'Escolha uma estrutura…',
+  'gen.selectSearch': 'Pesquisar…',
+  'gen.selectNoResults': 'Nenhum resultado',
   'gen.detailsStartTitle': 'O que você quer construir?',
   'gen.detailsStartHint': 'Escolha uma estrutura para liberar suas opções — ou pule isto e apenas descreva abaixo.',
   'gen.detailsChange': 'Trocar',

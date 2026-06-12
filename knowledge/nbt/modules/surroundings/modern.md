@@ -7,7 +7,9 @@
 
 ## What is already there (do not remove or cover)
 
-The build box is LARGER than the house: the outer margin all around is the yard, laid at
+The build box is LARGER than the house: the outer margin all around is the yard — it
+SCALES with the house (a bigger villa gets wider grounds) and its corners are cut by
+seeded chamfers, so the footprint is never a plain rectangle. Everything is laid at
 ground level (y=0 of the box, or the ground-floor level over a basement podium):
 
 - A **white-quartz pool terrace** across the front, with a **recessed water pool**

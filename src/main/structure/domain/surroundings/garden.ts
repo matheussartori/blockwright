@@ -6,24 +6,24 @@
 // house (the walkable region, distinct from the lawn), flower beds hugging the facade, and
 // seeded features over the lawns — a fountain or a stone well, tilled crop plots, a flower
 // parterre and clipped bushes. The fence OUTLINE is seeded too: every corner is cut by a
-// stepped chamfer of varying size, so no two yards share a footprint.
+// stepped chamfer of varying size (scaled with the yard — see outline.ts) and the lawn
+// is CLIPPED to that outline, so no two yards share a footprint and the plot is never
+// the plain rectangle.
 //
 // The geometry covers the RING ONLY (see modern.ts): the host structure insets its massing
-// by the shared `SURROUND_MARGINS` and hands over the FULL box, so this module re-derives
-// the house footprint from the same constants — both sides agree by construction. Own kit
-// over the decoration (a lawn stays a lawn under any look). Everything stays ≤3 cells
-// above ground (the lamp-post lanterns) — landscaping, never construction.
+// by the shared scaled margins and hands over the FULL box, so this module re-derives the
+// house footprint from the same function — both sides agree by construction. The margins
+// SCALE with the house (`shared/domain/surroundings.ts`): a bigger house earns a roomier
+// yard. Own kit over the decoration (a lawn stays a lawn under any look). Everything stays
+// ≤3 cells above ground (the lamp-post lanterns) — landscaping, never construction.
 import type { AuthoringOp } from '../../authoring/types';
-import { SURROUND_MARGINS } from '@/shared/domain/surroundings';
+import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import { mulberry32 } from '../rng';
-import type { Box } from '../structure-types/types';
+import { inCut, rimCells, seededChamfers, type Pt } from './outline';
 import type { SurroundingsModule } from './types';
 
 /** Bushes/beds must not despawn in-game — every leaf is placed persistent. */
 const LEAF = { persistent: 'true' };
-
-/** A horizontal cell of the fence rim. */
-interface Pt { x: number; z: number }
 
 /** An axis-aligned horizontal region of the yard (inclusive). */
 interface Rect { x0: number; x1: number; z0: number; z1: number }
@@ -41,40 +41,6 @@ function clampRect(r: Rect, w: number, d: number): Rect {
   return { x0, x1: x0 + cw - 1, z0, z1: z0 + cd - 1 };
 }
 
-/**
- * Ordered perimeter cells of the yard wall: the box rim with every corner cut by a
- * STEPPED chamfer (orthogonally connected cells, so the fence row never breaks), walked
- * clockwise from the front-left run — the ordering spaces the lamp posts evenly.
- *
- * @param b - The full build box (the rim follows its x/z bounds).
- * @param ch - The chamfer size per corner: front-left (nw), front-right (ne),
- *   back-right (se), back-left (sw). Front is the -z face.
- * @returns The rim cells in walking order, deduplicated.
- */
-function fenceRim(b: Box, ch: { nw: number; ne: number; se: number; sw: number }): Pt[] {
-  const cells = new Map<string, Pt>();
-  const push = (x: number, z: number): void => {
-    const k = `${x},${z}`;
-    if (!cells.has(k)) cells.set(k, { x, z });
-  };
-  // A stepped diagonal from (x,z): `c` pairs of one step along `first`, one along the other.
-  const steps = (x: number, z: number, first: 'x' | 'z', dx: number, dz: number, c: number): void => {
-    for (let i = 0; i < c; i++) {
-      if (first === 'x') { x += dx; push(x, z); z += dz; push(x, z); }
-      else { z += dz; push(x, z); x += dx; push(x, z); }
-    }
-  };
-  for (let x = b.x0 + ch.nw; x <= b.x1 - ch.ne; x++) push(x, b.z0); // front run (between chamfers)
-  steps(b.x1 - ch.ne, b.z0, 'x', 1, 1, ch.ne); // front-right corner
-  for (let z = b.z0 + ch.ne; z <= b.z1 - ch.se; z++) push(b.x1, z); // right run
-  steps(b.x1, b.z1 - ch.se, 'z', -1, 1, ch.se); // back-right corner
-  for (let x = b.x1 - ch.se; x >= b.x0 + ch.sw; x--) push(x, b.z1); // back run
-  steps(b.x0 + ch.sw, b.z1, 'x', -1, -1, ch.sw); // back-left corner
-  for (let z = b.z1 - ch.sw; z >= b.z0 + ch.nw; z--) push(b.x0, z); // left run
-  steps(b.x0, b.z0 + ch.nw, 'z', 1, -1, ch.nw); // front-left corner
-  return [...cells.values()];
-}
-
 export const garden: SurroundingsModule = {
   id: 'garden',
   label: 'Garden',
@@ -84,8 +50,10 @@ export const garden: SurroundingsModule = {
     'fence and stone lamp posts, a double-door gate aligned with the entry, a dirt walk ' +
     'to the door plus a path looping the house, flower beds along the facade, and a ' +
     'seeded mix of features over the lawns — a fountain or stone well, tilled crop ' +
-    'plots, a flower parterre and clipped bushes. The fence outline varies with every ' +
-    'seed. The build box grows beyond the house shell to fit the yard.',
+    'plots, a flower parterre and clipped bushes. The yard scales with the house — a ' +
+    'bigger home earns wider grounds — and the chamfered fence outline varies with ' +
+    'every seed, so the plot is never a plain rectangle. The build box grows beyond ' +
+    'the house shell to fit the yard.',
   knowledge: 'nbt/modules/surroundings/garden.md',
   appliesTo: ['classic', 'farmhouse', 'sakura', 'gothic'],
   // Previewed as the classic house + its yard (the ring only reads in context).
@@ -107,10 +75,11 @@ export const garden: SurroundingsModule = {
     water: 'minecraft:water',
     light: 'minecraft:lantern',
   },
-  // GENERIC over the FULL box: the house footprint is re-derived from the shared margins
-  // (the host inset itself by the same constants), the ring around it is the yard.
+  // GENERIC over the FULL box: the house footprint is re-derived from the shared scaled
+  // margins (the host inset itself by the same function), the ring around it is the yard.
   build({ box: b, palette, seed }): AuthoringOp[] {
-    const m = SURROUND_MARGINS.garden;
+    const m = surroundMarginsForOuter('garden', b.W, b.D);
+    if (!m) return [];
     const hx0 = b.x0 + m.side, hx1 = b.x1 - m.side;
     const hz0 = b.z0 + m.front, hz1 = b.z1 - m.back;
     if (hx1 - hx0 < 2 || hz1 - hz0 < 2) return []; // no house footprint left — nothing to wrap
@@ -137,20 +106,31 @@ export const garden: SurroundingsModule = {
     const free = (x: number, z: number): boolean => !used.has(`${x},${z}`);
     const rnd = mulberry32(seed);
 
-    // --- Lawn base: the whole ring at ground level ------------------------------------
+    // The seeded chamfered outline — scaled with the yard's margins, so a bigger plot
+    // earns deeper cuts. Cells beyond it get NOTHING: the footprint isn't a rectangle.
+    const ch = seededChamfers(rnd, m, 2, 6);
+    const cut = (x: number, z: number): boolean => inCut(b, ch, x, z);
+
+    // --- Lawn base: the ring at ground level, clipped to the chamfered outline ---------
     const strips: Rect[] = [
       { x0: b.x0, x1: b.x1, z0: b.z0, z1: hz0 - 1 }, // front
       { x0: b.x0, x1: b.x1, z0: hz1 + 1, z1: b.z1 }, // back
       { x0: b.x0, x1: hx0 - 1, z0: hz0, z1: hz1 }, // left
       { x0: hx1 + 1, x1: b.x1, z0: hz0, z1: hz1 }, // right
     ].filter((s) => s.x1 >= s.x0 && s.z1 >= s.z0);
-    for (const s of strips) ops.push({ op: 'fill', from: [s.x0, gy, s.z0], to: [s.x1, gy, s.z1], state: lawn });
+    for (const s of strips) {
+      for (let x = s.x0; x <= s.x1; x++) {
+        for (let z = s.z0; z <= s.z1; z++) {
+          if (cut(x, z)) { mark(x, z); continue; } // beyond the outline — no yard at all
+          ops.push({ op: 'block', pos: [x, gy, z], state: lawn });
+        }
+      }
+    }
 
-    // --- Perimeter wall: a stone course with a wooden fence on top, every corner cut by
-    // a seeded chamfer (2–4 cells) so the yard's outline varies with every build. Stone
-    // lamp posts flank the gate and break the runs at a steady rhythm — the yard's light.
-    const chamfer = (): number => 2 + Math.floor(rnd() * 3);
-    const rim = fenceRim(b, { nw: chamfer(), ne: chamfer(), se: chamfer(), sw: chamfer() });
+    // --- Perimeter wall: a stone course with a wooden fence on top, following the
+    // chamfered outline. Stone lamp posts flank the gate and break the runs at a steady
+    // rhythm — the yard's light.
+    const rim = rimCells(b, ch);
     const gateXs = [cx, cx + 1]; // the double-door bay on the front run
     rim.forEach((p, i) => {
       mark(p.x, p.z);

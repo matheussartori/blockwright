@@ -172,6 +172,8 @@ export const en = {
   'gen.detailsHintLink': 'module gallery',
   'gen.detailsHintPost': ' to preview what each one builds.',
   'gen.structurePlaceholder': 'Choose a structure…',
+  'gen.selectSearch': 'Search…',
+  'gen.selectNoResults': 'No matches',
   'gen.detailsStartTitle': 'What are you building?',
   'gen.detailsStartHint': 'Pick a structure to unlock its options — or skip this and just describe it below.',
   'gen.detailsChange': 'Change',

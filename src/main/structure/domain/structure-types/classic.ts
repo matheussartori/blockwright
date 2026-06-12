@@ -3,10 +3,11 @@
 // entirely by code: a real stack of levels (optional below-grade basement, N
 // above-ground storeys, an optional in-roof attic), a SINGLE pitched roof, a
 // connected switchback stair core linking every level, window bands, a seated front
-// door, a stone plinth, a chimney, and an optional recessed (covered) balcony. The
-// model never rebuilds walls/roofs/floors/stairs — it only furnishes the clean rooms
-// this hands it. The `seed` varies the shell (windows, corners, roof, chimney side)
-// run-to-run while every build keeps the same invariants.
+// door, a stone plinth, a chimney, and an optional recessed (covered) balcony. Like
+// every house type it is SEEDED (`seedShell`): a fresh build compiles this shell,
+// locks it, and the model only furnishes the clean rooms it hands over. Variety
+// doesn't need free-form — the `seed` varies the shell (windows, corners, roof,
+// chimney side) run-to-run while every build keeps the same invariants.
 //
 // Everything is emitted in terms of semantic roles; the decoration supplies the
 // concrete blocks. The type ships its own `defaults` kit so it reads right even
@@ -67,6 +68,11 @@ export const classic: StructureType = {
   finalize: ['chimney'],
   // A roomy storeyed home: up to three interior rooms can share a floor.
   maxRoomsPerFloor: 3,
+  // Seeded like every other house type: the code-built shell (with its own seeded
+  // window/corner/roof/chimney variety) is compiled, seeded and locked; the model
+  // only furnishes. Cozy is its identity look, auto-paired in the composer.
+  seedShell: true,
+  pairedDecoration: 'cozy',
   params: {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
     // Surfaced in Details as the separate "Basement" module select (category

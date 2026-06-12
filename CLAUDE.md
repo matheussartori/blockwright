@@ -76,6 +76,10 @@ src/
         geometry-module.ts GeometryModule — the build shape (params/defaults/build/integrations)
                            shared by RoofModule/BasementModule/AtticModule/SurroundingsModule (they extend
                            it + narrow category/appliesTo), declared ONCE instead of N identical copies.
+        groups.ts          STRUCTURE_GROUPS — the structure FAMILIES (currently one: 'house'). Every
+                           structure type declares `group`; a module's `appliesTo` can name the GROUP id
+                           to pair with the whole family at once (`moduleAppliesTo` resolves the host's
+                           group); the UI headers the gallery rail + the structure Select by group.
         roles.ts           Semantic block roles (wall/floor/roof/…) + BASE_BLOCKS fallback + isRole
         params.ts          ParamSpec/ParamDef + resolveParams + paramFields (single per-type param decl)
         compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
@@ -88,8 +92,9 @@ src/
                            storeyEntries (ladder → authoritative FloorPlanEntry[]), seatDoor,
                            cornerPosts, storeySlabs, ceilingLanterns. Every house type composes its
                            casco from these; per-type code is only the genuine identity geometry.
-        structure-types/   Category "structure": one file per archetype — classic (pitched storeyed home,
-                           free-form) + four SEEDED archetypes with code-built shells (modern = flat-roofed
+        structure-types/   Category "structure": one file per archetype, ALL FIVE SEEDED with code-built
+                           shells — classic (pitched storeyed home; its seed varies window rhythm/corner
+                           treatment/roof form/chimney side per run) + (modern = flat-roofed
                            glass villa by default, but HONORS the Roof pick — a gable/hip crowns the upper
                            volume in white quartz stairs, reserving the pitch height; farmhouse = L plan +
                            cross-gable + veranda; sakura = pink cherry
@@ -132,20 +137,26 @@ src/
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
         surroundings/      Category "surroundings": one file per yard typology (modern, garden) +
-                           types.ts (SurroundingsModule, required `appliesTo`) + index.ts (registry +
-                           `insetHouseBox` + the shared `yardFor` every host's build()/floors() opens
-                           with). A GROUND-LEVEL landscaping RING laid OUTSIDE the building
-                           shell: the user's W×D is the SHELL, the compiled box grows by the shared
-                           `SURROUND_MARGINS` (`shared/domain/surroundings.ts` — same constants on both
-                           sides of IPC), the host structure INSETS its massing and delegates the ring
-                           via `composeModule('surroundings', …)`. The module re-derives the house
-                           footprint from the same margins, so host and ring always agree. Own palette
+                           types.ts (SurroundingsModule, required `appliesTo`) + outline.ts (the shared
+                           seeded chamfered OUTLINE: rimCells/inCut/seededChamfers — the lawn is CLIPPED
+                           to it, so the yard's footprint is never the plain rectangle) + index.ts
+                           (registry + `insetHouseBox` + the shared `yardFor` every host's build()/
+                           floors() opens with). A GROUND-LEVEL landscaping RING laid OUTSIDE the
+                           building shell: the user's W×D is the SHELL, the compiled box grows by
+                           margins that SCALE with the house (`SURROUND_SCALE` in
+                           `shared/domain/surroundings.ts` — base→max, +1 cell per 4 shell cells past
+                           14; same math on both sides of IPC: the renderer expands via
+                           `surroundMargins(id,w,d)`, main inverts exactly via
+                           `surroundMarginsForOuter(id,W,D)`), the host structure INSETS its massing and
+                           delegates the ring via `composeModule('surroundings', …)`. The module
+                           re-derives the house footprint from the same function, so host and ring
+                           always agree. Own palette
                            over the decoration (like a basement — a lawn stays a lawn); ring stays ≤3
                            cells tall (landscaping, never construction — the cap is the lamp-post
                            lantern); leaves placed persistent.
-                           modern = pool terrace + stepped entry walk aligned with the door + hedge rim
-                           + planters + seeded bushes/bollards; `appliesTo: ['modern']` (the villa
-                           declares the `surroundings` param, marked `module:'surroundings'`).
+                           modern = pool terrace + stepped entry walk aligned with the door + chamfered
+                           hedge rim + planters + seeded bushes/bollards; `appliesTo: ['modern']` (the
+                           villa declares the `surroundings` param, marked `module:'surroundings'`).
                            garden = the cottage homestead yard for every NON-modern house
                            (`appliesTo: ['classic','farmhouse','sakura','gothic']`, all four declare
                            the param): a cobble-course + oak-fence perimeter whose corners are cut by
@@ -153,9 +164,9 @@ src/
                            a double-door front gate aligned with the house door, a dirt walk + a loop
                            path around the house, facade flower beds, and seeded features (fountain or
                            stone well, hydrated crop plots, flower parterre, bushes). Uses the garden
-                           roles (`path`/`soil`/`crop`/`flower` in roles.ts). A garden pick on the
-                           free-form classic PROMOTES the build to a seeded, locked shell (the ring is
-                           code-built geometry — see ai/shell-seed.ts).
+                           roles (`path`/`soil`/`crop`/`flower` in roles.ts). The ring is code-built
+                           geometry, shipped with the host's seeded shell (every house type seeds —
+                           see ai/shell-seed.ts).
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -273,7 +284,8 @@ src/
                           textarea + an "Advanced" button that opens the planner overlay + icon action
                           toolbar), DetailsSection (the progressive Details — a PURE view: the structure
                           pick + every single-select slot/enum param render as the themed `ui/Select`
-                          dropdown (NOT chip groups), plus the size box with a Total ⇄ Per-floor height
+                          dropdown (NOT chip groups; the structure pick is `searchable` and grouped by
+                          family via `catalog.groups`), plus the size box with a Total ⇄ Per-floor height
                           switch + per-floor rooms), FloorsSection (the ▦ Floors editor), BuildCard (the chat
                           build card), BuildProgress (the COMPACT live progress bar — phase + design-pass +
                           a determinate fill from designStep/designSteps + elapsed/tokens, shared by the dock
@@ -289,7 +301,10 @@ src/
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Select
                           (the themed single-select dropdown — portal-rendered in `position:fixed` so it's
                           never clipped by a scrolling column, keyboard-navigable, options carry an optional
-                          one-line `description` clamped with ellipsis + the full text on hover; the OPAQUE
+                          one-line `description` clamped with ellipsis + the full text on hover; options can
+                          also carry a `group` (family) label — contiguous runs get a header/divider, and
+                          the opt-in `searchable` prop adds a sticky search box whose filtered results keep
+                          the group name inline on each row; the OPAQUE
                           `--elevated` token backs the menu, never the translucent `--panel`), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
@@ -331,7 +346,9 @@ src/
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
                           two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
-                          Details filtering and the main guide gating call the SAME function) +
+                          Details filtering and the main guide gating call the SAME function; it also
+                          takes the host's GROUP id, so an `appliesTo` naming a structure FAMILY — e.g.
+                          'house' — matches every member) +
                           conflicts.ts (modulesConflict — symmetric `incompatibleWith` check, dims the
                           gallery + Details) + module-slots.ts (MODULE_SLOTS + ModuleSlotKey — the
                           single-select module categories: ONE registry that drives the brief, the
@@ -484,13 +501,14 @@ decoration, and a new module is one small file.
   of a silently ignored pick (e.g. a too-short box's attic/basement skip). 'flat' isn't gated (a
   flat cap can be a type's own identity geometry — the modern villa's terraces).
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`. Follow the
-  contract: a `plan()` shared by `build()`+`floors()`, compose the casco from `shell-kit` parts
+  contract: declare its `group` (the family — `domain/groups.ts`), a `plan()` shared by
+  `build()`+`floors()`, compose the casco from `shell-kit` parts
   (roofFormFor/roofCap/storeySlabs/ceilingLanterns/cornerPosts/seatDoor) + `addStairCore`, declare
   `pairedDecoration` if it has an identity look — the contract test fails anything missing.
   **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
-  (the structure ids it pairs with — a growing link; omit = applies to all).
+  (the structure-type ids and/or group ids it pairs with — a growing link; omit = applies to all).
 - **The single-select module SLOTS are registry-driven** (`shared/domain/module-slots.ts`,
   `MODULE_SLOTS` + `ModuleSlotKey` = decoration/roof/basement/attic/surroundings — NOT structure,
   which is the grouped first pick, nor rooms, which are per-floor multi-select). This one list is
@@ -517,9 +535,12 @@ decoration, and a new module is one small file.
   by `appliesTo` (`selectedGuides` skips a roof guide that doesn't fit the chosen structure).
 - **`appliesTo` is REQUIRED on every roof/basement/room module** (those contracts narrow ModuleMeta's
   optional `appliesTo` to required), so a module must always declare which structures it fits — never
-  silently apply to all. Every one currently lists `['house']`; it's a GROWING multi-structure link, so
-  a future structure type reuses an existing module by adding its id (e.g. a `tower` getting a `crypt`
-  basement → `crypt.appliesTo = ['house', 'tower']`). `moduleAppliesTo` then shows it in the tower's
+  silently apply to all. The entries are structure-type ids AND/OR GROUP ids (`domain/groups.ts`):
+  `['house']` is the whole family in one tag (gable, flat, the basements, the rooms), while a
+  deliberate narrowing lists ids (hip skips sakura; the attics are classic-only; the yards split
+  modern vs the rest). It's a GROWING link: a future structure type reuses an existing module by
+  joining a group or having its id added (e.g. a `tower` getting a `crypt` basement →
+  `crypt.appliesTo = ['house', 'tower']`). `moduleAppliesTo` then shows it in the tower's
   Details + loads its guide. (Decorations + structure types don't use `appliesTo` — a decoration crosses
   with every structure.)
 - **A structure type DELEGATES roof/basement geometry to those modules** (the modules are the single
@@ -555,29 +576,32 @@ decoration, and a new module is one small file.
   `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
 - **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern,
   garden): a required single-select slot defaulting to **None**. The user's W×D stays the
-  BUILDING SHELL — a pick grows the compiled box by the module's `SURROUND_MARGINS` (shared
-  constants in `shared/domain/surroundings.ts`, so the renderer's `buildBoxSize` and the
-  main-side inset can't drift); the host structure lays its massing in `insetHouseBox(...)` and
+  BUILDING SHELL — a pick grows the compiled box by margins that SCALE with the house
+  (`SURROUND_SCALE` in `shared/domain/surroundings.ts`: base→max, bigger shell = wider ring; the
+  renderer's `buildBoxSize` expands via `surroundMargins(id,w,d)` and the main-side inset inverts
+  it exactly via `surroundMarginsForOuter(id,W,D)`, so the two can't drift); the host structure
+  lays its massing in `insetHouseBox(...)` and
   delegates the ring via `composeModule('surroundings', …)` (module-respect verified) — every
   host's `build()`/`floors()` opens with the shared `yardFor` so massing and storey math agree.
   The ring is landscaping (≤3 cells tall — the lamp-post lantern cap — open-air, persistent
   leaves) and ships with the seeded shell, so it's LOCKED like the rest of the exterior; the
-  model only adds outdoor detail (its knowledge guide spells the rules out). A yard pick on a
-  NON-`seedShell` type (the free-form classic) PROMOTES that build to a seeded, locked shell
-  (`ai/shell-seed.ts` — a code-built ring can only exist if the shell is compiled), and the
+  model only adds outdoor detail (its knowledge guide spells the rules out). Every house type
+  is `seedShell` now, so the ring always ships inside a compiled, locked shell, and the
   central-basement descent ladder targets the INSET house box so it never lands on the lawn.
   Designed for in-world placement by a mod: the yard carries its own ground layer, so pair the
   structure with `terrain_adaptation` (beard) at worldgen — true terrain conformity is a worldgen
-  concern, not an NBT one. **Add a surroundings module:** new file + register in its `index.ts`,
-  a `SURROUND_MARGINS` entry, `appliesTo` + each host structure declares the `surroundings`
+  concern, not an NBT one. Both yards clip their lawn to the SEEDED chamfered outline
+  (`surroundings/outline.ts`), so the grounds are never the plain rectangle. **Add a surroundings
+  module:** new file + register in its `index.ts`,
+  a `SURROUND_SCALE` entry, `appliesTo` + each host structure declares the `surroundings`
   param value, + a `knowledge/nbt/modules/surroundings/<id>.md` guide.
-  `modern` (hosts: modern) = pool terrace + entry walk + hedge + planters; `garden` (hosts:
+  `modern` (hosts: modern) = pool terrace + entry walk + chamfered hedge + planters; `garden` (hosts:
   classic/farmhouse/sakura/gothic) = the cottage homestead yard — cobble + oak-fence perimeter
   with SEEDED chamfered corners (the outline varies every build), stone lamp posts, a
   double-door gate aligned with the door, dirt walk + house loop path, facade flower beds, and
   seeded fountain/well/crop-plot/parterre features (uses the `path`/`soil`/`crop`/`flower` roles).
-- **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: modern,
-  farmhouse, sakura, gothic): the fix for "the style keeps coming out as a wooden pitched box." A
+- **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: ALL FIVE,
+  classic included): the fix for "the style keeps coming out as a wooden pitched box." A
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
   any advisory guide text — so styles the model can't reliably invent are NOT guidance; they're STRUCTURE
   TYPES that OWN their massing in code. Each archetype's `build()` emits its silhouette: **modern** =
@@ -593,16 +617,15 @@ decoration, and a new module is one small file.
   central frontispiece tower projecting at the front and rising past the ridge (carrying the grand entrance),
   a balustraded front veranda, a mini corner tower past the roofline, a glass chapel wing down one side + ivy
   garlands over the eaves, steep slate roof. Each declares its identity decoration as `pairedDecoration`
-  on the MODULE (the composer auto-pairs it from the catalog — no hardcoded map); classic stays
-  free-form on cozy.
+  on the MODULE (the composer auto-pairs it from the catalog — no hardcoded map); the classic's is cozy.
   - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
     shell instead of leaving it free-form: `ai/shell-seed.ts` compiles the shell (a `template` op at the
     requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
     (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
     `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
-    model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety) — with ONE
-    exception: a picked SURROUNDINGS ring is code-built geometry, so a yard pick (the classic's `garden`)
-    promotes that build to a seeded, locked shell too (`wantsYard` in `buildShellSeed`).
+    model only finishes it. EVERY house type seeds — the classic included: its run-to-run variety
+    comes from the shell's own seed (window rhythm/corners/roof form/chimney side), not from
+    free-form. Free-form remains the path for a build with NO structure selected.
   - **Every seeded shell is LOCKED** (no separate flag — `seedShell` implies the lock): a seed is only
     CONTEXT the model can ignore, and it does — it deletes the ground-floor slab + strips the roof (the
     "sem chão / sem telhado" defect) or emits a furniture-only delta that "keeps" the exterior by not
@@ -613,8 +636,8 @@ decoration, and a new module is one small file.
     tower can't be gutted) while the model still furnishes the interior + may redecorate (solid→solid) and
     glaze walls (a hole→pane is solid, so it's kept). (Door note: gothic's central tower carries the
     entrance, so the portico colonnade/veranda must skip the tower's central bay or a column buries the door.)
-  - **The emit COLLAPSE GATE** (`emit-handler.ts`) backs the lock generically, covering the FREE-FORM
-    classic too: a non-`patch` emit whose post-pass solid count falls below HALF of the baseline (the last
+  - **The emit COLLAPSE GATE** (`emit-handler.ts`) backs the lock generically, covering free-form
+    (no-structure) builds too: a non-`patch` emit whose post-pass solid count falls below HALF of the baseline (the last
     accepted version's `session.lastSolids`, or the locked shell's cell count on the first emit; baselines
     under 50 blocks don't gate) is REJECTED back to the model — it never becomes a version — with feedback
     explaining that a "full" emit replaces the whole structure and to re-emit complete or use mode `patch`
@@ -756,8 +779,8 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
   room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
   are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per
-  floor (`buildRoomPlan`) — (NOT a `template` op for the FREE-FORM house; a seeded archetype instead seeds
-  its shell, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
+  floor (`buildRoomPlan`) — (never a `template` op; a picked structure type seeds its compiled shell
+  instead, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
   `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`surroundings`/`rooms`/`size`, the rooms deduped across
   floors) so the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype

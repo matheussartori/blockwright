@@ -45,7 +45,9 @@ refines through an emit → render → review loop — previewed live in the vie
   Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
   to trade quality for spend, configured in Settings ▸ AI
 - Composable generation domain — pick a structure type (classic / modern / farmhouse / sakura /
-  gothic), a decoration, a roof, a basement, an in-roof attic, the surroundings (a code-built yard
+  gothic; each compiles a code-built shell with seeded run-to-run variety that the AI furnishes
+  and details, so the silhouette is guaranteed), a decoration, a roof, a basement, an in-roof
+  attic, the surroundings (a code-built yard
   laid outside the house shell: a fenced **cottage garden** for the classic houses — stone-and-fence
   perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop
   plots and a well or fountain — or a **pool terrace** for the modern villa) and per-floor interior rooms (living
@@ -95,8 +97,10 @@ pool terrace; the W×D you set is the building shell, and the compiled box grows
 steer it — and, for a multi-storey house, assign up to two interior rooms to each
 floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) and set the build size
 (one total height, or a height per floor) — alongside a live 3D preview of the build volume.
-Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer, iterating
-through a visual review loop; follow-up edits continue in the chat, where **Build options** reopens
+A picked structure type starts from its code-built shell (the exterior is guaranteed and kept;
+the AI furnishes the interior and layers on detail), while a build with no structure selected is
+designed free-form from the prompt. Blockwright compiles the result to `.nbt` and renders it in
+the viewer, iterating through a visual review loop; follow-up edits continue in the chat, where **Build options** reopens
 the planner and your picks are shown back as a tidy build card. Browse every module with live 3D
 previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI
 provider and model in **Settings ▸ AI** first.

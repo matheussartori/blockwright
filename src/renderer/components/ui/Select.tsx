@@ -5,10 +5,13 @@
 // flips above the trigger when there's no room below, and supports full keyboard
 // navigation (Arrow/Home/End/Enter/Escape) + click-outside / scroll-to-dismiss.
 // Disabled options are greyed with their reason in a tooltip (the conflict gating the
-// chip group used to show as a strike-through).
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+// chip group used to show as a strike-through). Options can carry a `group` (family)
+// label: contiguous runs get a header/divider in the menu, and — with `searchable` on —
+// a filtered result keeps its group name inline on the row, so a match never loses
+// its family context.
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Search } from 'lucide-react';
 
 /** One choice. `disabled` greys + blocks it (with `title` as the reason tooltip). */
 export interface SelectOption {
@@ -17,6 +20,10 @@ export interface SelectOption {
   /** A short explanation shown under the label (smaller, muted) when the menu is open. It's
    *  clamped to one line — the full text shows in the option's hover tooltip. */
   description?: string;
+  /** The display label of the group (family) this option belongs to (e.g. "House").
+   *  A run of same-group options gets a header/divider in the menu; while a search
+   *  query filters the list, the group instead rides inline on each result row. */
+  group?: string;
   disabled?: boolean;
   title?: string;
 }
@@ -32,6 +39,12 @@ interface SelectProps {
   placeholder?: string;
   /** Extra class on the trigger button (e.g. `bw-select-action` for the dashed look). */
   className?: string;
+  /** Adds a search box at the top of the open menu, filtering options by label,
+   *  group and description. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  /** Shown in the menu when a search query matches nothing. */
+  noResultsLabel?: string;
 }
 
 /** The next selectable index in `dir` from `from`, skipping disabled options. Clamps
@@ -47,9 +60,21 @@ function nextEnabled(options: SelectOption[], from: number, dir: 1 | -1): number
   return Math.max(0, Math.min(options.length - 1, from));
 }
 
-export function Select({ value, options, onChange, disabled, ariaLabel, placeholder, className }: SelectProps) {
+export function Select({
+  value,
+  options,
+  onChange,
+  disabled,
+  ariaLabel,
+  placeholder,
+  className,
+  searchable,
+  searchPlaceholder,
+  noResultsLabel,
+}: SelectProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [query, setQuery] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number; flip: boolean; max: number } | null>(null);
@@ -60,6 +85,18 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
   const selectedIndex = options.findIndex((o) => o.value === value);
   const triggerLabel = options[selectedIndex]?.label ?? placeholder ?? options[0]?.label ?? '';
   const isPlaceholder = selectedIndex < 0 && !!placeholder;
+
+  // The options the open menu shows: all of them, or — with a search query — the ones
+  // whose label/group/description match. `active` indexes into THIS list.
+  const q = searchable ? query.trim().toLowerCase() : '';
+  const visible = !q
+    ? options
+    : options.filter(
+        (o) =>
+          o.label.toLowerCase().includes(q) ||
+          o.group?.toLowerCase().includes(q) ||
+          o.description?.toLowerCase().includes(q),
+      );
 
   const place = useCallback(() => {
     const el = triggerRef.current;
@@ -83,6 +120,7 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
   const openMenu = useCallback(() => {
     if (disabled) return;
     place();
+    setQuery('');
     setActive(selectedIndex >= 0 ? selectedIndex : nextEnabled(options, -1, 1));
     setOpen(true);
   }, [disabled, place, selectedIndex, options]);
@@ -122,7 +160,7 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
     }
     const row = popupRef.current?.querySelector<HTMLElement>(`[data-i="${active}"]`);
     row?.scrollIntoView({ block: 'nearest' });
-    const opt = options[active];
+    const opt = visible[active];
     const descEl = row?.querySelector<HTMLElement>('.bw-select-option-desc');
     const clipped = !!descEl && descEl.scrollWidth > descEl.clientWidth + 1;
     if (!opt?.description || !descEl || !clipped) {
@@ -138,7 +176,8 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
       top: r.top,
       ...(onLeft ? { right: window.innerWidth - r.left + gap } : { left: r.right + gap }),
     });
-  }, [active, open, options]);
+    // `visible` is derived from options+query, so those are the real deps.
+  }, [active, open, options, q]);
 
   const pick = useCallback(
     (opt: SelectOption | undefined) => {
@@ -167,28 +206,35 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
         break;
       case 'ArrowDown':
         e.preventDefault();
-        setActive((i) => nextEnabled(options, i, 1));
+        setActive((i) => nextEnabled(visible, i, 1));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setActive((i) => nextEnabled(options, i, -1));
+        setActive((i) => nextEnabled(visible, i, -1));
         break;
       case 'Home':
         e.preventDefault();
-        setActive(nextEnabled(options, -1, 1));
+        setActive(nextEnabled(visible, -1, 1));
         break;
       case 'End':
         e.preventDefault();
-        setActive(nextEnabled(options, options.length, -1));
+        setActive(nextEnabled(visible, visible.length, -1));
         break;
       case 'Enter':
       case ' ':
         e.preventDefault();
-        pick(options[active]);
+        pick(visible[active]);
         break;
       default:
         break;
     }
+  };
+
+  // The search box's keys: navigation + Enter/Escape come from the shared handler,
+  // but typing (incl. Space) and the caret keys (Home/End) stay with the input.
+  const onSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Home' || e.key === 'End') return;
+    onKeyDown(e);
   };
 
   return (
@@ -223,29 +269,59 @@ export function Select({ value, options, onChange, disabled, ariaLabel, placehol
               ...(pos.flip ? { bottom: window.innerHeight - pos.top } : { top: pos.top }),
             }}
           >
-            {options.map((o, i) => {
+            {searchable && (
+              <div className="bw-select-search">
+                <Search size={13} strokeWidth={2} aria-hidden />
+                <input
+                  type="text"
+                  value={query}
+                  placeholder={searchPlaceholder}
+                  aria-label={searchPlaceholder}
+                  autoFocus
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setActive(0);
+                  }}
+                  onKeyDown={onSearchKeyDown}
+                />
+              </div>
+            )}
+            {visible.length === 0 && <div className="bw-select-empty">{noResultsLabel}</div>}
+            {visible.map((o, i) => {
               const selected = o.value === value;
+              // A header opens each new GROUP run — but only on the unfiltered list,
+              // where groups are contiguous; a search result names its group inline.
+              const groupHead = !q && o.group && o.group !== visible[i - 1]?.group ? o.group : null;
               return (
-                <button
-                  key={o.value || '_neutral'}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  data-i={i}
-                  // The full description rides in the custom tooltip (below); a native title is
-                  // kept only for a disabled option's reason, which the tooltip doesn't show.
-                  title={o.disabled ? o.title : undefined}
-                  disabled={o.disabled}
-                  className={`bw-select-option${selected ? ' selected' : ''}${i === active ? ' active' : ''}${o.disabled ? ' disabled' : ''}${o.description ? ' has-desc' : ''}`}
-                  onMouseEnter={() => !o.disabled && setActive(i)}
-                  onClick={() => pick(o)}
-                >
-                  <span className="bw-select-option-main">
-                    <span className="bw-select-option-label">{o.label}</span>
-                    {o.description && <span className="bw-select-option-desc">{o.description}</span>}
-                  </span>
-                  {selected && <Check size={13} strokeWidth={2.4} className="bw-select-tick" aria-hidden />}
-                </button>
+                <Fragment key={o.value || '_neutral'}>
+                  {groupHead && (
+                    <div className="bw-select-group-head" role="presentation">
+                      {groupHead}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    data-i={i}
+                    // The full description rides in the custom tooltip (below); a native title is
+                    // kept only for a disabled option's reason, which the tooltip doesn't show.
+                    title={o.disabled ? o.title : undefined}
+                    disabled={o.disabled}
+                    className={`bw-select-option${selected ? ' selected' : ''}${i === active ? ' active' : ''}${o.disabled ? ' disabled' : ''}${o.description ? ' has-desc' : ''}`}
+                    onMouseEnter={() => !o.disabled && setActive(i)}
+                    onClick={() => pick(o)}
+                  >
+                    <span className="bw-select-option-main">
+                      <span className="bw-select-option-label">
+                        {o.label}
+                        {q && o.group && <span className="bw-select-option-group">{o.group}</span>}
+                      </span>
+                      {o.description && <span className="bw-select-option-desc">{o.description}</span>}
+                    </span>
+                    {selected && <Check size={13} strokeWidth={2.4} className="bw-select-tick" aria-hidden />}
+                  </button>
+                </Fragment>
               );
             })}
           </div>,
