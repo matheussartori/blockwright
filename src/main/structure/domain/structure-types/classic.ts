@@ -14,9 +14,41 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { DEFAULT_STOREY_H, planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
-import type { StructureType } from './types';
+import type { ParamValues } from '../params';
+import type { Box, FloorPlanEntry, StructureType } from './types';
 import { logProps } from './types';
 import { addStairCore } from './stair-core';
+import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+
+/** The house's level plan for a box + params — ONE source shared by `build()` and
+ *  `floors()` (the standard per-type pattern). The box is the whole envelope; levels
+ *  stack inside it: an optional basement bottom storey, then the above-grade storeys
+ *  (honouring explicit per-floor heights — the basement keeps the neutral +5 the
+ *  composer's overhead budgets for it), then the roof reserve on top.
+ *  `canPitch` mirrors whether the active roof block can pitch; `floors()` (which has no
+ *  palette) uses the declared kit's default (stairs → true). */
+function plan(b: Box, params: ParamValues, floorHeights?: number[], canPitch = true) {
+  const { y0, y1, W, D } = b;
+  const floors = params.floors as number;
+  const hasBasement = (params.basement as string) !== 'none';
+  const belowLevels = hasBasement ? 1 : 0;
+  const storeyCount = belowLevels + floors;
+  const isFlat = (params.roof as string) === 'flat';
+  const wantsPitched = !isFlat && canPitch;
+  const roofRings = Math.max(1, Math.floor(Math.min(W, D) / 2));
+  // Reserve headroom at the top for the roof: a pitch needs the gable rings; anything
+  // else caps with the flat module's deck + parapet (2).
+  const roofReserve = wantsPitched ? roofRings : 2;
+  const ladder = planStoreys({
+    baseY: y0,
+    idealTop: y1 - roofReserve,
+    maxWallTop: y1 - 2,
+    floors: storeyCount,
+    floorHeights: floorHeights && hasBasement ? [DEFAULT_STOREY_H, ...floorHeights] : floorHeights,
+  });
+  const wallTop = Math.min(ladder.wallTop, y1);
+  return { hasBasement, belowLevels, storeyCount, isFlat, slabYs: ladder.slabYs, wallTop };
+}
 
 export const classic: StructureType = {
   id: 'classic',
@@ -117,38 +149,15 @@ export const classic: StructureType = {
     const cx = Math.floor((x0 + x1) / 2);
     const cz = Math.floor((z0 + z1) / 2);
 
-    // --- Level plan ------------------------------------------------------------
-    // The box is the whole envelope; levels stack inside it. A basement is the
-    // bottom storey (within bounds, not dug below y0), then `floors` above-grade
-    // storeys, then the roof — with the attic living inside the roof void.
-    const hasBasement = basement !== 'none';
-    const belowLevels = hasBasement ? 1 : 0;
-    const storeyCount = belowLevels + floors;
-
-    const wantsPitched = !isFlat && palette.idOf('roof').endsWith('_stairs');
-    const roofRings = Math.max(1, Math.floor(Math.min(W, D) / 2));
-    // Reserve headroom at the top for the roof: a pitch needs the gable rings; a FLAT
-    // roof just a deck + parapet (2); a bare ceiling needs 1. A flat roof keeps the walls
-    // tall (no pitch void), which is also why it can't host an attic.
-    const roofReserve = wantsPitched ? roofRings : isFlat ? 2 : 1;
-    // The storey split, via the shared ladder: the user's explicit per-floor heights
-    // (above-ground; a basement level keeps the neutral height — the same +5 the
-    // composer's overhead budgets for it) when given, else the uniform fill that
-    // leaves room for the roof on top.
-    const ladder = planStoreys({
-      baseY: y0,
-      idealTop: y1 - roofReserve,
-      maxWallTop: y1 - 2,
-      floors: storeyCount,
-      floorHeights: floorHeights && hasBasement ? [DEFAULT_STOREY_H, ...floorHeights] : floorHeights,
-    });
-    const wallTop = Math.min(ladder.wallTop, y1);
-    const doRoof = wantsPitched && wallTop >= y0 + 3 && y1 - wallTop >= 3;
-    const doFlat = isFlat && y1 - wallTop >= 1;
-    const hasAttic = attic !== 'none' && doRoof && y1 - wallTop >= 3;
+    // --- Level plan (shared with floors() via plan()) ---------------------------
+    const canPitch = palette.idOf('roof').endsWith('_stairs');
+    const { hasBasement, storeyCount, belowLevels, slabYs, wallTop } = plan(box, params, floorHeights, canPitch);
+    // The cap this build actually lays — the kit GUARANTEE: a pitched pick that can't
+    // fit (or can't pitch) still caps FLAT (deck + parapet), never a roofless shell.
+    const roofForm = roofFormFor(isFlat ? 'flat' : roofPick === 'hip' ? 'hip' : 'gable', y1 - wallTop, canPitch);
+    const hasAttic = attic !== 'none' && (roofForm === 'gable' || roofForm === 'hip') && y1 - wallTop >= 3;
 
     // Floor-slab Y of each storey (bottom→top); index `groundIdx` is the ground floor.
-    const slabYs = ladder.slabYs;
     const groundIdx = belowLevels;
     const groundY = slabYs[groundIdx];
 
@@ -158,9 +167,7 @@ export const classic: StructureType = {
     // Framed corner posts (skipped for the 'flush' treatment — the wall already turns
     // the corner; the variety is in whether a post reads against it).
     if (cornerStyle !== 'flush') {
-      for (const [px, pz] of [[x0, z0], [x0, z1], [x1, z0], [x1, z1]] as [number, number][]) {
-        ops.push({ op: 'fill', from: [px, y0, pz], to: [px, wallTop, pz], state: corner });
-      }
+      ops.push(...cornerPosts([[x0, z0], [x0, z1], [x1, z0], [x1, z1]], y0, wallTop, corner));
     }
 
     // Below-grade level: DELEGATE the cellar room to the basement module (the single
@@ -177,42 +184,28 @@ export const classic: StructureType = {
     // house sits on stone instead of timber meeting the dirt — a calm, grounding detail.
     ops.push({ op: 'walls', from: [x0, groundY, z0], to: [x1, groundY, z1], state: found });
 
-    // Floor slabs for every storey above the foundation.
-    for (let i = 1; i < storeyCount; i++) {
-      ops.push({ op: 'fill', from: [x0 + 1, slabYs[i], z0 + 1], to: [x1 - 1, slabYs[i], z1 - 1], state: floorIdx });
-    }
-    // Cap the top: the attic loft (DELEGATED to the attic module — the single source of
-    // attic geometry: it floors the void at the wall top + lights it), or a flat ceiling
-    // when there's no roof. The box's y0 is the wall top = the attic floor plane.
+    // Floor slabs for every storey above the foundation (kit).
+    ops.push(...storeySlabs(slabYs, { x0, z0, x1, z1 }, y1, floorIdx));
+    // The attic loft (DELEGATED to the attic module — the single source of attic
+    // geometry: it floors the void at the wall top + lights it). The box's y0 is the
+    // wall top = the attic floor plane.
     if (hasAttic) ops.push(...composeModule('attic', attic, [x0, wallTop, z0], [x1, y1, z1]));
-    else if (!doRoof && !doFlat) ops.push({ op: 'fill', from: [x0, wallTop, z0], to: [x1, wallTop, z1], state: floorIdx });
 
     // --- Roof (emitted ONCE — the model must never add another) ----------------
-    // DELEGATED to the roof module (the single source of roof geometry): the house owns
-    // placement (the box over the wall top) + which form the seed/param picked; the
-    // module emits the pitched `roof` op (against this build's palette, so materials
-    // match) plus its host integration (gable-end vents). The seed varies the form
-    // (gable either way, or a hip) for a square-ish footprint.
-    if (doRoof) {
-      const roofBoxFrom: [number, number, number] = [x0, wallTop + 1, z0];
-      const roofBoxTo: [number, number, number] = [x1, y1, z1];
-      if (roofPick === 'hip') {
-        ops.push(...composeModule('roof', 'hip', roofBoxFrom, roofBoxTo));
-      } else {
-        const ridge = roofPick === 'gx' ? 'x' : roofPick === 'gz' ? 'z' : W <= D ? 'z' : 'x';
-        ops.push(...composeModule('roof', 'gable', roofBoxFrom, roofBoxTo, { ridge }));
-      }
-    } else if (doFlat) {
-      // A flat cap (walkable deck + parapet lip) over the wall top — delegated to the
-      // flat roof module. No roof void → the attic is suppressed (hasAttic is false).
-      ops.push(...composeModule('roof', 'flat', [x0, wallTop + 1, z0], [x1, y1, z1]));
-    }
+    // DELEGATED to the roof module via the kit: the house owns placement (the box over
+    // the wall top) + which form the seed/param picked; the module emits the geometry
+    // (against this build's palette) plus its host integration (gable-end vents). The
+    // seed varies the form (gable either way, or a hip) for a square-ish footprint.
+    const ridge = roofPick === 'gx' ? 'x' : roofPick === 'gz' ? 'z' : W <= D ? 'z' : 'x';
+    ops.push(...roofCap(composeModule, roofForm, [x0, wallTop + 1, z0], [x1, y1, z1], ridge));
+    // Degenerate box (walls already at the box top → no cell for any cap): a bare
+    // ceiling fill, so even that never ships open to the sky.
+    if (roofForm === 'none') ops.push({ op: 'fill', from: [x0, wallTop, z0], to: [x1, wallTop, z1], state: floorIdx });
 
     // --- Openings --------------------------------------------------------------
     // Front entrance: the actual door seated in the front wall + a hanging lantern
     // just inside, so the doorway reads finished (not a bare gap).
-    ops.push({ op: 'block', pos: [cx, groundY + 1, z0], state: palette.get('door', { facing: 'north', half: 'lower', hinge: 'left', open: 'false', powered: 'false' }) });
-    ops.push({ op: 'block', pos: [cx, groundY + 2, z0], state: palette.get('door', { facing: 'north', half: 'upper', hinge: 'left', open: 'false', powered: 'false' }) });
+    ops.push(...seatDoor(palette, cx, groundY + 1, z0));
     const ceilGround = groundIdx + 1 < storeyCount ? slabYs[groundIdx + 1] : wallTop;
     if (ceilGround - 1 > groundY) ops.push({ op: 'block', pos: [cx, ceilGround - 1, z0 + 1], state: lantern });
 
@@ -283,11 +276,8 @@ export const classic: StructureType = {
       }
     }
 
-    // --- Guaranteed light: a hanging lantern under every level's ceiling --------
-    for (let i = 0; i < storeyCount; i++) {
-      const ceil = i + 1 < storeyCount ? slabYs[i + 1] : wallTop;
-      if (ceil - 1 > slabYs[i]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
-    }
+    // --- Guaranteed light: a hanging lantern under every level's ceiling (kit) --
+    ops.push(...ceilingLanterns(slabYs, wallTop, cx, cz, lantern));
     // (The attic loft's own floor + light come from the delegated attic module above.)
 
     // --- Stair core: a 2-wide switchback in the back-right corner linking every
@@ -319,6 +309,15 @@ export const classic: StructureType = {
       }
     }
     return ops;
+  },
+  // Authoritative storeys, from the SAME plan() build() uses (basement → ground →
+  // uppers) — so the viewer bands / sidecar / stairwell pass see the laid planes.
+  floors(b: Box, params, floorHeights): FloorPlanEntry[] {
+    const { hasBasement, slabYs, wallTop } = plan(b, params, floorHeights);
+    const entries = storeyEntries(slabYs, wallTop);
+    return hasBasement
+      ? entries.map((e, i) => ({ ...e, role: i === 0 ? ('basement' as const) : i === 1 ? ('ground' as const) : ('upper' as const) }))
+      : entries;
   },
 };
 

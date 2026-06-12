@@ -112,6 +112,7 @@ export const modern: StructureType = {
   // A fresh AI build is SEEDED with this code-built shell (the model can't reliably
   // invent the modern silhouette) — it keeps the massing and furnishes the interior.
   seedShell: true,
+  pairedDecoration: 'modern',
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
     // Surfaced as the "Roof" module select (category 'roof'), so it's hidden from the

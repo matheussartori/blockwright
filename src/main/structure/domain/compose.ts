@@ -196,11 +196,13 @@ function makeModuleComposer(
   rawParams: Record<string, unknown>,
   host: string | undefined,
   intern: Intern,
+  onInvoke?: (category: 'roof' | 'basement' | 'attic', id: string) => void,
 ): BuildArgs['composeModule'] {
   // A const arrow that references itself, so a delegated module can delegate again.
   const delegate: BuildArgs['composeModule'] = (category, id, from, to, extra = {}) => {
     const module = getGeometryModule(category, id);
     if (!module) throw new Error(`unknown ${category} module "${id}"`);
+    onInvoke?.(category, id); // record for the module-respect check (nested calls too)
     const subBox = box(from, to);
     const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
     applyDecorationDecay(subParams, deco, extra, rawParams);
@@ -210,6 +212,35 @@ function makeModuleComposer(
     return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, composeModule: delegate });
   };
   return delegate;
+}
+
+/** The MODULE-RESPECT check: after a structure type builds, every module the params
+ *  REQUESTED must actually have been delegated to — a silent skip (a too-short attic
+ *  guard, a basement that didn't fit, a future type that simply forgot a slot) becomes a
+ *  visible compile warning instead of a quietly ignored pick. Checks the categories a
+ *  type delegates by contract: a PITCHED roof pick (a flat cap can be a type's own
+ *  identity geometry — the modern villa's terraces — so 'flat' isn't gated here; the
+ *  shell kit's `roofFormFor` guarantees flat caps), the type's own `attic`/`basement`
+ *  params. The centrally-composed basement path warns separately when it can't fit. */
+function verifyModuleRespect(
+  type: { id: string; params: Record<string, unknown> },
+  values: ParamValues,
+  invoked: ReadonlySet<string>,
+  warn?: (message: string) => void,
+): void {
+  const wanted: ['roof' | 'basement' | 'attic', string][] = [];
+  if (values.roof === 'gable' || values.roof === 'hip') wanted.push(['roof', values.roof]);
+  if ('attic' in type.params && typeof values.attic === 'string' && values.attic !== 'none') wanted.push(['attic', values.attic]);
+  if ('basement' in type.params && typeof values.basement === 'string' && values.basement !== 'none') wanted.push(['basement', values.basement]);
+  for (const [category, id] of wanted) {
+    if (![...invoked].some((k) => k.startsWith(`${category}:`))) {
+      warn?.(
+        `The selected ${category} ("${id}") was NOT built: the "${type.id}" structure laid no ${category} ` +
+          `module for this box/params (usually the box is too tight for it). The pick was silently ignored — ` +
+          `raise the build box or change the selection.`,
+      );
+    }
+  }
 }
 
 /**
@@ -254,8 +285,14 @@ export function composeStructure(
   // storey ladder honours them in every house type.
   const floorHeights = sanitizeFloorHeights(params.floorHeights);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
-  // this injected composer (the modules are the single source of that geometry).
-  const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
+  // this injected composer (the modules are the single source of that geometry). Every
+  // delegation is RECORDED so the module-respect check can verify the requested picks
+  // were actually built (see verifyModuleRespect).
+  const invoked = new Set<string>();
+  const composeModuleDelegate = makeModuleComposer(
+    palette, seed, deco, params, name, intern,
+    (category, id) => invoked.add(`${category}:${id}`),
+  );
 
   // Below-grade level: a type that declares its OWN `basement` param (classic) handles
   // burial inside its build(); for every OTHER type we compose the selected basement
@@ -269,7 +306,7 @@ export function composeStructure(
     if (b.H - bH >= 6) {
       const groundY = b.y0 + bH;
       const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
-      return [
+      const ops = [
         // The vault fills the footprint below grade (forced rect so it spans the whole base).
         ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
@@ -277,6 +314,8 @@ export function composeStructure(
         // The descent carves through that slab last, so the stairwell opening survives.
         ...basementDescent(b, groundY, palette),
       ];
+      verifyModuleRespect(type, values, invoked, warn);
+      return ops;
     }
     // The pick can't fit — say so instead of silently building without it (the user
     // chose a crypt and got none, with nothing explaining why).
@@ -287,7 +326,9 @@ export function composeStructure(
     );
   }
 
-  return type.build({ box: b, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate });
+  const ops = type.build({ box: b, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate });
+  verifyModuleRespect(type, values, invoked, warn);
+  return ops;
 }
 
 /**

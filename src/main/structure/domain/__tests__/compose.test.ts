@@ -76,8 +76,17 @@ describe('compose: structure types × decorations', () => {
     expect(plan[1].to).toBe(14);
   });
 
-  it('structureFloorPlan is empty for a type with no authoritative plan (classic)', () => {
-    expect(structureFloorPlan('classic', [11, 13, 9], {})).toEqual([]);
+  it('structureFloorPlan covers EVERY storeyed type now (classic included) — and is empty for unknowns', () => {
+    // classic gained an authoritative plan with the shared plan()/floors() pattern.
+    const classic = structureFloorPlan('classic', [11, 13, 9], { floors: 2 });
+    expect(classic.map((f) => f.role)).toEqual(['ground', 'upper']);
+    // A basement pick prepends the below-grade level.
+    const withCellar = structureFloorPlan('classic', [11, 18, 9], { floors: 2, basement: 'full' });
+    expect(withCellar.map((f) => f.role)).toEqual(['basement', 'ground', 'upper']);
+    // The sakura's visible stone base reads as its basement-grade level.
+    const sak = structureFloorPlan('sakura', [13, 14, 11], { floors: 2 });
+    expect(sak[0].role).toBe('basement');
+    expect(structureFloorPlan('castle', [9, 9, 9], {})).toEqual([]);
   });
 
   it('accepts both `decoration` and the legacy `theme` param key', () => {

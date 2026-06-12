@@ -14,7 +14,22 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
-import { box as mkBox, logProps, type StructureType } from './types';
+import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { box as mkBox, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
+
+/** The manor's plan lines for a box + params — ONE source shared by `build()` and
+ *  `floors()` (the standard per-type pattern, see farmhouse): the portico strip, the
+ *  storey ladder (honouring explicit per-floor heights) and the wall top. */
+function plan(b: Box, floors: number, isFlat: boolean, floorHeights?: number[]) {
+  const { y0, y1, z0, W, D } = b;
+  const portD = D >= 10 ? 2 : 0; // covered front portico depth
+  const hz0 = z0 + portD; // the manor's front wall (behind the portico)
+  const roofRings = isFlat ? 2 : Math.max(3, Math.floor(Math.min(W, D - portD) / 2));
+  const ladder = planStoreys({ baseY: y0, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
+  const slabYs = ladder.slabYs;
+  const wallTop = ladder.wallTop > y1 - 2 ? Math.max(y0 + 3, y1 - 2) : ladder.wallTop;
+  return { portD, hz0, roofRings, slabYs, wallTop };
+}
 
 export const gothic: StructureType = {
   id: 'gothic',
@@ -35,6 +50,8 @@ export const gothic: StructureType = {
   // (every seeded shell is locked — preserveShell restores any floor/roof/wall/tower the
   // model deletes, so it finishes the interior but can't gut the code-built exterior).
   seedShell: true,
+  pairedDecoration: 'gothic',
+  complex: true,
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
     roof: {
@@ -80,46 +97,30 @@ export const gothic: StructureType = {
     const soul = palette.get('light');
     const fence = palette.get('fence');
     const leaf = palette.get('plant'); // ivy/garland greenery (roof eaves + tower shoulders)
-    const door = (half: 'lower' | 'upper') =>
-      palette.get('door', { facing: 'north', half, hinge: 'left', open: 'false', powered: 'false' });
 
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
     const cz = Math.floor((z0 + z1) / 2);
 
-    // A covered front PORTICO eats a shallow front strip; the manor stands behind it.
-    const portD = D >= 10 ? 2 : 0;
-    const hz0 = z0 + portD; // the manor's front wall (behind the portico)
+    // --- Plan lines (shared with floors() via plan()) ----------------------------------
+    const roofShape = (params.roof as string) ?? 'gable';
+    const isFlat = roofShape === 'flat';
+    const { portD, hz0, roofRings, slabYs, wallTop } = plan(box, floors, isFlat, floorHeights);
+    const groundH = (slabYs[1] ?? wallTop) - y0; // the ground storey's slab-to-slab height
     // A central frontispiece TOWER projects at the front-centre (the "tower in the middle").
     // Computed early so the portico colonnade/railing leaves its central bay open for the
     // tower + its entrance — a portico column at `cx` would otherwise bury the door.
     const hasTower = W >= 11 && H >= 12 && D - portD >= 5;
     const towerHW = W >= 16 ? 2 : 1; // tower half-width (front-centre span cx±towerHW)
 
-    // --- Storeys (a STEEP gable identity) ---------------------------------------------
-    const roofShape = (params.roof as string) ?? 'gable';
-    const isFlat = roofShape === 'flat';
-    const isHip = roofShape === 'hip';
-    const roofRings = isFlat ? 2 : Math.max(3, Math.floor(Math.min(W, D - portD) / 2));
-    // The storey split via the shared ladder (the user's explicit per-floor heights win).
-    const ladder = planStoreys({ baseY: y0, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
-    const slabYs = ladder.slabYs;
-    const wallTop = ladder.wallTop > y1 - 2 ? Math.max(y0 + 3, y1 - 2) : ladder.wallTop;
-    const groundH = (slabYs[1] ?? wallTop) - y0; // the ground storey's slab-to-slab height
-
     // --- Foundation + per-storey floor slabs ------------------------------------------
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: found });
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: floorIdx });
-    for (let f = 1; f < floors; f++) {
-      const midY = slabYs[f];
-      if (midY < wallTop) ops.push({ op: 'fill', from: [x0 + 1, midY, hz0 + 1], to: [x1 - 1, midY, z1 - 1], state: floorIdx });
-    }
+    ops.push(...storeySlabs(slabYs, { x0, z0: hz0, x1, z1 }, wallTop, floorIdx));
 
     // --- Dark shell + log quoins ------------------------------------------------------
     ops.push({ op: 'walls', from: [x0, y0, hz0], to: [x1, wallTop, z1], state: wall });
-    for (const [px, pz] of [[x0, hz0], [x0, z1], [x1, hz0], [x1, z1]] as [number, number][]) {
-      ops.push({ op: 'fill', from: [px, y0, pz], to: [px, wallTop, pz], state: corner });
-    }
+    ops.push(...cornerPosts([[x0, hz0], [x0, z1], [x1, hz0], [x1, z1]], y0, wallTop, corner));
     // White belt courses: a pale ring at each upper floor line + a cornice at the eaves.
     for (let f = 1; f < floors; f++) {
       const midY = slabYs[f];
@@ -127,15 +128,14 @@ export const gothic: StructureType = {
     }
     ops.push({ op: 'walls', from: [x0, wallTop, hz0], to: [x1, wallTop, z1], state: accent });
 
-    // --- Roof: a steep slate gable/hip (delegated), or a flat cap ----------------------
-    const roofFrom: [number, number, number] = [x0, wallTop + 1, hz0];
-    const roofTo: [number, number, number] = [x1, y1, z1];
-    if (isFlat) ops.push(...composeModule('roof', 'flat', roofFrom, roofTo));
-    else if (isHip) ops.push(...composeModule('roof', 'hip', roofFrom, roofTo));
-    else ops.push(...composeModule('roof', 'gable', roofFrom, roofTo, { ridge: W <= D ? 'z' : 'x' }));
+    // --- Roof: a steep slate gable/hip (delegated), or a flat cap. `roofFormFor` is the
+    // kit GUARANTEE: a pitch that can't fit (or a non-stair roof material) still caps FLAT
+    // (deck + parapet) — a gothic manor can never ship roofless. ------------------------
+    const form = roofFormFor(roofShape, y1 - wallTop, palette.idOf('roof').endsWith('_stairs'));
+    ops.push(...roofCap(composeModule, form, [x0, wallTop + 1, hz0], [x1, y1, z1], W <= D ? 'z' : 'x'));
 
     // --- Garland foliage dotting the eaves (the ivy cascading over the slate) -----------
-    if (!isFlat) {
+    if (form !== 'flat') {
       const ey = wallTop + 1;
       for (let x = x0 + 1; x <= x1 - 1; x += 3) {
         ops.push({ op: 'block', pos: [x, ey, hz0], state: leaf });
@@ -209,8 +209,7 @@ export const gothic: StructureType = {
       }
       // Grand arched entrance on the tower front (pale jambs + lintel).
       ops.push({ op: 'fill', from: [cx, y0 + 1, tz0], to: [cx, y0 + 2, tz0], state: air });
-      ops.push({ op: 'block', pos: [cx, y0 + 1, tz0], state: door('lower') });
-      ops.push({ op: 'block', pos: [cx, y0 + 2, tz0], state: door('upper') });
+      ops.push(...seatDoor(palette, cx, y0 + 1, tz0));
       for (const px of [cx - 1, cx + 1]) if (px > tx0 - 1 && px < tx1 + 1) ops.push({ op: 'fill', from: [px, y0 + 1, tz0], to: [px, y0 + 3, tz0], state: accent });
       ops.push({ op: 'line', from: [cx - 1, y0 + 3, tz0], to: [cx + 1, y0 + 3, tz0], state: accent });
       // Steep pyramidal cap: stair rings stepping inward and up to a finial.
@@ -264,8 +263,7 @@ export const gothic: StructureType = {
     // central tower carries the entrance on its own front face (no redundant inner door). ---
     if (!hasTower) {
       ops.push({ op: 'fill', from: [cx, y0 + 1, hz0], to: [cx, y0 + 2, hz0], state: air });
-      ops.push({ op: 'block', pos: [cx, y0 + 1, hz0], state: door('lower') });
-      ops.push({ op: 'block', pos: [cx, y0 + 2, hz0], state: door('upper') });
+      ops.push(...seatDoor(palette, cx, y0 + 1, hz0));
       for (const px of [cx - 1, cx + 1]) ops.push({ op: 'fill', from: [px, y0 + 1, hz0], to: [px, y0 + 3, hz0], state: accent }); // jambs
       ops.push({ op: 'line', from: [cx - 1, y0 + 3, hz0], to: [cx + 1, y0 + 3, hz0], state: accent }); // lintel
       ops.push({ op: 'block', pos: [cx, y0 + 4 <= wallTop ? y0 + 4 : wallTop, hz0], state: accent }); // pinnacle
@@ -284,16 +282,19 @@ export const gothic: StructureType = {
       ops.push({ op: 'fill', from: [cx, wy, z1], to: [cx, wy + 1, z1], state: win }); // back
     }
 
-    // --- Soul lanterns under each ceiling ---------------------------------------------
-    for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
-      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
-    }
+    // --- Soul lanterns under each ceiling (the guaranteed-light rule, kit) -------------
+    ops.push(...ceilingLanterns(slabYs, wallTop, cx, cz, lantern));
 
     // --- Interior stair core (behind the portico); the stairwell pass only REPAIRS it ---
     if (floors >= 2) {
       addStairCore({ ops, box: mkBox([x0, y0, hz0], [x1, y1, z1]), slabYs, palette });
     }
     return ops;
+  },
+  // Authoritative storeys, from the SAME plan() build() uses — so the viewer bands,
+  // the metadata sidecar and the stairwell pass see exactly the planes the shell laid.
+  floors(b: Box, params, floorHeights): FloorPlanEntry[] {
+    const { slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
+    return storeyEntries(slabYs, wallTop);
   },
 };

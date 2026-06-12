@@ -11,7 +11,22 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
-import { box as mkBox, logProps, type StructureType } from './types';
+import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { box as mkBox, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
+
+/** The cottage's plan lines for a box + params — ONE source shared by `build()` and
+ *  `floors()` (the standard per-type pattern): the visible stone base, the raised main
+ *  floor, the living-storey ladder (honouring explicit per-floor heights), the wall top. */
+function plan(b: Box, floors: number, isFlat: boolean, floorHeights?: number[]) {
+  const { y0, y1, W, D } = b;
+  const baseH = Math.max(3, Math.min(4, Math.floor((y1 - y0) / 4)));
+  const mainY = y0 + baseH; // the raised main floor
+  const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(W, D) / 2));
+  const ladder = planStoreys({ baseY: mainY, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
+  const slabYs = ladder.slabYs;
+  const wallTop = ladder.wallTop > y1 - 2 ? Math.max(mainY + 3, y1 - 2) : ladder.wallTop;
+  return { baseH, mainY, slabYs, wallTop };
+}
 
 export const sakura: StructureType = {
   id: 'sakura',
@@ -29,6 +44,7 @@ export const sakura: StructureType = {
   maxRoomsPerFloor: 2,
   // A fresh build is SEEDED with this shell so the model keeps the raised blossom massing.
   seedShell: true,
+  pairedDecoration: 'sakura',
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
     roof: {
@@ -70,24 +86,16 @@ export const sakura: StructureType = {
     const post = palette.get('pillar', logProps(palette.idOf('pillar')));
     const leaf = palette.get('plant', { persistent: 'true' });
     const lantern = palette.get('light', { hanging: 'true' });
-    const door = (half: 'lower' | 'upper') =>
-      palette.get('door', { facing: 'north', half, hinge: 'left', open: 'false', powered: 'false' });
 
     const ops: AuthoringOp[] = [];
     const cx = Math.floor((x0 + x1) / 2);
     const cz = Math.floor((z0 + z1) / 2);
 
-    // --- Levels: a VISIBLE stone basement, then the raised cherry living storey(s) ----
-    const baseH = Math.max(3, Math.min(4, Math.floor((y1 - y0) / 4)));
-    const mainY = y0 + baseH; // the raised main floor
+    // --- Levels: a VISIBLE stone basement, then the raised cherry living storey(s),
+    // from the shared plan() (the same planes floors() reports). ------------------------
     const roofShape = (params.roof as string) ?? 'gable';
     const isFlat = roofShape === 'flat';
-    const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(W, D) / 2));
-    // The cherry storeys over the stone base, via the shared ladder (the user's explicit
-    // per-floor heights apply to the LIVING storeys; the stone base keeps its own height).
-    const ladder = planStoreys({ baseY: mainY, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
-    const slabYs = ladder.slabYs;
-    const wallTop = ladder.wallTop > y1 - 2 ? Math.max(mainY + 3, y1 - 2) : ladder.wallTop;
+    const { baseH, mainY, slabYs, wallTop } = plan(box, floors, isFlat, floorHeights);
 
     // --- Visible stone basement (ground slab + plinth ring + small windows) -----------
     ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, z1], state: base });          // ground slab
@@ -98,23 +106,15 @@ export const sakura: StructureType = {
     ops.push({ op: 'block', pos: [x1, bwy, cz], state: win });
     ops.push({ op: 'block', pos: [cx, bwy, z1], state: win });
 
-    // --- Cherry living shell over the base --------------------------------------------
+    // --- Cherry living shell over the base (kit: posts + storey slabs) ------------------
     ops.push({ op: 'walls', from: [x0, mainY, z0], to: [x1, wallTop, z1], state: wall });
-    for (const [px, pz] of [[x0, z0], [x0, z1], [x1, z0], [x1, z1]] as [number, number][]) {
-      ops.push({ op: 'fill', from: [px, mainY, pz], to: [px, wallTop, pz], state: corner });
-    }
-    for (let f = 1; f < floors; f++) {
-      const midY = slabYs[f];
-      if (midY < wallTop) ops.push({ op: 'fill', from: [x0 + 1, midY, z0 + 1], to: [x1 - 1, midY, z1 - 1], state: floorIdx });
-    }
+    ops.push(...cornerPosts([[x0, z0], [x0, z1], [x1, z0], [x1, z1]], mainY, wallTop, corner));
+    ops.push(...storeySlabs(slabYs, { x0, z0, x1, z1 }, wallTop, floorIdx));
 
-    // --- Roof: a pink cherry gable (delegated to the module), or a flat cap ------------
-    if (isFlat) {
-      ops.push(...composeModule('roof', 'flat', [x0, wallTop + 1, z0], [x1, y1, z1]));
-    } else {
-      const ridge: 'x' | 'z' = W <= D ? 'z' : 'x';
-      ops.push(...composeModule('roof', 'gable', [x0, wallTop + 1, z0], [x1, y1, z1], { ridge }));
-    }
+    // --- Roof: a pink cherry gable (delegated), or a flat cap. `roofFormFor` is the kit
+    // GUARANTEE: a pitch that can't fit still caps FLAT — never a roofless cottage. ------
+    const form = roofFormFor(roofShape, y1 - wallTop, palette.idOf('roof').endsWith('_stairs'));
+    ops.push(...roofCap(composeModule, form, [x0, wallTop + 1, z0], [x1, y1, z1], W <= D ? 'z' : 'x'));
 
     // --- Raised front entry reached by an exterior stone stair -------------------------
     // The cherry upper storey overhangs the stair, so the entry is covered + recessed
@@ -128,13 +128,11 @@ export const sakura: StructureType = {
       }
       ops.push({ op: 'fill', from: [cx - 1, mainY, entryZ], to: [cx + 1, mainY + 2, entryZ], state: wall }); // recessed facade
       ops.push({ op: 'fill', from: [cx, mainY + 1, entryZ], to: [cx, mainY + 2, entryZ], state: air });      // door slot
-      ops.push({ op: 'block', pos: [cx, mainY + 1, entryZ], state: door('lower') });
-      ops.push({ op: 'block', pos: [cx, mainY + 2, entryZ], state: door('upper') });
+      ops.push(...seatDoor(palette, cx, mainY + 1, entryZ));
       for (const px of [cx - 1, cx + 1]) ops.push({ op: 'fill', from: [px, mainY, z0], to: [px, mainY + 2, z0], state: post }); // overhang posts
       ops.push({ op: 'block', pos: [cx, Math.min(mainY + 3, wallTop), z0 + 1], state: lantern });
     } else {
-      ops.push({ op: 'block', pos: [cx, mainY + 1, z0], state: door('lower') });
-      ops.push({ op: 'block', pos: [cx, mainY + 2, z0], state: door('upper') });
+      ops.push(...seatDoor(palette, cx, mainY + 1, z0));
     }
 
     // --- Cherry windows + leafy window boxes on the living storeys ---------------------
@@ -168,11 +166,8 @@ export const sakura: StructureType = {
       ops.push({ op: 'fill', from: [lx, eaveY - drop, lz], to: [lx, eaveY, lz], state: leaf });
     }
 
-    // --- Lanterns under each ceiling --------------------------------------------------
-    for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
-      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
-    }
+    // --- Lanterns under each ceiling (the guaranteed-light rule, kit) ------------------
+    ops.push(...ceilingLanterns(slabYs, wallTop, cx, cz, lantern));
 
     // --- Interior stair core for the cherry storeys (the stairwell pass only REPAIRS;
     // a code-built shell must lay its own climb). Stairs where a 45° run fits, else a ladder.
@@ -180,5 +175,14 @@ export const sakura: StructureType = {
       addStairCore({ ops, box: mkBox([x0, mainY, z0], [x1, y1, z1]), slabYs, palette });
     }
     return ops;
+  },
+  // Authoritative storeys, from the SAME plan() build() uses: the visible stone base as
+  // a basement-grade level, then the cherry living storeys.
+  floors(b: Box, params, floorHeights): FloorPlanEntry[] {
+    const { mainY, slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
+    return [
+      { from: b.y0, to: Math.max(b.y0, mainY - 1), role: 'basement' },
+      ...storeyEntries(slabYs, wallTop),
+    ];
   },
 };

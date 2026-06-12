@@ -46,6 +46,7 @@ export function listStructureTypes(): ModuleSummary[] {
     group: t.group,
     params: paramFields(t.params),
     maxRoomsPerFloor: t.maxRoomsPerFloor,
+    pairedDecoration: t.pairedDecoration,
   }));
 }
 

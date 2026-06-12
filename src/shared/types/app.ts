@@ -91,6 +91,10 @@ export interface GenerationModule {
    *  only) — drives the planner's per-floor room cap so a roomier house allows more
    *  than a cabin. Omit → the generic default (`ROOMS_PER_FLOOR`). */
   maxRoomsPerFloor?: number;
+  /** The decoration id that IS this structure's identity look (structure types only) —
+   *  auto-picked in the composer Details when the structure is chosen. Declared on the
+   *  module so the renderer never hardcodes a type→decoration map. */
+  pairedDecoration?: string;
   /** Furnishing presets, tiered by floor space (room modules only) → the gallery's
    *  expandable per-room preset list. */
   presets?: FurnishingPreset[];

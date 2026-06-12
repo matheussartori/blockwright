@@ -6,7 +6,7 @@
 // Kept free of Electron/fs imports so it's unit-testable in isolation. The actual file
 // reading lives in knowledge.ts; the selection→guide-path mapping lives in the domain
 // (each module declares its own `knowledge` path + optional `keywords`).
-import { promptGuides, selectedGuides, type ModuleSelection } from '../structure/domain';
+import { getStructureType, promptGuides, selectedGuides, type ModuleSelection } from '../structure/domain';
 
 export type { ModuleSelection } from '../structure/domain';
 
@@ -29,7 +29,8 @@ const CONDITIONAL_CORE: Record<string, (prompt: string, selection?: ModuleSelect
 };
 
 // Any signal of complexity keeps `08-complex-structures`. Selection signals: a basement,
-// two-plus rooms, or an inherently articulated structure (gothic). Prompt signals: words
+// two-plus rooms, or an inherently articulated structure (one whose module declares
+// `complex` — the type owns that fact, never an id hardcoded here). Prompt signals: words
 // that imply scale / multiple rooms / below-grade / articulation. Generous on purpose
 // (err toward INCLUDING the guide) so a build that turns out complex isn't left without it.
 const COMPLEX_PROMPT =
@@ -41,7 +42,7 @@ export function isComplexBuild(prompt: string, selection?: ModuleSelection): boo
   if (selection) {
     if (selection.basement) return true;
     if ((selection.rooms?.length ?? 0) >= 2) return true;
-    if (selection.structureType === 'gothic') return true;
+    if (selection.structureType && getStructureType(selection.structureType)?.complex) return true;
   }
   return COMPLEX_PROMPT.test(prompt);
 }

@@ -62,8 +62,12 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
 
   const onField = useCallback(
-    (key: DetailField, value: string) => plannerStore.getState().setDetails((d) => setDetailField(d, key, value)),
-    [],
+    (key: DetailField, value: string) =>
+      plannerStore.getState().setDetails((d) =>
+        // The chosen structure module rides along so its declared pairedDecoration applies.
+        setDetailField(d, key, value, catalog?.structure.find((m) => m.id === value)),
+      ),
+    [catalog],
   );
   const onParam = useCallback(
     (name: string, value: string | number) => plannerStore.getState().setDetails((d) => setDetailParam(d, name, value)),

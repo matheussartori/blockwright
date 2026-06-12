@@ -141,6 +141,16 @@ export interface StructureType extends ModuleMeta {
   /** Max interior rooms a single floor of this type accepts in the build planner. Omit →
    *  the generic default. A roomier archetype (a manor) raises it; a tight one lowers it. */
   maxRoomsPerFloor?: number;
+  /** The decoration id that IS this type's identity look (the modern villa's white-and-
+   *  glass, the sakura's pink cherry) — auto-picked in the composer Details when this
+   *  structure is chosen (the user can still change it). DECLARED HERE, on the module,
+   *  so the renderer never hardcodes a type→decoration map. Omit → no pairing (classic
+   *  stays free on the default decoration). */
+  pairedDecoration?: string;
+  /** Marks an inherently articulated archetype (wings/towers/multi-volume massing) so
+   *  build-complexity gates (e.g. the complex-structures knowledge guide) include it
+   *  without naming type ids in general code. Omit → judged by selection/prompt alone. */
+  complex?: boolean;
   /** When true, a FRESH AI build of this type is SEEDED with this type's code-built shell
    *  (compiled via `build()` at the requested size + decoration) instead of being left
    *  fully free-form — the model keeps the exterior massing and only furnishes/details it.

@@ -18,18 +18,6 @@ import {
 import type { ModuleSlotKey } from '@/shared/domain/module-slots';
 import type { GenerationModule } from '@/shared/types';
 
-/** Structures whose look is part of their identity, auto-paired with a decoration when
- *  picked: the modern villa is white-and-glass; the farmhouse is warm oak + a dark slate
- *  roof; the sakura cottage is pink cherry; the gothic manor is black + white detailing.
- *  Picking the structure defaults the decoration so the materials + guide come along (the
- *  user can still change it after). */
-const PAIRED_DECORATION: Record<string, string> = {
-  modern: 'modern',
-  farmhouse: 'farmhouse',
-  sakura: 'sakura',
-  gothic: 'gothic',
-};
-
 /** The single-value Details selects driven by `setDetailField`: the structure pill plus
  *  every single-select module slot (decoration/roof/basement/attic/exterior). */
 export type DetailField = 'structureType' | ModuleSlotKey;
@@ -52,19 +40,27 @@ export const SIZE_MAX = 64;
 /** Set one of the single-value Details selects, applying the dependent-field rules:
  *  switching STRUCTURE drops the old type's params/size/heights and clears roof/basement/
  *  rooms (the compatible set is structure-specific) — and pairs the identity decoration
- *  (modern/farmhouse/…). Editing any OTHER slot now PRESERVES the user's explicit size — a
+ *  the chosen module DECLARES (`pairedDecoration`, registry-driven — no type→decoration
+ *  map here). Editing any OTHER slot now PRESERVES the user's explicit size — a
  *  basement/attic still auto-grows the box only while the size is on auto (it derives them
  *  in via `effectiveSize`), so the box never snaps back under the user's typed dimensions.
  *  @param d - The current Details state.
  *  @param key - Which select changed.
  *  @param value - The new id ('' = none/auto).
+ *  @param struct - The newly-chosen structure module (catalog lookup of `value`), so a
+ *    structure pick pairs the decoration its module declares. Only read for `structureType`.
  *  @returns The next Details state (a new object). */
-export function setDetailField(d: BuildDetails, key: DetailField, value: string): BuildDetails {
+export function setDetailField(
+  d: BuildDetails,
+  key: DetailField,
+  value: string,
+  struct?: GenerationModule,
+): BuildDetails {
   if (key === 'structureType') {
     // Switching structure clears every slot (the compatible set is structure-specific) +
-    // the params/size/heights/rooms. A structure with an identity look (modern, farmhouse)
-    // pairs its decoration by default so its materials + guide come along.
-    const decoration = PAIRED_DECORATION[value] ?? '';
+    // the params/size/heights/rooms. A structure with an identity look pairs the
+    // decoration its module declares, so its materials + guide come along.
+    const decoration = struct?.pairedDecoration ?? '';
     return {
       ...d,
       ...EMPTY_SLOTS,

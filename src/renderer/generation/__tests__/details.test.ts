@@ -38,9 +38,16 @@ describe('setDetailField', () => {
     });
   });
 
-  it('pairs the Modern decoration when the modern house is chosen', () => {
-    const next = setDetailField(details({ structureType: 'house' }), 'structureType', 'modern');
+  it('pairs the decoration the chosen module DECLARES (registry-driven, no hardcoded map)', () => {
+    const modernModule = {
+      id: 'modern', label: 'Modern house', category: 'structure', description: '',
+      hasPreview: true, pairedDecoration: 'modern',
+    } as const;
+    const next = setDetailField(details({ structureType: 'house' }), 'structureType', 'modern', modernModule);
     expect(next).toMatchObject({ structureType: 'modern', decoration: 'modern' });
+    // A module with no declared pairing leaves the decoration free.
+    const plain = setDetailField(details({}), 'structureType', 'classic', { ...modernModule, id: 'classic', pairedDecoration: undefined });
+    expect(plain.decoration).toBe('');
   });
 
   it('choosing a basement preserves an explicit size (no auto-reset)', () => {

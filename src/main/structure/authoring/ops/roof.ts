@@ -31,6 +31,18 @@ export function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx):
   };
   const slabTop = (): number | null =>
     slabName ? intern({ Name: slabName, Properties: { type: 'top', waterlogged: 'false' } }) : null;
+  // TRUNCATION DECK — when the op's box top clips the pitch BEFORE the slopes meet, the
+  // ridge opening that remains is decked flat at the clamp height (top slabs, else the
+  // fill, else the stair block) so a clipped roof reads as a low mansard top, NEVER an
+  // open slot to the sky (the "telhado com rasgo na cumeeira" defect).
+  const deckOpening = (xl: number, xr: number, zl: number, zr: number): void => {
+    if (xl > xr || zl > zr) return; // the slopes met — nothing left open
+    const st = slabTop() ?? op.fill ?? op.state;
+    for (let x = xl; x <= xr; x++) {
+      for (let z = zl; z <= zr; z++) set(x, yMax, z, st);
+    }
+  };
+  const rise = yMax - y0; // the last laid ring/step index before the clamp
 
   if (hip) {
     // Four slopes meeting at a central ridge: each level is the rectangular RING
@@ -65,6 +77,7 @@ export function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx):
         plug(x, y - 1, zr);
       }
     }
+    deckOpening(x0 + rise + 1, x1 - rise - 1, z0 + rise + 1, z1 - rise - 1);
     return;
   }
 
@@ -80,6 +93,7 @@ export function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx):
         if (xr !== xl) plug(xr, y - 1, z);
       }
     }
+    deckOpening(x0 + rise + 1, x1 - rise - 1, z0, z1);
   } else {
     // Ridge along x → slopes across z (eaves on the north/south sides), climbing inward.
     for (let i = 0; z0 + i <= z1 - i && y0 + i <= yMax; i++) {
@@ -92,6 +106,7 @@ export function applyRoof(op: Extract<AuthoringOp, { op: 'roof' }>, ctx: OpCtx):
         if (zr !== zl) plug(x, y - 1, zr);
       }
     }
+    deckOpening(x0, x1, z0 + rise + 1, z1 - rise - 1);
   }
   // Close the gable-end triangles (the vertical wall under each slope at the two
   // ends) so you can't see into the attic. Only for a gabled (non-hip) roof, and

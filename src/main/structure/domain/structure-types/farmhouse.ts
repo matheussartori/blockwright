@@ -10,6 +10,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
+import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, storeyEntries } from './shell-kit';
 import { dormers, frontVeranda } from './farmhouse-parts';
 import { box, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
@@ -47,6 +48,7 @@ export const farmhouse: StructureType = {
   maxRoomsPerFloor: 3,
   // A fresh build is SEEDED with this shell so the model keeps the sítio massing.
   seedShell: true,
+  pairedDecoration: 'farmhouse',
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
     roof: {
@@ -74,22 +76,14 @@ export const farmhouse: StructureType = {
     light: 'minecraft:lantern',
   },
   floors(b, params, floorHeights): FloorPlanEntry[] {
-    const floors = params.floors as number;
-    const { slabYs, wallTop } = plan(b, floors, (params.roof as string) === 'flat', floorHeights);
-    const out: FloorPlanEntry[] = [];
-    for (let f = 0; f < floors; f++) {
-      const from = slabYs[f];
-      const to = (f + 1 < floors ? slabYs[f + 1] : wallTop) - 1;
-      out.push({ from, to: Math.max(from, to), role: f === 0 ? 'ground' : 'upper' });
-    }
-    return out;
+    const { slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
+    return storeyEntries(slabYs, wallTop);
   },
   build({ box: b, params, palette, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1 } = b;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'gable';
     const isFlat = roofShape === 'flat';
-    const isHip = roofShape === 'hip';
     const { xn, zn, mainX1, slabYs, wallTop, upperFloorY } = plan(b, floors, isFlat, floorHeights);
 
     const wall = palette.get('wall');
@@ -122,33 +116,22 @@ export const farmhouse: StructureType = {
     wallSeg(mainX1, z0, mainX1, zn); // main wing east (faces the notch)
     wallSeg(xn, zn, x1, zn);         // back wing front (faces the notch)
 
-    // Log corner posts at the L's outer + inner corners.
-    for (const [px, pz] of [[x0, z0], [x0, z1], [x1, z1], [x1, zn], [mainX1, z0], [xn, zn]] as [number, number][]) {
-      ops.push({ op: 'fill', from: [px, y0, pz], to: [px, wallTop, pz], state: corner });
-    }
+    // Log corner posts at the L's outer + inner corners (kit).
+    ops.push(...cornerPosts([[x0, z0], [x0, z1], [x1, z1], [x1, zn], [mainX1, z0], [xn, zn]], y0, wallTop, corner));
 
-    // --- Cross-gable roof (per wing) — respecting the user's gable/hip/flat pick -------
-    const mainRoofFrom: [number, number, number] = [x0, wallTop + 1, z0];
-    const mainRoofTo: [number, number, number] = [mainX1, y1, z1];
-    const backRoofFrom: [number, number, number] = [xn, wallTop + 1, zn];
-    const backRoofTo: [number, number, number] = [x1, y1, z1];
-    if (isFlat) {
-      ops.push(...composeModule('roof', 'flat', mainRoofFrom, mainRoofTo));
-      ops.push(...composeModule('roof', 'flat', backRoofFrom, backRoofTo));
-    } else if (isHip) {
-      ops.push(...composeModule('roof', 'hip', mainRoofFrom, mainRoofTo));
-      ops.push(...composeModule('roof', 'hip', backRoofFrom, backRoofTo));
-    } else {
-      // Perpendicular ridges → an intersecting cross-gable roofline (the farmhouse "H").
-      ops.push(...composeModule('roof', 'gable', mainRoofFrom, mainRoofTo, { ridge: 'z' }));
-      ops.push(...composeModule('roof', 'gable', backRoofFrom, backRoofTo, { ridge: 'x' }));
-    }
+    // --- Cross-gable roof (per wing) — respecting the user's gable/hip/flat pick. The
+    // kit resolves ONE form for both wings ('roofFormFor' guarantees a cap: a pitch that
+    // can't fit still caps flat — never a roofless wing); perpendicular gable ridges make
+    // the intersecting cross-gable roofline (the farmhouse "H").
+    const form = roofFormFor(roofShape, y1 - wallTop, palette.idOf('roof').endsWith('_stairs'));
+    ops.push(...roofCap(composeModule, form, [x0, wallTop + 1, z0], [mainX1, y1, z1], 'z'));
+    ops.push(...roofCap(composeModule, form, [xn, wallTop + 1, zn], [x1, y1, z1], 'x'));
 
     // --- The deep covered veranda + upper gallery across the MAIN wing front -----------
     const mainBox = box([x0, y0, z0], [mainX1, y1, z1]);
     ops.push(...frontVeranda(mainBox, palette, { wallTop, upperFloorY }));
     // A dormer over the back-wing front slope (its ridge runs along x, so zn is a slope).
-    if (!isFlat && x1 - xn >= 4) ops.push(...dormers(box([xn, y0, zn], [x1, y1, z1]), palette, wallTop, zn));
+    if (form !== 'flat' && x1 - xn >= 4) ops.push(...dormers(box([xn, y0, zn], [x1, y1, z1]), palette, wallTop, zn));
 
     // --- Covered porch in the notch [xn..x1, z0..zn-1] (continues the front veranda) ---
     const porchTop = (upperFloorY ?? Math.min(wallTop, y0 + 4)) - 1;
@@ -170,12 +153,9 @@ export const farmhouse: StructureType = {
     const chimZ = Math.max(z0 + 1, z1 - 2);
     ops.push({ op: 'fill', from: [x0, y0, chimZ], to: [x0, y1, chimZ], state: found });
 
-    // --- A hanging lantern under each main-wing ceiling -------------------------------
+    // --- A hanging lantern under each main-wing ceiling (the guaranteed-light rule, kit)
     const cx = Math.floor((x0 + mainX1) / 2), cz = Math.floor((z0 + z1) / 2);
-    for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
-      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
-    }
+    ops.push(...ceilingLanterns(slabYs, wallTop, cx, cz, lantern));
 
     // --- Stair core in the MAIN wing back-right (the stairwell pass only repairs broken
     // flights, never invents one — so a multi-storey shell must build its own). Reuses the

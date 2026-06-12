@@ -83,6 +83,12 @@ src/
                            (decoration param accepts `decoration` or legacy `theme`)
         index.ts           barrel + catalog (listModuleCatalog), selection→guide mapping
                            (selectedGuides/promptGuides), buildModulePreview (gallery)
+        shell-kit.ts       The shared house-shell PARTS kit (like stair-core: a parts kit, not a base
+                           class): roofFormFor/roofCap (the ROOF GUARANTEE — a pitched pick that can't
+                           fit or can't pitch still caps with the flat module, never roofless),
+                           storeyEntries (ladder → authoritative FloorPlanEntry[]), seatDoor,
+                           cornerPosts, storeySlabs, ceilingLanterns. Every house type composes its
+                           casco from these; per-type code is only the genuine identity geometry.
         structure-types/   Category "structure": one file per archetype — classic (pitched storeyed home,
                            free-form) + four SEEDED archetypes with code-built shells (modern = flat-roofed
                            glass villa by default, but HONORS the Roof pick — a gable/hip crowns the upper
@@ -436,7 +442,25 @@ decoration, and a new module is one small file.
   These run on AI free-form builds too (gated by the Details selection), since the model is bad at the same details code can repair.
   (NOTE: only `'chimney'` still gates a pass. `'stairs'` is now vestigial — `rebuildStairwells` owns
   circulation always-on + self-gating, so it works on free-form builds with no structureType too.)
-- **Add a structure type:** new file in `structure-types/`, register in its `index.ts`.
+- **The structure-type CONTRACT is uniform and test-enforced** (`domain/__tests__/contract.test.ts`):
+  every type declares group/knowledge/preview/defaults; every STOREYED type (a `floors` param) has ONE
+  internal `plan()` (box+params → storey ladder/wall top, via the shared `planStoreys`) consumed by BOTH
+  `build()` and an authoritative `floors()` (so the viewer bands/sidecar/stairwell pass always match the
+  laid geometry — all five types have `floors()` now); per-type DATA lives ON the module, never as id
+  special-cases in general code (`pairedDecoration` drives the composer's auto-pairing; `complex` drives
+  the complex-structures guide gate). A cross-type INVARIANT MATRIX (every type × roof × basement × sizes)
+  asserts: dense shell (no "casa sem casco"), every interior column covered overhead (no roofless), and
+  ZERO module-respect warnings. The `roof` op itself DECKS a truncated pitch at its clamp height (no open
+  ridge slot when the box is short).
+- **Module-respect verification** (`compose.ts` `verifyModuleRespect`): the injected `composeModule`
+  delegate RECORDS every invocation; after `build()`, any requested module that was never delegated —
+  a pitched roof pick, the type's own `attic`/`basement` param — surfaces as a compile WARNING instead
+  of a silently ignored pick (the old classic too-short attic/basement skips). 'flat' isn't gated (a
+  flat cap can be a type's own identity geometry — the modern villa's terraces).
+- **Add a structure type:** new file in `structure-types/`, register in its `index.ts`. Follow the
+  contract: a `plan()` shared by `build()`+`floors()`, compose the casco from `shell-kit` parts
+  (roofFormFor/roofCap/storeySlabs/ceilingLanterns/cornerPosts/seatDoor) + `addStairCore`, declare
+  `pairedDecoration` if it has an identity look — the contract test fails anything missing.
   **Add a decoration:** new file in `decorations/`, register in its `index.ts`. **Add a role:**
   extend `roles.ts` (`Role` + `ROLES` + `BASE_BLOCKS`). Every module declares a `knowledge`
   path (its guide) + optional `keywords` + optional `preview` spec + optional `appliesTo`
