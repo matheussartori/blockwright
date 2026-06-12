@@ -56,10 +56,9 @@ src/
         jigsaw-assembler.ts  Plan a (seeded, bounded) jigsaw assembly + validate connectors
       domain/              Composable generation: MODULES by CATEGORY (structure × decoration
                            crossed by the `template` op in the authoring compiler — the model emits
-                           one op, the code produces the geometry — plus roof/basement modules that
-                           are selectable guidance but not yet geometry-wired, and guidance-only
-                           interior `room` modules assigned per floor). See "Composable
-                           generation domain" below.
+                           one op, the code produces the geometry — plus geometry-bearing roof/
+                           basement/attic modules and guidance-only interior `room` modules assigned
+                           per floor). See "Composable generation domain" below.
         modules.ts         ModuleMeta (id/label/category/description/knowledge/keywords/preview) — the
                            RICH build-bearing contract shared by every module + toSummary (project to the
                            wire shape). The renderer-facing shapes (`ModuleCategory`, `ModuleParam`,
@@ -97,18 +96,19 @@ src/
                            cottage RAISED on a visible stone basement with an exterior stair to the upper
                            entry; gothic = black+white manor with a central frontispiece tower, balustraded
                            front veranda, mini corner tower, glass chapel wing + ivy eaves) + types.ts
-                           (contract + Box/logProps + `seedShell`) + stair-core.ts (addStairCore — the
-                           shared switchback stair core every code-built house lays, taking the build's
-                           RolePalette; a `parts` helper so gothic/sakura/farmhouse reuse it WITHOUT
-                           importing classic) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts
-                           (registry). A type emits ops in terms of roles; never names blocks, and delegates
-                           roof/basement to modules. See "Seeded archetypes" below. (cabin/l-shaped retired;
-                           the EXTERIOR category was removed — sakura/gothic are full structure types now.)
+                           (contract: Box/logProps + `seedShell`/`pairedDecoration`/`complex` + `floors()`)
+                           + stair-core.ts (addStairCore — the shared switchback stair core every code-built
+                           house lays, taking the build's RolePalette; a `parts` helper, no cross-type
+                           imports) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts (registry).
+                           A type emits ops in terms of roles (never concrete blocks), composes its casco
+                           from shell-kit parts, keeps ONE `plan()` feeding both `build()` and `floors()`,
+                           and delegates roof/basement to modules. See "Seeded archetypes" below.
         decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
                            contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
                            maps roles→blocks + decay + weathering.
-        basements/ roofs/  Categories "basement"/"roof": one file per typology (roof: gable/hip;
-                           basement: cellar/crypt/cult-temple) + types.ts + index.ts (registry).
+        basements/ roofs/  Categories "basement"/"roof"/"attic": one file per typology (roof: gable/
+        attics/            hip/flat; basement: cellar/crypt/cult-temple; attic: storage/bedroom)
+                           + types.ts + index.ts (registry) each.
                            SELECTABLE in the composer Details (filtered by the chosen structure's
                            `appliesTo`) + listed in the gallery. Each carries GENERIC geometry
                            (`build()`, any host) + optional HOST-SPECIFIC extras (`integrations[host]`,
@@ -131,9 +131,6 @@ src/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
-                           (A short-lived guidance-only "form" category — cube/l-shaped/cabin/modern as
-                           advisory silhouette TEXT — was RETIRED: advisory text couldn't override the
-                           model's pitched-box prior, so each became a code-built structure type instead.)
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -146,7 +143,8 @@ src/
       emit-handler.ts       createEmitHandler(deps) — the per-emit validate→compile→mirror→render→review
                             step, extracted from the orchestrator so it's its own (testable) module. It
                             ADVANCES the shared EmitRunState each emit; the orchestrator reads it after
-                            the driver run to assemble the result.
+                            the driver run to assemble the result. Owns the COLLAPSE GATE (see "Seeded
+                            archetypes"): a delta-only "full" emit is rejected, never versioned.
       review-content.ts     buildReviewContent(...) — pure: assembles the content blocks (status +
                             fix/warning notes + reference target + screenshots) returned to the model
                             after each emit so it can review its own build. Tested in __tests__/.
@@ -158,8 +156,8 @@ src/
       emit-validate.ts      validateEmit(authoring) — the pre-compile gates (structural validity →
                             no `minecraft:light` → only real block ids); returns a {reason,feedback}
                             rejection for the model to self-correct, or null.
-      schema.ts             Shared system prompt + emit_structure schema (rich JSON Schema for
-                            Anthropic/OpenAI; flat string-schema for Gemini/Codex)
+      schema.ts             Shared system prompt + emit_structure schema (rich JSON Schema for the
+                            Claude SDK tool; a flat string-schema parse for Codex structured output)
       credentials.ts        Multi-provider credential store (per-provider secret via safeStorage) +
                             active-provider/model prefs + env precedence
       session.ts            Per-chat session state (provider session id + version counter + hidden
@@ -175,8 +173,8 @@ src/
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt in THREE
                             tiers (knowledge-select.ts): always-on CORE guides; CONDITIONAL core guides
                             gated on build characteristics (`CONDITIONAL_CORE` — e.g. 08-complex-structures
-                            rides along only when `isComplexBuild`: a basement / ≥2 rooms / gothic / a
-                            scale-or-rooms keyword in the prompt — conservative, errs toward INCLUDING);
+                            rides along only when `isComplexBuild`: a basement / ≥2 rooms / a structure
+                            flagged `complex` / a scale-or-rooms keyword in the prompt — conservative);
                             and a MODULE guide (knowledge/nbt/modules/**) only when its module is selected
                             or the prompt's keywords match it (the domain's selectedGuides/promptGuides).
                             All to cut the per-turn (re-sent every round) system-prompt token cost.
@@ -211,17 +209,15 @@ src/
                           anchored, complete the flue / drop a floating cap / keep one chimney). NEW
                           always-on checks plug in here; new per-structure fixes add a `FinalizePass`
                           id + a module `finalize` entry.
-                            rebuildStairwells (passes/stairwells.ts) is the DEFINITIVE circulation pass,
-                          replacing the old fragile insetStairs→stairsToLadder→carveStairwells chain
-                          (deleted). It is always-on + self-gating: detects the storey FLOOR PLANES,
+                            rebuildStairwells (passes/stairwells.ts) is the DEFINITIVE circulation pass:
+                          always-on + self-gating — it detects the storey FLOOR PLANES,
                           collects the model's flight/ladder hints (which gap each serves), strips the
                           broken geometry, and rebuilds ONE clean connector per gap — a straight stair
                           when a 45° run fits in the interior (full top step reaching the upper floor,
                           opening sized to the run, 2-block headroom, landings) else a flush wall ladder
                           (hung on the shell OR an interior wall). Connectors reserve their cells so two
                           can't collide; a gap it can't solve keeps the model's geometry + warns. Roof
-                          slopes (gables of stairs) are excluded via findFlights/topCeilingY. The
-                          'stairs' finalizer is now vestigial (no longer drives a pass).
+                          slopes (gables of stairs) are excluded via findFlights/topCeilingY.
       compile.ts          compileStructure / compileStructureReport / writeStructureFile
                           (validate → resolveBlocks → runPasses → encode), each taking optional
                           CompileOptions {structureType}; `pipelineFor(structureType)` assembles the
@@ -281,9 +277,10 @@ src/
                           `defaultFloorHeights` for the per-floor-height model: `BuildDetails.floorHeights`
                           (null = one Total Y; else a height per above-ground storey, total derived from
                           their sum + roof/basement overhead)), details.ts (pure reducers over BuildDetails —
-                          field/room/param/size edits + `setHeightMode`/`setFloorHeight`; NOTE editing a
-                          param or slot PRESERVES an explicit `size` now — it no longer snaps back to auto,
-                          and a `floors` change resizes the per-floor heights), attachments.ts (reference-
+                          field/room/param/size edits + `setHeightMode`/`setFloorHeight`; editing a
+                          param or slot PRESERVES an explicit `size` — never snaps it back to auto —
+                          and a `floors` change resizes the per-floor heights; a structure pick pairs
+                          the module's declared `pairedDecoration`), attachments.ts (reference-
                           image intake) and floors.ts (normalizeFloor + buildFloorPlan).
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
@@ -316,7 +313,11 @@ src/
                           Details selects, the build-card chips, the structured selection AND the
                           knowledge-guide gating, so "add a category" is one slot entry, not edits in
                           ~10 files; ModuleSlotKey also DERIVES the per-slot fields of BuildDetails/
-                          BuildSelection/BuildBrief — see below) + furnishing.ts (the SPACE × DECORATION
+                          BuildSelection/BuildBrief — see below) + storeys.ts (the canonical STOREY
+                          LADDER: planStoreys — explicit per-floor heights with proportional clamping,
+                          else the uniform split — + roof-aware heightOverhead + sanitizeFloorHeights;
+                          the renderer's size math and every structure type consume the SAME functions,
+                          so the height the composer promises is what the shell lays) + furnishing.ts (the SPACE × DECORATION
                           model: RoomScale tiers + scaleForArea + FurnishingPreset + presetForScale — the
                           room-plan brief picks a preset by area, the gallery lists them; thresholds once).
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
@@ -435,13 +436,13 @@ decoration, and a new module is one small file.
 - **Each type ships its own material `defaults`** (a "kit"), so it looks right even under a
   sparse decoration.
 - **A type declares its `finalize` passes** — the modular "which code fix applies to which
-  structure" map (`FinalizePass[]`). `house = ['stairs','chimney']`. The
+  structure" map (`FinalizePass[]`; currently only `'chimney'` — e.g. `classic = ['chimney']`). The
   compile pipeline (`pipelineFor`, via `structureFinalizers(id)`) runs each gated pass only when
   that structure is the SELECTED one (`BuildSelection.structureType`, threaded to `writeStructureFile`)
-  — so e.g. the single-chimney fix runs on a house but not on a structure that doesn't declare it.
-  These run on AI free-form builds too (gated by the Details selection), since the model is bad at the same details code can repair.
-  (NOTE: only `'chimney'` still gates a pass. `'stairs'` is now vestigial — `rebuildStairwells` owns
-  circulation always-on + self-gating, so it works on free-form builds with no structureType too.)
+  — so the single-chimney fix runs on a house but not on a structure that doesn't declare it. These
+  run on AI free-form builds too (gated by the Details selection), since the model is bad at the same
+  details code can repair. (Vertical circulation needs no finalizer — `rebuildStairwells` is always-on
+  and self-gating.)
 - **The structure-type CONTRACT is uniform and test-enforced** (`domain/__tests__/contract.test.ts`):
   every type declares group/knowledge/preview/defaults; every STOREYED type (a `floors` param) has ONE
   internal `plan()` (box+params → storey ladder/wall top, via the shared `planStoreys`) consumed by BOTH
@@ -455,7 +456,7 @@ decoration, and a new module is one small file.
 - **Module-respect verification** (`compose.ts` `verifyModuleRespect`): the injected `composeModule`
   delegate RECORDS every invocation; after `build()`, any requested module that was never delegated —
   a pitched roof pick, the type's own `attic`/`basement` param — surfaces as a compile WARNING instead
-  of a silently ignored pick (the old classic too-short attic/basement skips). 'flat' isn't gated (a
+  of a silently ignored pick (e.g. a too-short box's attic/basement skip). 'flat' isn't gated (a
   flat cap can be a type's own identity geometry — the modern villa's terraces).
 - **Add a structure type:** new file in `structure-types/`, register in its `index.ts`. Follow the
   contract: a `plan()` shared by `build()`+`floors()`, compose the casco from `shell-kit` parts
@@ -543,9 +544,9 @@ decoration, and a new module is one small file.
   cascades + an upper balcony; **gothic** = a black-with-white-detailing manor (pale belt courses) with a
   central frontispiece tower projecting at the front and rising past the ridge (carrying the grand entrance),
   a balustraded front veranda, a mini corner tower past the roofline, a glass chapel wing down one side + ivy
-  garlands over the eaves, steep slate roof. Each auto-pairs its identity decoration in Details (`details.ts` `PAIRED_DECORATION`:
-  modern/farmhouse/sakura/gothic); classic stays free-form on cozy. (cabin/l-shaped were retired; the
-  EXTERIOR category — sakura/gothic as skins over classic — was removed, since they're full types now.)
+  garlands over the eaves, steep slate roof. Each declares its identity decoration as `pairedDecoration`
+  on the MODULE (the composer auto-pairs it from the catalog — no hardcoded map); classic stays
+  free-form on cozy.
   - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
     shell instead of leaving it free-form: `ai/shell-seed.ts` compiles the shell (a `template` op at the
     requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
@@ -560,8 +561,7 @@ decoration, and a new module is one small file.
     `lockCells`; `generate.ts` threads them into EVERY emit's compile (`CompileOptions.lockCells`), and the
     `preserveShell` pass restores any the model deleted. The exterior becomes code-OWNED (floor/roof/walls/
     tower can't be gutted) while the model still furnishes the interior + may redecorate (solid→solid) and
-    glaze walls (a hole→pane is solid, so it's kept). (The old opt-in `lockShell` flag — gothic-only — was
-    removed; the unlocked-seed experiment failed.) (Door note: gothic's central tower carries the
+    glaze walls (a hole→pane is solid, so it's kept). (Door note: gothic's central tower carries the
     entrance, so the portico colonnade/veranda must skip the tower's central bay or a column buries the door.)
   - **The emit COLLAPSE GATE** (`emit-handler.ts`) backs the lock generically, covering the FREE-FORM
     classic too: a non-`patch` emit whose post-pass solid count falls below HALF of the baseline (the last
@@ -611,8 +611,7 @@ live in `schema.ts`. Validation errors are returned to the model so it self-corr
 
 The user picks the **active provider** + model in Settings ▸ AI (`shared/ai.ts` = the registry: id,
 label, auth kind, models). There are exactly TWO backends — both **subscription** (an existing CLI
-login, no API credits). The raw-API providers (Anthropic/OpenAI/Gemini) and their drivers were
-REMOVED to keep the surface small + the cost story simple:
+login, no API credits; no raw-API providers, by design — keep the surface + cost story simple):
 - **claude-subscription** (stable, default) — the **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`):
   authenticates like the Claude Code CLI, runs on the user's **Pro/Max plan**. The SDK manages the
   conversation/tool dispatch/resume; the driver just registers `emit_structure`. The ONLY path with an
@@ -636,10 +635,9 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   edited via `aiSetGeneration`): `maxRounds` (the emit→render→review cap — the #1 cost lever), `thinkingBudget`
   (extended-thinking tokens, 0 = off), `critic` (run the independent audit critic — Claude only). Three
   one-click PRESETS (`GENERATION_PRESETS`: Saver/Balanced/Thorough) set all three; the DEFAULT is **Saver**
-  (3 rounds, no thinking, no critic) — deliberately cheap, since the old always-on full-pass + critic run
-  was expensive. `generate.ts` reads these per-run (env `BW_AI_MAX_ROUNDS`/`BW_AI_THINKING_BUDGET` still
-  override); `maxRoundsFor` now HONORS an explicit budget down to 1 (so Saver can stop before the full
-  design-pass sequence — `rounds.ts`).
+  (3 rounds, no thinking, no critic) — deliberately cheap. `generate.ts` reads these per-run (env
+  `BW_AI_MAX_ROUNDS`/`BW_AI_THINKING_BUDGET` still override); `maxRoundsFor` honors an explicit budget
+  down to 1 (so Saver can stop before the full design-pass sequence — `rounds.ts`).
 
 - **The two AI SDKs are externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
   loaded via dynamic `import()` inside each `providers/` driver (so a provider's SDK only loads when
@@ -712,7 +710,7 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype
   compile its shell at the right box. Roof/Basement are enabled once a structure is chosen and are FILTERED
   by the chosen structure's `appliesTo` (a module that doesn't fit is hidden; switching structure clears an
-  incompatible pick + the room rows, and auto-pairs the Modern decoration for the modern house) — both the
+  incompatible pick + the room rows, and auto-pairs the structure's declared `pairedDecoration`) — both the
   renderer's Details filtering and the main guide gating call the SAME pure `moduleAppliesTo`
   (`shared/domain/applies-to.ts`), so the two can't drift. The selects are
   registry-backed: the composer fetches the categorized module catalog once via the `generationCatalog`
@@ -791,7 +789,7 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
 - **Floating windows:** Controls / Inspector / Jigsaw share one chrome (`components/FloatingWindow.tsx`):
   titled, draggable (clamped to the stage), redock / minimize / **close** (close hides via
   `setVisible(false)` — reopen from the View menu). Layout lives in `state/windows.ts`
-  (persisted; `generate.visible` is restored now, not force-hidden). The native **View** menu
+  (persisted). The native **View** menu
   shows/hides each window and offers Layout ▸ Reset Window Positions; `App.tsx` reports
   `{visible,available}` per window to main (`reportWindows`) so the menu's checkmarks/enabled state
   track the renderer (which owns the state). Don't inline window positions — go through the store.
@@ -807,7 +805,7 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   not window toggles, so they `notifyOpenCatalog/Modules` → `store.setCatalogOpen/ModulesOpen`).
 - **Home / tabs:** `activeId === null` (documents store) is the **Home** state — the Welcome screen
   shows whenever there's no active doc, even with tabs still open. The title-bar **House icon**
-  (`TabBar`, `goHome()`, a lucide `House` — not the logo anymore) returns there; clicking a tab
+  (`TabBar`, `goHome()`, a lucide `House`) returns there; clicking a tab
   restores it. The Generate dock tab has no close button (close it from View ▸ Generate, like
   Info/Versions). A brand-new tab (the "+" / File ▸ New / Welcome ▸ Generate) lands on the inline
   NewBuildPanel (Details-first), NOT the chat dock — `newDoc` resets the planner draft + does not

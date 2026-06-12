@@ -106,9 +106,10 @@ export interface BuildArgs {
  *  maps each id to a generic pass in `authoring/passes/` and runs it ONLY when the
  *  build's selected structure type declares it (so the gating is data on the module,
  *  not a hardcoded `if structureType === …` buried in the pass):
- *   - `'stairs'`  — multi-storey circulation cleanup (any storeyed structure).
- *   - `'chimney'` — single complete chimney enforcement (house-style homes only). */
-export type FinalizePass = 'stairs' | 'chimney';
+ *   - `'chimney'` — single complete chimney enforcement (house-style homes only).
+ *  (Vertical circulation needs no finalizer: `rebuildStairwells` is always-on and
+ *  self-gating.) */
+export type FinalizePass = 'chimney';
 
 /** A buildable structure archetype (house, …). Behaviour-only: it never
  *  names concrete blocks, so any type composes with any decoration. Carries the
@@ -136,7 +137,7 @@ export interface StructureType extends ModuleMeta {
   floors?(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[];
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
-   *  which structure" declaration — e.g. house = `['stairs','chimney']`. */
+   *  which structure" declaration — e.g. house = `['chimney']`. */
   finalize?: FinalizePass[];
   /** Max interior rooms a single floor of this type accepts in the build planner. Omit →
    *  the generic default. A roomier archetype (a manor) raises it; a tight one lowers it. */

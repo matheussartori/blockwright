@@ -85,16 +85,16 @@ screen.
 
 ### Generating a structure
 
-**File ▸ New Structure** opens a chat where you describe a build (optionally attaching a reference
-image). Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer,
-iterating through a visual review loop. The optional **⚙ Details** opens the full-stage **Build
-Planner**, where you pick a structure type, decoration, roof, basement and in-roof attic to steer the
-build — and, for a multi-storey house, assign up to two interior rooms to each floor (e.g. _Floor 1:
-living room + kitchen, Floor 2: bedrooms + library_) and set the build size (one total height, or a
-height per floor) — alongside a live 3D preview of the build volume. Your picks are shown back as a
-tidy build card in the chat. Browse every
-module with live 3D previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical
-levels. Pick an AI provider and model in **Settings ▸ AI** first.
+**File ▸ New Structure** opens the full-stage **Build Planner**, where you describe the build
+(optionally attaching a reference image) and pick a structure type, decoration, roof, basement and
+in-roof attic to steer it — and, for a multi-storey house, assign up to two interior rooms to each
+floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) and set the build size
+(one total height, or a height per floor) — alongside a live 3D preview of the build volume.
+Blockwright generates the structure, compiles it to `.nbt`, and renders it in the viewer, iterating
+through a visual review loop; follow-up edits continue in the chat, where **Build options** reopens
+the planner and your picks are shown back as a tidy build card. Browse every module with live 3D
+previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI
+provider and model in **Settings ▸ AI** first.
 
 Every finished build is saved to a browsable library — one folder per build, holding the latest clean
 `.nbt`, every kept version, and a `generation.log` of how it was made. A from-scratch build's tab

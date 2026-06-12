@@ -62,8 +62,8 @@ export const classic: StructureType = {
     'Decoration supplies the materials and (optionally) decay.',
   knowledge: 'nbt/modules/structure/classic.md',
   preview: { size: [11, 13, 9], params: { floors: 2, attic: 'storage' } },
-  // Multi-storey (stair cleanup) + a single complete chimney — the house-only finalizers.
-  finalize: ['stairs', 'chimney'],
+  // A single complete chimney — the house-only finalizer.
+  finalize: ['chimney'],
   // A roomy storeyed home: up to three interior rooms can share a floor.
   maxRoomsPerFloor: 3,
   params: {

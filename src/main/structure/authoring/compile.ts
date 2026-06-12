@@ -46,10 +46,10 @@ export interface CompileOptions {
  *  STRUCTURE-SCOPED one left is `'chimney'` (house), gated by the selected structure
  *  module's declared `finalize` list.
  *
- *  `rebuildStairwells` now OWNS all vertical circulation: it is always-on and
+ *  `rebuildStairwells` OWNS all vertical circulation: it is always-on and
  *  self-gating (it engages only when it finds ≥2 storey floor planes and a real
  *  climbing flight/ladder to rebuild), so it works on free-form AI builds too — no
- *  `'stairs'` finalizer needed. It replaces the old inset/ladder/carve chain. */
+ *  stairs finalizer needed. */
 function pipelineFor(structureType?: string): Pass[] {
   const passes: Pass[] = [];
   // The shell lock runs FIRST (no-op unless `lockCells` is supplied): it re-asserts the

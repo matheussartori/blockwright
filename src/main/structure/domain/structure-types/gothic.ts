@@ -44,7 +44,7 @@ export const gothic: StructureType = {
     'Brooding, vertical and asymmetric — soul-lit and manorly.',
   knowledge: 'nbt/modules/structure/gothic.md',
   preview: { size: [15, 16, 13], params: { decoration: 'gothic', floors: 2 } },
-  finalize: ['stairs', 'chimney'],
+  finalize: ['chimney'],
   maxRoomsPerFloor: 3,
   // A fresh build is SEEDED with this shell so the model keeps the towered manor massing
   // (every seeded shell is locked — preserveShell restores any floor/roof/wall/tower the

@@ -367,9 +367,9 @@ describe('fixPlacement — doorway carve shell protection', () => {
     { Name: 'minecraft:stone_bricks' },
   ];
 
-  it('never carves a doorway through a LOCKED shell cell (lockShell archetype)', () => {
+  it('never carves a doorway through a LOCKED shell cell (seeded archetype)', () => {
     // The same blocked-doorway scene the pass normally repairs — but the plug belongs
-    // to a lockShell structure's code-built exterior, so it must survive untouched.
+    // to a seeded structure's locked, code-built exterior, so it must survive untouched.
     const lockedCtx = {
       size: [16, 16, 16] as [number, number, number],
       lockCells: [

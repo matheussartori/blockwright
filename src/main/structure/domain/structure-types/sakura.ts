@@ -40,7 +40,7 @@ export const sakura: StructureType = {
     'blossom cascades, leafy window boxes and an upper-front balcony. Romantic and springtime.',
   knowledge: 'nbt/modules/structure/sakura.md',
   preview: { size: [13, 14, 11], params: { decoration: 'sakura', floors: 2 } },
-  finalize: ['stairs', 'chimney'],
+  finalize: ['chimney'],
   maxRoomsPerFloor: 2,
   // A fresh build is SEEDED with this shell so the model keeps the raised blossom massing.
   seedShell: true,

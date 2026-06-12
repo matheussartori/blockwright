@@ -148,8 +148,9 @@ describe('compose: structure types × decorations', () => {
   });
 
   it('structure modules declare their finalize passes (modular per-structure code gating)', () => {
-    // Classic is a hearth home → stair cleanup + single-chimney; an unknown id contributes nothing.
-    expect(structureFinalizers('classic')).toEqual(expect.arrayContaining(['stairs', 'chimney']));
+    // Classic is a hearth home → the single-chimney fix; an unknown id contributes nothing.
+    expect(structureFinalizers('classic')).toEqual(['chimney']);
+    expect(structureFinalizers('modern')).toEqual([]); // no chimney on the villa
     expect(structureFinalizers(undefined)).toEqual([]);
     expect(structureFinalizers('castle')).toEqual([]);
   });

@@ -107,8 +107,7 @@ export const modern: StructureType = {
   knowledge: 'nbt/modules/structure/modern.md',
   // Previewed (and seeded) under the modern decoration so the white/glass palette reads.
   preview: { size: [15, 13, 13], params: { decoration: 'modern' } },
-  // Multi-level circulation cleanup; NO chimney (modern houses have none).
-  finalize: ['stairs'],
+  // NO chimney finalizer (modern houses have none); circulation is the always-on pass.
   // A fresh AI build is SEEDED with this code-built shell (the model can't reliably
   // invent the modern silhouette) — it keeps the massing and furnishes the interior.
   seedShell: true,

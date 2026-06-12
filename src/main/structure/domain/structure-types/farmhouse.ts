@@ -44,7 +44,7 @@ export const farmhouse: StructureType = {
     'tiled roof, and a tall gable-end chimney. Sprawling, lived-in, grounded.',
   knowledge: 'nbt/modules/structure/farmhouse.md',
   preview: { size: [17, 14, 13], params: { floors: 2, decoration: 'farmhouse' } },
-  finalize: ['stairs', 'chimney'],
+  finalize: ['chimney'],
   maxRoomsPerFloor: 3,
   // A fresh build is SEEDED with this shell so the model keeps the sítio massing.
   seedShell: true,
