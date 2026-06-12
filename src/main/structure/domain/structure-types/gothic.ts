@@ -12,6 +12,7 @@
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own gothic kit.
 import type { AuthoringOp } from '../../authoring/types';
+import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
 import { box as mkBox, logProps, type StructureType } from './types';
 
@@ -30,11 +31,10 @@ export const gothic: StructureType = {
   preview: { size: [15, 16, 13], params: { decoration: 'gothic', floors: 2 } },
   finalize: ['stairs', 'chimney'],
   maxRoomsPerFloor: 3,
-  // A fresh build is SEEDED with this shell so the model keeps the towered manor massing,
-  // and the shell is LOCKED (preserveShell restores any floor/roof/wall/tower the model
-  // deletes) — the model finishes the interior but can't gut the code-built exterior.
+  // A fresh build is SEEDED with this shell so the model keeps the towered manor massing
+  // (every seeded shell is locked — preserveShell restores any floor/roof/wall/tower the
+  // model deletes, so it finishes the interior but can't gut the code-built exterior).
   seedShell: true,
-  lockShell: true,
   params: {
     floors: { kind: 'int', default: 2, min: 1, max: 3, label: 'Floors' },
     roof: {
@@ -62,7 +62,7 @@ export const gothic: StructureType = {
     light: 'minecraft:soul_lantern',
     plant: 'minecraft:flowering_azalea_leaves', // ivy/garland greenery on the roof + tower
   },
-  build({ box, params, palette, composeModule }) {
+  build({ box, params, palette, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
 
@@ -101,16 +101,17 @@ export const gothic: StructureType = {
     const isFlat = roofShape === 'flat';
     const isHip = roofShape === 'hip';
     const roofRings = isFlat ? 2 : Math.max(3, Math.floor(Math.min(W, D - portD) / 2));
-    let storeyH = Math.max(4, Math.floor((y1 - y0 - roofRings) / floors));
-    let wallTop = y0 + storeyH * floors;
-    while (wallTop + 2 > y1 && storeyH > 3) { storeyH--; wallTop = y0 + storeyH * floors; }
-    if (wallTop > y1 - 2) wallTop = Math.max(y0 + 3, y1 - 2);
+    // The storey split via the shared ladder (the user's explicit per-floor heights win).
+    const ladder = planStoreys({ baseY: y0, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
+    const slabYs = ladder.slabYs;
+    const wallTop = ladder.wallTop > y1 - 2 ? Math.max(y0 + 3, y1 - 2) : ladder.wallTop;
+    const groundH = (slabYs[1] ?? wallTop) - y0; // the ground storey's slab-to-slab height
 
     // --- Foundation + per-storey floor slabs ------------------------------------------
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: found });
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: floorIdx });
     for (let f = 1; f < floors; f++) {
-      const midY = y0 + f * storeyH;
+      const midY = slabYs[f];
       if (midY < wallTop) ops.push({ op: 'fill', from: [x0 + 1, midY, hz0 + 1], to: [x1 - 1, midY, z1 - 1], state: floorIdx });
     }
 
@@ -121,7 +122,7 @@ export const gothic: StructureType = {
     }
     // White belt courses: a pale ring at each upper floor line + a cornice at the eaves.
     for (let f = 1; f < floors; f++) {
-      const midY = y0 + f * storeyH;
+      const midY = slabYs[f];
       if (midY < wallTop) ops.push({ op: 'walls', from: [x0, midY, hz0], to: [x1, midY, z1], state: accent });
     }
     ops.push({ op: 'walls', from: [x0, wallTop, hz0], to: [x1, wallTop, z1], state: accent });
@@ -193,7 +194,7 @@ export const gothic: StructureType = {
       ops.push({ op: 'walls', from: [tx0, y0, tz0], to: [tx1, tTop, tz1], state: wall });
       for (const px of [tx0, tx1]) ops.push({ op: 'fill', from: [px, y0, tz0], to: [px, tTop, tz0], state: corner });
       for (let f = 1; f < floors; f++) {
-        const midY = y0 + f * storeyH;
+        const midY = slabYs[f];
         if (midY < tTop) ops.push({ op: 'walls', from: [tx0, midY, tz0], to: [tx1, midY, tz1], state: accent });
       }
       ops.push({ op: 'walls', from: [tx0, tTop, tz0], to: [tx1, tTop, tz1], state: accent });
@@ -201,7 +202,7 @@ export const gothic: StructureType = {
       ops.push({ op: 'fill', from: [tx0 + 1, y0 + 1, tz0 + 1], to: [tx1 - 1, tTop - 1, tz1], state: air });
       // Tall traceried front window per storey (a grey lancet flanked by mullions).
       for (let f = 0; f < floors; f++) {
-        const wy = y0 + f * storeyH + 2;
+        const wy = slabYs[f] + 2;
         if (wy + 1 >= tTop) break;
         ops.push({ op: 'fill', from: [cx, wy, tz0], to: [cx, Math.min(wy + 2, tTop - 1), tz0], state: win });
         if (tw >= 2) for (const px of [cx - 1, cx + 1]) ops.push({ op: 'fill', from: [px, wy, tz0], to: [px, wy + 1, tz0], state: glass });
@@ -235,7 +236,7 @@ export const gothic: StructureType = {
 
     // --- Covered front portico: a colonnade'd corridor across the facade ---------------
     if (portD > 0) {
-      const portTop = Math.min(wallTop - 1, y0 + Math.max(3, storeyH - 1));
+      const portTop = Math.min(wallTop - 1, y0 + Math.max(3, groundH - 1));
       ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, hz0 - 1], state: floorIdx }); // deck
       // Flat veranda roof — split around the tower bay so it doesn't shelf across the entrance.
       if (hasTower) {
@@ -272,7 +273,7 @@ export const gothic: StructureType = {
 
     // --- Tall windows with pale sills, front + right + back (skip the entry/chapel) -----
     for (let f = 0; f < floors; f++) {
-      const wy = y0 + f * storeyH + 2;
+      const wy = slabYs[f] + 2;
       if (wy + 1 >= wallTop) break;
       for (const x of [x0 + 2, x1 - 2]) {
         if (f === 0 && Math.abs(x - cx) <= 1) continue;
@@ -285,15 +286,13 @@ export const gothic: StructureType = {
 
     // --- Soul lanterns under each ceiling ---------------------------------------------
     for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? y0 + (f + 1) * storeyH : wallTop;
-      if (ceil - 1 > y0 + f * storeyH) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
+      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
+      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
     }
 
     // --- Interior stair core (behind the portico); the stairwell pass only REPAIRS it ---
     if (floors >= 2) {
-      const slabYs: number[] = [];
-      for (let f = 0; f < floors; f++) slabYs.push(y0 + f * storeyH);
-      addStairCore({ ops, box: mkBox([x0, y0, hz0], [x1, y1, z1]), slabYs, storeyH, palette });
+      addStairCore({ ops, box: mkBox([x0, y0, hz0], [x1, y1, z1]), slabYs, palette });
     }
     return ops;
   },

@@ -189,7 +189,7 @@ src/
                           {blocks,palette,fixes?,warnings?}; runPasses chains them, accumulating
                           fixes/warnings. ctx carries `size` + the selected `structureType`.
                           ALWAYS-ON: preserveShell (runs FIRST; a no-op unless `ctx.lockCells` is
-                          supplied — for a `lockShell` structure (gothic) it restores any shell cell the
+                          supplied — for a shell-seeded structure it restores any shell cell the
                           model DELETED/aired-out, so the code-built exterior floor/roof/walls/tower can't
                           be gutted; the model may still redecorate solid→solid, glaze walls and furnish),
                           rebuildStairwells (code OWNS vertical circulation — see below),
@@ -528,16 +528,23 @@ decoration, and a new module is one small file.
     (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
     `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
     model only finishes it. The plain **house has NO `seedShell`** → stays free-form (variety).
-  - **`lockShell: true`** (`StructureType`, implies `seedShell`; **gothic only** for now) hardens the seed
-    into a guarantee: a seed is only CONTEXT the model can ignore, and it does — it reliably deletes the
-    ground-floor slab + strips the roof (the "sem chão / sem telhado" defect), then strews furniture over
-    the hole (stripped as "unsupported" by `fixPlacement`). For a locked type, `buildShellSeed` returns the
-    compiled shell's solid cells as `lockCells`; `generate.ts` threads them into EVERY emit's compile
-    (`CompileOptions.lockCells`), and the `preserveShell` pass restores any the model deleted. The exterior
-    becomes code-OWNED (floor/roof/walls/tower can't be gutted) while the model still furnishes the interior
-    + may redecorate (solid→solid) and glaze walls (a hole→pane is solid, so it's kept). Other `seedShell`
-    types stay UNLOCKED (free to re-emit) — opt in per type. (Door note: gothic's central tower carries the
+  - **Every seeded shell is LOCKED** (no separate flag — `seedShell` implies the lock): a seed is only
+    CONTEXT the model can ignore, and it does — it deletes the ground-floor slab + strips the roof (the
+    "sem chão / sem telhado" defect) or emits a furniture-only delta that "keeps" the exterior by not
+    re-emitting it, so the whole shell vanished (the sakura "skeleton" defect — v1 was 1.3k blocks of
+    carpets/barrels in a 45×69×24 box). `buildShellSeed` returns the compiled shell's solid cells as
+    `lockCells`; `generate.ts` threads them into EVERY emit's compile (`CompileOptions.lockCells`), and the
+    `preserveShell` pass restores any the model deleted. The exterior becomes code-OWNED (floor/roof/walls/
+    tower can't be gutted) while the model still furnishes the interior + may redecorate (solid→solid) and
+    glaze walls (a hole→pane is solid, so it's kept). (The old opt-in `lockShell` flag — gothic-only — was
+    removed; the unlocked-seed experiment failed.) (Door note: gothic's central tower carries the
     entrance, so the portico colonnade/veranda must skip the tower's central bay or a column buries the door.)
+  - **The emit COLLAPSE GATE** (`emit-handler.ts`) backs the lock generically, covering the FREE-FORM
+    classic too: a non-`patch` emit whose post-pass solid count falls below HALF of the baseline (the last
+    accepted version's `session.lastSolids`, or the locked shell's cell count on the first emit; baselines
+    under 50 blocks don't gate) is REJECTED back to the model — it never becomes a version — with feedback
+    explaining that a "full" emit replaces the whole structure and to re-emit complete or use mode `patch`
+    (air fills in a patch remain the legitimate demolition path).
   - **Verify a shell visually with `BW_CAPTURE`** (compile a `template name:'<id>'` to `.nbt`, open it) —
     the geometry is real code, so screenshot it BEFORE relying on an AI run (which can't be verified
     locally). `domain/__tests__/compose.test.ts` also guards that each archetype compiles from its preview.

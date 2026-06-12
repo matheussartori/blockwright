@@ -7,7 +7,7 @@
 import type { Vec3 } from '../geometry';
 import type { AuthoringBlock, AuthoringPaletteEntry } from '../types';
 
-/** One cell of the code-built starting SHELL that a `lockShell` structure type insists
+/** One cell of the code-built starting SHELL that a seeded structure type insists
  *  on keeping (its floor decks, roof, walls, tower, …). `preserveShell` restores any of
  *  these the model deleted (left as air), so a locked exterior can't be gutted by the AI. */
 export interface ShellLockCell {
@@ -31,7 +31,7 @@ export interface PassContext {
    *  `runPasses` reports each pass's intent + any fixes/warnings through it. Left
    *  undefined for non-AI compiles (catalog/module previews) so they stay quiet. */
   log?: (message: string) => void;
-  /** The protected SHELL cells for a `lockShell` structure (gothic) — `preserveShell`
+  /** The protected SHELL cells of a seeded structure — `preserveShell`
    *  re-asserts any of these the model deleted, so the code-built exterior survives the
    *  AI's edits. Undefined/empty for every other build → `preserveShell` no-ops. */
   lockCells?: ShellLockCell[];

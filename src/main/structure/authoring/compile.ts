@@ -37,7 +37,7 @@ export interface CompileOptions {
   /** Optional sink for the per-pass code-fix play-by-play (the AI Console dock).
    *  Omit for context-free compiles (catalog/module previews) so they stay quiet. */
   log?: (message: string) => void;
-  /** The protected SHELL cells for a `lockShell` structure (gothic) — `preserveShell`
+  /** The protected SHELL cells of a seeded structure — `preserveShell`
    *  restores any of these the model deleted. Omit for everything else (the pass no-ops). */
   lockCells?: ShellLockCell[];
 }

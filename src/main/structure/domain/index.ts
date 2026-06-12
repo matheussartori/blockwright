@@ -7,6 +7,7 @@ import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../
 import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
+import { sanitizeFloorHeights } from '@/shared/domain/storeys';
 import { composeModulePreview } from './compose';
 import { getModule } from './categories';
 import { resolveParams } from './params';
@@ -93,7 +94,8 @@ export function listModuleCatalog(): ModuleCatalog {
  *
  * @param id - The structure-type id (e.g. 'modern').
  * @param size - The build size [X, Y, Z].
- * @param rawParams - The build's loose params (floors, roof, …); defaults applied.
+ * @param rawParams - The build's loose params (floors, roof, a `floorHeights` array, …);
+ *   defaults applied.
  * @returns The numbered storeys bottom-up (`FloorDef[]`), or `[]` when the type doesn't
  *   declare an authoritative plan (so the caller falls back to detection).
  */
@@ -106,7 +108,7 @@ export function structureFloorPlan(
   if (!type?.floors) return [];
   const b = box([0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]);
   const params = resolveParams(type.params, rawParams);
-  return type.floors(b, params).map((f, i) => ({
+  return type.floors(b, params, sanitizeFloorHeights(rawParams.floorHeights)).map((f, i) => ({
     id: `floor-${i + 1}`,
     name: `Floor ${i + 1}`,
     from: f.from,

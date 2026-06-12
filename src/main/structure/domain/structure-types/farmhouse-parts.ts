@@ -8,7 +8,6 @@ import { logProps, type Box, type RolePalette } from './types';
 
 /** The storey lines a build derived, threaded into the veranda so it aligns with the host. */
 export interface Plan {
-  storeyH: number;
   wallTop: number;
   /** The upper-floor slab Y (= the porch roof / gallery deck), or null for a 1-storey box. */
   upperFloorY: number | null;
@@ -33,7 +32,7 @@ export function door(palette: RolePalette, x: number, y: number, z: number): Aut
  *
  * @param box - The (sub-)box to apply the veranda to; its front is `z0`, width `x0..x1`.
  * @param palette - The role palette (uses wall/window/fence/beam/pillar/light/roof/door/air).
- * @param plan - The storey lines (storeyH/wallTop/upperFloorY) the caller derived for `box`.
+ * @param plan - The storey lines (wallTop/upperFloorY) the caller derived for `box`.
  */
 export function frontVeranda(box: Box, palette: RolePalette, plan: Plan): AuthoringOp[] {
   const { x0, y0, z0, x1 } = box;

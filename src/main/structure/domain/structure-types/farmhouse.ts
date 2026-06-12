@@ -8,13 +8,15 @@
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own farmhouse kit.
 import type { AuthoringOp } from '../../authoring/types';
+import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
 import { dormers, frontVeranda } from './farmhouse-parts';
 import { box, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
 /** The L split + storey lines for a box+params — shared by `build()` and `floors()` so the
- *  detector/stairwell pass see the SAME planes the geometry uses. */
-function plan(b: Box, floors: number, isFlat: boolean) {
+ *  detector/stairwell pass see the SAME planes the geometry uses. The shared ladder
+ *  honours the user's explicit per-floor heights when given. */
+function plan(b: Box, floors: number, isFlat: boolean, floorHeights?: number[]) {
   const { x0, y0, z0, x1, y1, D } = b;
   const W = x1 - x0 + 1;
   const xn = x0 + Math.max(4, Math.ceil(W * 0.6)); // back wing's first (east) column
@@ -22,12 +24,11 @@ function plan(b: Box, floors: number, isFlat: boolean) {
   const mainX1 = xn - 1; // main wing's east column
   const mainW = mainX1 - x0 + 1;
   const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(mainW, D) / 2));
-  let storeyH = Math.max(4, Math.floor((y1 - y0 - roofRings) / floors));
-  let wallTop = y0 + storeyH * floors;
-  while (wallTop + 2 > y1 && storeyH > 3) { storeyH--; wallTop = y0 + storeyH * floors; }
-  if (wallTop > y1 - 2) wallTop = Math.max(y0 + 3, y1 - 2);
-  const upperFloorY = floors >= 2 ? y0 + storeyH : null;
-  return { xn, zn, mainX1, storeyH, wallTop, upperFloorY };
+  const ladder = planStoreys({ baseY: y0, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
+  const slabYs = ladder.slabYs;
+  const wallTop = ladder.wallTop > y1 - 2 ? Math.max(y0 + 3, y1 - 2) : ladder.wallTop;
+  const upperFloorY = floors >= 2 ? slabYs[1] : null;
+  return { xn, zn, mainX1, slabYs, wallTop, upperFloorY };
 }
 
 export const farmhouse: StructureType = {
@@ -72,24 +73,24 @@ export const farmhouse: StructureType = {
     fence: 'minecraft:oak_fence',
     light: 'minecraft:lantern',
   },
-  floors(b, params): FloorPlanEntry[] {
+  floors(b, params, floorHeights): FloorPlanEntry[] {
     const floors = params.floors as number;
-    const { storeyH, wallTop } = plan(b, floors, (params.roof as string) === 'flat');
+    const { slabYs, wallTop } = plan(b, floors, (params.roof as string) === 'flat', floorHeights);
     const out: FloorPlanEntry[] = [];
     for (let f = 0; f < floors; f++) {
-      const from = b.y0 + f * storeyH;
-      const to = (f + 1 < floors ? b.y0 + (f + 1) * storeyH : wallTop) - 1;
+      const from = slabYs[f];
+      const to = (f + 1 < floors ? slabYs[f + 1] : wallTop) - 1;
       out.push({ from, to: Math.max(from, to), role: f === 0 ? 'ground' : 'upper' });
     }
     return out;
   },
-  build({ box: b, params, palette, composeModule }) {
+  build({ box: b, params, palette, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1 } = b;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'gable';
     const isFlat = roofShape === 'flat';
     const isHip = roofShape === 'hip';
-    const { xn, zn, mainX1, storeyH, wallTop, upperFloorY } = plan(b, floors, isFlat);
+    const { xn, zn, mainX1, slabYs, wallTop, upperFloorY } = plan(b, floors, isFlat, floorHeights);
 
     const wall = palette.get('wall');
     const found = palette.get('foundation');
@@ -108,7 +109,7 @@ export const farmhouse: StructureType = {
       ops.push({ op: 'fill', from: [xn, y, zn], to: [x1, y, z1], state: st });      // back wing
     };
     slab(y0, found);
-    for (let f = 1; f < floors; f++) slab(y0 + f * storeyH, floorIdx);
+    for (let f = 1; f < floors; f++) slab(slabYs[f], floorIdx);
 
     // --- Perimeter walls along the L outline ------------------------------------------
     const wallSeg = (ax: number, az: number, bx: number, bz: number): void => {
@@ -145,7 +146,7 @@ export const farmhouse: StructureType = {
 
     // --- The deep covered veranda + upper gallery across the MAIN wing front -----------
     const mainBox = box([x0, y0, z0], [mainX1, y1, z1]);
-    ops.push(...frontVeranda(mainBox, palette, { storeyH, wallTop, upperFloorY }));
+    ops.push(...frontVeranda(mainBox, palette, { wallTop, upperFloorY }));
     // A dormer over the back-wing front slope (its ridge runs along x, so zn is a slope).
     if (!isFlat && x1 - xn >= 4) ops.push(...dormers(box([xn, y0, zn], [x1, y1, z1]), palette, wallTop, zn));
 
@@ -172,18 +173,16 @@ export const farmhouse: StructureType = {
     // --- A hanging lantern under each main-wing ceiling -------------------------------
     const cx = Math.floor((x0 + mainX1) / 2), cz = Math.floor((z0 + z1) / 2);
     for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? y0 + (f + 1) * storeyH : wallTop;
-      if (ceil - 1 > y0 + f * storeyH) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
+      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
+      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
     }
 
     // --- Stair core in the MAIN wing back-right (the stairwell pass only repairs broken
     // flights, never invents one — so a multi-storey shell must build its own). Reuses the
     // classic's proven 2-wide switchback over the main wing's clean rectangle. -----------
     if (floors >= 2) {
-      const slabYs: number[] = [];
-      for (let f = 0; f < floors; f++) slabYs.push(y0 + f * storeyH);
       const mainWing = box([x0, y0, z0], [mainX1, y1, z1]);
-      addStairCore({ ops, box: mainWing, slabYs, storeyH, palette });
+      addStairCore({ ops, box: mainWing, slabYs, palette });
     }
 
     return ops;

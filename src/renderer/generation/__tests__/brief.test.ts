@@ -129,6 +129,16 @@ describe('effectiveSize', () => {
     const without = effectiveSize(details({ structureType: 'house' }), houseModule);
     expect(withBasement.h).toBeGreaterThan(without.h);
   });
+  it('a FLAT roof pick drops the pitch reserve from the derived height', () => {
+    const flat = effectiveSize(details({ structureType: 'house', roof: 'flat', params: { floors: 2 } }), houseModule);
+    const pitched = effectiveSize(details({ structureType: 'house', roof: 'gable', params: { floors: 2 } }), houseModule);
+    // 11×11 footprint: pitched reserves floor(11/2)+1 = 6; flat needs only a deck + parapet (2).
+    expect(pitched.h - flat.h).toBe(4);
+  });
+  it('derives the total height from explicit per-floor heights + the roof-aware overhead', () => {
+    const d = details({ structureType: 'house', roof: 'flat', params: { floors: 2 }, floorHeights: [7, 4] });
+    expect(effectiveSize(d, houseModule).h).toBe(7 + 4 + 2); // storeys + flat deck/parapet
+  });
 });
 
 describe('buildBrief', () => {
@@ -145,6 +155,20 @@ describe('buildBrief', () => {
     expect(out).toContain('Gable roof');
     expect(out).toContain('Cellar');
     expect(out).toContain('Do NOT use a `template` op');
+  });
+  it('emits the storey-height line whenever per-floor heights are set — EQUAL heights too', () => {
+    const out = buildBrief(
+      details({ structureType: 'house', params: { floors: 2 }, floorHeights: [5, 5] }),
+      catalog,
+    );
+    expect(out).toContain('Storey heights');
+    expect(out).toContain('floor 1 = 5 blocks (slab at y=0)');
+    expect(out).toContain('floor 2 = 5 blocks (slab at y=5)');
+    expect(out).toContain('respect these heights exactly');
+  });
+  it('omits the storey-height line in total-height mode (floorHeights null)', () => {
+    const out = buildBrief(details({ structureType: 'house', params: { floors: 2 } }), catalog);
+    expect(out).not.toContain('Storey heights');
   });
 });
 
@@ -220,6 +244,12 @@ describe('buildSelection', () => {
     expect(buildSelection(details({ structureType: 'house' }), catalog).size).toHaveLength(3);
     // No structure picked → size is moot and must not drag a shell into a free-form build.
     expect(buildSelection(details({ structureType: '' }), catalog).size).toBeUndefined();
+  });
+  it('threads the per-floor heights only alongside a structure', () => {
+    const d = details({ structureType: 'house', params: { floors: 2 }, floorHeights: [7, 4] });
+    expect(buildSelection(d, catalog).floorHeights).toEqual([7, 4]);
+    expect(buildSelection(details({ structureType: 'house' }), catalog).floorHeights).toBeUndefined();
+    expect(buildSelection(details({ floorHeights: [7, 4] }), catalog).floorHeights).toBeUndefined();
   });
 });
 

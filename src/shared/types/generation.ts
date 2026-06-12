@@ -23,6 +23,11 @@ export type BuildSelection = Partial<Record<ModuleSlotKey, string>> & {
    *  that ships a code-built starting SHELL (e.g. the modern house) can compile that
    *  shell at the right size and seed the model with it. */
   size?: [number, number, number];
+  /** The user's explicit per-floor storey heights (slab-to-slab, bottom-up, above-ground
+   *  floors only) from the composer's "Per floor" height mode. Threaded so a code-built
+   *  shell lays its decks at EXACTLY these heights (via the shared storey ladder) instead
+   *  of its uniform split — the per-floor rule holds in every house type. */
+  floorHeights?: number[];
 };
 
 /** A display-ready build card shown in the chat. On the USER message it summarises

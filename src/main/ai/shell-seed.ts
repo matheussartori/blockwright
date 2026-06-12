@@ -31,15 +31,21 @@ export interface ShellSeedOptions {
   /** The selected basement-module id (cellar/crypt/cult-temple), threaded so the shell
    *  digs the chosen below-grade vault — composed centrally by `composeStructure`. */
   basement?: string;
+  /** The user's explicit per-floor storey heights (slab-to-slab, bottom-up), threaded so
+   *  the shell's storey ladder lays its decks at exactly those heights. */
+  floorHeights?: number[];
 }
 
-/** The result of {@link buildShellSeed}: the model-facing preamble plus — for a
- *  `lockShell` type only — the protected shell cells the compile pass re-asserts. */
+/** The result of {@link buildShellSeed}: the model-facing preamble plus the protected
+ *  shell cells the compile pass re-asserts on every emit. */
 export interface ShellSeed {
   /** The {@link shellPreamble} wrapping the compiled shell's authoring JSON, or ''. */
   preamble: string;
-  /** The solid shell cells to LOCK against deletion (only for a `lockShell` type, else
-   *  undefined → no lock). Threaded into every emit's compile as `CompileOptions.lockCells`. */
+  /** The solid shell cells to LOCK against deletion — EVERY seeded shell is locked
+   *  (the unlocked-seed experiment failed: the model emits furniture-only deltas and
+   *  the shell vanishes, the sakura "skeleton" defect). Threaded into every emit's
+   *  compile as `CompileOptions.lockCells`; `preserveShell` restores any cell the
+   *  model deleted. Undefined only when there is no shell at all. */
   lockCells?: ShellLockCell[];
 }
 
@@ -49,10 +55,10 @@ export interface ShellSeed {
  *
  * @param opts - The {@link ShellSeedOptions} (structure/decoration/size/roof).
  * @param dir - A scratch dir to compile the shell into (the session dir).
- * @returns A {@link ShellSeed}: the preamble, plus the lock cells for a `lockShell` type.
+ * @returns A {@link ShellSeed}: the preamble plus the locked shell cells.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof, basement } = opts;
+  const { structureType, decoration, size, roof, basement, floorHeights } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type?.seedShell) return { preamble: '' };
 
@@ -65,6 +71,9 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The basement-module id rides in as `params.basement`; composeStructure reserves the
   // bottom of the box for it and ladders it to the ground floor (central, per-type-free).
   if (basement && basement !== 'none') params.basement = basement;
+  // The user's per-floor heights ride in as a raw array param; composeStructure sanitizes
+  // them and the type's storey ladder lays its decks at exactly those heights.
+  if (floorHeights?.length) params.floorHeights = floorHeights;
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size: [W, H, D],
@@ -80,9 +89,12 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
     const file = path.join(dir, 'shell.nbt');
     await writeStructureFile(authoring, file, { structureType });
     const expanded = await readAuthoring(file);
-    // A LOCKED type's compiled shell becomes the protected cell set (every solid block):
-    // the compile pass restores any of these the model deletes, so the exterior survives.
-    const lockCells = type.lockShell ? shellLockCells(expanded) : undefined;
+    // The compiled shell becomes the protected cell set (every solid block): the
+    // `preserveShell` compile pass restores any of these the model deletes, so the
+    // exterior survives even an emit that carries only furniture. Every seeded shell
+    // is locked — a seed that's only context gets ignored (the model "keeps" the
+    // exterior by not re-emitting it, and the whole shell vanishes).
+    const lockCells = shellLockCells(expanded);
     return { preamble: shellPreamble(JSON.stringify(expanded)), lockCells };
   } catch {
     return { preamble: '' }; // never block generation on a shell-seed failure — fall back to free-form

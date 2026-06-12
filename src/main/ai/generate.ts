@@ -92,9 +92,9 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // code-built exterior shell, so the model finishes a guaranteed-modern silhouette
   // instead of inventing one (and reliably reverting to a pitched box). Falls through
   // to the normal edit/free-form seed for every other case.
-  // The LOCKED shell cells of a `lockShell` archetype (gothic): re-asserted on every
-  // emit's compile so the AI can't gut the code-built exterior. Empty for every other
-  // build (so `preserveShell` no-ops and other archetypes are unaffected).
+  // The LOCKED shell cells of a seeded archetype: re-asserted on every emit's compile
+  // so the AI can't gut the code-built exterior (it reliably emits furniture-only
+  // deltas otherwise). Empty for a free-form build (so `preserveShell` no-ops).
   let lockCells: ShellLockCell[] | undefined;
   let seed = await buildSeed(resumable, session, basePath);
   if (!seed && session.version === 0) {
@@ -104,6 +104,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       size: selection?.size,
       roof: selection?.roof,
       basement: selection?.basement,
+      floorHeights: selection?.floorHeights,
     }, session.dir);
     seed = shell.preamble;
     lockCells = shell.lockCells;

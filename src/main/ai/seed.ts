@@ -45,7 +45,11 @@ export function shellPreamble(json: string): string {
     'they ARE the requested style. Your job is to: furnish the interior room-by-room, connect the rooms ' +
     'to any porch/gallery doors, add finishing exterior detail (greenery/hedges/planters/flower boxes, ' +
     'outdoor steps, porch furniture, lighting), fix anything unsound, and otherwise REFINE — not ' +
-    'replace — this shell. Then call emit_structure with the COMPLETE structure (mode "full"). Keep the ' +
+    'replace — this shell. CRITICAL: a mode "full" emit REPLACES the entire structure — anything you do ' +
+    'not re-emit is DELETED, so "keeping" the shell means RE-EMITTING EVERY BLOCK OF IT. Never emit only ' +
+    'your additions as a full structure (a furniture-only emit erases the walls, floors and roof and is ' +
+    'rejected). Your FIRST emit must contain the whole shell plus your work; from the second emit on you ' +
+    'may instead use mode "patch" to layer additions onto the previous version. Keep the ' +
     'same size unless the request clearly needs more room.\n\n' +
     'STARTING SHELL:\n```json\n' +
     json +

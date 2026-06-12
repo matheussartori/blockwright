@@ -19,10 +19,10 @@ export interface StairCoreArgs {
   ops: AuthoringOp[];
   /** The box the stair core sits in — its back-right corner carries the switchback. */
   box: Box;
-  /** The y of each walkable floor slab, bottom-up (a flight links each consecutive pair). */
+  /** The y of each walkable floor slab, bottom-up (a flight links each consecutive pair).
+   *  Each flight's 45° horizontal run is derived from its own slab gap, so storeys of
+   *  DIFFERENT heights (the user's per-floor heights) each get a correctly-sized flight. */
   slabYs: number[];
-  /** Interior storey height (floor-to-ceiling): sets the 45° flight's horizontal run. */
-  storeyH: number;
   /** The active role palette — stairs/floor/air/ladders are resolved from it. */
   palette: RolePalette;
   /** When the house has an in-roof attic: the wall-top y an access LADDER climbs to
@@ -44,16 +44,19 @@ export interface StairCoreArgs {
  * @param args - See {@link StairCoreArgs}.
  */
 export function addStairCore(args: StairCoreArgs): void {
-  const { ops, box, slabYs, storeyH, palette, atticWallTop } = args;
+  const { ops, box, slabYs, palette, atticWallTop } = args;
   const { x0, z0, x1, z1 } = box;
   const stair = palette.get('roof'); // interior stairs reuse the roof's *_stairs block
   const fill = palette.get('floor');
   const air = palette.air();
 
-  const run = storeyH - 1; // horizontal cells = vertical rise (45° flight)
-  // A 2-wide well needs `run` along one axis and 2 cells on the perpendicular.
-  const fitX = run <= x1 - x0 - 1 && z1 - z0 >= 3;
-  const fitZ = !fitX && run <= z1 - z0 - 1 && x1 - x0 >= 3;
+  // Horizontal cells = vertical rise (45° flight), per flight — storeys may differ in
+  // height, so the well must fit the LONGEST run.
+  const runs = slabYs.slice(1).map((y, k) => y - slabYs[k] - 1);
+  const maxRun = runs.length ? Math.max(...runs) : 0;
+  // A 2-wide well needs `maxRun` along one axis and 2 cells on the perpendicular.
+  const fitX = maxRun <= x1 - x0 - 1 && z1 - z0 >= 3;
+  const fitZ = !fitX && maxRun <= z1 - z0 - 1 && x1 - x0 >= 3;
 
   if (!fitX && !fitZ) {
     // No room for a stair → a CONTINUOUS wall ladder (rule: stair if it fits, else a
@@ -71,6 +74,7 @@ export function addStairCore(args: StairCoreArgs): void {
   for (let k = 0; k < slabYs.length - 1; k++) {
     const by = slabYs[k] + 1; // bottom step
     const ty = slabYs[k + 1]; // top step lands on the upper floor
+    const run = runs[k]; // this flight's own 45° run
     const fwd = k % 2 === 0; // alternate direction + row → a side-by-side switchback
     if (fitX) {
       const lo = x1 - 1 - run, hi = x1 - 1;

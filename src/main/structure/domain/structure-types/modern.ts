@@ -9,6 +9,7 @@
 // white/quartz `defaults` kit so it still reads modern under a sparse decoration. The model
 // never rebuilds this shell — it furnishes the open, glass-walled rooms it hands over.
 import type { AuthoringOp } from '../../authoring/types';
+import { planStoreys } from '@/shared/domain/storeys';
 import type { ParamValues } from '../params';
 import type { Box, FloorPlanEntry, StructureType } from './types';
 
@@ -16,11 +17,26 @@ import type { Box, FloorPlanEntry, StructureType } from './types';
  *  storey math, shared by `build()` (which needs the deck Ys) and `floors()` (which needs
  *  the walkable storeys). `gTop` is the lower roof/upper-floor deck; `uTop` the upper roof.
  *  `roofReserve` keeps that many cells free at the box top for a PITCHED roof (0 for the
- *  default flat roof, which caps the walls directly), so a gable/hip cap isn't clipped. */
-function modernLevels(y0: number, y1: number, H: number, floors: number, roofReserve = 0): {
+ *  default flat roof, which caps the walls directly), so a gable/hip cap isn't clipped.
+ *  Explicit `floorHeights` (the user's per-floor heights) take over the split when they
+ *  fit; the villa's signature low 4–6 storeys remain the UNIFORM fallback only. */
+function modernLevels(y0: number, y1: number, H: number, floors: number, roofReserve = 0, floorHeights?: number[]): {
   gTop: number; twoStorey: boolean; uH: number; uTop: number;
 } {
   const top = y1 - roofReserve; // the highest wall course; the roof sits above it
+  if (floorHeights?.length) {
+    // The villa stacks at most two volumes; the ladder clamps the user's heights to fit
+    // under `top - 1` (the rail/deck course legacy math reserves too).
+    const n = floors >= 2 ? 2 : 1;
+    const ladder = planStoreys({ baseY: y0, idealTop: top - 1, maxWallTop: top - 1, floors: n, floorHeights });
+    if (ladder.wallTop <= top - 1) {
+      const gTop = y0 + ladder.heights[0];
+      const twoStorey = n === 2;
+      const uH = twoStorey ? ladder.heights[1] : 0;
+      return { gTop, twoStorey, uH, uTop: twoStorey ? gTop + uH : gTop };
+    }
+    // Too tight for the requested heights even after clamping → the uniform fallback.
+  }
   const availH = top - y0;
   const gH = Math.max(4, Math.min(6, Math.floor(availH / (floors >= 2 ? 2 : 1))));
   const gTop = y0 + gH;
@@ -129,7 +145,7 @@ export const modern: StructureType = {
     water: 'minecraft:water',
     light: 'minecraft:sea_lantern',
   },
-  build({ box, params, palette, composeModule }) {
+  build({ box, params, palette, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1, H } = box;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'flat';
@@ -154,7 +170,7 @@ export const modern: StructureType = {
     const hz0 = z0; // the house's front wall
 
     // --- Storey heights (shared with floors() via modernLevels) ---------------------
-    const { gTop, twoStorey, uTop } = modernLevels(y0, y1, H, floors, roofReserve);
+    const { gTop, twoStorey, uTop } = modernLevels(y0, y1, H, floors, roofReserve, floorHeights);
 
     // --- Lower volume (full house footprint) ----------------------------------------
     ops.push({ op: 'fill', from: [x0, y0, hz0], to: [x1, y0, z1], state: found });   // floor base
@@ -225,10 +241,10 @@ export const modern: StructureType = {
   // Authoritative storeys (the SAME level math `build()` uses) so the viewer labels the
   // flat-roofed villa's floors exactly, instead of the geometric detector mistaking its
   // stacked flat decks for extra storeys.
-  floors(box: Box, params: ParamValues): FloorPlanEntry[] {
+  floors(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[] {
     const roofShape = (params.roof as string) ?? 'flat';
     const reserve = modernRoofReserve(box, roofShape === 'gable' || roofShape === 'hip');
-    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number, reserve);
+    const { gTop, twoStorey } = modernLevels(box.y0, box.y1, box.H, params.floors as number, reserve, floorHeights);
     if (twoStorey) {
       return [
         { from: box.y0, to: gTop - 1, role: 'ground' },

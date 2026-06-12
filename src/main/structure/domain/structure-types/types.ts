@@ -65,6 +65,12 @@ export interface BuildArgs {
   palette: RolePalette;
   /** Stable per-build seed (explicit `seed` param, else derived from the box). */
   seed: number;
+  /** The user's explicit slab-to-slab storey heights, bottom-up (ABOVE-GROUND floors
+   *  only — a basement level is handled by whoever digs it). Sanitized by the compose
+   *  layer from the op's raw `floorHeights` param. A storeyed type feeds these to the
+   *  shared ladder (`planStoreys`) instead of its uniform split, so the user's
+   *  per-floor heights hold in EVERY house type. Undefined → the uniform split. */
+  floorHeights?: number[];
   /** The host structure-type id this module is being applied to (e.g. `'classic'`),
    *  when applicable. Lets a roof/basement module run GENERIC geometry for any host
    *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
@@ -125,8 +131,9 @@ export interface StructureType extends ModuleMeta {
   /** The EXACT walkable storeys this type lays for a box+params, bottom-up — the
    *  AUTHORITATIVE floor planes, so a code-built shell never has to be GUESSED by the
    *  geometric detector (whose stacked-flat-deck heuristic is fallible). Shares the storey
-   *  math with `build()`. Omit → the app falls back to `detectFloors`. */
-  floors?(box: Box, params: ParamValues): FloorPlanEntry[];
+   *  math with `build()` — including the user's explicit per-floor heights, when given.
+   *  Omit → the app falls back to `detectFloors`. */
+  floors?(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[];
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['stairs','chimney']`. */
@@ -138,15 +145,16 @@ export interface StructureType extends ModuleMeta {
    *  (compiled via `build()` at the requested size + decoration) instead of being left
    *  fully free-form — the model keeps the exterior massing and only furnishes/details it.
    *  Used for archetypes the model can't reliably invent (the modern villa: flat roofs,
-   *  stacked volumes, glass, pool). The house stays free-form (omit → no shell seed). */
-  seedShell?: boolean;
-  /** When true, the code-built shell is LOCKED: a compile pass (`preserveShell`) restores
-   *  any shell cell the model deleted (turned to air), so the AI can't gut the exterior
-   *  (the "sem chão / sem telhado" defect — a deleted floor slab / stripped roof). The
+   *  stacked volumes, glass, pool). The house stays free-form (omit → no shell seed).
+   *
+   *  Every seeded shell is also LOCKED: a compile pass (`preserveShell`) restores any
+   *  shell cell the model deleted (turned to air), so the AI can't gut the exterior. The
    *  model may still redecorate (solid→solid), glaze walls and furnish the interior; it
-   *  just can't leave a hole where the shell put structure. Implies `seedShell`. Opt-in
-   *  per type (gothic), so types that already finish well stay fully free to re-emit. */
-  lockShell?: boolean;
+   *  just can't leave a hole where the shell put structure. (There used to be a separate
+   *  opt-in `lockShell` flag with gothic the only locked type — the unlocked-seed
+   *  experiment failed: the model emits furniture-only deltas, "keeping" the seeded
+   *  exterior by not re-emitting it, and the whole shell vanishes.) */
+  seedShell?: boolean;
   /** Optional system-prompt fragment (wired into the generator prompt later). */
   prompt?: string;
 }

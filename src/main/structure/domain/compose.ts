@@ -17,6 +17,7 @@ import { getBasement } from './basements';
 import { getGeometryModule } from './categories';
 import type { GeometryModule } from './geometry-module';
 import { resolveParams, type ParamValues } from './params';
+import { sanitizeFloorHeights } from '@/shared/domain/storeys';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
 import { seed3 } from './rng';
 import {
@@ -248,6 +249,10 @@ export function composeStructure(
   applyDecorationDecay(values, deco, params); // "cozy = 0" default; an explicit op param wins
   const seed = seedFor(params, b);
   const palette = makePalette(type.defaults, deco, params, intern);
+  // The user's explicit per-floor storey heights (the composer's "Per floor" mode),
+  // riding in as a raw array param — threaded into the type's build so the shared
+  // storey ladder honours them in every house type.
+  const floorHeights = sanitizeFloorHeights(params.floorHeights);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry).
   const composeModuleDelegate = makeModuleComposer(palette, seed, deco, params, name, intern);
@@ -268,7 +273,7 @@ export function composeStructure(
         // The vault fills the footprint below grade (forced rect so it spans the whole base).
         ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
-        ...type.build({ box: buildBox, params: values, palette, seed, composeModule: composeModuleDelegate }),
+        ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate }),
         // The descent carves through that slab last, so the stairwell opening survives.
         ...basementDescent(b, groundY, palette),
       ];
@@ -282,7 +287,7 @@ export function composeStructure(
     );
   }
 
-  return type.build({ box: b, params: values, palette, seed, composeModule: composeModuleDelegate });
+  return type.build({ box: b, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate });
 }
 
 /**

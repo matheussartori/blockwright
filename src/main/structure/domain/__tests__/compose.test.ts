@@ -283,6 +283,65 @@ describe('module slots stay in lock-step with the catalog', () => {
   });
 });
 
+describe('compose: explicit per-floor storey heights (the shared ladder)', () => {
+  const big: [number, number, number] = [13, 19, 13]; // a 14×20×14 box
+
+  it('classic lays its upper slab at EXACTLY the requested ground-floor height', () => {
+    const ops = composeStructure('classic', from, big, { floors: 2, seed: 3, floorHeights: [7, 4] }, stubIntern());
+    // The storey slab fill for floor 2 sits at y = 7 (the ground storey's slab-to-slab height).
+    const slabAt = (y: number) =>
+      ops.some((o) => o.op === 'fill' && o.from[1] === y && o.to[1] === y && o.from[0] === 1 && o.to[0] === 12);
+    expect(slabAt(7)).toBe(true);
+    // The uniform default for this box would land it at 6 — prove the heights moved it.
+    const uniform = composeStructure('classic', from, big, { floors: 2, seed: 3 }, stubIntern());
+    expect(uniform.some((o) => o.op === 'fill' && o.from[1] === 6 && o.to[1] === 6 && o.from[0] === 1)).toBe(true);
+  });
+
+  it('keeps the build deterministic and the single-roof invariant under explicit heights', () => {
+    const p = { floors: 2, seed: 3, floorHeights: [7, 4] };
+    const a = composeStructure('classic', from, big, p, stubIntern());
+    const b = composeStructure('classic', from, big, p, stubIntern());
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.filter((o) => o.op === 'roof')).toHaveLength(1);
+  });
+
+  it('structureFloorPlan honours floorHeights for the modern villa', () => {
+    const plan = structureFloorPlan('modern', [36, 15, 20], { floorHeights: [7, 4] });
+    expect(plan.map((f) => [f.from, f.to])).toEqual([
+      [0, 6], // ground storey = 7 cells, exactly as asked
+      [7, 14],
+    ]);
+  });
+
+  it('structureFloorPlan honours floorHeights for the farmhouse', () => {
+    const plan = structureFloorPlan('farmhouse', [17, 16, 13], { floorHeights: [6, 4] });
+    expect(plan[0]).toMatchObject({ from: 0, to: 5 });
+    expect(plan[1].from).toBe(6);
+  });
+
+  it('every seeded archetype compiles with explicit floorHeights (the shell-seed path)', () => {
+    for (const id of ['modern', 'farmhouse', 'sakura', 'gothic']) {
+      expect(() =>
+        compileStructure({
+          DataVersion: 3955,
+          size: [17, 18, 15],
+          palette: [{ Name: 'minecraft:air' }],
+          ops: [{
+            op: 'template', name: id, from: [0, 0, 0], to: [16, 17, 14],
+            params: { floors: 2, floorHeights: [7, 4] },
+          }],
+        }), id,
+      ).not.toThrow();
+    }
+  });
+
+  it('ignores an unusable floorHeights value instead of throwing', () => {
+    expect(() =>
+      composeStructure('classic', from, big, { floors: 2, floorHeights: 'tall' }, stubIntern()),
+    ).not.toThrow();
+  });
+});
+
 describe('compose: house roof form + determinism', () => {
   it('the roof param forces the roof form (overriding the seeded pick)', () => {
     const big: [number, number, number] = [14, 20, 14];

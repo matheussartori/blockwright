@@ -1,4 +1,4 @@
-// preserveShell — re-assert the code-built starting SHELL of a `lockShell` structure
+// preserveShell — re-assert the code-built starting SHELL of a seeded structure
 // type (gothic) so the AI can't gut its exterior. A seeded shell is only CONTEXT the
 // model is free to ignore, and it does: it reliably deletes the ground-floor slab and
 // half the roof (the "sem chão / sem telhado" defect), then strews furniture over the

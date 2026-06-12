@@ -78,7 +78,7 @@ export interface EmitHandlerDeps {
   floors?: FloorDef[];
   images?: GenerateImage[];
   capture?: CapturePreview;
-  /** Locked shell cells re-asserted on every compile (a `lockShell` archetype). */
+  /** Locked shell cells re-asserted on every compile (any seeded archetype). */
   lockCells?: ShellLockCell[];
   /** The independent audit critic, or null to fall back to the model's self-report. */
   critic: Critic | null;
@@ -157,17 +157,49 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         structureType: selection?.structureType,
         // The user's Floor plan (UI) overrides the model's declared storeys for grade.
         floors: floors?.length ? floors : undefined,
-        // Re-assert a locked archetype's shell (gothic) so its exterior can't be gutted.
+        // Re-assert a seeded archetype's locked shell so its exterior can't be gutted.
         lockCells,
         log: run.fix,
       });
-      await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     } catch (err) {
       state.captureError = `Failed to compile the structure: ${errMessage(err)}`;
       return text(state.captureError, true);
     }
 
+    const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
+    // The compile report carries the FINAL post-pass blocks (what the .nbt actually
+    // contains), so stats/metadata reflect the build as fixed up — explicit air cells
+    // are the interior carve, not geometry, so they're excluded.
+    const solidBlocks = report.blocks.filter((b) => !isAir(report.palette[b.state]?.Name ?? ''));
+    const blockCount = solidBlocks.length;
+
+    // COLLAPSE GATE — a non-patch emit REPLACES the whole structure, so an emit that
+    // carries only a delta (the model "keeping" the rest by reference — the sakura
+    // "skeleton" defect: a furniture-only emit deleted the entire shell) is REJECTED,
+    // not versioned. Baseline = the last accepted version's solids (or the seeded
+    // shell's locked cells on the first emit); a real refinement never halves the
+    // build. Deliberate demolition still has a path: a `patch` with air fills.
+    const baseline = session.lastSolids ?? lockCells?.length ?? 0;
+    if (args.mode !== 'patch' && baseline >= 50 && blockCount < baseline / 2) {
+      await fsp.unlink(nbtPath).catch(() => {}); // drop the gutted compile from the scratch dir
+      state.captureError = `Emit dropped most of the build (${blockCount} solid blocks vs ${baseline} before)`;
+      run.ai(
+        `Rejected the emit: it contains only ${blockCount} solid blocks where the build had ` +
+          `${baseline} — a full emit must carry the COMPLETE structure, not just the changes.`,
+      );
+      return text(
+        `REJECTED — this emit contains only ${blockCount} solid blocks, but the current build has ${baseline}. ` +
+          `A mode "full" emit REPLACES the entire structure, so everything you did not re-emit (walls, floors, ` +
+          `roof, the whole shell) would be DELETED. Either re-emit the COMPLETE build — every existing block/op ` +
+          `plus your changes — with mode "full", or emit ONLY your additions with mode "patch" (it layers onto ` +
+          `the previous version; in a patch, air fills remove specific cells if something must go).`,
+        true,
+      );
+    }
+
+    await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     session.version = version;
+    session.lastSolids = blockCount;
 
     run.fix(
       report.fixes.length || report.warnings.length
@@ -181,13 +213,6 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
     // folder exists, tee the AI/fix log into its `generation.log`.
     session.library = await mirrorToLibrary(session.library, prompt, nbtPath, version);
     if (session.library.dir) run.attach(session.library.dir);
-
-    const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
-    // The compile report carries the FINAL post-pass blocks (what the .nbt actually
-    // contains), so stats/metadata reflect the build as fixed up — explicit air cells
-    // are the interior carve, not geometry, so they're excluded.
-    const solidBlocks = report.blocks.filter((b) => !isAir(report.palette[b.state]?.Name ?? ''));
-    const blockCount = solidBlocks.length;
 
     // Write/refresh the `.bw.json` sidecar beside the library build, so a later edit
     // has the size, dominant palette and recognised storeys to work from. Storeys come
@@ -203,7 +228,10 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
       }
       const authoritative = !floors?.length && selection?.structureType
-        ? structureFloorPlan(selection.structureType, size, { roof: selection.roof })
+        ? structureFloorPlan(selection.structureType, size, {
+            roof: selection.roof,
+            floorHeights: selection.floorHeights,
+          })
         : [];
       const meta = buildMetadata({
         name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),

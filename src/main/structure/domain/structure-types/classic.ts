@@ -12,6 +12,7 @@
 // concrete blocks. The type ships its own `defaults` kit so it reads right even
 // under a sparse decoration.
 import type { AuthoringOp } from '../../authoring/types';
+import { DEFAULT_STOREY_H, planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
 import type { StructureType } from './types';
 import { logProps } from './types';
@@ -76,7 +77,7 @@ export const classic: StructureType = {
     fence: 'minecraft:spruce_fence',
     light: 'minecraft:lantern',
   },
-  build({ box, params, palette, seed, composeModule }) {
+  build({ box, params, palette, seed, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
     const basement = params.basement as string;
@@ -130,21 +131,24 @@ export const classic: StructureType = {
     // roof just a deck + parapet (2); a bare ceiling needs 1. A flat roof keeps the walls
     // tall (no pitch void), which is also why it can't host an attic.
     const roofReserve = wantsPitched ? roofRings : isFlat ? 2 : 1;
-    // Pick a storey height that fills the box, leaving room for the roof on top.
-    let storeyH = Math.max(4, Math.floor((H - roofReserve) / storeyCount));
-    let wallTop = y0 + storeyCount * storeyH;
-    while (wallTop + 2 > y1 && storeyH > 3) {
-      storeyH--;
-      wallTop = y0 + storeyCount * storeyH;
-    }
-    if (wallTop > y1) wallTop = y1;
+    // The storey split, via the shared ladder: the user's explicit per-floor heights
+    // (above-ground; a basement level keeps the neutral height — the same +5 the
+    // composer's overhead budgets for it) when given, else the uniform fill that
+    // leaves room for the roof on top.
+    const ladder = planStoreys({
+      baseY: y0,
+      idealTop: y1 - roofReserve,
+      maxWallTop: y1 - 2,
+      floors: storeyCount,
+      floorHeights: floorHeights && hasBasement ? [DEFAULT_STOREY_H, ...floorHeights] : floorHeights,
+    });
+    const wallTop = Math.min(ladder.wallTop, y1);
     const doRoof = wantsPitched && wallTop >= y0 + 3 && y1 - wallTop >= 3;
     const doFlat = isFlat && y1 - wallTop >= 1;
     const hasAttic = attic !== 'none' && doRoof && y1 - wallTop >= 3;
 
     // Floor-slab Y of each storey (bottom→top); index `groundIdx` is the ground floor.
-    const slabYs: number[] = [];
-    for (let i = 0; i < storeyCount; i++) slabYs.push(y0 + i * storeyH);
+    const slabYs = ladder.slabYs;
     const groundIdx = belowLevels;
     const groundY = slabYs[groundIdx];
 
@@ -294,7 +298,6 @@ export const classic: StructureType = {
       ops,
       box: { x0, y0, z0, x1, y1, z1, W, D, H },
       slabYs,
-      storeyH,
       palette,
       atticWallTop: hasAttic ? wallTop : undefined,
     });

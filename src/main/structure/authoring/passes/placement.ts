@@ -101,7 +101,7 @@ export const fixPlacement: Pass = (blocks, palette, ctx) => {
   // Cells to delete after the per-block pass: decoration sitting on a chest lid, and
   // wall blocks plugging a doorway. Collected by position so order doesn't matter.
   const carve = new Set<string>();
-  // The exterior envelope + the lockShell cells, for the doorway carve: an interior
+  // The exterior envelope + the locked shell cells, for the doorway carve: an interior
   // blocker is always carvable, but a block on the watertight outer SKIN may only be
   // opened where the passage completes to the outside (finishing an entrance) — never
   // a code-owned locked shell block, and never a carve that leaves a blind niche in a

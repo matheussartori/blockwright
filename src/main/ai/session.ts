@@ -14,6 +14,10 @@ export interface Session {
   sdkSessionId: string | null;
   /** Highest compiled version written so far (`vN.nbt`). */
   version: number;
+  /** Solid-block count of the last ACCEPTED version — the baseline for the emit
+   *  COLLAPSE GATE (a non-patch emit that loses most of the build is rejected back
+   *  to the model instead of becoming a gutted version). Unset until the first emit. */
+  lastSolids?: number;
   /** Per-session scratch dir under the generated root. */
   dir: string;
   /** Library FOLDER this session mirrors its build into (`<slug>/` under the user's

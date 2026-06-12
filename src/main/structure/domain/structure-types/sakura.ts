@@ -9,6 +9,7 @@
 //
 // Massing in semantic roles (the decoration supplies blocks); ships its own sakura kit.
 import type { AuthoringOp } from '../../authoring/types';
+import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
 import { box as mkBox, logProps, type StructureType } from './types';
 
@@ -55,7 +56,7 @@ export const sakura: StructureType = {
     plant: 'minecraft:cherry_leaves',
     light: 'minecraft:lantern',
   },
-  build({ box, params, palette, composeModule }) {
+  build({ box, params, palette, floorHeights, composeModule }) {
     const { x0, y0, z0, x1, y1, z1, W, D } = box;
     const floors = params.floors as number; // cherry living storeys above the stone base
 
@@ -82,10 +83,11 @@ export const sakura: StructureType = {
     const roofShape = (params.roof as string) ?? 'gable';
     const isFlat = roofShape === 'flat';
     const roofRings = isFlat ? 2 : Math.max(2, Math.floor(Math.min(W, D) / 2));
-    let storeyH = Math.max(4, Math.floor((y1 - mainY - roofRings) / floors));
-    let wallTop = mainY + storeyH * floors;
-    while (wallTop + 2 > y1 && storeyH > 3) { storeyH--; wallTop = mainY + storeyH * floors; }
-    if (wallTop > y1 - 2) wallTop = Math.max(mainY + 3, y1 - 2);
+    // The cherry storeys over the stone base, via the shared ladder (the user's explicit
+    // per-floor heights apply to the LIVING storeys; the stone base keeps its own height).
+    const ladder = planStoreys({ baseY: mainY, idealTop: y1 - roofRings, maxWallTop: y1 - 2, floors, floorHeights });
+    const slabYs = ladder.slabYs;
+    const wallTop = ladder.wallTop > y1 - 2 ? Math.max(mainY + 3, y1 - 2) : ladder.wallTop;
 
     // --- Visible stone basement (ground slab + plinth ring + small windows) -----------
     ops.push({ op: 'fill', from: [x0, y0, z0], to: [x1, y0, z1], state: base });          // ground slab
@@ -102,7 +104,7 @@ export const sakura: StructureType = {
       ops.push({ op: 'fill', from: [px, mainY, pz], to: [px, wallTop, pz], state: corner });
     }
     for (let f = 1; f < floors; f++) {
-      const midY = mainY + f * storeyH;
+      const midY = slabYs[f];
       if (midY < wallTop) ops.push({ op: 'fill', from: [x0 + 1, midY, z0 + 1], to: [x1 - 1, midY, z1 - 1], state: floorIdx });
     }
 
@@ -137,7 +139,7 @@ export const sakura: StructureType = {
 
     // --- Cherry windows + leafy window boxes on the living storeys ---------------------
     for (let f = 0; f < floors; f++) {
-      const wy = mainY + f * storeyH + 2;
+      const wy = slabYs[f] + 2;
       if (wy >= wallTop) break;
       for (const x of [x0 + 2, x1 - 2]) {
         if (f === 0 && Math.abs(x - cx) <= 1) continue; // keep the entry bay clear
@@ -151,7 +153,7 @@ export const sakura: StructureType = {
 
     // --- Upper-front balcony: a cherry rail + posts over the covered entry -------------
     if (floors >= 2) {
-      const balY = mainY + storeyH;
+      const balY = slabYs[1];
       if (balY + 2 < wallTop) {
         ops.push({ op: 'line', from: [x0 + 1, balY + 1, z0], to: [x1 - 1, balY + 1, z0], state: fence });
         for (const px of [x0 + 1, x1 - 1]) ops.push({ op: 'block', pos: [px, balY + 2, z0], state: post });
@@ -168,16 +170,14 @@ export const sakura: StructureType = {
 
     // --- Lanterns under each ceiling --------------------------------------------------
     for (let f = 0; f < floors; f++) {
-      const ceil = f + 1 < floors ? mainY + (f + 1) * storeyH : wallTop;
-      if (ceil - 1 > mainY + f * storeyH) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
+      const ceil = f + 1 < floors ? slabYs[f + 1] : wallTop;
+      if (ceil - 1 > slabYs[f]) ops.push({ op: 'block', pos: [cx, ceil - 1, cz], state: lantern });
     }
 
     // --- Interior stair core for the cherry storeys (the stairwell pass only REPAIRS;
     // a code-built shell must lay its own climb). Stairs where a 45° run fits, else a ladder.
     if (floors >= 2) {
-      const slabYs: number[] = [];
-      for (let f = 0; f < floors; f++) slabYs.push(mainY + f * storeyH);
-      addStairCore({ ops, box: mkBox([x0, mainY, z0], [x1, y1, z1]), slabYs, storeyH, palette });
+      addStairCore({ ops, box: mkBox([x0, mainY, z0], [x1, y1, z1]), slabYs, palette });
     }
     return ops;
   },
