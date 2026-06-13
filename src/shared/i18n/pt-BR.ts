@@ -251,6 +251,7 @@ export const ptBR: Messages = {
   'planner.generateEdit': 'Aplicar',
   'planner.dimsKey': '(L×P×A)',
   'planner.scaleNote': 'Jogador ~{h} blocos, para escala',
+  'planner.dragFloorHint': 'Arraste a faixa de um andar para ajustar a altura',
   'planner.previewEmpty': 'Escolha uma estrutura para ver o tamanho de relance.',
 
   // O cartão de "construindo" no palco (entre clicar em Gerar e a primeira versão carregar).

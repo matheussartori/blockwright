@@ -11,7 +11,7 @@ import {
   DEFAULT_STOREY_H,
   EMPTY_SLOTS,
   MAX_STOREY_H,
-  MIN_STOREY_H,
+  MIN_FLOOR_H,
   ROOMS_PER_FLOOR,
   defaultFloorHeights,
 } from './brief';
@@ -69,6 +69,8 @@ export function setDetailField(
       params: {},
       size: null,
       floorHeights: null,
+      basementH: null,
+      atticH: null,
       rooms: [],
     };
   }
@@ -76,6 +78,9 @@ export function setDetailField(
   // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
   // two can't be selected together (mirrors the attic module's `incompatibleWith: ['flat']`).
   if (key === 'roof' && value === FLAT_ROOF) next.attic = '';
+  // A cleared slot drops its custom band height (it described a band that no longer exists).
+  if (!next.basement) next.basementH = null;
+  if (!next.attic) next.atticH = null;
   return next;
 }
 
@@ -162,14 +167,15 @@ function resizeHeights(heights: number[], n: number): number[] {
  *  @param struct - The chosen structure module (seeds the per-floor heights).
  *  @returns The next Details state. */
 export function setHeightMode(d: BuildDetails, mode: 'total' | 'floors', struct: GenerationModule | undefined): BuildDetails {
-  if (mode === 'total') return { ...d, floorHeights: null };
+  if (mode === 'total') return { ...d, floorHeights: null, basementH: null, atticH: null };
   if (d.floorHeights && d.floorHeights.length) return d; // already per-floor
   return { ...d, floorHeights: defaultFloorHeights(d, struct) };
 }
 
-/** Set one floor's interior height (clamped to [{@link MIN_STOREY_H}, {@link MAX_STOREY_H}]).
- *  When `linked`, every floor moves to the same value (the chain/link affordance — raise the
- *  ground floor and the whole stack follows); otherwise only `index` changes.
+/** Set one floor's interior height (clamped to [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}] —
+ *  every floor is at least 5 blocks). When `linked`, every floor moves to the same value
+ *  (the chain/link affordance — raise the ground floor and the whole stack follows);
+ *  otherwise only `index` changes.
  *  @param d - The current Details state (a no-op unless per-floor heights are active).
  *  @param index - The 0-based floor to edit (bottom-up).
  *  @param value - The requested height (clamped).
@@ -177,11 +183,27 @@ export function setHeightMode(d: BuildDetails, mode: 'total' | 'floors', struct:
  *  @returns The next Details state. */
 export function setFloorHeight(d: BuildDetails, index: number, value: number, linked: boolean): BuildDetails {
   if (!d.floorHeights) return d;
-  const v = Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_STOREY_H));
+  const v = Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_FLOOR_H));
   const floorHeights = linked
     ? d.floorHeights.map(() => v)
     : d.floorHeights.map((h, i) => (i === index ? v : h));
   return { ...d, floorHeights };
+}
+
+/** The non-floor bands of the Height panel whose height the user can size directly. */
+export type BandKey = 'basement' | 'attic';
+
+/** Set the picked basement/attic band's height (clamped to [{@link MIN_FLOOR_H},
+ *  {@link MAX_STOREY_H}] — the attic/basement is a level too, so the 5-block floor rule
+ *  applies). A no-op when that slot isn't picked.
+ *  @param d - The current Details state.
+ *  @param band - Which band to size.
+ *  @param value - The requested height (clamped).
+ *  @returns The next Details state. */
+export function setBandHeight(d: BuildDetails, band: BandKey, value: number): BuildDetails {
+  if (!d[band]) return d;
+  const v = Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_FLOOR_H));
+  return band === 'basement' ? { ...d, basementH: v } : { ...d, atticH: v };
 }
 
 /** Set one axis of the explicit build size (switching the box from auto to manual),

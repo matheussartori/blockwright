@@ -3963,6 +3963,9 @@ body.row-resizing {
 }
 .gen-floor-height-tag {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   color: var(--text-2, var(--text));
 }
@@ -4259,6 +4262,24 @@ body.row-resizing {
 .planner-scale-note {
   font-size: 11px;
   color: var(--text-muted);
+}
+.planner-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.planner-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.planner-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
 }
 .planner-preview-empty {
   display: flex;

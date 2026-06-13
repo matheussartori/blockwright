@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_DETAILS, MIN_STOREY_H, ROOMS_PER_FLOOR, type BuildDetails } from '../brief';
+import { EMPTY_DETAILS, MIN_FLOOR_H, ROOMS_PER_FLOOR, type BuildDetails } from '../brief';
 import {
   SIZE_MAX,
   SIZE_MIN,
   addRoom,
   assignRoom,
   removeRoomAt,
+  setBandHeight,
   setDetailField,
   setDetailParam,
   setDetailSize,
@@ -163,7 +164,7 @@ describe('setHeightMode / setFloorHeight', () => {
     const d = details({ structureType: 'house', size: { w: 9, d: 9, h: 12 } });
     const next = setHeightMode(d, 'floors', undefined);
     expect(next.floorHeights).not.toBeNull();
-    expect(next.floorHeights?.every((h) => h >= MIN_STOREY_H)).toBe(true);
+    expect(next.floorHeights?.every((h) => h >= MIN_FLOOR_H)).toBe(true);
   });
 
   it('linked edit moves every floor; unlinked edits one', () => {
@@ -175,6 +176,31 @@ describe('setHeightMode / setFloorHeight', () => {
   it('clamps a floor height and is a no-op without per-floor heights', () => {
     expect(setFloorHeight(details({ floorHeights: [5] }), 0, 999, false).floorHeights).toEqual([32]);
     expect(setFloorHeight(EMPTY_DETAILS, 0, 8, false)).toBe(EMPTY_DETAILS);
+  });
+
+  it('never lets a floor go under the 5-block rule', () => {
+    expect(setFloorHeight(details({ floorHeights: [6] }), 0, 3, false).floorHeights).toEqual([MIN_FLOOR_H]);
+  });
+});
+
+describe('setBandHeight', () => {
+  it('sizes the picked basement/attic band, clamped to the 5-block rule', () => {
+    const d = details({ basement: 'cellar', attic: 'storage' });
+    expect(setBandHeight(d, 'basement', 8).basementH).toBe(8);
+    expect(setBandHeight(d, 'attic', 3).atticH).toBe(MIN_FLOOR_H);
+  });
+  it('is a no-op when that slot is not picked', () => {
+    expect(setBandHeight(EMPTY_DETAILS, 'basement', 8)).toBe(EMPTY_DETAILS);
+  });
+  it('a cleared slot drops its custom band height', () => {
+    const d = details({ basement: 'cellar', basementH: 8 });
+    expect(setDetailField(d, 'basement', '').basementH).toBeNull();
+  });
+  it("switching back to 'total' clears the custom bands", () => {
+    const d = details({ floorHeights: [5, 5], basement: 'cellar', basementH: 8, attic: 'storage', atticH: 6 });
+    const next = setHeightMode(d, 'total', undefined);
+    expect(next.basementH).toBeNull();
+    expect(next.atticH).toBeNull();
   });
 });
 

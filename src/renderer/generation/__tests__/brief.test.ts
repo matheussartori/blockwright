@@ -15,6 +15,7 @@ import {
   formatElapsed,
   hasDetails,
   maxRoomsForStructure,
+  previewOverheads,
   resolveDetailParams,
   roomsOnFloor,
 } from '../brief';
@@ -147,6 +148,35 @@ describe('effectiveSize', () => {
   it('keeps SHELL semantics — a surroundings pick never inflates the user-facing size', () => {
     const d = details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } });
     expect(effectiveSize(d, houseModule)).toEqual({ w: 15, d: 13, h: 13 });
+  });
+});
+
+describe('previewOverheads', () => {
+  it('zeroes the basement/attic bands when neither slot is picked', () => {
+    const ov = previewOverheads(details({ structureType: 'house' }), houseModule);
+    expect(ov.basement).toBe(0);
+    expect(ov.attic).toBe(0);
+    expect(ov.roof).toBeGreaterThan(0); // a pitched reserve is always paid
+  });
+  it('a picked attic is the TOPMOST band — it engulfs the whole roof zone', () => {
+    const d = details({ structureType: 'house', basement: 'cellar', attic: 'loft' });
+    const ov = previewOverheads(d, houseModule);
+    expect(ov.basement).toBe(5);
+    // 11×11 derived footprint: pitched reserve floor(11/2)+1 = 6; attic band = 6 + 2.
+    expect(ov.attic).toBe(8);
+    expect(ov.roof).toBe(0); // nothing sits above the attic
+  });
+  it('honours the user-sized basement/attic bands', () => {
+    const d = details({ structureType: 'house', basement: 'cellar', attic: 'loft', basementH: 7, atticH: 5 });
+    const ov = previewOverheads(d, houseModule);
+    expect(ov.basement).toBe(7);
+    expect(ov.attic).toBe(5);
+    expect(ov.roof).toBe(0);
+  });
+  it('custom bands drive the per-floor total height', () => {
+    const base = details({ structureType: 'house', params: { floors: 2 }, basement: 'cellar', floorHeights: [5, 5] });
+    const sized = { ...base, basementH: 8 };
+    expect(effectiveSize(sized, houseModule).h - effectiveSize(base, houseModule).h).toBe(3);
   });
 });
 

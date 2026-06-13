@@ -10,12 +10,23 @@
 // fit the box, preserving their RATIO), else falls back to the legacy uniform split —
 // so every structure type that consumes the ladder gets the per-floor rule for free.
 
-/** Smallest slab-to-slab storey height (2 clear interior cells + the slab). */
+/** Hard structural floor for a slab-to-slab storey (2 clear interior cells + the slab).
+ *  Only the shrink-to-fit paths may go this low — a box that physically can't give every
+ *  storey {@link MIN_FLOOR_H} compromises down to this instead of overflowing. */
 export const MIN_STOREY_H = 3;
+/** THE RULE: every floor is at least 5 blocks slab-to-slab (4 clear cells + the slab).
+ *  Every input path — the composer's per-floor fields, sanitized authoring heights, the
+ *  uniform auto split — enforces it; only {@link MIN_STOREY_H} sits below as the
+ *  impossible-box safety valve. */
+export const MIN_FLOOR_H = 5;
 /** Largest slab-to-slab storey height the composer accepts. */
 export const MAX_STOREY_H = 32;
 /** The neutral storey height used when nothing better is known. */
 export const DEFAULT_STOREY_H = 5;
+/** Height of the below-grade basement level a storeyed box reserves (see {@link heightOverhead}). */
+export const BASEMENT_OVERHEAD = 5;
+/** In-roof attic headroom a storeyed box reserves (see {@link heightOverhead}). */
+export const ATTIC_OVERHEAD = 2;
 
 /** Inputs for {@link planStoreys}. */
 export interface StoreySpec {
@@ -47,13 +58,14 @@ export interface StoreyLadder {
 
 /** Coerce a loose `floorHeights` value (e.g. a raw `template` op param) into a usable
  *  array: every entry a finite number, truncated and clamped to
- *  [{@link MIN_STOREY_H}, {@link MAX_STOREY_H}]; anything else → undefined.
+ *  [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}] (the every-floor-≥5 rule); anything else
+ *  → undefined.
  *  @param v - The unknown raw value.
  *  @returns The sanitized heights (1–8 entries), or undefined when not usable. */
 export function sanitizeFloorHeights(v: unknown): number[] | undefined {
   if (!Array.isArray(v) || v.length === 0 || v.length > 8) return undefined;
   if (!v.every((h) => typeof h === 'number' && Number.isFinite(h))) return undefined;
-  return v.map((h) => Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, Math.trunc(h))));
+  return v.map((h) => Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(h))));
 }
 
 /** Resize a heights array to `n` storeys: extra storeys repeat the last height,
@@ -67,12 +79,13 @@ function fitLength(heights: readonly number[], n: number): number[] {
 /**
  * Compute the storey ladder for a build's vertical zone.
  *
- * With explicit `floorHeights` the ladder is exactly those heights, shrunk
- * PROPORTIONALLY (never below {@link MIN_STOREY_H}) when their sum overflows
- * `maxWallTop - baseY` — so a tall-ground-over-low-upper request keeps its ratio in a
- * box that can't fit it outright. Without them it reproduces the legacy uniform split
- * every structure type used: `max(4, floor((idealTop - baseY) / floors))`, shrunk one
- * cell at a time (to a floor of 3) while the wall top overflows `maxWallTop`.
+ * With explicit `floorHeights` the ladder is exactly those heights (each raised to the
+ * {@link MIN_FLOOR_H} every-floor-≥5 rule), shrunk PROPORTIONALLY (never below
+ * {@link MIN_STOREY_H}) when their sum overflows `maxWallTop - baseY` — so a
+ * tall-ground-over-low-upper request keeps its ratio in a box that can't fit it
+ * outright. Without them it splits uniformly: `max(MIN_FLOOR_H, floor((idealTop -
+ * baseY) / floors))`, shrunk one cell at a time (to a floor of {@link MIN_STOREY_H})
+ * while the wall top overflows `maxWallTop`.
  *
  * @param spec - See {@link StoreySpec}.
  * @returns The {@link StoreyLadder} (heights, slab Ys, wall top).
@@ -84,7 +97,7 @@ export function planStoreys(spec: StoreySpec): StoreyLadder {
   let heights: number[];
   if (floorHeights && floorHeights.length) {
     heights = fitLength(floorHeights, floors).map((h) =>
-      Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, Math.trunc(h))),
+      Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(h))),
     );
     const avail = maxWallTop - baseY;
     const sum = heights.reduce((a, b) => a + b, 0);
@@ -102,7 +115,7 @@ export function planStoreys(spec: StoreySpec): StoreyLadder {
       heights = scaled;
     }
   } else {
-    let h = Math.max(4, Math.floor((idealTop - baseY) / floors));
+    let h = Math.max(MIN_FLOOR_H, Math.floor((idealTop - baseY) / floors));
     while (baseY + floors * h > maxWallTop && h > MIN_STOREY_H) h--;
     heights = Array.from({ length: floors }, () => h);
   }
@@ -138,8 +151,8 @@ export interface OverheadSpec {
  *  @param spec - See {@link OverheadSpec}.
  *  @returns The overhead in cells; `sum(floorHeights) + overhead` = the total box H. */
 export function heightOverhead(spec: OverheadSpec): number {
-  const basement = spec.basement ? 5 : 0;
-  const attic = spec.attic ? 2 : 0;
+  const basement = spec.basement ? BASEMENT_OVERHEAD : 0;
+  const attic = spec.attic ? ATTIC_OVERHEAD : 0;
   const roof = spec.roof === 'flat' ? 2 : Math.floor(Math.min(spec.w, spec.d) / 2) + 1;
   return basement + roof + attic;
 }

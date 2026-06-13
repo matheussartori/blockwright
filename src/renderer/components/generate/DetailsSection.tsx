@@ -16,16 +16,18 @@ import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import {
   type BuildDetails,
   MAX_STOREY_H,
-  MIN_STOREY_H,
+  MIN_FLOOR_H,
   effectiveSize,
   floorCount,
   maxRoomsForStructure,
+  previewOverheads,
 } from '../../generation/brief';
-import type { DetailField, SizeBox } from '../../generation/details';
+import type { BandKey, DetailField, SizeBox } from '../../generation/details';
 import type { ChipOption } from './chips';
 import { Select, type SelectOption } from '../ui/Select';
 import { Segmented } from '../ui/Segmented';
 import { FloorStack } from './FloorStack';
+import { ATTIC_COLOR, BASEMENT_COLOR } from './BuildScalePreview';
 import type { TFunction } from '@/shared/i18n';
 import type { GenerationCatalog, GenerationModule } from '@/shared/types';
 
@@ -41,6 +43,7 @@ interface Props {
   onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
   onHeightMode: (mode: 'total' | 'floors') => void;
   onFloorHeight: (index: number, value: number, linked: boolean) => void;
+  onBandHeight: (band: BandKey, value: number) => void;
   onAddRoom: (floor: number, id: string) => void;
   onRemoveRoom: (floor: number, index: number) => void;
 }
@@ -55,6 +58,7 @@ export function DetailsSection({
   onSize,
   onHeightMode,
   onFloorHeight,
+  onBandHeight,
   onAddRoom,
   onRemoveRoom,
 }: Props) {
@@ -207,6 +211,7 @@ export function DetailsSection({
       <SizeSection
         details={details}
         sz={effectiveSize(details, selStruct)}
+        overheads={previewOverheads(details, selStruct)}
         nFloors={nFloors}
         linked={linked}
         setLinked={setLinked}
@@ -215,6 +220,7 @@ export function DetailsSection({
         onSize={onSize}
         onHeightMode={onHeightMode}
         onFloorHeight={onFloorHeight}
+        onBandHeight={onBandHeight}
       />
 
       {nFloors > 0 && roomOptions.length > 0 && (
@@ -237,11 +243,14 @@ export function DetailsSection({
 
 /** The build-size controls: the W/D/H box plus — for a storeyed structure — a Total ⇄ Per
  *  floor height switch. In "per floor" mode the single H field is replaced by one input per
- *  storey with a chain toggle (linked = raise one, raise all); the total height then reads
- *  out as the derived sum. */
+ *  storey with a chain toggle (linked = raise one, raise all), bracketed by a Basement row
+ *  below and an Attic row on top when those slots are picked (the attic is the topmost
+ *  band — it owns the whole attic + roof zone); the total height then reads out as the
+ *  derived sum. */
 function SizeSection({
   details,
   sz,
+  overheads,
   nFloors,
   linked,
   setLinked,
@@ -250,9 +259,11 @@ function SizeSection({
   onSize,
   onHeightMode,
   onFloorHeight,
+  onBandHeight,
 }: {
   details: BuildDetails;
   sz: SizeBox;
+  overheads: { basement: number; attic: number; roof: number };
   nFloors: number;
   linked: boolean;
   setLinked: (v: boolean) => void;
@@ -261,6 +272,7 @@ function SizeSection({
   onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
   onHeightMode: (mode: 'total' | 'floors') => void;
   onFloorHeight: (index: number, value: number, linked: boolean) => void;
+  onBandHeight: (band: BandKey, value: number) => void;
 }) {
   const heights = details.floorHeights;
   const perFloor = !!heights && heights.length > 0;
@@ -323,6 +335,22 @@ function SizeSection({
               {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
             </button>
           </div>
+          {details.basement && (
+            <label className="gen-floor-height">
+              <span className="gen-floor-height-tag">
+                <span className="planner-legend-dot" style={{ background: BASEMENT_COLOR }} />
+                {t('gen.fieldBasement')}
+              </span>
+              <input
+                type="number"
+                min={MIN_FLOOR_H}
+                max={MAX_STOREY_H}
+                value={overheads.basement}
+                disabled={busy}
+                onChange={(e) => onBandHeight('basement', Math.trunc(Number(e.target.value)) || overheads.basement)}
+              />
+            </label>
+          )}
           {heights.map((h, i) => (
             <label key={i} className="gen-floor-height">
               <span className="gen-floor-height-tag">
@@ -330,7 +358,7 @@ function SizeSection({
               </span>
               <input
                 type="number"
-                min={MIN_STOREY_H}
+                min={MIN_FLOOR_H}
                 max={MAX_STOREY_H}
                 value={h}
                 disabled={busy}
@@ -338,6 +366,22 @@ function SizeSection({
               />
             </label>
           ))}
+          {details.attic && (
+            <label className="gen-floor-height">
+              <span className="gen-floor-height-tag">
+                <span className="planner-legend-dot" style={{ background: ATTIC_COLOR }} />
+                {t('gen.fieldAttic')}
+              </span>
+              <input
+                type="number"
+                min={MIN_FLOOR_H}
+                max={MAX_STOREY_H}
+                value={overheads.attic}
+                disabled={busy}
+                onChange={(e) => onBandHeight('attic', Math.trunc(Number(e.target.value)) || overheads.attic)}
+              />
+            </label>
+          )}
           <div className="gen-floor-heights-total">
             <span>{t('gen.totalHeightLabel')}</span>
             <span className="gen-floor-heights-total-val">{sz.h}</span>

@@ -249,6 +249,7 @@ export const en = {
   'planner.generateEdit': 'Apply',
   'planner.dimsKey': '(W×D×H)',
   'planner.scaleNote': 'Player ~{h} blocks, for scale',
+  'planner.dragFloorHint': 'Drag a floor band to adjust its height',
   'planner.previewEmpty': 'Pick a structure to preview its size at a glance.',
 
   // The stage "building" card (between hitting Generate and the first version loading).

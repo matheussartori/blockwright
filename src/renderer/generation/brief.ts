@@ -8,9 +8,11 @@ import type { BuildBrief, BuildSelection, GenerationCatalog, GenerationModule } 
 import { presetForScale, scaleForArea } from '@/shared/domain/furnishing';
 import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 import {
+  ATTIC_OVERHEAD,
+  BASEMENT_OVERHEAD,
   DEFAULT_STOREY_H,
   MAX_STOREY_H,
-  MIN_STOREY_H,
+  MIN_FLOOR_H,
   heightOverhead,
 } from '@/shared/domain/storeys';
 import { expandSizeForSurroundings } from '@/shared/domain/surroundings';
@@ -40,6 +42,14 @@ export type BuildDetails = Record<ModuleSlotKey, string> & {
    *  user can make a tall ground floor over a low upper one. Length tracks the `floors`
    *  param (see `setDetailParam`). */
   floorHeights: number[] | null;
+  /** Height of the picked BASEMENT band (cells), or `null` for the default
+   *  ({@link BASEMENT_OVERHEAD}). Edited in the per-floor Height panel; only meaningful
+   *  while a basement is picked and per-floor mode is on. */
+  basementH: number | null;
+  /** Height of the picked ATTIC band (cells) — the attic is always the TOPMOST level and
+   *  its band ENGULFS the roof zone (attic headroom + roof reserve, nothing above it).
+   *  `null` = the default (roof reserve + {@link ATTIC_OVERHEAD}). */
+  atticH: number | null;
   /** Interior room modules assigned per floor (index = floor, 0-based, bottom-up). Each
    *  floor holds up to 2 room ids; '' marks an empty slot. Only meaningful for a storeyed
    *  structure (one with a `floors` param). */
@@ -56,13 +66,16 @@ export const EMPTY_DETAILS: BuildDetails = {
   params: {},
   size: null,
   floorHeights: null,
+  basementH: null,
+  atticH: null,
   rooms: [],
 };
 
 // Storey-height bounds + the neutral default come from the shared storey ladder
 // (`shared/domain/storeys.ts`) — the SAME constants the structure types build with —
-// re-exported so the composer controls keep importing them from here.
-export { DEFAULT_STOREY_H, MAX_STOREY_H, MIN_STOREY_H };
+// re-exported so the composer controls keep importing them from here. MIN_FLOOR_H is
+// the every-floor-≥5-blocks rule.
+export { DEFAULT_STOREY_H, MAX_STOREY_H, MIN_FLOOR_H };
 
 /** "m:ss" from a millisecond duration.
  *  @param ms - Elapsed time in milliseconds.
@@ -172,26 +185,53 @@ function overhead(params: Record<string, string | number>, w: number, d: number)
   });
 }
 
-/** The total build height implied by explicit per-floor storey heights: their sum plus the
- *  roof/basement/attic overhead. The inverse of "split a total H across N equal storeys".
+/** Just the roof reserve of the overhead (no basement/attic) — what an attic band's
+ *  default swallows. */
+function roofReserve(params: Record<string, string | number>, w: number, d: number): number {
+  return heightOverhead({ w, d, roof: typeof params.roof === 'string' ? params.roof : undefined });
+}
+
+/** The non-storey vertical BANDS of the box: the picked basement at the bottom (the
+ *  user's custom height or {@link BASEMENT_OVERHEAD}), and the TOP band — when an attic
+ *  is picked it is always the topmost level and ENGULFS the whole roof zone (custom
+ *  height or roof reserve + {@link ATTIC_OVERHEAD}; `roof` is then 0, nothing sits above
+ *  it), otherwise the roof reserve alone. */
+function bandHeights(
+  d: BuildDetails,
+  params: Record<string, string | number>,
+  w: number,
+  dd: number,
+): { basement: number; attic: number; roof: number } {
+  const roof = roofReserve(params, w, dd);
+  const basement = d.basement ? (d.basementH ?? BASEMENT_OVERHEAD) : 0;
+  const attic = d.attic ? (d.atticH ?? roof + ATTIC_OVERHEAD) : 0;
+  return { basement, attic, roof: d.attic ? 0 : roof };
+}
+
+/** The total build height implied by explicit per-floor storey heights: their sum plus
+ *  the basement/attic-or-roof bands (honouring the user's custom band heights).
+ *  The inverse of "split a total H across N equal storeys".
+ *  @param d - The current Details state (custom `basementH`/`atticH` ride in from here).
  *  @param floorHeights - The interior storey heights, bottom-up.
- *  @param params - The resolved params (basement/attic drive the overhead).
+ *  @param params - The resolved slot-folded params (roof pick drives the reserve).
  *  @param w - Build width (roof reserve scales with the footprint).
- *  @param d - Build depth.
+ *  @param dd - Build depth.
  *  @returns The total box height. */
 export function totalHeightFromFloors(
+  d: BuildDetails,
   floorHeights: number[],
   params: Record<string, string | number>,
   w: number,
-  d: number,
+  dd: number,
 ): number {
   const sum = floorHeights.reduce((a, b) => a + b, 0);
-  return sum + overhead(params, w, d);
+  const bands = bandHeights(d, params, w, dd);
+  return sum + bands.basement + bands.attic + bands.roof;
 }
 
 /** Seed the per-floor height editor: a uniform storey height for every above-ground floor,
  *  back-derived from the currently-effective total so switching into per-floor mode keeps
- *  the same overall height. Clamped to [{@link MIN_STOREY_H}, {@link MAX_STOREY_H}].
+ *  the same overall height. Clamped to [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}].
  *  @param d - The current Details state.
  *  @param struct - The chosen structure module.
  *  @returns One height per floor (all equal), length = the resolved floor count (≥ 1). */
@@ -201,8 +241,25 @@ export function defaultFloorHeights(d: BuildDetails, struct: GenerationModule | 
   const base = d.size ?? derivedSize(struct, params);
   const storeys = base.h - overhead(params, base.w, base.d);
   const each = Math.round(storeys / n) || DEFAULT_STOREY_H;
-  const clamped = Math.max(MIN_STOREY_H, Math.min(MAX_STOREY_H, each));
+  const clamped = Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, each));
   return Array.from({ length: n }, () => clamped);
+}
+
+/** The non-storey vertical SEGMENTS of the effective box, for the planner's 3D preview
+ *  and the Height panel's basement/attic rows: the selected basement band at the bottom,
+ *  and the TOP band — a picked attic is always the topmost level, engulfing the roof
+ *  zone (`roof` is then 0); without one the roof reserve caps the box. Honours the
+ *  user's custom `basementH`/`atticH`.
+ *  @param d - The current Details state.
+ *  @param struct - The chosen structure module.
+ *  @returns Heights in cells; zeros for the slots that aren't picked. */
+export function previewOverheads(
+  d: BuildDetails,
+  struct: GenerationModule | undefined,
+): { basement: number; attic: number; roof: number } {
+  const params = paramsWithSlots(d, struct);
+  const sz = effectiveSize(d, struct);
+  return bandHeights(d, params, sz.w, sz.d);
 }
 
 /** The effective size: the user's override, else the derived default. The selected
@@ -219,7 +276,7 @@ export function effectiveSize(
   const params = paramsWithSlots(d, struct);
   const base = d.size ?? derivedSize(struct, params);
   if (d.floorHeights && d.floorHeights.length) {
-    return { w: base.w, d: base.d, h: totalHeightFromFloors(d.floorHeights, params, base.w, base.d) };
+    return { w: base.w, d: base.d, h: totalHeightFromFloors(d, d.floorHeights, params, base.w, base.d) };
   }
   return base;
 }
@@ -351,6 +408,15 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     heightLine =
       `- Storey heights (slab-to-slab, bottom-up, y relative to the ground floor): ${lines.join(', ')}. ` +
       `Each storey's floor slab MUST sit at its stated level — respect these heights exactly.\n`;
+    // The basement/attic bands the user sized in the same panel (the attic band is the
+    // TOPMOST level — it owns the whole attic + roof zone, nothing sits above it).
+    const bands = previewOverheads(d, s);
+    if (bands.basement) heightLine += `- Basement level: ${bands.basement} blocks deep, below the ground floor.\n`;
+    if (bands.attic) {
+      heightLine +=
+        `- Attic: the TOPMOST level — ${bands.attic} blocks covering the whole attic + roof zone ` +
+        `above the top floor (nothing sits above it).\n`;
+    }
   }
   return (
     `\n\n[Build details — guidance the user picked, NOT a fixed mold. Design and build this structure YOURSELF, from scratch, with your own ops. Do NOT use a \`template\` op or any stamped preset shell.]\n` +

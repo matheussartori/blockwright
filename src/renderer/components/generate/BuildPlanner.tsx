@@ -24,12 +24,15 @@ import {
   buildSummary,
   effectiveSize,
   maxRoomsForStructure,
+  previewOverheads,
 } from '../../generation/brief';
 import {
+  type BandKey,
   type DetailField,
   type SizeBox,
   addRoom,
   removeRoomAt,
+  setBandHeight,
   setDetailField,
   setDetailParam,
   setDetailSize,
@@ -37,7 +40,7 @@ import {
   setHeightMode,
 } from '../../generation/details';
 import { DetailsSection } from './DetailsSection';
-import { BuildScalePreview, PLAYER_H } from './BuildScalePreview';
+import { ATTIC_COLOR, BASEMENT_COLOR, BuildScalePreview, PLAYER_H } from './BuildScalePreview';
 import type { GenerationCatalog } from '@/shared/types';
 
 /** The shared planner UI, rendered inline (new build) or as an overlay (advanced edit). */
@@ -91,6 +94,10 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
       plannerStore.getState().setDetails((d) => setFloorHeight(d, index, value, linked)),
     [],
   );
+  const onBandHeight = useCallback(
+    (band: BandKey, value: number) => plannerStore.getState().setDetails((d) => setBandHeight(d, band, value)),
+    [],
+  );
   const onAddRoom = useCallback(
     (floor: number, id: string) => {
       const ps = plannerStore.getState();
@@ -134,6 +141,8 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
   }, [catalog]);
 
   const sz = details.structureType ? effectiveSize(details, selStruct) : null;
+  const overheads = details.structureType ? previewOverheads(details, selStruct) : null;
+  const perFloor = !!details.floorHeights?.length;
   const title = inline ? (isEdit ? t('planner.advancedTitle') : t('planner.newTitle')) : t('planner.advancedTitle');
   const cta = isEdit ? t('planner.generateEdit') : t('planner.generate');
 
@@ -178,6 +187,7 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onSize={onSize}
             onHeightMode={onHeightMode}
             onFloorHeight={onFloorHeight}
+            onBandHeight={onBandHeight}
             onAddRoom={onAddRoom}
             onRemoveRoom={onRemoveRoom}
           />
@@ -214,13 +224,40 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
         <div className="planner-preview">
           {sz ? (
             <>
-              <BuildScalePreview size={sz} floors={details.floorHeights} />
+              <BuildScalePreview
+                size={sz}
+                floors={details.floorHeights}
+                overheads={overheads}
+                onBandHeight={
+                  perFloor
+                    ? (band, v) => (typeof band === 'number' ? onFloorHeight(band, v, false) : onBandHeight(band, v))
+                    : undefined
+                }
+              />
               <div className="planner-preview-caption">
                 <span className="planner-dims">
                   {sz.w} × {sz.d} × {sz.h}
                   <span className="planner-dims-key"> {t('planner.dimsKey')}</span>
                 </span>
-                <span className="planner-scale-note">{t('planner.scaleNote').replace('{h}', String(PLAYER_H))}</span>
+                {(!!overheads?.basement || !!overheads?.attic) && (
+                  <span className="planner-legend">
+                    {!!overheads.basement && (
+                      <span className="planner-legend-item">
+                        <span className="planner-legend-dot" style={{ background: BASEMENT_COLOR }} />
+                        {t('gen.fieldBasement')}
+                      </span>
+                    )}
+                    {!!overheads.attic && (
+                      <span className="planner-legend-item">
+                        <span className="planner-legend-dot" style={{ background: ATTIC_COLOR }} />
+                        {t('gen.fieldAttic')}
+                      </span>
+                    )}
+                  </span>
+                )}
+                <span className="planner-scale-note">
+                  {perFloor ? t('planner.dragFloorHint') : t('planner.scaleNote').replace('{h}', String(PLAYER_H))}
+                </span>
               </div>
             </>
           ) : (

@@ -24,17 +24,22 @@ describe('planStoreys: the uniform fallback (legacy split)', () => {
 
 describe('planStoreys: explicit per-floor heights', () => {
   it('uses the heights exactly when they fit', () => {
-    const ladder = planStoreys({ baseY: 0, idealTop: 20, maxWallTop: 20, floors: 2, floorHeights: [7, 4] });
-    expect(ladder.heights).toEqual([7, 4]);
+    const ladder = planStoreys({ baseY: 0, idealTop: 20, maxWallTop: 20, floors: 2, floorHeights: [7, 6] });
+    expect(ladder.heights).toEqual([7, 6]);
     expect(ladder.slabYs).toEqual([0, 7]);
-    expect(ladder.wallTop).toBe(11);
+    expect(ladder.wallTop).toBe(13);
+  });
+
+  it('raises any floor under the 5-block rule to MIN_FLOOR_H', () => {
+    const ladder = planStoreys({ baseY: 0, idealTop: 20, maxWallTop: 20, floors: 2, floorHeights: [7, 4] });
+    expect(ladder.heights).toEqual([7, 5]);
   });
 
   it('pads a short array with its last height and truncates a long one', () => {
     expect(planStoreys({ baseY: 0, idealTop: 30, maxWallTop: 30, floors: 3, floorHeights: [7] }).heights)
       .toEqual([7, 7, 7]);
-    expect(planStoreys({ baseY: 0, idealTop: 30, maxWallTop: 30, floors: 2, floorHeights: [7, 4, 5] }).heights)
-      .toEqual([7, 4]);
+    expect(planStoreys({ baseY: 0, idealTop: 30, maxWallTop: 30, floors: 2, floorHeights: [7, 6, 5] }).heights)
+      .toEqual([7, 6]);
   });
 
   it('shrinks proportionally (keeping the ratio) when the box is too short', () => {
@@ -57,15 +62,15 @@ describe('planStoreys: explicit per-floor heights', () => {
   });
 
   it('offsets the slab Ys from a raised base', () => {
-    const ladder = planStoreys({ baseY: 4, idealTop: 20, maxWallTop: 20, floors: 2, floorHeights: [6, 4] });
+    const ladder = planStoreys({ baseY: 4, idealTop: 20, maxWallTop: 20, floors: 2, floorHeights: [6, 5] });
     expect(ladder.slabYs).toEqual([4, 10]);
-    expect(ladder.wallTop).toBe(14);
+    expect(ladder.wallTop).toBe(15);
   });
 });
 
 describe('sanitizeFloorHeights', () => {
-  it('accepts a numeric array, truncating and clamping each entry', () => {
-    expect(sanitizeFloorHeights([5.7, 2, 40])).toEqual([5, 3, 32]);
+  it('accepts a numeric array, truncating and clamping each entry to the 5-block floor rule', () => {
+    expect(sanitizeFloorHeights([5.7, 2, 40])).toEqual([5, 5, 32]);
   });
 
   it('rejects anything that is not a non-empty numeric array', () => {
