@@ -93,10 +93,12 @@ screen.
 **File ▸ New Structure** opens the full-stage **Build Planner**, where you describe the build
 (optionally attaching a reference image) and pick a structure type, decoration, roof, basement,
 in-roof attic and surroundings (a yard wrapping the house — a fenced cottage garden or a modern
-pool terrace; the W×D you set is the building shell, and the compiled box grows around it) to
-steer it — and, for a multi-storey house, assign up to two interior rooms to each
-floor (e.g. _Floor 1: living room + kitchen, Floor 2: bedrooms + library_) and set the build size
-(one total height, or a height per floor) — alongside a live 3D preview of the build volume.
+pool terrace, whose size you set by hand on each axis; the W×D you set is the building shell, and
+the compiled box grows around it by the chosen yard margins) to steer it — and, for a multi-storey
+house, assign up to two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2:
+bedrooms + library_) and set a height per floor (optionally linked so the whole stack moves
+together) — alongside a live 3D preview of the build volume, where the storeys rise from the ground,
+a basement drops below it, and the yard ring shows at ground level around the house.
 A picked structure type starts from its code-built shell (the exterior is guaranteed and kept;
 the AI furnishes the interior and layers on detail), while a build with no structure selected is
 designed free-form from the prompt. Blockwright compiles the result to `.nbt` and renders it in

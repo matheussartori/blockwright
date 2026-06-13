@@ -142,15 +142,22 @@ src/
                            to it, so the yard's footprint is never the plain rectangle) + index.ts
                            (registry + `insetHouseBox` + the shared `yardFor` every host's build()/
                            floors() opens with). A GROUND-LEVEL landscaping RING laid OUTSIDE the
-                           building shell: the user's W×D is the SHELL, the compiled box grows by
-                           margins that SCALE with the house (`SURROUND_SCALE` in
-                           `shared/domain/surroundings.ts` — base→max, +1 cell per 4 shell cells past
-                           14; same math on both sides of IPC: the renderer expands via
-                           `surroundMargins(id,w,d)`, main inverts exactly via
-                           `surroundMarginsForOuter(id,W,D)`), the host structure INSETS its massing and
-                           delegates the ring via `composeModule('surroundings', …)`. The module
-                           re-derives the house footprint from the same function, so host and ring
-                           always agree. Own palette
+                           building shell: the user's W×D is the SHELL, the compiled box grows by the
+                           ring margins. By default those AUTO-SCALE with the house (`SURROUND_SCALE` in
+                           `shared/domain/surroundings.ts` — base→max, +1 cell per 4 shell cells past 14),
+                           but the composer's YARD-SIZE control lets the user OVERRIDE them with explicit
+                           per-side cell margins (`SurroundSizing {side,front,back}`, the manual Width-X /
+                           Depth-Z steppers). `resolveSurroundMargins(id,w,d,override?)` is the single
+                           resolver (override wins, else auto); `surroundMargins`/`expandSizeForSurroundings`/
+                           `surroundMarginsForOuter`/`insetHouseBox`/`yardFor` all take the optional override
+                           — with an override the margins are used DIRECTLY (house = outer − override, no
+                           inversion), without one main inverts the auto expansion exactly via
+                           `surroundMarginsForOuter(id,W,D)`. Same math on both sides of IPC (the override
+                           rides through `BuildSelection.surroundSizing` → shell-seed `params.surroundSizing`
+                           → `BuildArgs.surroundSizing` + `floors()` + the module's `args.surroundSizing`).
+                           The host structure INSETS its massing and delegates the ring via
+                           `composeModule('surroundings', …, {surroundSizing})`. The module re-derives the
+                           house footprint from the same resolver, so host and ring always agree. Own palette
                            over the decoration (like a basement — a lawn stays a lawn); ring stays ≤3
                            cells tall (landscaping, never construction — the cap is the lamp-post
                            lantern); leaves placed persistent.
@@ -285,8 +292,11 @@ src/
                           toolbar), DetailsSection (the progressive Details — a PURE view: the structure
                           pick + every single-select slot/enum param render as the themed `ui/Select`
                           dropdown (NOT chip groups; the structure pick is `searchable` and grouped by
-                          family via `catalog.groups`), plus the size box with a Total ⇄ Per-floor height
-                          switch + per-floor rooms), FloorsSection (the ▦ Floors editor), BuildCard (the chat
+                          family via `catalog.groups`), plus the size box (a storeyed structure is ALWAYS
+                          sized PER FLOOR — one height input per storey with a link/chain toggle; there is no
+                          "Total" height mode), the YARD-SIZE control when a surroundings ring is picked
+                          (the SAME boxed number-stepper panel as the floor heights: Width X / Depth Z in
+                          cells, nudged in 2-cell steps) + per-floor rooms), FloorsSection (the ▦ Floors editor), BuildCard (the chat
                           build card), BuildProgress (the COMPACT live progress bar — phase + design-pass +
                           a determinate fill from designStep/designSteps + elapsed/tokens, shared by the dock
                           and the stage), StageBuilding (the centered "building…" card shown over an empty
@@ -315,12 +325,17 @@ src/
                           the model's "[Build details]" brief + BuildSelection + the BuildBrief chat
                           card + size/floor helpers — incl. `effectiveSize`/`totalHeightFromFloors`/
                           `defaultFloorHeights` for the per-floor-height model: `BuildDetails.floorHeights`
-                          (null = one Total Y; else a height per above-ground storey, total derived from
-                          their sum + roof/basement overhead)), details.ts (pure reducers over BuildDetails —
-                          field/room/param/size edits + `setHeightMode`/`setFloorHeight`; editing a
-                          param or slot PRESERVES an explicit `size` — never snaps it back to auto —
-                          and a `floors` change resizes the per-floor heights; a structure pick pairs
-                          the module's declared `pairedDecoration`), attachments.ts (reference-
+                          is a height per above-ground storey (total derived from their sum + roof/basement
+                          overhead). A storeyed structure is ALWAYS per-floor — the heights are SEEDED on the
+                          structure pick (`defaultFloorHeights`); there is no "Total/auto" height mode (the
+                          link/chain toggle covers "don't size each floor by hand"). `null` only for a
+                          NON-storeyed type (a single H field). Also `surroundRing` (the picked yard's
+                          effective per-side margins, auto or the user's explicit override)), details.ts
+                          (pure reducers over BuildDetails — field/room/param/size edits + `setFloorHeight`
+                          + `setSurroundSize` (the manual yard margins); editing a param or slot PRESERVES an
+                          explicit `size` — never snaps it back to auto — and a `floors` change resizes the
+                          per-floor heights; a structure pick pairs the module's declared `pairedDecoration`
+                          and seeds the per-floor heights), attachments.ts (reference-
                           image intake) and floors.ts (normalizeFloor + buildFloorPlan).
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
@@ -576,12 +591,17 @@ decoration, and a new module is one small file.
   `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
 - **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern,
   garden): a required single-select slot defaulting to **None**. The user's W×D stays the
-  BUILDING SHELL — a pick grows the compiled box by margins that SCALE with the house
-  (`SURROUND_SCALE` in `shared/domain/surroundings.ts`: base→max, bigger shell = wider ring; the
-  renderer's `buildBoxSize` expands via `surroundMargins(id,w,d)` and the main-side inset inverts
-  it exactly via `surroundMarginsForOuter(id,W,D)`, so the two can't drift); the host structure
+  BUILDING SHELL — a pick grows the compiled box by the ring margins. By DEFAULT those auto-scale
+  with the house (`SURROUND_SCALE` in `shared/domain/surroundings.ts`: base→max, bigger shell =
+  wider ring), but the composer's YARD-SIZE steppers let the user OVERRIDE them with explicit
+  per-side cell margins (`SurroundSizing {side,front,back}`); `resolveSurroundMargins(id,w,d,override?)`
+  is the single resolver. The renderer's `buildBoxSize` expands via `expandSizeForSurroundings`
+  (honouring the override) and the main-side inset uses `surroundMarginsForOuter(id,W,D,override?)`
+  — an override is used directly (house = outer − override), else the auto expansion is inverted
+  exactly — so the two can't drift (the override rides through `BuildSelection.surroundSizing` →
+  shell-seed → `BuildArgs.surroundSizing` + `floors()` + the module). The host structure
   lays its massing in `insetHouseBox(...)` and
-  delegates the ring via `composeModule('surroundings', …)` (module-respect verified) — every
+  delegates the ring via `composeModule('surroundings', …, {surroundSizing})` (module-respect verified) — every
   host's `build()`/`floors()` opens with the shared `yardFor` so massing and storey math agree.
   The ring is landscaping (≤3 cells tall — the lamp-post lantern cap — open-air, persistent
   leaves) and ships with the seeded shell, so it's LOCKED like the rest of the exterior; the
@@ -773,15 +793,18 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic), **Decoration**
   (cozy/haunted/modern/farmhouse/sakura/gothic), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
   cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern/garden — required
-  pick, defaults to None, filtered by the chosen structure's hosts; a non-None pick EXPANDS the
+  pick, defaults to None, filtered by the chosen structure's hosts; a non-None pick reveals a
+  **Yard size** control — manual Width-X / Depth-Z cell steppers (2-cell steps) — and EXPANDS the
   compiled box beyond the user's W×D shell via `buildBoxSize`, the composer size fields keep
   SHELL semantics) — plus, for a
-  storeyed structure (a `floors` param), a **per-floor room editor**: one row per floor with up to **two**
+  storeyed structure (a `floors` param) the build size is ALWAYS sized PER FLOOR (one height per
+  storey, link-toggle to move them together — no "Total" mode) and a **per-floor room editor**: one
+  row per floor with up to **two**
   room selects (living/kitchen/library/bedroom/dormitory/storage), capped by `ROOMS_PER_FLOOR`. The picks
   are folded into the prompt as a plain-language "[Build details]" brief — incl. a `[Room plan]` line per
   floor (`buildRoomPlan`) — (never a `template` op; a picked structure type seeds its compiled shell
   instead, see "Seeded archetypes"; cleared after sending), AND ride along as a structured
-  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`surroundings`/`rooms`/`size`, the rooms deduped across
+  `BuildSelection` (`structureType`/`decoration`/`roof`/`basement`/`attic`/`surroundings`/`surroundSizing`/`rooms`/`size`/`floorHeights`, the rooms deduped across
   floors) so the system prompt loads only those modules' knowledge guides — one guide per pick (threaded
   `aiGenerate → generateStructure → systemPrompt → loadKnowledge`), and `size` lets a seeded archetype
   compile its shell at the right box. Roof/Basement are enabled once a structure is chosen and are FILTERED
