@@ -264,6 +264,95 @@ describe('garden surroundings geometry (template expansion)', () => {
   });
 });
 
+describe('graveyard surroundings geometry (template expansion)', () => {
+  const YSHELL: [number, number, number] = [13, 15, 11];
+  const y = surroundMargins('graveyard', YSHELL[0], YSHELL[2])!;
+  const YSIZE: [number, number, number] = [YSHELL[0] + y.side * 2, YSHELL[1], YSHELL[2] + y.front + y.back];
+  const { at, warnings } = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 21 }, 'gothic');
+  const outer = box([0, 0, 0], [YSIZE[0] - 1, YSIZE[1] - 1, YSIZE[2] - 1]);
+  const inner = insetHouseBox(outer, 'graveyard');
+  const cx = Math.floor((YSIZE[0] - 1) / 2);
+  const inRing = (x: number, z: number) => x < inner.x0 || x > inner.x1 || z < inner.z0 || z > inner.z1;
+  const ringNames = new Set(
+    [...at.entries()].filter(([k]) => { const [x, , z] = k.split(',').map(Number); return inRing(x, z); }).map(([, c]) => c.name),
+  );
+
+  it('is at least 4× the garden ring in both x and z (a grand, front-heavy cemetery)', () => {
+    const g = surroundMargins('garden', YSHELL[0], YSHELL[2])!;
+    expect(y.side * 2).toBeGreaterThanOrEqual(g.side * 2 * 4);
+    expect(y.front + y.back).toBeGreaterThanOrEqual((g.front + g.back) * 4);
+    expect(y.front).toBeGreaterThan(y.back); // front-weighted (the spacious approach)
+  });
+
+  it('composes with no module-respect warnings (the ring was actually built)', () => {
+    expect(warnings).toEqual([]);
+  });
+
+  it('lays a grass lawn and a gravel approach, with the manor inset to the shell', () => {
+    expect(ringNames.has('minecraft:grass_block')).toBe(true);
+    expect(ringNames.has('minecraft:gravel')).toBe(true);
+    // The approach runs up the centre to the manor door.
+    expect(at.get(`${cx},0,1`)?.name).toBe('minecraft:gravel');
+    // The manor reaches the inner (shell) bounds, above yard height.
+    expect(isSolid(at.get(`${inner.x0},6,${inner.z0 + 2}`))).toBe(true);
+    expect([inner.W, inner.D]).toEqual([YSHELL[0], YSHELL[2]]);
+  });
+
+  it('rings the grounds with a crumbling mossy-stone wall lit by soul lanterns', () => {
+    expect(ringNames.has('minecraft:mossy_stone_bricks')).toBe(true);
+    expect(ringNames.has('minecraft:cobblestone_wall')).toBe(true);
+    const lanterns = [...at.entries()].filter(([k, c]) => {
+      const [x, , z] = k.split(',').map(Number);
+      return c.name === 'minecraft:soul_lantern' && inRing(x, z);
+    });
+    expect(lanterns.length).toBeGreaterThan(2);
+  });
+
+  it('sets an arched gate on a cobblestone threshold, aligned with the door', () => {
+    for (const x of [cx - 1, cx, cx + 1]) expect(at.get(`${x},0,0`)?.name).toBe('minecraft:cobblestone');
+    // Flanking piers rise on either side of the opening.
+    expect(at.get(`${cx - 2},2,0`)?.name).toBe('minecraft:stone_bricks');
+    expect(at.get(`${cx + 2},2,0`)?.name).toBe('minecraft:stone_bricks');
+  });
+
+  it('fills the grounds with graves, ruins and a weeping tree', () => {
+    // Disturbed-earth grave mounds + headstones over the front grounds.
+    expect(ringNames.has('minecraft:podzol')).toBe(true);
+    expect(ringNames.has('minecraft:stone_brick_slab')).toBe(true);
+    // The weeping tree (trunk + persistent canopy) is the focal point.
+    expect(ringNames.has('minecraft:oak_log')).toBe(true);
+    const leaves = [...at.entries()].filter(([k, c]) => {
+      const [x, , z] = k.split(',').map(Number);
+      return c.name === 'minecraft:oak_leaves' && inRing(x, z);
+    });
+    expect(leaves.length).toBeGreaterThan(8);
+    for (const [, c] of leaves) expect(c.props?.persistent).toBe('true');
+    // Overgrowth reclaiming the lawn.
+    expect(ringNames.has('minecraft:poppy') || ringNames.has('minecraft:fern')).toBe(true);
+  });
+
+  it('every corner is chamfered (the outline varies — never a plain rectangle)', () => {
+    for (const [x, z] of [[0, 0], [YSIZE[0] - 1, 0], [0, YSIZE[2] - 1], [YSIZE[0] - 1, YSIZE[2] - 1]]) {
+      expect(isSolid(at.get(`${x},0,${z}`)), `corner ${x},${z} must be cut`).toBe(false);
+    }
+  });
+
+  it('keeps every ring feature inside the build box height', () => {
+    for (const [k, c] of at) {
+      const [x, yy, z] = k.split(',').map(Number);
+      if (inRing(x, z) && isSolid(c)) expect(yy, `ring block at ${k} (${c.name})`).toBeLessThanOrEqual(YSIZE[1] - 1);
+    }
+  });
+
+  it('seeds vary the layout (two seeds disagree on some grave/wall cells)', () => {
+    const other = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 22 }, 'gothic');
+    const set = (m: typeof at) =>
+      new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:mossy_stone_bricks').map(([k]) => k));
+    const a = set(at), b = set(other.at);
+    expect([...a].some((k) => !b.has(k)) || [...b].some((k) => !a.has(k))).toBe(true);
+  });
+});
+
 describe('the ring scales with the house (big-shell template expansion)', () => {
   it.each([
     ['modern', 'modern', 25, 21],

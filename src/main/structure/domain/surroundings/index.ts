@@ -12,12 +12,13 @@ import type { ParamValues } from '../params';
 import { createRegistry } from '../registry';
 import { box, type Box } from '../structure-types/types';
 import { garden } from './garden';
+import { graveyard } from './graveyard';
 import { modern } from './modern';
 import type { SurroundingsModule } from './types';
 
 export type { SurroundingsModule } from './types';
 
-export const registry = createRegistry<SurroundingsModule>([modern, garden]);
+export const registry = createRegistry<SurroundingsModule>([modern, garden, graveyard]);
 
 /** Look up a surroundings module by id (undefined if unknown). */
 export function getSurroundings(id: string): SurroundingsModule | undefined {

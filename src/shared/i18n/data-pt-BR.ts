@@ -83,6 +83,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.surroundings.garden.label': 'Jardim',
   'mod.surroundings.garden.desc':
     'Um jardim de chácara cercado envolvendo a casa: um muro baixo de pedra coroado por uma cerca de madeira com postes de lampião em pedra, um portão de porta dupla alinhado com a entrada, um caminho de terra até a porta mais uma trilha contornando a casa, canteiros de flores ao longo da fachada, e uma mistura sorteada de elementos pelos gramados — uma fonte ou um poço de pedra, hortas aradas, um canteiro ornamental e arbustos aparados. O quintal escala com a casa — um lar maior ganha um terreno mais amplo — e o contorno chanfrado da cerca varia a cada semente, então o lote nunca é um retângulo puro. A caixa da construção cresce além do casco da casa para abrigar o quintal.',
+  'mod.surroundings.graveyard.label': 'Cemitério',
+  'mod.surroundings.graveyard.desc':
+    'Um cemitério vasto e sombrio envolvendo a mansão gótica: um muro de pedra musgosa desmoronando, aberto em pontos e iluminado por lanternas das almas sobre pilares de pedra, um portão em arco alinhado com a entrada, uma longa alameda de cascalho ladeada por fileiras de lápides desgastadas, uma colunata em ruínas de pilares tombando e entulho, uma grande árvore-chorona como ponto focal, um pequeno mausoléu de pedra, e vegetação — samambaias, papoulas e folhas pendentes — reconquistando as ruínas. O terreno é deliberadamente imenso (cerca de quatro vezes um quintal comum) e voltado para a frente, então a mansão parece uma propriedade. A caixa da construção cresce bem além do casco da casa para abrigar o cemitério.',
 
   // --- tunable params -------------------------------------------------------
   'param.floors.label': 'Andares',

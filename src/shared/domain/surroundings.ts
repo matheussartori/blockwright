@@ -42,6 +42,15 @@ export const SURROUND_SCALE: Record<string, SurroundScale> = {
     base: { front: 9, back: 7, side: 7 },
     max: { front: 14, back: 11, side: 11 },
   },
+  // The gothic graveyard grounds are GRAND — by design at least ~4× the garden/modern
+  // ring in both x and z (a spacious cemetery the eye reads as an estate), and heavily
+  // FRONT-weighted: the long approach holds the gate, the headstone rows, the ruined
+  // colonnade and the weeping tree, while the rear keeps a crypt and rubble. Only the
+  // gothic manor hosts it (see graveyard.ts `appliesTo`).
+  graveyard: {
+    base: { front: 40, back: 24, side: 28 },
+    max: { front: 52, back: 32, side: 36 },
+  },
 };
 
 /** One margin scaled to a shell extent: the base, +1 cell per {@link GROW_PER} shell

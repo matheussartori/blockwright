@@ -62,8 +62,8 @@ export const gothic: StructureType = {
     // Surfaced as the "Surroundings" module select (hidden from the type's own Details
     // controls like `roof`); a pick insets the house and delegates the yard ring.
     surroundings: {
-      kind: 'enum', default: 'none', values: ['none', 'garden'], label: 'Surroundings',
-      labels: { none: 'None', garden: 'Garden' }, module: 'surroundings',
+      kind: 'enum', default: 'none', values: ['none', 'garden', 'graveyard'], label: 'Surroundings',
+      labels: { none: 'None', garden: 'Garden', graveyard: 'Graveyard' }, module: 'surroundings',
     },
     decay: { kind: 'unit', default: 0 },
   },
