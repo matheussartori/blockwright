@@ -123,11 +123,11 @@ export const classic: StructureType = {
     fence: 'minecraft:spruce_fence',
     light: 'minecraft:lantern',
   },
-  build({ box: outer, params, palette, seed, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, seed, floorHeights, surroundSizing, composeModule }) {
     // A picked surroundings ring reserves the box's outer margins for the yard: the
     // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
-    const yard = yardFor(outer, params);
-    const box = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const box = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
     const basement = params.basement as string;
@@ -170,7 +170,7 @@ export const classic: StructureType = {
     // The yard first (it never overlaps the inset house, so order is cosmetic — laying
     // it first means any future overlap resolves in the house's favour).
     if (yard) {
-      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1], { surroundSizing }));
     }
 
     // --- Level plan (shared with floors() via plan()) ---------------------------
@@ -338,10 +338,10 @@ export const classic: StructureType = {
   },
   // Authoritative storeys, from the SAME plan() build() uses (basement → ground →
   // uppers) — so the viewer bands / sidecar / stairwell pass see the laid planes.
-  floors(outer: Box, params, floorHeights): FloorPlanEntry[] {
+  floors(outer: Box, params, floorHeights, surroundSizing): FloorPlanEntry[] {
     // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
-    const yard = yardFor(outer, params);
-    const b = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const b = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { hasBasement, slabYs, wallTop } = plan(b, params, floorHeights);
     const entries = storeyEntries(slabYs, wallTop);
     return hasBasement

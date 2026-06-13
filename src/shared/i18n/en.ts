@@ -209,6 +209,10 @@ export const en = {
   'gen.heightFloorsMode': 'Per floor',
   'gen.linkHeights': 'Heights linked — every floor moves together',
   'gen.unlinkHeights': 'Heights independent — set each floor on its own',
+  'gen.fieldYardSize': 'Yard size',
+  'gen.yardWidth': 'Width (X)',
+  'gen.yardDepth': 'Depth (Z)',
+  'gen.yardRingHint': 'Yard footprint',
   'gen.totalHeightLabel': 'Total height',
   'gen.floorPlan': 'Floor plan',
   'gen.floorPlanHint':

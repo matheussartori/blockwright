@@ -10,6 +10,7 @@
 // never rebuilds this shell — it furnishes the open, glass-walled rooms it hands over.
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
+import type { SurroundSizing } from '@/shared/domain/surroundings';
 import type { ParamValues } from '../params';
 import { insetHouseBox, yardFor } from '../surroundings';
 import type { Box, FloorPlanEntry, StructureType } from './types';
@@ -153,11 +154,11 @@ export const modern: StructureType = {
     water: 'minecraft:water',
     light: 'minecraft:sea_lantern',
   },
-  build({ box: outer, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, surroundSizing, composeModule }) {
     // A picked surroundings ring reserves the box's outer margins for the yard: the
     // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
-    const yard = yardFor(outer, params);
-    const box = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const box = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { x0, y0, z0, x1, y1, z1, H } = box;
     const floors = params.floors as number;
     const roofShape = (params.roof as string) ?? 'flat';
@@ -180,7 +181,7 @@ export const modern: StructureType = {
     // The yard first (it never overlaps the inset house, so order is cosmetic — laying
     // it first means any future overlap resolves in the house's favour).
     if (yard) {
-      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1], { surroundSizing }));
     }
 
     // The house volume fills the whole footprint (the front pool yard was removed — a
@@ -259,11 +260,11 @@ export const modern: StructureType = {
   // Authoritative storeys (the SAME level math `build()` uses) so the viewer labels the
   // flat-roofed villa's floors exactly, instead of the geometric detector mistaking its
   // stacked flat decks for extra storeys.
-  floors(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[] {
+  floors(box: Box, params: ParamValues, floorHeights?: number[], surroundSizing?: SurroundSizing): FloorPlanEntry[] {
     // The SAME house-box inset build() applies: a surroundings ring narrows the footprint,
     // and the pitched-roof reserve scales with the HOUSE's spans, not the full box's.
-    const yard = yardFor(box, params);
-    const b = yard ? insetHouseBox(box, yard) : box;
+    const yard = yardFor(box, params, surroundSizing);
+    const b = yard ? insetHouseBox(box, yard, surroundSizing) : box;
     const roofShape = (params.roof as string) ?? 'flat';
     const reserve = modernRoofReserve(b, roofShape === 'gable' || roofShape === 'hip');
     const { gTop, twoStorey } = modernLevels(b.y0, b.y1, b.H, params.floors as number, reserve, floorHeights);

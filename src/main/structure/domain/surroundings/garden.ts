@@ -77,8 +77,8 @@ export const garden: SurroundingsModule = {
   },
   // GENERIC over the FULL box: the house footprint is re-derived from the shared scaled
   // margins (the host inset itself by the same function), the ring around it is the yard.
-  build({ box: b, palette, seed }): AuthoringOp[] {
-    const m = surroundMarginsForOuter('garden', b.W, b.D);
+  build({ box: b, palette, seed, surroundSizing }): AuthoringOp[] {
+    const m = surroundMarginsForOuter('garden', b.W, b.D, surroundSizing);
     if (!m) return [];
     const hx0 = b.x0 + m.side, hx1 = b.x1 - m.side;
     const hz0 = b.z0 + m.front, hz1 = b.z1 - m.back;

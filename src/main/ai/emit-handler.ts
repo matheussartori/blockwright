@@ -231,6 +231,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         ? structureFloorPlan(selection.structureType, size, {
             roof: selection.roof,
             surroundings: selection.surroundings,
+            surroundSizing: selection.surroundSizing,
             floorHeights: selection.floorHeights,
           })
         : [];

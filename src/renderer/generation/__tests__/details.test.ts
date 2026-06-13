@@ -11,7 +11,7 @@ import {
   setDetailParam,
   setDetailSize,
   setFloorHeight,
-  setHeightMode,
+  setSurroundSize,
 } from '../details';
 
 const details = (over: Partial<BuildDetails>): BuildDetails => ({ ...EMPTY_DETAILS, ...over });
@@ -153,20 +153,7 @@ describe('setDetailParam', () => {
   });
 });
 
-describe('setHeightMode / setFloorHeight', () => {
-  it("clears per-floor heights when switching back to 'total'", () => {
-    const d = details({ floorHeights: [6, 5] });
-    expect(setHeightMode(d, 'total', undefined).floorHeights).toBeNull();
-  });
-
-  it("seeds per-floor heights from the size when switching to 'floors'", () => {
-    // No struct → floorCount falls to 1; a uniform storey is seeded from the box.
-    const d = details({ structureType: 'house', size: { w: 9, d: 9, h: 12 } });
-    const next = setHeightMode(d, 'floors', undefined);
-    expect(next.floorHeights).not.toBeNull();
-    expect(next.floorHeights?.every((h) => h >= MIN_FLOOR_H)).toBe(true);
-  });
-
+describe('setFloorHeight', () => {
   it('linked edit moves every floor; unlinked edits one', () => {
     const d = details({ floorHeights: [5, 5, 5] });
     expect(setFloorHeight(d, 1, 8, true).floorHeights).toEqual([8, 8, 8]);
@@ -196,11 +183,27 @@ describe('setBandHeight', () => {
     const d = details({ basement: 'cellar', basementH: 8 });
     expect(setDetailField(d, 'basement', '').basementH).toBeNull();
   });
-  it("switching back to 'total' clears the custom bands", () => {
-    const d = details({ floorHeights: [5, 5], basement: 'cellar', basementH: 8, attic: 'storage', atticH: 6 });
-    const next = setHeightMode(d, 'total', undefined);
-    expect(next.basementH).toBeNull();
-    expect(next.atticH).toBeNull();
+});
+
+describe('setSurroundSize', () => {
+  it('stores the explicit per-side cell margins (clamped)', () => {
+    const d = details({ surroundings: 'garden' });
+    expect(setSurroundSize(d, { side: 10, front: 14, back: 8 }).surroundSizing).toEqual({ side: 10, front: 14, back: 8 });
+  });
+  it('clamps each margin to the allowed cell range', () => {
+    const d = details({ surroundings: 'garden' });
+    expect(setSurroundSize(d, { side: 999, front: 0, back: 14 }).surroundSizing).toEqual({ side: 32, front: 2, back: 14 });
+  });
+  it('null clears the override (back to the auto ring)', () => {
+    const d = details({ surroundings: 'garden', surroundSizing: { side: 10, front: 10, back: 10 } });
+    expect(setSurroundSize(d, null).surroundSizing).toBeNull();
+  });
+  it('is a no-op when no surroundings ring is picked', () => {
+    expect(setSurroundSize(EMPTY_DETAILS, { side: 8, front: 8, back: 8 })).toBe(EMPTY_DETAILS);
+  });
+  it('clearing the surroundings slot drops the yard override', () => {
+    const d = details({ surroundings: 'garden', surroundSizing: { side: 8, front: 8, back: 8 } });
+    expect(setDetailField(d, 'surroundings', 'none').surroundSizing).toBeNull();
   });
 });
 

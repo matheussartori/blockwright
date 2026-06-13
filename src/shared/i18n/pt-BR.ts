@@ -211,6 +211,10 @@ export const ptBR: Messages = {
   'gen.heightFloorsMode': 'Por andar',
   'gen.linkHeights': 'Alturas vinculadas — todos os andares mudam juntos',
   'gen.unlinkHeights': 'Alturas independentes — defina cada andar separadamente',
+  'gen.fieldYardSize': 'Tamanho do quintal',
+  'gen.yardWidth': 'Largura (X)',
+  'gen.yardDepth': 'Profundidade (Z)',
+  'gen.yardRingHint': 'Área do quintal',
   'gen.totalHeightLabel': 'Altura total',
   'gen.floorPlan': 'Planta de andares',
   'gen.floorPlanHint':

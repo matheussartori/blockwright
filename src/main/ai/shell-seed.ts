@@ -36,6 +36,9 @@ export interface ShellSeedOptions {
    *  yard ring (the `size` already includes the ring margins — see
    *  `shared/domain/surroundings.ts`; the type insets its massing by the same margins). */
   surroundings?: string;
+  /** The user's explicit per-side surroundings ring margins in cells (the composer's manual
+   *  yard-size control), threaded so the shell grows its yard to exactly this footprint. */
+  surroundSizing?: { side: number; front: number; back: number };
   /** The user's explicit per-floor storey heights (slab-to-slab, bottom-up), threaded so
    *  the shell's storey ladder lays its decks at exactly those heights. */
   floorHeights?: number[];
@@ -63,7 +66,7 @@ export interface ShellSeed {
  * @returns A {@link ShellSeed}: the preamble plus the locked shell cells.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof, basement, surroundings, floorHeights } = opts;
+  const { structureType, decoration, size, roof, basement, surroundings, surroundSizing, floorHeights } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type || !type.seedShell) return { preamble: '' };
 
@@ -79,6 +82,9 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The surroundings-module id doubles as the structure's `surroundings` param value, so
   // the type insets its massing and delegates the yard ring around it.
   if (surroundings && surroundings !== 'none') params.surroundings = surroundings;
+  // The user's per-axis yard scale rides in as a raw param; composeStructure sanitizes it
+  // and threads it into the type's house/yard split + the surroundings module delegation.
+  if (surroundSizing && surroundings && surroundings !== 'none') params.surroundSizing = surroundSizing;
   // The user's per-floor heights ride in as a raw array param; composeStructure sanitizes
   // them and the type's storey ladder lays its decks at exactly those heights.
   if (floorHeights?.length) params.floorHeights = floorHeights;

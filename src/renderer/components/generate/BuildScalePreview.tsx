@@ -40,6 +40,19 @@ const FLOOR_COLORS = [0x4a8cff, 0x35c4a3, 0xf5a623, 0xb06ef0, 0xff6b81, 0x6ad36a
  *  chips show the same swatches the 3D bands use. */
 export const BASEMENT_COLOR = '#8d6e63';
 export const ATTIC_COLOR = '#d9b54a';
+/** The surroundings ring's ground-level swatch (a lawn green). */
+export const SURROUND_COLOR = '#4f9e5a';
+
+/** The surroundings RING margins (cells per side) around the building shell — `side` on
+ *  the X axis (both sides), `front`/`back` on the Z axis (the front is the -z entry face). */
+export interface ScaleSurround {
+  side: number;
+  front: number;
+  back: number;
+}
+
+/** How many cells tall the ground-level yard plate reads in the preview (landscaping). */
+const SURROUND_PLATE_H = 1;
 
 /** A draggable band: an above-ground storey (by index) or the basement/attic band. */
 export type BandId = number | 'basement' | 'attic';
@@ -88,12 +101,16 @@ export function BuildScalePreview({
   size,
   floors,
   overheads,
+  surround,
   onBandHeight,
 }: {
   size: ScaleSize | null;
   floors?: number[] | null;
   /** Basement/attic/roof band heights — a picked basement/attic gets its own colour. */
   overheads?: ScaleOverheads | null;
+  /** The picked surroundings ring's per-side margins, drawn as a ground-level yard plate
+   *  around the house footprint. Null when no surroundings module is selected. */
+  surround?: ScaleSurround | null;
   /** When given (per-floor mode), every band becomes draggable: drag up/down to resize
    *  that storey (by index) or the basement/attic band. */
   onBandHeight?: (band: BandId, value: number) => void;
@@ -103,6 +120,9 @@ export function BuildScalePreview({
   const basementH = overheads?.basement ?? 0;
   const atticH = overheads?.attic ?? 0;
   const roofH = overheads?.roof ?? 0;
+  const surroundSide = surround?.side ?? 0;
+  const surroundFront = surround?.front ?? 0;
+  const surroundBack = surround?.back ?? 0;
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -291,13 +311,13 @@ export function BuildScalePreview({
       return fill;
     };
 
-    // Stack the box's vertical segments from the ground: the picked BASEMENT band first
-    // (its own colour, so the selection is visible), then the storeys — one COLOURED,
-    // draggable slab per floor in per-floor mode, else one accent volume — and the TOP
-    // band: a picked ATTIC is always the topmost level and engulfs the whole roof zone
-    // (nothing renders above it; `overheads.roof` is 0 then), otherwise the roof reserve
-    // caps the box as a faint accent. With nothing picked and a single total height, the
-    // box stays one plain accent volume.
+    // The GROUND floor sits at y=0. Above-ground storeys stack UP from there — one
+    // COLOURED, draggable slab per floor in per-floor mode, else one accent volume —
+    // capped by the TOP band (a picked ATTIC is the topmost level and engulfs the whole
+    // roof zone; `overheads.roof` is 0 then — otherwise the roof reserve caps it as a
+    // faint accent). A picked BASEMENT drops BELOW the ground plane (negative y), so the
+    // preview reads the way the house does in-world. With nothing picked and a single
+    // total height, the box stays one plain accent volume rising from the ground.
     const registerBand = (mesh: THREE.Mesh | null, band: BandId) => {
       if (!mesh) return;
       mesh.userData.band = band;
@@ -306,11 +326,12 @@ export function BuildScalePreview({
     const floorList = floorsKey ? floorsKey.split(',').map(Number) : null;
     const segmented = basementH > 0 || atticH > 0 || !!floorList?.length;
     if (segmented) {
-      let y = 0;
+      // The basement hangs below the ground plane: [-basementH, 0].
       if (basementH > 0) {
-        registerBand(addSlab(y, Math.min(basementH, h), new THREE.Color(BASEMENT_COLOR), 0.28, 0.9), 'basement');
-        y += basementH;
+        registerBand(addSlab(-basementH, basementH, new THREE.Color(BASEMENT_COLOR), 0.28, 0.9), 'basement');
       }
+      const top = h - basementH; // the above-ground extent (the basement lives below y=0)
+      let y = 0;
       if (floorList && floorList.length) {
         floorList.forEach((fh, i) => {
           const mesh = addSlab(y, Math.max(0.001, fh), new THREE.Color(FLOOR_COLORS[i % FLOOR_COLORS.length]), 0.26, 0.85);
@@ -318,27 +339,51 @@ export function BuildScalePreview({
           y += fh;
         });
       } else {
-        const storeys = h - y - atticH - roofH;
-        addSlab(y, storeys, accent, 0.1, 0.85);
-        y += Math.max(0, storeys);
+        const storeys = top - atticH - roofH;
+        addSlab(0, storeys, accent, 0.1, 0.85);
+        y = Math.max(0, storeys);
       }
       if (atticH > 0) {
-        // The attic band runs to the very top of the box — it owns the roof zone too.
-        registerBand(addSlab(y, Math.max(0, h - y), new THREE.Color(ATTIC_COLOR), 0.28, 0.9), 'attic');
+        // The attic band runs to the very top of the above-ground box — it owns the roof zone.
+        registerBand(addSlab(y, Math.max(0, top - y), new THREE.Color(ATTIC_COLOR), 0.28, 0.9), 'attic');
       } else {
-        addSlab(y, h - y, accent, 0.07, 0.4); // no attic → the roof reserve caps the box
+        addSlab(y, top - y, accent, 0.07, 0.4); // no attic → the roof reserve caps the box
       }
     } else {
       addSlab(0, h, accent, 0.1, 0.85);
     }
 
+    // The surroundings ring: a translucent ground-level yard plate around the house
+    // footprint, extending by the picked margins (side on x, front/back on z — the house
+    // is centred at the origin, the front being the -z entry face). Drawn at y∈[0, plate]
+    // so it reads at ground level, never as a floor of the house.
+    if (surroundSide > 0 || surroundFront > 0 || surroundBack > 0) {
+      const ow = w + surroundSide * 2;
+      const od = d + surroundFront + surroundBack;
+      const zc = (surroundBack - surroundFront) / 2; // shift so front/back margins land right
+      const lawn = new THREE.Color(SURROUND_COLOR);
+      const geo = new THREE.BoxGeometry(ow, SURROUND_PLATE_H, od);
+      const plate = new THREE.Mesh(
+        geo,
+        new THREE.MeshStandardMaterial({ color: lawn, transparent: true, opacity: 0.16, depthWrite: false }),
+      );
+      plate.position.set(0, SURROUND_PLATE_H / 2, zc);
+      content.add(plate);
+      const edge = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: lawn, transparent: true, opacity: 0.55 }),
+      );
+      edge.position.copy(plate.position);
+      content.add(edge);
+    }
+
     // Player beside the box for scale.
     const player = makePlayer(skin);
-    player.position.set(w / 2 + 0.95, 0, d / 2 - 0.4);
+    player.position.set(w / 2 + surroundSide + 0.95, 0, d / 2 - 0.4);
     content.add(player);
 
-    // Ground grid spanning the box + the player.
-    const span = Math.ceil(Math.max(w, d) + 4);
+    // Ground grid spanning the box (incl. the yard ring) + the player.
+    const span = Math.ceil(Math.max(w + surroundSide * 2, d + surroundFront + surroundBack) + 4);
     const grid = new THREE.GridHelper(span, span, text, text);
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.14;
@@ -356,7 +401,7 @@ export function BuildScalePreview({
     scene.add(wrap);
     contentRef.current = wrap;
     frameCamera(cameraRef.current, dims);
-  }, [size?.w, size?.d, size?.h, floorsKey, basementH, atticH, roofH]);
+  }, [size?.w, size?.d, size?.h, floorsKey, basementH, atticH, roofH, surroundSide, surroundFront, surroundBack]);
 
   return <div className="scale-preview-canvas" ref={mountRef} />;
 }

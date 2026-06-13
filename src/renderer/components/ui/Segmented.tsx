@@ -16,9 +16,11 @@ interface SegmentedProps<T extends string> {
   ariaLabel?: string;
   /** `icon` tightens padding for icon-only options. */
   variant?: 'text' | 'icon';
+  /** Disable every option (the control is read-only, e.g. while a build is running). */
+  disabled?: boolean;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, ariaLabel, variant = 'text' }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ value, options, onChange, ariaLabel, variant = 'text', disabled }: SegmentedProps<T>) {
   return (
     <div className={`segmented${variant === 'icon' ? ' segmented-icon' : ''}`} role="radiogroup" aria-label={ariaLabel}>
       {options.map((o) => (
@@ -28,6 +30,7 @@ export function Segmented<T extends string>({ value, options, onChange, ariaLabe
           role="radio"
           aria-checked={value === o.value}
           title={o.title}
+          disabled={disabled}
           className={`segmented-option${value === o.value ? ' active' : ''}`}
           onClick={() => onChange(o.value)}
         >

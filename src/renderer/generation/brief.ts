@@ -15,7 +15,11 @@ import {
   MIN_FLOOR_H,
   heightOverhead,
 } from '@/shared/domain/storeys';
-import { expandSizeForSurroundings } from '@/shared/domain/surroundings';
+import {
+  type SurroundSizing,
+  expandSizeForSurroundings,
+  resolveSurroundMargins,
+} from '@/shared/domain/surroundings';
 
 /** Max interior rooms a single floor can be assigned in the composer. */
 export const ROOMS_PER_FLOOR = 2;
@@ -50,6 +54,10 @@ export type BuildDetails = Record<ModuleSlotKey, string> & {
    *  its band ENGULFS the roof zone (attic headroom + roof reserve, nothing above it).
    *  `null` = the default (roof reserve + {@link ATTIC_OVERHEAD}). */
   atticH: number | null;
+  /** The user's explicit per-side surroundings ring margins in cells (the manual yard-size
+   *  control: `side` = X each side, `front`/`back` = Z). `null` = the auto, footprint-scaled
+   *  ring. Only meaningful while a surroundings module is picked. */
+  surroundSizing: SurroundSizing | null;
   /** Interior room modules assigned per floor (index = floor, 0-based, bottom-up). Each
    *  floor holds up to 2 room ids; '' marks an empty slot. Only meaningful for a storeyed
    *  structure (one with a `floors` param). */
@@ -68,6 +76,7 @@ export const EMPTY_DETAILS: BuildDetails = {
   floorHeights: null,
   basementH: null,
   atticH: null,
+  surroundSizing: null,
   rooms: [],
 };
 
@@ -294,8 +303,23 @@ export function buildBoxSize(
   struct: GenerationModule | undefined,
 ): { w: number; d: number; h: number } {
   const sz = effectiveSize(d, struct);
-  const grown = expandSizeForSurroundings(sz.w, sz.d, d.surroundings);
+  const grown = expandSizeForSurroundings(sz.w, sz.d, d.surroundings, d.surroundSizing);
   return { w: grown.w, d: grown.d, h: sz.h };
+}
+
+/** The surroundings RING margins (per side) the picked yard adds around the building
+ *  shell, honouring the user's per-axis size scale — for the 3D preview's ground-level
+ *  ring and the yard-size readout. `null` when no surroundings module is picked.
+ *  @param d - The current Details state.
+ *  @param struct - The chosen structure module (drives the shell size the ring scales with).
+ *  @returns The ring's `{ side, front, back }` cell margins, or null. */
+export function surroundRing(
+  d: BuildDetails,
+  struct: GenerationModule | undefined,
+): { side: number; front: number; back: number } | null {
+  if (!d.surroundings || d.surroundings === 'none') return null;
+  const sz = effectiveSize(d, struct);
+  return resolveSurroundMargins(d.surroundings, sz.w, sz.d, d.surroundSizing);
 }
 
 /** The interior floor area (cells) one room gets on a storey: the build's interior
@@ -479,6 +503,9 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
     rooms: rooms.length ? rooms : undefined,
     size: sz ? [sz.w, sz.h, sz.d] : undefined,
     floorHeights: d.structureType && d.floorHeights?.length ? [...d.floorHeights] : undefined,
+    // The yard scale rides along only when a surroundings ring is actually picked.
+    surroundSizing:
+      d.surroundings && d.surroundings !== 'none' && d.surroundSizing ? { ...d.surroundSizing } : undefined,
   };
 }
 

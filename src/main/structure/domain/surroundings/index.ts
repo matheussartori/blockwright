@@ -6,7 +6,7 @@
 // guidance + its own knowledge guide (loaded ONLY when selected), and is listed in the
 // gallery. Each links to the structures it fits via `appliesTo` (a yard is composed
 // around a specific massing, so the list is explicit — start with `['modern']`).
-import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
+import { type SurroundSizing, surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import type { ModuleSummary } from '../modules';
 import type { ParamValues } from '../params';
 import { createRegistry } from '../registry';
@@ -43,9 +43,11 @@ export function surroundingsModules(): SurroundingsModule[] {
  *  on where the house ends and the yard begins.
  *  @param b - The full (already expanded) build box.
  *  @param id - The selected surroundings-module id ('none'/'' = no ring).
+ *  @param sizing - The user's per-axis yard scale (the same one the box was expanded with),
+ *    or undefined for the auto ring. Recovered margins honour it, so the inset matches.
  *  @returns The inner house {@link Box} (== `b` when no ring applies). */
-export function insetHouseBox(b: Box, id: string | undefined): Box {
-  const m = surroundMarginsForOuter(id, b.W, b.D);
+export function insetHouseBox(b: Box, id: string | undefined, sizing?: SurroundSizing): Box {
+  const m = surroundMarginsForOuter(id, b.W, b.D, sizing);
   if (!m) return b;
   return box([b.x0 + m.side, b.y0, b.z0 + m.front], [b.x1 - m.side, b.y1, b.z1 - m.back]);
 }
@@ -56,10 +58,11 @@ export function insetHouseBox(b: Box, id: string | undefined): Box {
  *  occupies — the standard first line of a yard-aware structure type.
  *  @param outer - The full (already expanded) build box.
  *  @param params - The type's resolved params (reads the `surroundings` value).
+ *  @param sizing - The user's per-axis yard scale (or undefined for the auto ring).
  *  @returns The ring's module id, or null for none / a too-tight inset. */
-export function yardFor(outer: Box, params: ParamValues): string | null {
+export function yardFor(outer: Box, params: ParamValues, sizing?: SurroundSizing): string | null {
   const id = typeof params.surroundings === 'string' ? params.surroundings : 'none';
   if (id === 'none') return null;
-  const inner = insetHouseBox(outer, id);
+  const inner = insetHouseBox(outer, id, sizing);
   return inner.W >= 7 && inner.D >= 7 ? id : null;
 }

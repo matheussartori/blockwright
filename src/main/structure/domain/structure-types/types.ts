@@ -5,6 +5,7 @@
 // theme, and a `params` spec declaring its shape/behaviour knobs.
 import type { AuthoringOp } from '../../authoring/types';
 import type { FloorRole } from '@/shared/types';
+import type { SurroundSizing } from '@/shared/domain/surroundings';
 import type { ModuleMeta } from '../modules';
 import type { ParamSpec, ParamValues } from '../params';
 import type { Role } from '../roles';
@@ -71,6 +72,11 @@ export interface BuildArgs {
    *  shared ladder (`planStoreys`) instead of its uniform split, so the user's
    *  per-floor heights hold in EVERY house type. Undefined → the uniform split. */
   floorHeights?: number[];
+  /** The user's per-axis surroundings ring scale (the composer's yard-size control), or
+   *  undefined for the auto-derived ring. A yard-aware type threads it into `yardFor`/
+   *  `insetHouseBox` so the house/yard split honours the user's chosen yard size, and into
+   *  its `composeModule('surroundings', …)` delegation so the ring fills the same margins. */
+  surroundSizing?: SurroundSizing;
   /** The host structure-type id this module is being applied to (e.g. `'classic'`),
    *  when applicable. Lets a roof/basement module run GENERIC geometry for any host
    *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
@@ -135,7 +141,7 @@ export interface StructureType extends ModuleMeta {
    *  geometric detector (whose stacked-flat-deck heuristic is fallible). Shares the storey
    *  math with `build()` — including the user's explicit per-floor heights, when given.
    *  Omit → the app falls back to `detectFloors`. */
-  floors?(box: Box, params: ParamValues, floorHeights?: number[]): FloorPlanEntry[];
+  floors?(box: Box, params: ParamValues, floorHeights?: number[], surroundSizing?: SurroundSizing): FloorPlanEntry[];
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['chimney']`. */

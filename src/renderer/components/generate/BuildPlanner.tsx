@@ -25,6 +25,7 @@ import {
   effectiveSize,
   maxRoomsForStructure,
   previewOverheads,
+  surroundRing,
 } from '../../generation/brief';
 import {
   type BandKey,
@@ -37,8 +38,9 @@ import {
   setDetailParam,
   setDetailSize,
   setFloorHeight,
-  setHeightMode,
+  setSurroundSize,
 } from '../../generation/details';
+import type { SurroundSizing } from '@/shared/domain/surroundings';
 import { DetailsSection } from './DetailsSection';
 import { ATTIC_COLOR, BASEMENT_COLOR, BuildScalePreview, PLAYER_H } from './BuildScalePreview';
 import type { GenerationCatalog } from '@/shared/types';
@@ -81,13 +83,9 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
       plannerStore.getState().setDetails((d) => setDetailSize(d, axis, value, base)),
     [],
   );
-  const onHeightMode = useCallback(
-    (mode: 'total' | 'floors') => {
-      const ps = plannerStore.getState();
-      const struct = catalog?.structure.find((m) => m.id === ps.details.structureType);
-      ps.setDetails((d) => setHeightMode(d, mode, struct));
-    },
-    [catalog],
+  const onSurroundSize = useCallback(
+    (sizing: SurroundSizing | null) => plannerStore.getState().setDetails((d) => setSurroundSize(d, sizing)),
+    [],
   );
   const onFloorHeight = useCallback(
     (index: number, value: number, linked: boolean) =>
@@ -142,6 +140,7 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
 
   const sz = details.structureType ? effectiveSize(details, selStruct) : null;
   const overheads = details.structureType ? previewOverheads(details, selStruct) : null;
+  const surround = details.structureType ? surroundRing(details, selStruct) : null;
   const perFloor = !!details.floorHeights?.length;
   const title = inline ? (isEdit ? t('planner.advancedTitle') : t('planner.newTitle')) : t('planner.advancedTitle');
   const cta = isEdit ? t('planner.generateEdit') : t('planner.generate');
@@ -185,9 +184,9 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onField={onField}
             onParam={onParam}
             onSize={onSize}
-            onHeightMode={onHeightMode}
             onFloorHeight={onFloorHeight}
             onBandHeight={onBandHeight}
+            onSurroundSize={onSurroundSize}
             onAddRoom={onAddRoom}
             onRemoveRoom={onRemoveRoom}
           />
@@ -228,6 +227,7 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
                 size={sz}
                 floors={details.floorHeights}
                 overheads={overheads}
+                surround={surround}
                 onBandHeight={
                   perFloor
                     ? (band, v) => (typeof band === 'number' ? onFloorHeight(band, v, false) : onBandHeight(band, v))

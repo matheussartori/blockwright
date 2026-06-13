@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SURROUND_SCALE, expandSizeForSurroundings, surroundMargins, surroundMarginsForOuter } from '@/shared/domain/surroundings';
+import { SURROUND_SCALE, expandSizeForSurroundings, resolveSurroundMargins, surroundMargins, surroundMarginsForOuter } from '@/shared/domain/surroundings';
 import { readAuthoring, writeStructureFile } from '../../authoring';
 import { resolveBlocks } from '../../authoring/ops';
 import type { AuthoringStructure } from '../../authoring/types';
@@ -99,6 +99,23 @@ describe('surroundings module contract', () => {
       }
     }
   });
+
+  it('an explicit user margin override REPLACES the auto ring and round-trips exactly', () => {
+    const override = { side: 10, front: 16, back: 12 }; // hand-set yard footprint (cells)
+    for (const id of Object.keys(SURROUND_SCALE)) {
+      for (const [w, d] of [[11, 11], [15, 13], [25, 21], [40, 34]]) {
+        // The override is the effective ring regardless of shell size (it's manual).
+        expect(resolveSurroundMargins(id, w, d, override), `${id} ${w}x${d} resolve`).toEqual(override);
+        // The compiled box grows by exactly the override margins…
+        const grown = expandSizeForSurroundings(w, d, id, override);
+        expect([grown.w, grown.d]).toEqual([w + override.side * 2, d + override.front + override.back]);
+        // …and the main-side derive returns the override directly (no inversion needed).
+        expect(surroundMarginsForOuter(id, grown.w, grown.d, override), `${id} ${w}x${d} derive`).toEqual(override);
+        const inner = insetHouseBox(box([0, 0, 0], [grown.w - 1, 9, grown.d - 1]), id, override);
+        expect([inner.W, inner.D], `${id} ${w}x${d} shell`).toEqual([w, d]);
+      }
+    }
+  });
 });
 
 describe('modern surroundings geometry (template expansion)', () => {
@@ -184,6 +201,17 @@ describe('garden surroundings geometry (template expansion)', () => {
 
   it('composes with no module-respect warnings (the ring was actually built)', () => {
     expect(warnings).toEqual([]);
+  });
+
+  it('honours an explicit yard-size override end-to-end (bigger box, house still inset, no warnings)', () => {
+    const sizing = { side: 12, front: 16, back: 12 };
+    const big: [number, number, number] = [GSHELL[0] + sizing.side * 2, GSHELL[1], GSHELL[2] + sizing.front + sizing.back];
+    const r = expand(big, { surroundings: 'garden', surroundSizing: sizing, floors: 2, seed: 11 }, 'classic');
+    expect(r.warnings).toEqual([]);
+    // The house is inset by the override margins, so the same shell sits inside the bigger box.
+    const bigInner = insetHouseBox(box([0, 0, 0], [big[0] - 1, big[1] - 1, big[2] - 1]), 'garden', sizing);
+    expect([bigInner.W, bigInner.D]).toEqual([GSHELL[0], GSHELL[2]]);
+    expect(bigInner.x0).toBe(sizing.side);
   });
 
   it('rings the yard with a stone course topped by a wooden fence, lamp posts lit', () => {

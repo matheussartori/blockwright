@@ -28,6 +28,11 @@ export type BuildSelection = Partial<Record<ModuleSlotKey, string>> & {
    *  shell lays its decks at EXACTLY these heights (via the shared storey ladder) instead
    *  of its uniform split — the per-floor rule holds in every house type. */
   floorHeights?: number[];
+  /** The user's explicit per-side surroundings ring margins in cells (the composer's manual
+   *  yard-size control: `side` = X each side, `front`/`back` = Z), when a surroundings module
+   *  is picked. Threaded so a code-built shell grows its yard to exactly this footprint and
+   *  the house/yard split agrees with the renderer's preview. */
+  surroundSizing?: { side: number; front: number; back: number };
 };
 
 /** A display-ready build card shown in the chat. On the USER message it summarises

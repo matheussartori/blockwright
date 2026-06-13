@@ -8,6 +8,7 @@ import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import { sanitizeFloorHeights } from '@/shared/domain/storeys';
+import { sanitizeSurroundSizing } from '@/shared/domain/surroundings';
 import { composeModulePreview } from './compose';
 import { getModule } from './categories';
 import { resolveParams } from './params';
@@ -111,7 +112,12 @@ export function structureFloorPlan(
   if (!type?.floors) return [];
   const b = box([0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]);
   const params = resolveParams(type.params, rawParams);
-  return type.floors(b, params, sanitizeFloorHeights(rawParams.floorHeights)).map((f, i) => ({
+  return type.floors(
+    b,
+    params,
+    sanitizeFloorHeights(rawParams.floorHeights),
+    sanitizeSurroundSizing(rawParams.surroundSizing),
+  ).map((f, i) => ({
     id: `floor-${i + 1}`,
     name: `Floor ${i + 1}`,
     from: f.from,

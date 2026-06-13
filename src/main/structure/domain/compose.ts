@@ -18,6 +18,7 @@ import { getGeometryModule } from './categories';
 import type { GeometryModule } from './geometry-module';
 import { resolveParams, type ParamValues } from './params';
 import { sanitizeFloorHeights } from '@/shared/domain/storeys';
+import { sanitizeSurroundSizing } from '@/shared/domain/surroundings';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
 import { seed3 } from './rng';
 import {
@@ -211,7 +212,10 @@ function makeModuleComposer(
     const palette = category === 'roof' || category === 'attic'
       ? hostPalette
       : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern, true);
-    return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, composeModule: delegate });
+    // A surroundings module re-derives the house/yard split from the box, so it needs the
+    // same per-axis yard scale the host inset with (passed in `extra` by the host).
+    const surroundSizing = sanitizeSurroundSizing(extra.surroundSizing ?? rawParams.surroundSizing);
+    return runModuleGeometry(module, host, { box: subBox, params: subParams, palette, seed, host, surroundSizing, composeModule: delegate });
   };
   return delegate;
 }
@@ -290,6 +294,10 @@ export function composeStructure(
   // riding in as a raw array param — threaded into the type's build so the shared
   // storey ladder honours them in every house type.
   const floorHeights = sanitizeFloorHeights(params.floorHeights);
+  // The user's per-axis surroundings ring scale (the composer's yard-size control), riding
+  // in as a raw param like floorHeights — threaded into the type's build so its house/yard
+  // split and yard delegation honour the chosen yard size.
+  const surroundSizing = sanitizeSurroundSizing(params.surroundSizing);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry). Every
   // delegation is RECORDED so the module-respect check can verify the requested picks
@@ -315,13 +323,13 @@ export function composeStructure(
       // With a surroundings ring the type insets its massing — the descent must land
       // INSIDE the house, not out on the yard's lawn, so it targets the same inset
       // (the shared yardFor, so a too-tight inset the type ignored is ignored here too).
-      const yard = yardFor(b, values);
-      const houseB = yard ? insetHouseBox(b, yard) : b;
+      const yard = yardFor(b, values, surroundSizing);
+      const houseB = yard ? insetHouseBox(b, yard, surroundSizing) : b;
       const ops = [
         // The vault fills the footprint below grade (forced rect so it spans the whole base).
         ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
-        ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate }),
+        ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, surroundSizing, composeModule: composeModuleDelegate }),
         // The descent carves through that slab last, so the stairwell opening survives.
         ...basementDescent(houseB, groundY, palette),
       ];
@@ -337,7 +345,7 @@ export function composeStructure(
     );
   }
 
-  const ops = type.build({ box: b, params: values, palette, seed, floorHeights, composeModule: composeModuleDelegate });
+  const ops = type.build({ box: b, params: values, palette, seed, floorHeights, surroundSizing, composeModule: composeModuleDelegate });
   verifyModuleRespect(type, values, invoked, warn);
   return ops;
 }

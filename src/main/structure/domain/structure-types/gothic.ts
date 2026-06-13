@@ -86,11 +86,11 @@ export const gothic: StructureType = {
     light: 'minecraft:soul_lantern',
     plant: 'minecraft:flowering_azalea_leaves', // ivy/garland greenery on the roof + tower
   },
-  build({ box: outer, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, surroundSizing, composeModule }) {
     // A picked surroundings ring reserves the box's outer margins for the yard: the
     // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
-    const yard = yardFor(outer, params);
-    const box = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const box = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
 
@@ -115,7 +115,7 @@ export const gothic: StructureType = {
 
     // The yard first (it never overlaps the inset house, so order is cosmetic).
     if (yard) {
-      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1], { surroundSizing }));
     }
 
     // --- Plan lines (shared with floors() via plan()) ----------------------------------
@@ -309,10 +309,10 @@ export const gothic: StructureType = {
   },
   // Authoritative storeys, from the SAME plan() build() uses — so the viewer bands,
   // the metadata sidecar and the stairwell pass see exactly the planes the shell laid.
-  floors(outer: Box, params, floorHeights): FloorPlanEntry[] {
+  floors(outer: Box, params, floorHeights, surroundSizing): FloorPlanEntry[] {
     // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
-    const yard = yardFor(outer, params);
-    const b = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const b = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
     return storeyEntries(slabYs, wallTop);
   },

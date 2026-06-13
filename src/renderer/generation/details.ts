@@ -14,8 +14,10 @@ import {
   MIN_FLOOR_H,
   ROOMS_PER_FLOOR,
   defaultFloorHeights,
+  floorCount,
 } from './brief';
 import type { ModuleSlotKey } from '@/shared/domain/module-slots';
+import { type SurroundSizing, clampSurroundSizing } from '@/shared/domain/surroundings';
 import type { GenerationModule } from '@/shared/types';
 
 /** The single-value Details selects driven by `setDetailField`: the structure pill plus
@@ -61,7 +63,7 @@ export function setDetailField(
     // the params/size/heights/rooms. A structure with an identity look pairs the
     // decoration its module declares, so its materials + guide come along.
     const decoration = struct?.pairedDecoration ?? '';
-    return {
+    const base: BuildDetails = {
       ...d,
       ...EMPTY_SLOTS,
       decoration,
@@ -71,8 +73,13 @@ export function setDetailField(
       floorHeights: null,
       basementH: null,
       atticH: null,
+      surroundSizing: null,
       rooms: [],
     };
+    // The "auto/total" height mode was removed — a storeyed structure is ALWAYS per-floor
+    // (the link toggle covers "don't size each floor by hand"); a non-storeyed type keeps a
+    // single H field. So seed the per-floor heights up front when the type has storeys.
+    return floorCount(struct, {}) > 0 ? { ...base, floorHeights: defaultFloorHeights(base, struct) } : base;
   }
   const next: BuildDetails = { ...d, [key]: value };
   // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
@@ -81,6 +88,8 @@ export function setDetailField(
   // A cleared slot drops its custom band height (it described a band that no longer exists).
   if (!next.basement) next.basementH = null;
   if (!next.attic) next.atticH = null;
+  // Clearing the surroundings ring drops the yard-size scale (no ring to scale).
+  if (!next.surroundings || next.surroundings === 'none') next.surroundSizing = null;
   return next;
 }
 
@@ -158,18 +167,16 @@ function resizeHeights(heights: number[], n: number): number[] {
   return [...heights, ...Array.from({ length: n - heights.length }, () => fill)];
 }
 
-/** Switch the build's height control between "total" (a single H field driving every storey
- *  equally) and "per floor" (one height per above-ground storey, optionally linked). Entering
- *  per-floor mode seeds each storey from the current effective height so the build doesn't
- *  jump; leaving it clears the per-floor heights (the total H takes back over).
+/** Set the surroundings ring's explicit per-side cell margins (the manual yard-size
+ *  control). The composer computes the full override from the currently-shown margins with
+ *  the edited axis replaced, so this just clamps + stores it. `null` returns the ring to its
+ *  auto size. A no-op unless a surroundings module is picked.
  *  @param d - The current Details state.
- *  @param mode - 'total' or 'floors'.
- *  @param struct - The chosen structure module (seeds the per-floor heights).
+ *  @param sizing - The new per-side margins (cells), or null to clear the override.
  *  @returns The next Details state. */
-export function setHeightMode(d: BuildDetails, mode: 'total' | 'floors', struct: GenerationModule | undefined): BuildDetails {
-  if (mode === 'total') return { ...d, floorHeights: null, basementH: null, atticH: null };
-  if (d.floorHeights && d.floorHeights.length) return d; // already per-floor
-  return { ...d, floorHeights: defaultFloorHeights(d, struct) };
+export function setSurroundSize(d: BuildDetails, sizing: SurroundSizing | null): BuildDetails {
+  if (!d.surroundings || d.surroundings === 'none') return d;
+  return { ...d, surroundSizing: sizing ? clampSurroundSizing(sizing) : null };
 }
 
 /** Set one floor's interior height (clamped to [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}] —

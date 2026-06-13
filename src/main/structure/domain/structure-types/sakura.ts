@@ -79,11 +79,11 @@ export const sakura: StructureType = {
     plant: 'minecraft:cherry_leaves',
     light: 'minecraft:lantern',
   },
-  build({ box: outer, params, palette, floorHeights, composeModule }) {
+  build({ box: outer, params, palette, floorHeights, surroundSizing, composeModule }) {
     // A picked surroundings ring reserves the box's outer margins for the yard: the
     // HOUSE is laid in the inset box, and the ring module wraps it over the full box.
-    const yard = yardFor(outer, params);
-    const box = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const box = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D } = box;
     const floors = params.floors as number; // cherry living storeys above the stone base
 
@@ -104,7 +104,7 @@ export const sakura: StructureType = {
 
     // The yard first (it never overlaps the inset house, so order is cosmetic).
     if (yard) {
-      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1]));
+      ops.push(...composeModule('surroundings', yard, [outer.x0, outer.y0, outer.z0], [outer.x1, outer.y1, outer.z1], { surroundSizing }));
     }
 
     // --- Levels: a VISIBLE stone basement, then the raised cherry living storey(s),
@@ -206,10 +206,10 @@ export const sakura: StructureType = {
   },
   // Authoritative storeys, from the SAME plan() build() uses: the visible stone base as
   // a basement-grade level, then the cherry living storeys.
-  floors(outer: Box, params, floorHeights): FloorPlanEntry[] {
+  floors(outer: Box, params, floorHeights, surroundSizing): FloorPlanEntry[] {
     // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
-    const yard = yardFor(outer, params);
-    const b = yard ? insetHouseBox(outer, yard) : outer;
+    const yard = yardFor(outer, params, surroundSizing);
+    const b = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { mainY, slabYs, wallTop } = plan(b, params.floors as number, (params.roof as string) === 'flat', floorHeights);
     return [
       { from: b.y0, to: Math.max(b.y0, mainY - 1), role: 'basement' },

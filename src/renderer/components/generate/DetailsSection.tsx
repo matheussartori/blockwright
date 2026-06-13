@@ -21,11 +21,17 @@ import {
   floorCount,
   maxRoomsForStructure,
   previewOverheads,
+  surroundRing,
 } from '../../generation/brief';
 import type { BandKey, DetailField, SizeBox } from '../../generation/details';
+import {
+  type SurroundSizing,
+  SURROUND_MARGIN_MAX,
+  SURROUND_MARGIN_MIN,
+  SURROUND_MARGIN_STEP,
+} from '@/shared/domain/surroundings';
 import type { ChipOption } from './chips';
 import { Select, type SelectOption } from '../ui/Select';
-import { Segmented } from '../ui/Segmented';
 import { FloorStack } from './FloorStack';
 import { ATTIC_COLOR, BASEMENT_COLOR } from './BuildScalePreview';
 import type { TFunction } from '@/shared/i18n';
@@ -41,9 +47,9 @@ interface Props {
   onField: (key: DetailField, value: string) => void;
   onParam: (name: string, value: string | number) => void;
   onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
-  onHeightMode: (mode: 'total' | 'floors') => void;
   onFloorHeight: (index: number, value: number, linked: boolean) => void;
   onBandHeight: (band: BandKey, value: number) => void;
+  onSurroundSize: (sizing: SurroundSizing | null) => void;
   onAddRoom: (floor: number, id: string) => void;
   onRemoveRoom: (floor: number, index: number) => void;
 }
@@ -56,9 +62,9 @@ export function DetailsSection({
   onField,
   onParam,
   onSize,
-  onHeightMode,
   onFloorHeight,
   onBandHeight,
+  onSurroundSize,
   onAddRoom,
   onRemoveRoom,
 }: Props) {
@@ -212,16 +218,18 @@ export function DetailsSection({
         details={details}
         sz={effectiveSize(details, selStruct)}
         overheads={previewOverheads(details, selStruct)}
-        nFloors={nFloors}
         linked={linked}
         setLinked={setLinked}
         busy={busy}
         t={t}
         onSize={onSize}
-        onHeightMode={onHeightMode}
         onFloorHeight={onFloorHeight}
         onBandHeight={onBandHeight}
       />
+
+      {!!details.surroundings && details.surroundings !== 'none' && (
+        <YardSizeSection ring={surroundRing(details, selStruct)} busy={busy} t={t} onSurroundSize={onSurroundSize} />
+      )}
 
       {nFloors > 0 && roomOptions.length > 0 && (
         <FloorStack
@@ -241,44 +249,37 @@ export function DetailsSection({
   );
 }
 
-/** The build-size controls: the W/D/H box plus — for a storeyed structure — a Total ⇄ Per
- *  floor height switch. In "per floor" mode the single H field is replaced by one input per
- *  storey with a chain toggle (linked = raise one, raise all), bracketed by a Basement row
- *  below and an Attic row on top when those slots are picked (the attic is the topmost
- *  band — it owns the whole attic + roof zone); the total height then reads out as the
- *  derived sum. */
+/** The build-size controls: the W/D box plus the per-storey height stack. The old Total ⇄
+ *  Per floor switch is gone — a storeyed structure is ALWAYS sized per floor (one input per
+ *  storey with a chain toggle: linked = raise one, raise all), bracketed by a Basement row
+ *  below and an Attic row on top when those slots are picked (the attic is the topmost band —
+ *  it owns the whole attic + roof zone), with the total height read out as the derived sum. A
+ *  non-storeyed structure just gets a single H field. */
 function SizeSection({
   details,
   sz,
   overheads,
-  nFloors,
   linked,
   setLinked,
   busy,
   t,
   onSize,
-  onHeightMode,
   onFloorHeight,
   onBandHeight,
 }: {
   details: BuildDetails;
   sz: SizeBox;
   overheads: { basement: number; attic: number; roof: number };
-  nFloors: number;
   linked: boolean;
   setLinked: (v: boolean) => void;
   busy: boolean;
   t: T;
   onSize: (axis: keyof SizeBox, value: number, base: SizeBox) => void;
-  onHeightMode: (mode: 'total' | 'floors') => void;
   onFloorHeight: (index: number, value: number, linked: boolean) => void;
   onBandHeight: (band: BandKey, value: number) => void;
 }) {
   const heights = details.floorHeights;
   const perFloor = !!heights && heights.length > 0;
-  // The switch shows for any multi-storey build (and stays available while per-floor is on,
-  // so the user can always return to Total). A single-storey build is just a height field.
-  const showToggle = nFloors >= 2 || perFloor;
   const axes: (keyof SizeBox)[] = perFloor ? ['w', 'd'] : ['w', 'd', 'h'];
   const axisLabel = (a: keyof SizeBox) => (a === 'w' ? t('gen.width') : a === 'd' ? t('gen.depth') : t('gen.height'));
 
@@ -289,17 +290,6 @@ function SizeSection({
           {t('gen.sizeLabel')}
           {details.size || perFloor ? '' : t('gen.autoSuffix')}
         </span>
-        {showToggle && (
-          <Segmented
-            value={perFloor ? 'floors' : 'total'}
-            options={[
-              { value: 'total', label: t('gen.heightTotalMode') },
-              { value: 'floors', label: t('gen.heightFloorsMode') },
-            ]}
-            onChange={(m) => onHeightMode(m as 'total' | 'floors')}
-            ariaLabel={t('gen.height')}
-          />
-        )}
       </div>
 
       <div className="gen-size">
@@ -388,6 +378,68 @@ function SizeSection({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The surroundings yard-size control (shown only when a surroundings ring is picked) —
+ *  the SAME boxed number-stepper panel as the per-floor heights. Two manual cell inputs:
+ *  yard WIDTH (the X / side margins, each side) and yard DEPTH (the Z / front+back margins),
+ *  nudged in {@link SURROUND_MARGIN_STEP}-cell steps. The values shown are the current ring
+ *  margins (the auto, footprint-scaled ones until the user edits, then their explicit
+ *  override). Editing WIDTH keeps the auto front/back; editing DEPTH sets front = back. */
+function YardSizeSection({
+  ring,
+  busy,
+  t,
+  onSurroundSize,
+}: {
+  ring: { side: number; front: number; back: number } | null;
+  busy: boolean;
+  t: T;
+  onSurroundSize: (sizing: SurroundSizing | null) => void;
+}) {
+  if (!ring) return null;
+  return (
+    <div className="gen-chip-group gen-yard-size">
+      <div className="gen-floor-heights">
+        <div className="gen-floor-heights-head">
+          <span className="gen-chip-label">{t('gen.fieldYardSize')}</span>
+        </div>
+        <label className="gen-floor-height">
+          <span className="gen-floor-height-tag">{t('gen.yardWidth')}</span>
+          <input
+            type="number"
+            min={SURROUND_MARGIN_MIN}
+            max={SURROUND_MARGIN_MAX}
+            step={SURROUND_MARGIN_STEP}
+            value={ring.side}
+            disabled={busy}
+            onChange={(e) =>
+              onSurroundSize({ side: Math.trunc(Number(e.target.value)) || ring.side, front: ring.front, back: ring.back })
+            }
+          />
+        </label>
+        <label className="gen-floor-height">
+          <span className="gen-floor-height-tag">{t('gen.yardDepth')}</span>
+          <input
+            type="number"
+            min={SURROUND_MARGIN_MIN}
+            max={SURROUND_MARGIN_MAX}
+            step={SURROUND_MARGIN_STEP}
+            value={ring.front}
+            disabled={busy}
+            onChange={(e) => {
+              const z = Math.trunc(Number(e.target.value)) || ring.front;
+              onSurroundSize({ side: ring.side, front: z, back: z });
+            }}
+          />
+        </label>
+        <div className="gen-floor-heights-total">
+          <span>{t('gen.yardRingHint')}</span>
+          <span className="gen-floor-heights-total-val">{ring.side * 2 + ring.front + ring.back}</span>
+        </div>
+      </div>
     </div>
   );
 }

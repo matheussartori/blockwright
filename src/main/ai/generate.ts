@@ -105,6 +105,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       roof: selection?.roof,
       basement: selection?.basement,
       surroundings: selection?.surroundings,
+      surroundSizing: selection?.surroundSizing,
       floorHeights: selection?.floorHeights,
     }, session.dir);
     seed = shell.preamble;
