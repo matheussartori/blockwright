@@ -15,8 +15,9 @@ ground level (y=0 of the box, or the ground-floor level over a basement podium):
 - A **perimeter wall** following a varied (chamfered-corner) outline: a cobblestone
   course with an oak fence on top, broken by **stone-brick lamp posts** carrying
   lanterns — the yard's exterior lighting.
-- A **double-door gate** in the front wall, aligned with the house door, flanked by
-  lit stone piers.
+- A **double-door gate** (two door panels = ONE gate) in the front wall, aligned with the
+  house door, flanked by lit stone piers. There is exactly ONE gate in the whole yard —
+  never add a second gate further up the walk or anywhere else on the fence.
 - A **dirt walk** from the gate to the front door plus a **path looping the house** —
   the walkable region, kept distinct from the grass.
 - **Flower beds** hugging the facade, and a seeded mix of features over the lawns:
@@ -38,8 +39,8 @@ ground level (y=0 of the box, or the ground-floor level over a basement podium):
 
 - **Everything outdoors stays LOW** (≤ 3 blocks above ground, like the lamp posts) and
   OPEN-AIR — never roof, wall in, or floor over any part of the yard ring.
-- **Never remove the fence, the gate doors, or the paths**; never fill the well or the
-  fountain basin, never deck over water.
+- **Never remove the fence, the gate door, or the paths**, and **never add another gate**;
+  never fill the well or the fountain basin, never deck over water.
 - **Keep the gate→door walk clear** end to end — nothing placed on the path cells.
 - **Leaves must be `persistent: true`** (placed foliage decays in-game otherwise).
 - Crops stay on farmland next to their water channel; don't replace farmland with

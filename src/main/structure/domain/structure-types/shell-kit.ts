@@ -99,6 +99,58 @@ export function storeySlabs(
   return ops;
 }
 
+/** The roof surface height at column (x, z) for a cap `form`+`ridge` over a wall box —
+ *  so a chimney can rise to just CLEAR the roof there instead of spiking to the box top.
+ *  The pitch climbs from `wallTop + 1`, capped at the box top `y1`. A gable climbs the axis
+ *  perpendicular to its ridge; a hip climbs the nearer of both axes; a flat/none cap sits
+ *  just above the wall. */
+export function roofSurfaceY(
+  x: number,
+  z: number,
+  wallTop: number,
+  y1: number,
+  form: RoofForm,
+  ridge: 'x' | 'z',
+  b: { x0: number; x1: number; z0: number; z1: number },
+): number {
+  if (form === 'flat' || form === 'none') return Math.min(y1, wallTop + 1);
+  const base = wallTop + 1;
+  const inX = Math.min(x - b.x0, b.x1 - x);
+  const inZ = Math.min(z - b.z0, b.z1 - z);
+  const climb = form === 'hip' ? Math.min(inX, inZ) : ridge === 'x' ? inZ : inX;
+  return Math.min(y1, base + Math.max(0, climb));
+}
+
+/** The shared chimney BREAST every house type lays — FOUNDATION code, identical across
+ *  types (the user's rule: no per-type difference). A cobblestone/foundation stack rising
+ *  from the hearth at `groundY` up an EXTERIOR wall to ~2 blocks proud of the local roof
+ *  surface — NEVER run to the box top (the "chaminé grande demais" spike). It sits on a
+ *  wall the roof SLOPES AWAY from so it pokes into open air, never buried climbing a gable
+ *  peak to the ridge: for a gable that's the wall PERPENDICULAR to the ridge (the back wall
+ *  when the ridge runs along x — the front carries the door); for hip/flat any side wall
+ *  (the seeded `sideX`). The AI caps the exposed top with a lit campfire (its guide says so).
+ *  @param rect - the roof's footprint (x0/x1/z0/z1) — for gothic this is behind the portico.
+ *  @returns the single vertical fill op, or [] when the box is too short for a stack. */
+export function chimneyBreast(
+  palette: RolePalette,
+  rect: { x0: number; x1: number; z0: number; z1: number },
+  groundY: number,
+  wallTop: number,
+  y1: number,
+  form: RoofForm,
+  ridge: 'x' | 'z',
+  sideX: number,
+): AuthoringOp[] {
+  if (wallTop - groundY < 2) return []; // no real storey to seat a hearth + flue
+  const cx = Math.floor((rect.x0 + rect.x1) / 2);
+  const cz = Math.floor((rect.z0 + rect.z1) / 2);
+  const [x, z] = form === 'gable' && ridge === 'x'
+    ? [cx, rect.z1] // ridge along x → slopes face z → put the breast on the back wall
+    : [sideX, cz]; // ridge along z (slopes face x), or hip/flat → a seeded side wall
+  const top = Math.min(y1, roofSurfaceY(x, z, wallTop, y1, form, ridge, rect) + 2);
+  return [{ op: 'fill', from: [x, groundY, z], to: [x, top, z], state: palette.get('foundation') }];
+}
+
 /** The guaranteed-light rule: one hanging lantern under every storey's ceiling, centred
  *  at (cx, cz). The ceiling of storey f is the next slab (or the wall top for the last). */
 export function ceilingLanterns(

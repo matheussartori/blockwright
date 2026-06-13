@@ -568,8 +568,11 @@ decoration, and a new module is one small file.
   **Palette strategy is per-category by design:** a **roof** reuses the HOST palette (it's part of the
   host's exterior material story — the house's spruce trim), a **basement** gets the MODULE's own
   palette (a cellar is a self-contained stone space, independent of the host's walls). The house keeps
-  `roof`/`basement` in its param spec (`roof`: auto/gable/hip; `basement`: none/full/half = burial
-  depth + the 'half' clerestory), marked `module:'roof'|'basement'` in `ParamDef` so `paramFields`
+  `roof`/`basement` in its param spec (`roof`: auto/gable/hip; `basement`: none + the basement-MODULE
+  ids cellar/crypt/cult-temple — the SAME namespace the Details select + the other archetypes' central
+  path use, so a "Cellar" pick rides in as `basement:'cellar'` and `build()` delegates the vault to that
+  module; the old none/full/half enum REJECTED the module id in `resolveParams` → silently no basement),
+  marked `module:'roof'|'basement'` in `ParamDef` so `paramFields`
   hides them from the house's own Details controls (no duplicate). **Add a roof/basement:** new file +
   register in its `index.ts`; give it `appliesTo` + optional `build()`/`integrations` + a
   `knowledge/nbt/modules/{roof,basement}/<id>.md`.

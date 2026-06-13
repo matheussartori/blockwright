@@ -107,6 +107,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       surroundings: selection?.surroundings,
       surroundSizing: selection?.surroundSizing,
       floorHeights: selection?.floorHeights,
+      floors: selection?.floorHeights?.length,
     }, session.dir);
     seed = shell.preamble;
     lockCells = shell.lockCells;

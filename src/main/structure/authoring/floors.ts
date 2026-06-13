@@ -18,6 +18,16 @@ export interface FloorRange {
   role?: FloorRole;
 }
 
+/** The WALKABLE floor-slab y of each storey (the level you stand on), ascending — every
+ *  labelled floor except the roof band (which isn't a storey you walk a connector up to).
+ *  Fed to the stairwell pass as authoritative planes so a code-built build's storeys are
+ *  recognised even when a big YARD ground plane at grade dwarfs them under the geometric
+ *  60%-of-busiest cut (the "stairs broke once the house got a yard" defect). */
+export function storeyPlanesFromFloors(floors: FloorRange[] | undefined): number[] {
+  if (!floors?.length) return [];
+  return [...new Set(floors.filter((f) => f.role !== 'roof').map((f) => Math.min(f.from, f.to)))].sort((a, b) => a - b);
+}
+
 /** The grade y from labelled storeys: the lowest `from` among non-basement floors
  *  (the ground floor sits just above the basement). If every floor is a basement,
  *  grade is one above the highest one. Returns `undefined` when there are no floors —

@@ -147,6 +147,26 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
 
     const version = session.version + 1;
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
+    const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
+    // The AUTHORITATIVE storeys of the code-built structure (its shell is locked, so these
+    // hold) — computed BEFORE the compile so the stairwell pass gets the real storey planes
+    // (a big yard's grade plane otherwise hides the house floors from geometric detection),
+    // AND reused for the library sidecar below. The user's UI Floor plan wins when present.
+    const authoritativeFloors = !floors?.length && selection?.structureType
+      ? structureFloorPlan(selection.structureType, size, {
+          roof: selection.roof,
+          // The basement + above-ground floor count drive how many storey bands the plan
+          // reports — pass them (the count is the per-floor heights' length) so a basement/
+          // multi-storey build isn't flattened to a single detected floor.
+          basement: selection.basement,
+          attic: selection.attic,
+          floors: selection.floorHeights?.length,
+          surroundings: selection.surroundings,
+          surroundSizing: selection.surroundSizing,
+          floorHeights: selection.floorHeights,
+        })
+      : [];
+    const compileFloors = floors?.length ? floors : authoritativeFloors.length ? authoritativeFloors : undefined;
     let report: CompileReport;
     try {
       run.fix('Compiling to .nbt and running the code fix-up passes over the build:');
@@ -155,8 +175,9 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       // `log` streams each pass's play-by-play into the Console dock (fix-tagged).
       report = await writeStructureFile(authoring, nbtPath, {
         structureType: selection?.structureType,
-        // The user's Floor plan (UI) overrides the model's declared storeys for grade.
-        floors: floors?.length ? floors : undefined,
+        // The Floor plan drives grade + the stairwell pass's storey planes: the user's UI
+        // plan when set, else the code structure's authoritative storeys.
+        floors: compileFloors,
         // Re-assert a seeded archetype's locked shell so its exterior can't be gutted.
         lockCells,
         log: run.fix,
@@ -166,7 +187,6 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       return text(state.captureError, true);
     }
 
-    const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     // The compile report carries the FINAL post-pass blocks (what the .nbt actually
     // contains), so stats/metadata reflect the build as fixed up — explicit air cells
     // are the interior carve, not geometry, so they're excluded.
@@ -227,14 +247,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         const nm = report.palette[b.state]?.Name ?? '';
         if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
       }
-      const authoritative = !floors?.length && selection?.structureType
-        ? structureFloorPlan(selection.structureType, size, {
-            roof: selection.roof,
-            surroundings: selection.surroundings,
-            surroundSizing: selection.surroundSizing,
-            floorHeights: selection.floorHeights,
-          })
-        : [];
+      const authoritative = authoritativeFloors;
       const meta = buildMetadata({
         name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
         source: session.library.latest,

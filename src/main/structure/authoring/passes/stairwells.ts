@@ -69,6 +69,26 @@ function floorPlanes(
   return { planes, runTop };
 }
 
+/** Merge the AUTHORITATIVE storey planes (from the build's labelled floors, threaded via
+ *  `ctx.floorPlanes`) into the geometric detection — the union, with each added plane
+ *  mapped to ITSELF in `runTop` (a single-thickness slab). So a storey the 60%-of-busiest
+ *  cut missed — a house with a big yard whose grade plane dwarfs the floors, or any porous
+ *  build — is still recognised and connected, without losing the geometric double-thick
+ *  floor info the carve logic relies on. No authoritative planes → geometric result as-is. */
+function mergedPlanes(
+  geo: { planes: number[]; runTop: Map<number, number> },
+  authoritative: number[] | undefined,
+): { planes: number[]; runTop: Map<number, number> } {
+  if (!authoritative?.length) return geo;
+  const runTop = new Map(geo.runTop);
+  const set = new Set(geo.planes);
+  for (const y of authoritative) {
+    if (!set.has(y)) set.add(y);
+    if (!runTop.has(y)) runTop.set(y, y);
+  }
+  return { planes: [...set].sort((a, b) => a - b), runTop };
+}
+
 /** The dominant (most common) full block of each given plane — its real floor
  *  material, reused for stringers so a rebuilt stair blends in. */
 function planeMaterials(
@@ -164,7 +184,7 @@ interface GapWork { hints: Hint[]; strip: Set<string>; }
 const DIRS: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
-  const { planes, runTop } = floorPlanes(blocks, palette);
+  const { planes, runTop } = mergedPlanes(floorPlanes(blocks, palette), ctx.floorPlanes);
   if (planes.length < 2) {
     // Single storey — nothing to connect. But if the build carries a REAL storey climb
     // (a narrow flight or a ladder rising ≥3) the plane detection itself likely failed

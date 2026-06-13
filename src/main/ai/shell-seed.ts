@@ -8,7 +8,7 @@
 // remains the path for a build with NO structure selected.
 import fs from 'node:fs';
 import path from 'node:path';
-import { getStructureType } from '../structure/domain';
+import { getStructureType, structureFloorPlan } from '../structure/domain';
 import { readAuthoring, writeStructureFile } from '../structure/authoring';
 import { isAir } from '../structure/authoring/palette';
 import type { AuthoringStructure } from '../structure/authoring/types';
@@ -42,6 +42,10 @@ export interface ShellSeedOptions {
   /** The user's explicit per-floor storey heights (slab-to-slab, bottom-up), threaded so
    *  the shell's storey ladder lays its decks at exactly those heights. */
   floorHeights?: number[];
+  /** The number of above-ground storeys (the structure type's `floors` param), so a
+   *  multi-storey pick lays that many decks. Defaults to the per-floor heights' length
+   *  when omitted (one height per storey). */
+  floors?: number;
 }
 
 /** The result of {@link buildShellSeed}: the model-facing preamble plus the protected
@@ -66,13 +70,17 @@ export interface ShellSeed {
  * @returns A {@link ShellSeed}: the preamble plus the locked shell cells.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof, basement, surroundings, surroundSizing, floorHeights } = opts;
+  const { structureType, decoration, size, roof, basement, surroundings, surroundSizing, floorHeights, floors } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type || !type.seedShell) return { preamble: '' };
 
   const [W, H, D] = size ?? DEFAULT_SIZE;
   const params: Record<string, unknown> = {};
   if (decoration) params.decoration = decoration;
+  // The above-ground storey count (else the per-floor heights imply it) — so a 2/3-floor
+  // pick lays that many decks instead of the type's default of one.
+  const storeyCount = floors ?? floorHeights?.length;
+  if (storeyCount && storeyCount > 0) params.floors = storeyCount;
   // The roof-module id doubles as the structure's `roof` param value (gable/hip/flat), so
   // a Details roof pick (e.g. flat) flows straight into the seeded shell's massing.
   if (roof) params.roof = roof;
@@ -101,7 +109,10 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
     // `template` op it might not preserve.
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, 'shell.nbt');
-    await writeStructureFile(authoring, file, { structureType });
+    // Pass the type's authoritative storeys so the stairwell pass recognises every floor
+    // (a big yard's grade plane otherwise hides them) when it lays the shell's circulation.
+    const planFloors = structureFloorPlan(structureType!, [W, H, D], params);
+    await writeStructureFile(authoring, file, { structureType, floors: planFloors.length ? planFloors : undefined });
     const expanded = await readAuthoring(file);
     // The compiled shell becomes the protected cell set (every solid block): the
     // `preserveShell` compile pass restores any of these the model deletes, so the

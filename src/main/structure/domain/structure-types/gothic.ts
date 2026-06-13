@@ -14,7 +14,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
-import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { ceilingLanterns, chimneyBreast, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 import { insetHouseBox, yardFor } from '../surroundings';
 import { box as mkBox, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
@@ -148,7 +148,14 @@ export const gothic: StructureType = {
     // kit GUARANTEE: a pitch that can't fit (or a non-stair roof material) still caps FLAT
     // (deck + parapet) — a gothic manor can never ship roofless. ------------------------
     const form = roofFormFor(roofShape, y1 - wallTop, palette.idOf('roof').endsWith('_stairs'));
-    ops.push(...roofCap(composeModule, form, [x0, wallTop + 1, hz0], [x1, y1, z1], W <= D ? 'z' : 'x'));
+    const ridge: 'x' | 'z' = W <= D ? 'z' : 'x';
+    ops.push(...roofCap(composeModule, form, [x0, wallTop + 1, hz0], [x1, y1, z1], ridge));
+
+    // --- Chimney: the SHARED shell-kit breast (foundation code, identical to every other
+    // house type) on the right wall (away from the left chapel glass + the back-right corner
+    // tower) — a modest stack proud of the roof, never the box-top spike the AI invents when
+    // no code chimney anchors it. The roof footprint sits behind the portico (hz0..z1). -----
+    ops.push(...chimneyBreast(palette, { x0, x1, z0: hz0, z1 }, y0, wallTop, y1, form, ridge, x1));
 
     // --- Garland foliage dotting the eaves (the ivy cascading over the slate) -----------
     if (form !== 'flat') {

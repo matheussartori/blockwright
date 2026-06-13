@@ -3,7 +3,7 @@
 // passes → encode. This is the JSON→NBT step the knowledge base describes.
 import fs from 'node:fs/promises';
 import { structureFinalizers } from '../domain';
-import { gradeFromFloors, type FloorRange } from './floors';
+import { gradeFromFloors, storeyPlanesFromFloors, type FloorRange } from './floors';
 import { encodeStructure } from './nbt-encode';
 import { resolveBlocks } from './ops';
 import {
@@ -78,8 +78,13 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
   const resolved = resolveBlocks(s);
   // Grade (ground-floor level) for the air-fill: the user's Floor plan wins when
   // defined, else the storeys the model labelled in the build itself.
-  const grade = gradeFromFloors(opts?.floors?.length ? opts.floors : s.floors);
-  const ctx = { size, structureType: opts?.structureType, grade, log: opts?.log, lockCells: opts?.lockCells };
+  const labelledFloors = opts?.floors?.length ? opts.floors : s.floors;
+  const grade = gradeFromFloors(labelledFloors);
+  // The labelled storeys' walkable planes — the stairwell pass merges them with its
+  // geometric detection so a house with a big yard (whose grade plane dwarfs the floors)
+  // still has every storey recognised + connected.
+  const floorPlanes = storeyPlanesFromFloors(labelledFloors);
+  const ctx = { size, structureType: opts?.structureType, grade, floorPlanes, log: opts?.log, lockCells: opts?.lockCells };
   const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
     dataVersion: s.DataVersion ?? 3955,

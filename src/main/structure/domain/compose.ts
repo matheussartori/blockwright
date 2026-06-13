@@ -136,7 +136,7 @@ function seedFor(params: Record<string, unknown>, b: ReturnType<typeof box>): nu
  *  id is reported through `warn` instead of vanishing silently. A structure type that
  *  declares its OWN `basement` param (classic) handles burial itself, so the central
  *  path is skipped for it (the caller checks `'basement' in type.params`). */
-function selectedBasement(params: Record<string, unknown>, warn?: (message: string) => void): string | undefined {
+export function selectedBasement(params: Record<string, unknown>, warn?: (message: string) => void): string | undefined {
   const id = params.basement;
   if (typeof id !== 'string' || id === '' || id === 'none') return undefined;
   if (!getBasement(id)) {
@@ -149,7 +149,7 @@ function selectedBasement(params: Record<string, unknown>, warn?: (message: stri
 /** Below-grade height reserved at the BOTTOM of the box for a centrally-composed
  *  basement: ~1/5 of the box, clamped so the vault has headroom but the above-ground
  *  storeys keep theirs. */
-function basementHeight(H: number): number {
+export function basementHeight(H: number): number {
   return Math.min(6, Math.max(4, Math.round(H * 0.2)));
 }
 
@@ -325,14 +325,22 @@ export function composeStructure(
       // (the shared yardFor, so a too-tight inset the type ignored is ignored here too).
       const yard = yardFor(b, values, surroundSizing);
       const houseB = yard ? insetHouseBox(b, yard, surroundSizing) : b;
-      const ops = [
-        // The vault fills the footprint below grade (forced rect so it spans the whole base).
-        ...composeModuleDelegate('basement', basement, [b.x0, b.y0, b.z0], [b.x1, groundY, b.z1], { shape: 'rect' }),
+      const ops: AuthoringOp[] = [];
+      // A basement is an extension of the HOUSE — its X/Z footprint is the house's, NEVER
+      // the surroundings' (the "basement gigantesco" defect: a crypt spanning the whole
+      // estate). So the vault is buried ONLY under the inset house box. Under the lawn the
+      // below-grade band is left OPEN (air): the yard sits at grade and the build is meant
+      // for in-world placement with terrain_adaptation, which beards the ground in — a solid
+      // full-footprint plinth here would also dwarf the house's own floor planes and break
+      // the storey/stairwell detection.
+      ops.push(
+        // The vault fills the HOUSE footprint below grade (forced rect so it spans it fully).
+        ...composeModuleDelegate('basement', basement, [houseB.x0, b.y0, houseB.z0], [houseB.x1, groundY, houseB.z1], { shape: 'rect' }),
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
         ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, surroundSizing, composeModule: composeModuleDelegate }),
         // The descent carves through that slab last, so the stairwell opening survives.
         ...basementDescent(houseB, groundY, palette),
-      ];
+      );
       verifyModuleRespect(type, values, invoked, warn);
       return ops;
     }

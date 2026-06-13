@@ -30,6 +30,10 @@ garlands** draping the eaves + tower shoulders. Brooding, vertical, asymmetric, 
 - The **glass chapel wing**: the left side re-glazed into **grey-glass windows** framed by
   pale mullions. **Ivy garlands** dotting the eaves + tower shoulders. A working
   **staircase** between floors.
+- A **single chimney breast**: a blackstone stack on the right/back wall poking a couple of
+  blocks proud of the roof. KEEP it — your only job is to rest a **lit campfire** on its
+  exposed top (the smoking pot) and build the firebox at its base inside. Do **NOT** raise it
+  into a tower, move it, or add any second/standalone chimney.
 
 Do NOT make it symmetric/squat, strip the central tower / corner tower / chapel glass, drop
 the veranda or the ivy, lighten the walls, or shallow the roof — they ARE the gothic manor.
@@ -42,7 +46,8 @@ the veranda or the ivy, lighten the walls, or shallow the roof — they ARE the 
    keep the soul-lantern cold light.
 3. **Detail the portico** — an iron-bar/fence balustrade between columns, a stepped entry,
    wall sconces.
-4. **Exterior gloom:** dead bushes, a fence + gate, cobwebs in the eaves, a smoking chimney.
+4. **Exterior gloom:** dead bushes, a fence + gate, cobwebs in the eaves. Cap the shell's
+   existing chimney breast with a lit campfire — never build a separate or taller chimney.
 
 ## Avoid
 

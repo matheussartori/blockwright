@@ -20,7 +20,7 @@ import { insetHouseBox, yardFor } from '../surroundings';
 import type { Box, FloorPlanEntry, StructureType } from './types';
 import { logProps } from './types';
 import { addStairCore } from './stair-core';
-import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { ceilingLanterns, chimneyBreast, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 
 /** The house's level plan for a box + params — ONE source shared by `build()` and
  *  `floors()` (the standard per-type pattern). The box is the whole envelope; levels
@@ -76,11 +76,14 @@ export const classic: StructureType = {
   params: {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
     // Surfaced in Details as the separate "Basement" module select (category
-    // 'basement'), so it's omitted from the house's own param controls — but kept here
-    // so the legacy `template name:'classic'` build path still resolves it.
+    // 'basement'), so it's omitted from the house's own param controls. The VALUE is the
+    // selected basement-MODULE id (the same namespace the Details select + the other
+    // archetypes' central basement path use), so a "Cellar" pick rides in as
+    // `basement:'cellar'` and `build()` delegates the vault to that module. ('none' = no
+    // basement.) Kept here so the legacy `template name:'classic'` path still resolves it.
     basement: {
-      kind: 'enum', default: 'none', values: ['none', 'full', 'half'], label: 'Basement',
-      labels: { none: 'None', full: 'Full cellar', half: 'Half-buried' }, module: 'basement',
+      kind: 'enum', default: 'none', values: ['none', 'cellar', 'crypt', 'cult-temple'], label: 'Basement',
+      labels: { none: 'None', cellar: 'Cellar', crypt: 'Crypt', 'cult-temple': 'Cult temple' }, module: 'basement',
     },
     // Surfaced in Details as the separate "Attic" module select (category 'attic'), so it's
     // omitted from the house's own param controls — but kept here so the legacy
@@ -201,7 +204,7 @@ export const classic: StructureType = {
     // the ground slab) + burial depth; the 'half' clerestory below and the stair-core
     // descent stay the house's own concern. The module brings its own stone palette.
     if (hasBasement && groundY - 1 >= y0 + 1) {
-      ops.push(...composeModule('basement', 'cellar', [x0, y0, z0], [x1, groundY, z1], { shape: 'rect' }));
+      ops.push(...composeModule('basement', basement, [x0, y0, z0], [x1, groundY, z1], { shape: 'rect' }));
     }
 
     // Stone plinth: a cobblestone water-table course at the ground-storey base, so the
@@ -259,22 +262,10 @@ export const classic: StructureType = {
         for (const c of winCells(z, wy, x1, 'z')) ops.push({ op: 'block', pos: c, state: win });
       }
     }
-    // A half-submerged basement gets a high clerestory band for daylight — barred
-    // (iron bars, never glass: the below-grade opening rule applies to code shells too).
-    if (hasBasement && basement === 'half' && groundY - 1 > y0 + 1) {
-      const wy = groundY - 1;
-      const bars = palette.get('bars');
-      for (const x of winX) {
-        ops.push({ op: 'block', pos: [x, wy, z0], state: bars });
-        ops.push({ op: 'block', pos: [x, wy, z1], state: bars });
-      }
-    }
-
-    // Chimney: a cobblestone stack centred on a seeded side wall, rising from the
-    // ground hearth up through the roof. It sits on the wall's centre column (which
-    // the window band also centres on), so it replaces that one pane and the facade
-    // stays symmetric — a chimney flanked by windows.
-    ops.push({ op: 'fill', from: [chimX, groundY, cz], to: [chimX, y1, cz], state: found });
+    // Chimney: the shared shell-kit breast (foundation code — identical across house types)
+    // rising from the ground hearth up an exterior wall to ~2 proud of the roof, never the
+    // box-top spike. The seeded `chimX` is the side wall it uses for a hip/ridge-along-z cap.
+    ops.push(...chimneyBreast(palette, { x0, x1, z0, z1 }, groundY, wallTop, y1, roofForm, ridge, chimX));
 
     // --- Covered balcony (a recessed loggia, so it never leaves the bounds) -----
     if (balcony !== 'none' && floors >= 1) {

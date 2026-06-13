@@ -77,12 +77,20 @@ describe('compose: structure types × decorations', () => {
   });
 
   it('structureFloorPlan covers EVERY storeyed type now (classic included) — and is empty for unknowns', () => {
-    // classic gained an authoritative plan with the shared plan()/floors() pattern.
+    // classic gained an authoritative plan with the shared plan()/floors() pattern; the
+    // ROOF band is appended last so the roof reads as its own level (not lumped with the
+    // storeys), and its `to` reaches the box top.
     const classic = structureFloorPlan('classic', [11, 13, 9], { floors: 2 });
-    expect(classic.map((f) => f.role)).toEqual(['ground', 'upper']);
+    expect(classic.map((f) => f.role)).toEqual(['ground', 'upper', 'roof']);
+    expect(classic[classic.length - 1].to).toBe(12); // the roof band ends at the box top (y1)
     // A basement pick prepends the below-grade level.
-    const withCellar = structureFloorPlan('classic', [11, 18, 9], { floors: 2, basement: 'full' });
-    expect(withCellar.map((f) => f.role)).toEqual(['basement', 'ground', 'upper']);
+    const withCellar = structureFloorPlan('classic', [11, 18, 9], { floors: 2, basement: 'cellar' });
+    expect(withCellar.map((f) => f.role)).toEqual(['basement', 'ground', 'upper', 'roof']);
+    // A CENTRAL-basement type (gothic owns no basement param) now reports the basement +
+    // storeys + roof too — not everything-above-the-cellar as one "roof" band.
+    const goth = structureFloorPlan('gothic', [16, 24, 14], { floors: 2, basement: 'crypt' });
+    expect(goth.map((f) => f.role)).toEqual(['basement', 'ground', 'upper', 'roof']);
+    expect(goth[0].from).toBe(0); // basement starts at the box bottom
     // The sakura's visible stone base reads as its basement-grade level.
     const sak = structureFloorPlan('sakura', [13, 14, 11], { floors: 2 });
     expect(sak[0].role).toBe('basement');
@@ -106,7 +114,7 @@ describe('compose: structure types × decorations', () => {
       'classic',
       from,
       big,
-      { floors: 2, basement: 'full', attic: 'storage', balcony: 'front' },
+      { floors: 2, basement: 'cellar', attic: 'storage', balcony: 'front' },
       stubIntern(),
     );
     const roofs = ops.filter((o) => o.op === 'roof');
@@ -377,10 +385,14 @@ describe('compose: house roof form + determinism', () => {
     expect(blocks('gable')).toBe(blocks('hip') + 2);
   });
 
-  it('delegates the below-grade level to the basement module (adds the cellar room)', () => {
+  it('delegates the below-grade level to the SELECTED basement module (adds the vault room)', () => {
     const big: [number, number, number] = [14, 22, 14];
     const base = { floors: 2, seed: 5 };
-    const withCellar = composeStructure('classic', from, big, { ...base, basement: 'full' }, stubIntern());
+    // The Details "Basement" pick rides in as the MODULE id (cellar/crypt/cult-temple) —
+    // the same namespace the other archetypes' central path uses — and classic delegates
+    // the vault to exactly that module (the fix for "picked Cellar, got no basement"
+    // because the param's old none/full/half enum rejected the module id).
+    const withCellar = composeStructure('classic', from, big, { ...base, basement: 'cellar' }, stubIntern());
     const noCellar = composeStructure('classic', from, big, { ...base, basement: 'none' }, stubIntern());
     // The delegated cellar adds a sealed room (floor/ceiling + perimeter walls + a grid of
     // lit support pillars) the no-basement build doesn't have, while the single-roof and
@@ -390,13 +402,16 @@ describe('compose: house roof form + determinism', () => {
     expect(withCellar.some((o) => o.op === 'stairs')).toBe(true);
   });
 
-  it('the basement "half" variant adds the clerestory the "full" one omits', () => {
+  it('honours a different basement MODULE pick (crypt) for classic', () => {
     const big: [number, number, number] = [14, 22, 14];
     const base = { floors: 2, seed: 5 };
-    const full = composeStructure('classic', from, big, { ...base, basement: 'full' }, stubIntern());
-    const half = composeStructure('classic', from, big, { ...base, basement: 'half' }, stubIntern());
-    // Same delegated cellar room; 'half' layers the high clerestory window band on top.
-    expect(half.length).toBeGreaterThan(full.length);
+    // A crypt is a different module with its own geometry, so it must delegate distinctly
+    // from the cellar (not silently fall back to one fixed vault).
+    const crypt = composeStructure('classic', from, big, { ...base, basement: 'crypt' }, stubIntern());
+    const cellar = composeStructure('classic', from, big, { ...base, basement: 'cellar' }, stubIntern());
+    expect(crypt.length).toBeGreaterThan(0);
+    expect(cellar.length).toBeGreaterThan(0);
+    expect(crypt.length).not.toBe(cellar.length);
   });
 
   it('composes a basement CENTRALLY for a seeded archetype that has no basement param (gothic)', () => {
@@ -417,7 +432,7 @@ describe('compose: house roof form + determinism', () => {
 
   it('house params are deterministic for the same box + params + seed', () => {
     const big: [number, number, number] = [12, 18, 12];
-    const p = { floors: 2, basement: 'half', attic: 'finished', balcony: 'side', seed: 3 };
+    const p = { floors: 2, basement: 'cellar', attic: 'bedroom', balcony: 'side', seed: 3 };
     const a = composeStructure('classic', from, big, p, stubIntern());
     const b = composeStructure('classic', from, big, p, stubIntern());
     expect(JSON.stringify(a)).toBe(JSON.stringify(b)); // byte-identical for a fixed seed
@@ -425,7 +440,7 @@ describe('compose: house roof form + determinism', () => {
 
   it('the seed varies the shell across runs (different windows/corners/roof), still a single roof', () => {
     const big: [number, number, number] = [14, 20, 14];
-    const base = { floors: 2, basement: 'full', attic: 'storage', balcony: 'front' };
+    const base = { floors: 2, basement: 'cellar', attic: 'storage', balcony: 'front' };
     const shapes = new Set<string>();
     for (let seed = 1; seed <= 16; seed++) {
       const ops = composeStructure('classic', from, big, { ...base, seed }, stubIntern());

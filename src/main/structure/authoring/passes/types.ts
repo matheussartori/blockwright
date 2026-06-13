@@ -35,6 +35,11 @@ export interface PassContext {
    *  re-asserts any of these the model deleted, so the code-built exterior survives the
    *  AI's edits. Undefined/empty for every other build → `preserveShell` no-ops. */
   lockCells?: ShellLockCell[];
+  /** The AUTHORITATIVE walkable storey-slab Ys (ascending), from the build's labelled
+   *  floors. `rebuildStairwells` MERGES these into its geometric plane detection, so a
+   *  storey the 60%-of-busiest cut misses (a big yard ground plane at grade dwarfs the
+   *  house floors) is still recognised and connected. Omit → geometric detection only. */
+  floorPlanes?: number[];
 }
 
 export interface PassResult {

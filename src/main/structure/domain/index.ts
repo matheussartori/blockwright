@@ -9,7 +9,7 @@ import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import { sanitizeFloorHeights } from '@/shared/domain/storeys';
 import { sanitizeSurroundSizing } from '@/shared/domain/surroundings';
-import { composeModulePreview } from './compose';
+import { basementHeight, composeModulePreview, selectedBasement } from './compose';
 import { getModule } from './categories';
 import { resolveParams } from './params';
 import { box } from './structure-types/types';
@@ -110,20 +110,44 @@ export function structureFloorPlan(
 ): FloorDef[] {
   const type = getStructureType(id);
   if (!type?.floors) return [];
-  const b = box([0, 0, 0], [size[0] - 1, size[1] - 1, size[2] - 1]);
+  const y1 = size[1] - 1;
+  const b = box([0, 0, 0], [size[0] - 1, y1, size[2] - 1]);
   const params = resolveParams(type.params, rawParams);
-  return type.floors(
-    b,
-    params,
-    sanitizeFloorHeights(rawParams.floorHeights),
-    sanitizeSurroundSizing(rawParams.surroundSizing),
-  ).map((f, i) => ({
-    id: `floor-${i + 1}`,
-    name: `Floor ${i + 1}`,
-    from: f.from,
-    to: f.to,
-    role: f.role,
-  }));
+  const floorHeights = sanitizeFloorHeights(rawParams.floorHeights);
+  const surroundSizing = sanitizeSurroundSizing(rawParams.surroundSizing);
+
+  // A type WITHOUT its own `basement` param (gothic/modern/farmhouse/sakura) gets its
+  // basement composed CENTRALLY: `composeStructure` reserves the bottom `basementHeight`
+  // of the box and raises the massing onto `groundY`. The floor plan must mirror that —
+  // prepend the basement level and compute the STOREYS from `groundY`, not the box bottom
+  // — else the plan reports the wrong planes (everything read as one "roof" band, the
+  // missing-floor-1/2 defect). A type that owns its `basement` param (classic) already
+  // folds the basement into its own `floors()`.
+  let floorBox = b;
+  const lead: FloorDef[] = [];
+  if (!('basement' in type.params) && selectedBasement(rawParams)) {
+    const bH = basementHeight(b.H);
+    if (b.H - bH >= 6) {
+      const groundY = b.y0 + bH;
+      floorBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
+      lead.push({ id: 'floor-1', name: 'Floor 1', from: b.y0, to: groundY - 1, role: 'basement' });
+    }
+  }
+
+  const storeys = type.floors(floorBox, params, floorHeights, surroundSizing);
+  const defs: FloorDef[] = [...lead];
+  for (const f of storeys) defs.push({ id: '', name: '', from: f.from, to: f.to, role: f.role });
+
+  // Append the ROOF band (everything above the top storey's ceiling up to the box top), so
+  // the plan shows the roof as its OWN level reaching just the roof — not lumped with the
+  // storeys below it. Skipped when the storeys already fill the box.
+  const topTo = defs.length ? defs[defs.length - 1].to : -1;
+  if (topTo >= 0 && topTo + 1 <= y1) {
+    defs.push({ id: '', name: '', from: topTo + 1, to: y1, role: 'roof' });
+  }
+
+  // Number them in order (Basement / Floor 1 / Floor 2 / Roof reads off the role + index).
+  return defs.map((f, i) => ({ ...f, id: `floor-${i + 1}`, name: `Floor ${i + 1}` }));
 }
 
 /** Every module across categories (for selection→guide mapping + lookups). */
