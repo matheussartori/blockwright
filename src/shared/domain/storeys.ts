@@ -25,6 +25,12 @@ export const MAX_STOREY_H = 32;
 export const DEFAULT_STOREY_H = 5;
 /** Height of the below-grade basement level a storeyed box reserves (see {@link heightOverhead}). */
 export const BASEMENT_OVERHEAD = 5;
+/** The neutral height of one below-grade basement LEVEL when the user hasn't sized it
+ *  (the default per-level depth of the multi-level basement). */
+export const DEFAULT_BASEMENT_H = BASEMENT_OVERHEAD;
+/** The deepest a basement may be dug — the composer caps the level count here so the box
+ *  height stays sane and generation stays reliable. */
+export const MAX_BASEMENT_LEVELS = 4;
 /** In-roof attic headroom a storeyed box reserves (see {@link heightOverhead}). */
 export const ATTIC_OVERHEAD = 2;
 
@@ -66,6 +72,44 @@ export function sanitizeFloorHeights(v: unknown): number[] | undefined {
   if (!Array.isArray(v) || v.length === 0 || v.length > 8) return undefined;
   if (!v.every((h) => typeof h === 'number' && Number.isFinite(h))) return undefined;
   return v.map((h) => Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(h))));
+}
+
+/** Coerce a loose `basementHeights` value (a raw `template` op param, bottom-up per-level
+ *  depths) into a usable array: every entry a finite number, capped at
+ *  {@link MAX_BASEMENT_LEVELS} levels and clamped to [{@link MIN_FLOOR_H},
+ *  {@link MAX_STOREY_H}]; anything else → undefined (the caller falls back to a single
+ *  {@link DEFAULT_BASEMENT_H} level).
+ *  @param v - The unknown raw value.
+ *  @returns The sanitized per-level heights (1–{@link MAX_BASEMENT_LEVELS}), or undefined. */
+export function sanitizeBasementHeights(v: unknown): number[] | undefined {
+  if (!Array.isArray(v) || v.length === 0) return undefined;
+  if (!v.every((h) => typeof h === 'number' && Number.isFinite(h))) return undefined;
+  return v
+    .slice(0, MAX_BASEMENT_LEVELS)
+    .map((h) => Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(h))));
+}
+
+/** Total below-grade depth (cells) of a basement from its per-level heights. */
+export function basementDepth(heights: readonly number[]): number {
+  return heights.reduce((a, b) => a + b, 0);
+}
+
+/** Whether a basement needs its OWN ceiling layer (1 extra Y) below the ground plane: it
+ *  does when its footprint extends BEYOND the house (under the surroundings/terrain), so the
+ *  vault ceiling is a distinct deck the user can re-block without destroying the yard ground
+ *  fused on top of it (the "mexer no teto do subsolo destrói o quintal" defect). Identity (0)
+ *  when the basement fits within the house footprint (the ceiling is just the house floor).
+ *  @param basementArea - The explicit basement footprint, or null/undefined to match the house.
+ *  @param houseW - The house footprint width.
+ *  @param houseD - The house footprint depth.
+ *  @returns 1 when an extra ceiling layer is reserved, else 0. */
+export function basementCeilingLayer(
+  basementArea: { w: number; d: number } | null | undefined,
+  houseW: number,
+  houseD: number,
+): number {
+  if (!basementArea) return 0;
+  return basementArea.w > houseW || basementArea.d > houseD ? 1 : 0;
 }
 
 /** Resize a heights array to `n` storeys: extra storeys repeat the last height,

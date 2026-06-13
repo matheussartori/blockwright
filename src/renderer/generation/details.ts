@@ -10,9 +10,12 @@ import {
   type BuildDetails,
   DEFAULT_STOREY_H,
   EMPTY_SLOTS,
+  MAX_BASEMENT_LEVELS,
   MAX_STOREY_H,
   MIN_FLOOR_H,
   ROOMS_PER_FLOOR,
+  basementHeightsOf,
+  defaultBasementHeights,
   defaultFloorHeights,
   floorCount,
 } from './brief';
@@ -71,7 +74,8 @@ export function setDetailField(
       params: {},
       size: null,
       floorHeights: null,
-      basementH: null,
+      basementHeights: null,
+      basementArea: null,
       atticH: null,
       surroundSizing: null,
       rooms: [],
@@ -85,8 +89,15 @@ export function setDetailField(
   // A flat roof leaves no roof void → it can't host an attic; clear any attic pick so the
   // two can't be selected together (mirrors the attic module's `incompatibleWith: ['flat']`).
   if (key === 'roof' && value === FLAT_ROOF) next.attic = '';
-  // A cleared slot drops its custom band height (it described a band that no longer exists).
-  if (!next.basement) next.basementH = null;
+  // A cleared slot drops its custom band sizing (it described a band that no longer exists);
+  // picking a basement afresh seeds a single default level so the size panel has a value to show.
+  if (!next.basement || next.basement === 'none') {
+    next.basementHeights = null;
+    next.basementArea = null;
+  } else if (!d.basement || d.basement === 'none') {
+    next.basementHeights = defaultBasementHeights();
+    next.basementArea = null;
+  }
   if (!next.attic) next.atticH = null;
   // Clearing the surroundings ring drops the yard-size scale (no ring to scale).
   if (!next.surroundings || next.surroundings === 'none') next.surroundSizing = null;
@@ -197,20 +208,64 @@ export function setFloorHeight(d: BuildDetails, index: number, value: number, li
   return { ...d, floorHeights };
 }
 
-/** The non-floor bands of the Height panel whose height the user can size directly. */
-export type BandKey = 'basement' | 'attic';
+/** The non-floor band of the Height panel whose height the user can size directly. The
+ *  basement is no longer a single band — it's a multi-level stack with its own reducers. */
+export type BandKey = 'attic';
 
-/** Set the picked basement/attic band's height (clamped to [{@link MIN_FLOOR_H},
- *  {@link MAX_STOREY_H}] — the attic/basement is a level too, so the 5-block floor rule
- *  applies). A no-op when that slot isn't picked.
+/** Set the picked attic band's height (clamped to [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}]
+ *  — the attic is a level too, so the 5-block floor rule applies). A no-op when no attic is
+ *  picked.
  *  @param d - The current Details state.
- *  @param band - Which band to size.
+ *  @param band - Which band to size (currently only 'attic').
  *  @param value - The requested height (clamped).
  *  @returns The next Details state. */
 export function setBandHeight(d: BuildDetails, band: BandKey, value: number): BuildDetails {
   if (!d[band]) return d;
   const v = Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_FLOOR_H));
-  return band === 'basement' ? { ...d, basementH: v } : { ...d, atticH: v };
+  return { ...d, atticH: v };
+}
+
+/** Set the number of below-grade basement levels (clamped to [1, {@link MAX_BASEMENT_LEVELS}]),
+ *  growing/shrinking the per-level heights array: extra levels copy the deepest level's
+ *  height, removed levels drop off the bottom. A no-op when no basement is picked.
+ *  @param d - The current Details state.
+ *  @param n - The requested level count (clamped).
+ *  @returns The next Details state. */
+export function setBasementLevels(d: BuildDetails, n: number): BuildDetails {
+  if (!d.basement || d.basement === 'none') return d;
+  const levels = Math.max(1, Math.min(MAX_BASEMENT_LEVELS, Math.trunc(n) || 1));
+  return { ...d, basementHeights: resizeHeights(basementHeightsOf(d), levels) };
+}
+
+/** Set one basement level's height (clamped to [{@link MIN_FLOOR_H}, {@link MAX_STOREY_H}]).
+ *  When `linked`, every level moves to the same value (the chain affordance); otherwise only
+ *  `index` changes. A no-op when no basement is picked.
+ *  @param d - The current Details state.
+ *  @param index - The 0-based level to edit (top-down).
+ *  @param value - The requested height (clamped).
+ *  @param linked - Move every level together when true.
+ *  @returns The next Details state. */
+export function setBasementLevelHeight(d: BuildDetails, index: number, value: number, linked: boolean): BuildDetails {
+  if (!d.basement || d.basement === 'none') return d;
+  const v = Math.max(MIN_FLOOR_H, Math.min(MAX_STOREY_H, Math.trunc(value) || MIN_FLOOR_H));
+  const heights = basementHeightsOf(d);
+  const basementHeights = linked ? heights.map(() => v) : heights.map((h, i) => (i === index ? v : h));
+  return { ...d, basementHeights };
+}
+
+/** Set one axis of the explicit basement FOOTPRINT (switching it from "match house" to a
+ *  manual size), clamped to [{@link SIZE_MIN}, {@link SIZE_MAX}]. The first manual edit
+ *  seeds the footprint from `base` (the currently-shown footprint) so the other axis keeps
+ *  its value. A no-op when no basement is picked.
+ *  @param d - The current Details state.
+ *  @param axis - Which dimension changed (`w`/`d`).
+ *  @param value - The requested value (clamped).
+ *  @param base - The currently-shown basement footprint, used to seed on first edit.
+ *  @returns The next Details state with an explicit `basementArea`. */
+export function setBasementArea(d: BuildDetails, axis: 'w' | 'd', value: number, base: { w: number; d: number }): BuildDetails {
+  if (!d.basement || d.basement === 'none') return d;
+  const clamped = Math.max(SIZE_MIN, Math.min(SIZE_MAX, value));
+  return { ...d, basementArea: { ...(d.basementArea ?? base), [axis]: clamped } };
 }
 
 /** Set one axis of the explicit build size (switching the box from auto to manual),

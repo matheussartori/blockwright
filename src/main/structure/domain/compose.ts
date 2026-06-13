@@ -17,7 +17,7 @@ import { getBasement } from './basements';
 import { getGeometryModule } from './categories';
 import type { GeometryModule } from './geometry-module';
 import { resolveParams, type ParamValues } from './params';
-import { sanitizeFloorHeights } from '@/shared/domain/storeys';
+import { basementCeilingLayer, basementDepth, sanitizeBasementHeights, sanitizeFloorHeights } from '@/shared/domain/storeys';
 import { sanitizeSurroundSizing } from '@/shared/domain/surroundings';
 import { BASE_BLOCKS, isRole, type Role } from './roles';
 import { seed3 } from './rng';
@@ -27,7 +27,7 @@ import {
   structureTypeIds,
   type RolePalette,
 } from './structure-types';
-import { insetHouseBox, yardFor } from './surroundings';
+import { basementBox, houseEnvelopeBox, insetHouseBox, yardFor } from './surroundings';
 import { box, type BuildArgs } from './structure-types/types';
 
 type Vec3 = [number, number, number];
@@ -147,26 +147,86 @@ export function selectedBasement(params: Record<string, unknown>, warn?: (messag
 }
 
 /** Below-grade height reserved at the BOTTOM of the box for a centrally-composed
- *  basement: ~1/5 of the box, clamped so the vault has headroom but the above-ground
- *  storeys keep theirs. */
+ *  basement when the user supplied no explicit per-level heights: ~1/5 of the box,
+ *  clamped so the vault has headroom but the above-ground storeys keep theirs. */
 export function basementHeight(H: number): number {
   return Math.min(6, Math.max(4, Math.round(H * 0.2)));
 }
 
-/** A flush wall ladder linking a centrally-composed basement to the ground floor above
- *  it: rungs from the vault floor up through the carved ground slab, in the back-left
- *  interior corner backed by the rear (z1) wall, with a step-off opening so you climb out
- *  onto the ground floor. Emitted LAST (after the type's foundation slab) so its carve
- *  wins. The host palette supplies the ladder so its facing/material match the build. */
-function basementDescent(b: ReturnType<typeof box>, groundY: number, palette: RolePalette): AuthoringOp[] {
-  const lx = b.x0 + 1, lz = b.z1 - 1; // one in from the rear wall (the ladder's backing)
-  const ladder = palette.get('ladder', { facing: 'north' }); // back against the +z (z1) wall
+/**
+ * Compose a centrally-managed basement STACK below the ground floor: one sealed module
+ * vault per level (top-down `levelHeights`, the deepest at the box bottom) laid at the
+ * basement FOOTPRINT (which may be wider than the house — excavated beyond its walls),
+ * plus ONE continuous descent ladder linking the deepest level up to the ground floor,
+ * landing inside the HOUSE box (so the climb ends in the house, not out under the lawn) with
+ * a step-off + 2-block headroom at EVERY level so each level is reachable.
+ *
+ * The ladder hangs on a thin solid spine so it attaches even when the house corner sits
+ * away from a basement wall (an enlarged, centred undercroft). When `groundY` is one above
+ * the vault stack's top (an enlarged basement reserves its OWN ceiling deck below the yard),
+ * the ladder climbs the extra cell so it still reaches the house floor. Emitted by the caller
+ * after the type's foundation slab so the stairwell carve survives; below-grade gaps are
+ * excluded from `rebuildStairwells`, so this descent is the authoritative one (not rebuilt).
+ *
+ * @param composeModule - The build's module delegate (lays each vault, records the pick).
+ * @param id - The basement-module id (cellar/crypt/cult-temple).
+ * @param foot - The basement footprint box (X/Z; its Y range is replaced per level).
+ * @param baseY - The deepest basement floor Y (the box bottom).
+ * @param levelHeights - Per-level slab-to-slab heights, top-down (index 0 = under ground).
+ * @param groundY - The ground-floor slab Y the descent climbs out to (≥ the vault top).
+ * @param houseB - The house box (the ladder lands in its back-left interior corner).
+ * @param palette - The HOST palette (supplies the ladder + the spine backing).
+ * @returns The vault + descent ops.
+ */
+function composeBasementStack(
+  composeModule: BuildArgs['composeModule'],
+  id: string,
+  foot: ReturnType<typeof box>,
+  baseY: number,
+  levelHeights: number[],
+  groundY: number,
+  houseB: ReturnType<typeof box>,
+  palette: RolePalette,
+): { vault: AuthoringOp[]; descent: AuthoringOp[] } {
+  const vault: AuthoringOp[] = [];
+  // Each level as a sealed rect vault, stacked downward from the vault top. Adjacent decks
+  // coincide (one level's ceiling is the next's floor) — harmless overwrite. The top ceiling
+  // sits at `vaultTop`; an enlarged basement reserves `groundY > vaultTop` so this ceiling
+  // is a DEDICATED deck below the yard ground (re-blockable without touching the yard).
+  const vaultTop = baseY + basementDepth(levelHeights);
+  let top = vaultTop;
+  // The Y of every level's FLOOR (a slab-to-slab deck), bottom-up — each gets a step-off.
+  const levelFloors: number[] = [baseY];
+  for (const h of levelHeights) {
+    const bottom = top - h;
+    vault.push(...composeModule('basement', id, [foot.x0, bottom, foot.z0], [foot.x1, top, foot.z1], { shape: 'rect' }));
+    if (bottom > baseY) levelFloors.push(bottom);
+    top = bottom;
+  }
+  // Descent ladder in the house's back-left interior corner, backed by a solid spine so it
+  // attaches through every level (the spine coincides with the rear wall when the basement
+  // matches the house). Rungs run the deepest floor → the ground slab; a step-off + 2-block
+  // headroom at the ground AND at every intermediate level, so each level is reachable. The
+  // descent is emitted by the caller AFTER the type's foundation slab so its shaft carve
+  // through the ground floor survives (else the foundation caps the climb).
+  const descent: AuthoringOp[] = [];
+  const lx = houseB.x0 + 1, lz = houseB.z1 - 1;
+  const ladder = palette.get('ladder', { facing: 'north' }); // back against the +z spine
+  const spine = palette.get('foundation');
   const air = palette.air();
-  const ops: AuthoringOp[] = [];
-  for (let y = b.y0 + 1; y <= groundY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
-  ops.push({ op: 'block', pos: [lx, groundY + 1, lz], state: air }); // headroom at the top of the climb
-  ops.push({ op: 'block', pos: [lx, groundY, lz - 1], state: air }); // step-off onto the ground floor
-  return ops;
+  for (let y = baseY + 1; y <= groundY; y++) {
+    descent.push({ op: 'block', pos: [lx, y, lz + 1], state: spine }); // backing
+    descent.push({ op: 'block', pos: [lx, y, lz], state: ladder });
+  }
+  descent.push({ op: 'block', pos: [lx, groundY + 1, lz], state: air }); // headroom over the top exit
+  // Step-off in FRONT of the ladder at every floor's WALK level (slab+1) + head clearance
+  // (slab+2), so you can leave the ladder onto the ground floor AND onto every below-grade
+  // level. The slab itself (you stand on it) is never carved.
+  for (const fy of [...levelFloors, groundY]) {
+    descent.push({ op: 'block', pos: [lx, fy + 1, lz - 1], state: air }); // standing cell (on the slab)
+    descent.push({ op: 'block', pos: [lx, fy + 2, lz - 1], state: air }); // head clearance
+  }
+  return { vault, descent };
 }
 
 /** Run a module's generic `build()` then its host-specific integration (when `host`
@@ -298,6 +358,12 @@ export function composeStructure(
   // in as a raw param like floorHeights — threaded into the type's build so its house/yard
   // split and yard delegation honour the chosen yard size.
   const surroundSizing = sanitizeSurroundSizing(params.surroundSizing);
+  // The user's basement SIZING (the composer's basement panel): per-level depths + an
+  // optional enlarged footprint + the house shell size (so the house can be centred when the
+  // basement grew the box wider). All ride in as raw params like the heights above.
+  const basementHeights = sanitizeBasementHeights(params.basementHeights);
+  const basementArea = sanitizeWH(params.basementArea);
+  const shellSize = sanitizeWH(params.shellSize);
   // The type owns placement; it DELEGATES roof/basement geometry to those modules via
   // this injected composer (the modules are the single source of that geometry). Every
   // delegation is RECORDED so the module-respect check can verify the requested picks
@@ -308,39 +374,50 @@ export function composeStructure(
     (category, id) => invoked.add(`${category}:${id}`),
   );
 
-  // Below-grade level: a type that declares its OWN `basement` param (classic) handles
-  // burial inside its build(); for every OTHER type we compose the selected basement
-  // CENTRALLY here — reserve the bottom of the box for the chosen module's vault, raise
-  // the type's massing onto the ground above it, then ladder the two together. So every
-  // structure type supports a basement with no per-type code (the fix for "I picked a
-  // crypt but the gothic shell built none").
-  const basement = 'basement' in type.params ? undefined : selectedBasement(params, warn);
-  const bH = basementHeight(b.H);
+  // Below-grade level: ALL structure types compose the selected basement CENTRALLY here —
+  // reserve the bottom of the box for the chosen module's vault STACK (one or more levels),
+  // raise the type's massing onto the ground above it, then ladder the two together. So
+  // every type supports a multi-level, independently-sized basement with no per-type code.
+  const basement = selectedBasement(params, warn);
+  // Per-level depths: the user's explicit heights, else a single auto-sized level.
+  const levelHeights = basementHeights ?? [basementHeight(b.H)];
+  const depth = basementDepth(levelHeights);
   if (basement) {
-    if (b.H - bH >= 6) {
-      const groundY = b.y0 + bH;
-      const buildBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
-      // With a surroundings ring the type insets its massing — the descent must land
-      // INSIDE the house, not out on the yard's lawn, so it targets the same inset
-      // (the shared yardFor, so a too-tight inset the type ignored is ignored here too).
-      const yard = yardFor(b, values, surroundSizing);
-      const houseB = yard ? insetHouseBox(b, yard, surroundSizing) : b;
-      const ops: AuthoringOp[] = [];
-      // A basement is an extension of the HOUSE — its X/Z footprint is the house's, NEVER
-      // the surroundings' (the "basement gigantesco" defect: a crypt spanning the whole
-      // estate). So the vault is buried ONLY under the inset house box. Under the lawn the
-      // below-grade band is left OPEN (air): the yard sits at grade and the build is meant
-      // for in-world placement with terrain_adaptation, which beards the ground in — a solid
-      // full-footprint plinth here would also dwarf the house's own floor planes and break
-      // the storey/stairwell detection.
-      ops.push(
-        // The vault fills the HOUSE footprint below grade (forced rect so it spans it fully).
-        ...composeModuleDelegate('basement', basement, [houseB.x0, b.y0, houseB.z0], [houseB.x1, groundY, houseB.z1], { shape: 'rect' }),
+    // The house occupies its shell-sized footprint CENTRED in the (possibly basement-widened)
+    // envelope; the type still receives this as its "outer" box and insets the yard itself, so
+    // its massing stays the user's W/D even when the basement grew the box.
+    const houseEnv = houseEnvelopeBox(b, shellSize, typeof values.surroundings === 'string' ? values.surroundings : undefined, surroundSizing);
+    const yard = yardFor(houseEnv, values, surroundSizing);
+    const houseB = yard ? insetHouseBox(houseEnv, yard, surroundSizing) : houseEnv;
+    // A basement that extends BEYOND the house (under the yard/terrain) reserves its OWN
+    // ceiling deck (one extra Y) so re-blocking the vault top never destroys the yard ground
+    // fused on top of it. The house footprint for the test is the un-grown shell when known.
+    const houseW = shellSize?.w ?? houseB.W;
+    const houseD = shellSize?.d ?? houseB.D;
+    const ceilingLayer = basementCeilingLayer(basementArea, houseW, houseD);
+    const reservedDepth = depth + ceilingLayer;
+    if (b.H - reservedDepth >= 6) {
+      const groundY = b.y0 + reservedDepth; // the house floor / yard ground (above the vault ceiling)
+      const buildBox = box([houseEnv.x0, groundY, houseEnv.z0], [houseEnv.x1, b.y1, houseEnv.z1]);
+      // The basement FOOTPRINT: the user's own W×D centred on the HOUSE (so the house always
+      // sits over the vault, even when an asymmetric yard ring offsets it), it may extend
+      // beyond the house walls — excavated underground; else the house footprint. Under the
+      // lawn / beyond the house the below-grade band is the vault itself; the build is meant
+      // for in-world placement with terrain_adaptation, which beards the ground in around it.
+      const basementB = basementArea
+        ? basementBox(b, houseB, basementArea.w, basementArea.d)
+        : box([houseB.x0, b.y0, houseB.z0], [houseB.x1, b.y1, houseB.z1]);
+      // The vault stack fills the basement footprint below grade; its top ceiling sits at
+      // `b.y0 + depth` (= groundY-1 when an extra ceiling layer is reserved). The descent
+      // climbs to `groundY` (the house floor) and is laid LAST so its shaft carve survives
+      // the type's foundation slab.
+      const { vault, descent } = composeBasementStack(composeModuleDelegate, basement, basementB, b.y0, levelHeights, groundY, houseB, palette);
+      const ops: AuthoringOp[] = [
+        ...vault,
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).
         ...type.build({ box: buildBox, params: values, palette, seed, floorHeights, surroundSizing, composeModule: composeModuleDelegate }),
-        // The descent carves through that slab last, so the stairwell opening survives.
-        ...basementDescent(houseB, groundY, palette),
-      );
+        ...descent,
+      ];
       verifyModuleRespect(type, values, invoked, warn);
       return ops;
     }
@@ -348,7 +425,7 @@ export function composeStructure(
     // chose a crypt and got none, with nothing explaining why).
     warn?.(
       `Skipped the selected "${basement}" basement: the ${b.H}-block-tall build box is too short to `
-      + `bury a ${bH}-block vault and keep livable storeys above it (needs a height of at least ${bH + 6}). `
+      + `bury a ${reservedDepth}-block vault and keep livable storeys above it (needs a height of at least ${reservedDepth + 6}). `
       + `Raise the build box or drop the basement.`,
     );
   }
@@ -356,6 +433,17 @@ export function composeStructure(
   const ops = type.build({ box: b, params: values, palette, seed, floorHeights, surroundSizing, composeModule: composeModuleDelegate });
   verifyModuleRespect(type, values, invoked, warn);
   return ops;
+}
+
+/** Coerce a loose `{ w, d }` (or `[w, d]`) raw param into a sane footprint, or undefined —
+ *  the basement-area / house-shell sizing rides in as a `template` op param like the
+ *  heights above. */
+function sanitizeWH(v: unknown): { w: number; d: number } | undefined {
+  const pair = Array.isArray(v) ? { w: v[0], d: v[1] } : (v as { w?: unknown; d?: unknown } | null);
+  const w = Number(pair?.w);
+  const d = Number(pair?.d);
+  if (!Number.isFinite(w) || !Number.isFinite(d) || w < 1 || d < 1) return undefined;
+  return { w: Math.trunc(w), d: Math.trunc(d) };
 }
 
 /**

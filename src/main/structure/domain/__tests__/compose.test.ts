@@ -120,9 +120,9 @@ describe('compose: structure types × decorations', () => {
     const roofs = ops.filter((o) => o.op === 'roof');
     const stairs = ops.filter((o) => o.op === 'stairs');
     expect(roofs).toHaveLength(1); // exactly one roof — never the doubled-roof bug
-    // basement→ground→floor2 = 2 flights (the attic is reached by a ladder, so a
-    // stair flight never pierces the roof).
-    expect(stairs.length).toBeGreaterThanOrEqual(2);
+    // ground→floor2 = 1 above-grade flight (the attic is reached by a ladder, so a stair
+    // flight never pierces the roof; the basement is reached by the central descent ladder).
+    expect(stairs.length).toBeGreaterThanOrEqual(1);
   });
 
   it('the catalog projects structure params for the Details controls (no decay/unit, no module-owned)', () => {

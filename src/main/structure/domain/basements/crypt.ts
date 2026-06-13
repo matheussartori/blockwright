@@ -74,8 +74,10 @@ export const crypt: BasementModule = {
       if (fp.isEdge(x, z)) ops.push({ op: 'fill', from: [x, y0 + 1, z], to: [x, y1 - 1, z], state: wall });
     }
 
-    // Cornice: a slab band ringing the wall just under the ceiling.
-    ops.push({ op: 'walls', from: [x0, y1 - 1, z0], to: [x1, y1 - 1, z1], state: cornice });
+    // Cornice: an INTERIOR slab ledge ringing the vault one cell inside the wall, just under
+    // the ceiling — it must NOT replace the perimeter wall's top course (a top-slab there left
+    // an open slit around the basement), so the structural wall stays full to the ceiling.
+    if (x1 - x0 > 2 && z1 - z0 > 2) ops.push({ op: 'walls', from: [x0 + 1, y1 - 1, z0 + 1], to: [x1 - 1, y1 - 1, z1 - 1], state: cornice });
 
     // Processional aisle: a bone runner straight down the centre of the floor.
     for (let z = z0 + 1; z <= z1 - 1; z++) if (fp.has(xm, z)) ops.push({ op: 'block', pos: [xm, y0, z], state: aisle });

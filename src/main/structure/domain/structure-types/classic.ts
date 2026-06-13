@@ -13,7 +13,7 @@
 // concrete blocks. The type ships its own `defaults` kit so it reads right even
 // under a sparse decoration.
 import type { AuthoringOp } from '../../authoring/types';
-import { DEFAULT_STOREY_H, planStoreys } from '@/shared/domain/storeys';
+import { planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
 import type { ParamValues } from '../params';
 import { insetHouseBox, yardFor } from '../surroundings';
@@ -23,18 +23,15 @@ import { addStairCore } from './stair-core';
 import { ceilingLanterns, chimneyBreast, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 
 /** The house's level plan for a box + params — ONE source shared by `build()` and
- *  `floors()` (the standard per-type pattern). The box is the whole envelope; levels
- *  stack inside it: an optional basement bottom storey, then the above-grade storeys
- *  (honouring explicit per-floor heights — the basement keeps the neutral +5 the
- *  composer's overhead budgets for it), then the roof reserve on top.
- *  `canPitch` mirrors whether the active roof block can pitch; `floors()` (which has no
- *  palette) uses the declared kit's default (stairs → true). */
+ *  `floors()` (the standard per-type pattern). The box is the house envelope ABOVE grade
+ *  (any basement is reserved + dug centrally by composeStructure, below this box); levels
+ *  stack inside it: the above-grade storeys (honouring explicit per-floor heights), then
+ *  the roof reserve on top. `canPitch` mirrors whether the active roof block can pitch;
+ *  `floors()` (which has no palette) uses the declared kit's default (stairs → true). */
 function plan(b: Box, params: ParamValues, floorHeights?: number[], canPitch = true) {
   const { y0, y1, W, D } = b;
   const floors = params.floors as number;
-  const hasBasement = (params.basement as string) !== 'none';
-  const belowLevels = hasBasement ? 1 : 0;
-  const storeyCount = belowLevels + floors;
+  const storeyCount = floors;
   const isFlat = (params.roof as string) === 'flat';
   const wantsPitched = !isFlat && canPitch;
   const roofRings = Math.max(1, Math.floor(Math.min(W, D) / 2));
@@ -46,10 +43,10 @@ function plan(b: Box, params: ParamValues, floorHeights?: number[], canPitch = t
     idealTop: y1 - roofReserve,
     maxWallTop: y1 - 2,
     floors: storeyCount,
-    floorHeights: floorHeights && hasBasement ? [DEFAULT_STOREY_H, ...floorHeights] : floorHeights,
+    floorHeights,
   });
   const wallTop = Math.min(ladder.wallTop, y1);
-  return { hasBasement, belowLevels, storeyCount, isFlat, slabYs: ladder.slabYs, wallTop };
+  return { storeyCount, isFlat, slabYs: ladder.slabYs, wallTop };
 }
 
 export const classic: StructureType = {
@@ -75,16 +72,10 @@ export const classic: StructureType = {
   pairedDecoration: 'cozy',
   params: {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
-    // Surfaced in Details as the separate "Basement" module select (category
-    // 'basement'), so it's omitted from the house's own param controls. The VALUE is the
-    // selected basement-MODULE id (the same namespace the Details select + the other
-    // archetypes' central basement path use), so a "Cellar" pick rides in as
-    // `basement:'cellar'` and `build()` delegates the vault to that module. ('none' = no
-    // basement.) Kept here so the legacy `template name:'classic'` path still resolves it.
-    basement: {
-      kind: 'enum', default: 'none', values: ['none', 'cellar', 'crypt', 'cult-temple'], label: 'Basement',
-      labels: { none: 'None', cellar: 'Cellar', crypt: 'Crypt', 'cult-temple': 'Cult temple' }, module: 'basement',
-    },
+    // The basement is the separate "Basement" module slot (category 'basement'), composed
+    // CENTRALLY by composeStructure for EVERY type (it reserves the box bottom, lays the
+    // vault stack and ladders it to the ground) — so classic no longer owns burial here, and
+    // a multi-level / enlarged basement works the same as for every other archetype.
     // Surfaced in Details as the separate "Attic" module select (category 'attic'), so it's
     // omitted from the house's own param controls — but kept here so the legacy
     // `template name:'classic'` build path still resolves it. The value is the attic-module
@@ -133,7 +124,6 @@ export const classic: StructureType = {
     const box = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
     const { x0, y0, z0, x1, y1, z1, W, D, H } = box;
     const floors = params.floors as number;
-    const basement = params.basement as string;
     const attic = params.attic as string;
     const balcony = params.balcony as string;
     const decay = params.decay as number;
@@ -178,14 +168,15 @@ export const classic: StructureType = {
 
     // --- Level plan (shared with floors() via plan()) ---------------------------
     const canPitch = palette.idOf('roof').endsWith('_stairs');
-    const { hasBasement, storeyCount, belowLevels, slabYs, wallTop } = plan(box, params, floorHeights, canPitch);
+    const { storeyCount, slabYs, wallTop } = plan(box, params, floorHeights, canPitch);
     // The cap this build actually lays — the kit GUARANTEE: a pitched pick that can't
     // fit (or can't pitch) still caps FLAT (deck + parapet), never a roofless shell.
     const roofForm = roofFormFor(isFlat ? 'flat' : roofPick === 'hip' ? 'hip' : 'gable', y1 - wallTop, canPitch);
     const hasAttic = attic !== 'none' && (roofForm === 'gable' || roofForm === 'hip') && y1 - wallTop >= 3;
 
-    // Floor-slab Y of each storey (bottom→top); index `groundIdx` is the ground floor.
-    const groundIdx = belowLevels;
+    // Floor-slab Y of each storey (bottom→top); the ground floor is the bottom one (any
+    // basement is reserved + dug below this box by composeStructure).
+    const groundIdx = 0;
     const groundY = slabYs[groundIdx];
 
     // --- Shell -----------------------------------------------------------------
@@ -195,16 +186,6 @@ export const classic: StructureType = {
     // the corner; the variety is in whether a post reads against it).
     if (cornerStyle !== 'flush') {
       ops.push(...cornerPosts([[x0, z0], [x0, z1], [x1, z0], [x1, z1]], y0, wallTop, corner));
-    }
-
-    // Below-grade level: DELEGATE the cellar room to the basement module (the single
-    // source of basement geometry — a self-contained stone undercroft with a distinct
-    // floor/ceiling, perimeter walls and lit support pillars). The house owns placement
-    // (it fills the building footprint, so force a rect footprint, the ceiling landing on
-    // the ground slab) + burial depth; the 'half' clerestory below and the stair-core
-    // descent stay the house's own concern. The module brings its own stone palette.
-    if (hasBasement && groundY - 1 >= y0 + 1) {
-      ops.push(...composeModule('basement', basement, [x0, y0, z0], [x1, groundY, z1], { shape: 'rect' }));
     }
 
     // Stone plinth: a cobblestone water-table course at the ground-storey base, so the
@@ -298,9 +279,10 @@ export const classic: StructureType = {
     // (The attic loft's own floor + light come from the delegated attic module above.)
 
     // --- Stair core: a 2-wide switchback in the back-right corner linking every
-    // WALKABLE storey (basement→ground→upper floors). The attic is reached by a
-    // ladder (inside addStairCore) so no flight ever pierces the roof. Emitted LAST so
-    // each flight's `clear` carves the stairwell hole through the slab above. ---------
+    // WALKABLE above-grade storey (ground→upper floors); any basement is reached by the
+    // central descent ladder. The attic is reached by a ladder (inside addStairCore) so no
+    // flight ever pierces the roof. Emitted LAST so each flight's `clear` carves the
+    // stairwell hole through the slab above. ---------
     addStairCore({
       ops,
       box: { x0, y0, z0, x1, y1, z1, W, D, H },
@@ -327,17 +309,15 @@ export const classic: StructureType = {
     }
     return ops;
   },
-  // Authoritative storeys, from the SAME plan() build() uses (basement → ground →
-  // uppers) — so the viewer bands / sidecar / stairwell pass see the laid planes.
+  // Authoritative ABOVE-GRADE storeys, from the SAME plan() build() uses — so the viewer
+  // bands / sidecar / stairwell pass see the laid planes. Any basement is reserved + dug
+  // below this box by composeStructure (the central path), like every other archetype.
   floors(outer: Box, params, floorHeights, surroundSizing): FloorPlanEntry[] {
     // The SAME house-box inset build() applies: a surroundings ring narrows the footprint.
     const yard = yardFor(outer, params, surroundSizing);
     const b = yard ? insetHouseBox(outer, yard, surroundSizing) : outer;
-    const { hasBasement, slabYs, wallTop } = plan(b, params, floorHeights);
-    const entries = storeyEntries(slabYs, wallTop);
-    return hasBasement
-      ? entries.map((e, i) => ({ ...e, role: i === 0 ? ('basement' as const) : i === 1 ? ('ground' as const) : ('upper' as const) }))
-      : entries;
+    const { slabYs, wallTop } = plan(b, params, floorHeights);
+    return storeyEntries(slabYs, wallTop);
   },
 };
 

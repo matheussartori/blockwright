@@ -19,6 +19,7 @@ import { runGeneration } from '../../state/generation';
 import { usePlanner, useT, useLocale, useActiveDoc } from '../../hooks/useStores';
 import { api } from '../../api';
 import {
+  basementAreaOf,
   buildBrief,
   buildSelection,
   buildSummary,
@@ -34,6 +35,9 @@ import {
   addRoom,
   removeRoomAt,
   setBandHeight,
+  setBasementArea,
+  setBasementLevelHeight,
+  setBasementLevels,
   setDetailField,
   setDetailParam,
   setDetailSize,
@@ -96,6 +100,20 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
     (band: BandKey, value: number) => plannerStore.getState().setDetails((d) => setBandHeight(d, band, value)),
     [],
   );
+  const onBasementLevels = useCallback(
+    (n: number) => plannerStore.getState().setDetails((d) => setBasementLevels(d, n)),
+    [],
+  );
+  const onBasementLevelHeight = useCallback(
+    (index: number, value: number, linked: boolean) =>
+      plannerStore.getState().setDetails((d) => setBasementLevelHeight(d, index, value, linked)),
+    [],
+  );
+  const onBasementArea = useCallback(
+    (axis: 'w' | 'd', value: number, base: { w: number; d: number }) =>
+      plannerStore.getState().setDetails((d) => setBasementArea(d, axis, value, base)),
+    [],
+  );
   const onAddRoom = useCallback(
     (floor: number, id: string) => {
       const ps = plannerStore.getState();
@@ -141,6 +159,10 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
   const sz = details.structureType ? effectiveSize(details, selStruct) : null;
   const overheads = details.structureType ? previewOverheads(details, selStruct) : null;
   const surround = details.structureType ? surroundRing(details, selStruct) : null;
+  // The basement footprint, drawn at scale in the preview only when enlarged past the house.
+  const basementArea = details.structureType ? basementAreaOf(details, selStruct) : null;
+  const basementSize =
+    basementArea && sz && (basementArea.w > sz.w || basementArea.d > sz.d) ? basementArea : null;
   const perFloor = !!details.floorHeights?.length;
   const title = inline ? (isEdit ? t('planner.advancedTitle') : t('planner.newTitle')) : t('planner.advancedTitle');
   const cta = isEdit ? t('planner.generateEdit') : t('planner.generate');
@@ -187,6 +209,9 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onFloorHeight={onFloorHeight}
             onBandHeight={onBandHeight}
             onSurroundSize={onSurroundSize}
+            onBasementLevels={onBasementLevels}
+            onBasementLevelHeight={onBasementLevelHeight}
+            onBasementArea={onBasementArea}
             onAddRoom={onAddRoom}
             onRemoveRoom={onRemoveRoom}
           />
@@ -228,11 +253,12 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
                 floors={details.floorHeights}
                 overheads={overheads}
                 surround={surround}
-                onBandHeight={
-                  perFloor
-                    ? (band, v) => (typeof band === 'number' ? onFloorHeight(band, v, false) : onBandHeight(band, v))
-                    : undefined
-                }
+                basementSize={basementSize}
+                onBandHeight={(band, v) => {
+                  if (typeof band === 'number') return perFloor ? onFloorHeight(band, v, false) : undefined;
+                  if (band === 'attic') return onBandHeight('attic', v);
+                  onBasementLevelHeight(Number(band.slice('basement:'.length)), v, false);
+                }}
               />
               <div className="planner-preview-caption">
                 <span className="planner-dims">

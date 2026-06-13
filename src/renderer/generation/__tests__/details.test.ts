@@ -7,6 +7,9 @@ import {
   assignRoom,
   removeRoomAt,
   setBandHeight,
+  setBasementArea,
+  setBasementLevelHeight,
+  setBasementLevels,
   setDetailField,
   setDetailParam,
   setDetailSize,
@@ -171,17 +174,47 @@ describe('setFloorHeight', () => {
 });
 
 describe('setBandHeight', () => {
-  it('sizes the picked basement/attic band, clamped to the 5-block rule', () => {
-    const d = details({ basement: 'cellar', attic: 'storage' });
-    expect(setBandHeight(d, 'basement', 8).basementH).toBe(8);
+  it('sizes the picked attic band, clamped to the 5-block rule', () => {
+    const d = details({ attic: 'storage' });
+    expect(setBandHeight(d, 'attic', 8).atticH).toBe(8);
     expect(setBandHeight(d, 'attic', 3).atticH).toBe(MIN_FLOOR_H);
   });
-  it('is a no-op when that slot is not picked', () => {
-    expect(setBandHeight(EMPTY_DETAILS, 'basement', 8)).toBe(EMPTY_DETAILS);
+  it('is a no-op when the attic slot is not picked', () => {
+    expect(setBandHeight(EMPTY_DETAILS, 'attic', 8)).toBe(EMPTY_DETAILS);
   });
-  it('a cleared slot drops its custom band height', () => {
-    const d = details({ basement: 'cellar', basementH: 8 });
-    expect(setDetailField(d, 'basement', '').basementH).toBeNull();
+  it('a cleared attic drops its custom band height', () => {
+    const d = details({ attic: 'storage', atticH: 8 });
+    expect(setDetailField(d, 'attic', '').atticH).toBeNull();
+  });
+});
+
+describe('basement sizing', () => {
+  it('picking a basement seeds a single default level; clearing it drops the sizing', () => {
+    const picked = setDetailField(EMPTY_DETAILS, 'basement', 'cellar');
+    expect(picked.basementHeights).toHaveLength(1);
+    const cleared = setDetailField(picked, 'basement', '');
+    expect(cleared.basementHeights).toBeNull();
+    expect(cleared.basementArea).toBeNull();
+  });
+  it('setBasementLevels grows/shrinks the per-level heights, capped at 4', () => {
+    const d = details({ basement: 'cellar', basementHeights: [6] });
+    expect(setBasementLevels(d, 3).basementHeights).toEqual([6, 6, 6]);
+    expect(setBasementLevels(d, 9).basementHeights).toHaveLength(4);
+    expect(setBasementLevels(details({ basement: 'cellar', basementHeights: [6, 7, 8] }), 1).basementHeights).toEqual([6]);
+  });
+  it('setBasementLevelHeight clamps to the 5-block rule and respects the link', () => {
+    const d = details({ basement: 'cellar', basementHeights: [6, 6] });
+    expect(setBasementLevelHeight(d, 0, 3, false).basementHeights).toEqual([MIN_FLOOR_H, 6]);
+    expect(setBasementLevelHeight(d, 0, 9, true).basementHeights).toEqual([9, 9]);
+  });
+  it('setBasementArea stores an explicit footprint, clamped', () => {
+    const d = details({ basement: 'cellar', basementHeights: [5] });
+    expect(setBasementArea(d, 'w', 20, { w: 11, d: 11 }).basementArea).toEqual({ w: 20, d: 11 });
+    expect(setBasementArea(d, 'w', SIZE_MAX + 99, { w: 11, d: 11 }).basementArea?.w).toBe(SIZE_MAX);
+  });
+  it('the basement reducers are a no-op when no basement is picked', () => {
+    expect(setBasementLevels(EMPTY_DETAILS, 3)).toBe(EMPTY_DETAILS);
+    expect(setBasementArea(EMPTY_DETAILS, 'w', 20, { w: 11, d: 11 })).toBe(EMPTY_DETAILS);
   });
 });
 

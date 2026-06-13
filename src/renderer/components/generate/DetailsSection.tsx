@@ -15,15 +15,18 @@ import { modulesConflict } from '@/shared/domain/conflicts';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import {
   type BuildDetails,
+  MAX_BASEMENT_LEVELS,
   MAX_STOREY_H,
   MIN_FLOOR_H,
+  basementAreaOf,
+  basementHeightsOf,
   effectiveSize,
   floorCount,
   maxRoomsForStructure,
   previewOverheads,
   surroundRing,
 } from '../../generation/brief';
-import type { BandKey, DetailField, SizeBox } from '../../generation/details';
+import { type BandKey, type DetailField, type SizeBox, SIZE_MAX, SIZE_MIN } from '../../generation/details';
 import {
   type SurroundSizing,
   SURROUND_MARGIN_MAX,
@@ -32,6 +35,7 @@ import {
 } from '@/shared/domain/surroundings';
 import type { ChipOption } from './chips';
 import { Select, type SelectOption } from '../ui/Select';
+import { Stepper } from '../ui/Stepper';
 import { FloorStack } from './FloorStack';
 import { ATTIC_COLOR, BASEMENT_COLOR } from './BuildScalePreview';
 import type { TFunction } from '@/shared/i18n';
@@ -50,6 +54,9 @@ interface Props {
   onFloorHeight: (index: number, value: number, linked: boolean) => void;
   onBandHeight: (band: BandKey, value: number) => void;
   onSurroundSize: (sizing: SurroundSizing | null) => void;
+  onBasementLevels: (n: number) => void;
+  onBasementLevelHeight: (index: number, value: number, linked: boolean) => void;
+  onBasementArea: (axis: 'w' | 'd', value: number, base: { w: number; d: number }) => void;
   onAddRoom: (floor: number, id: string) => void;
   onRemoveRoom: (floor: number, index: number) => void;
 }
@@ -65,6 +72,9 @@ export function DetailsSection({
   onFloorHeight,
   onBandHeight,
   onSurroundSize,
+  onBasementLevels,
+  onBasementLevelHeight,
+  onBasementArea,
   onAddRoom,
   onRemoveRoom,
 }: Props) {
@@ -183,22 +193,16 @@ export function DetailsSection({
 
       {(selStruct?.params ?? []).map((p) =>
         p.kind === 'int' ? (
-          <div className="gen-chip-group" key={p.name}>
+          <div className="gen-chip-group gen-chip-row" key={p.name}>
             <span className="gen-chip-label">{p.label}</span>
-            <div className="gen-stepper">
-              <input
-                type="number"
-                min={p.min}
-                max={p.max}
-                value={Number(details.params[p.name] ?? p.default)}
-                disabled={busy}
-                onChange={(e) => {
-                  const n = Math.trunc(Number(e.target.value));
-                  onParam(p.name, Math.max(p.min, Math.min(p.max, Number.isFinite(n) ? n : p.default)));
-                }}
-              />
-              <span className="gen-stepper-range">{p.min}–{p.max}</span>
-            </div>
+            <Stepper
+              value={Number(details.params[p.name] ?? p.default)}
+              min={p.min}
+              max={p.max}
+              disabled={busy}
+              ariaLabel={p.label}
+              onChange={(n) => onParam(p.name, n)}
+            />
           </div>
         ) : (
           <div className="gen-chip-group" key={p.name}>
@@ -227,6 +231,18 @@ export function DetailsSection({
         onBandHeight={onBandHeight}
       />
 
+      {!!details.basement && details.basement !== 'none' && (
+        <BasementSection
+          details={details}
+          struct={selStruct}
+          busy={busy}
+          t={t}
+          onBasementLevels={onBasementLevels}
+          onBasementLevelHeight={onBasementLevelHeight}
+          onBasementArea={onBasementArea}
+        />
+      )}
+
       {!!details.surroundings && details.surroundings !== 'none' && (
         <YardSizeSection ring={surroundRing(details, selStruct)} busy={busy} t={t} onSurroundSize={onSurroundSize} />
       )}
@@ -249,12 +265,13 @@ export function DetailsSection({
   );
 }
 
-/** The build-size controls: the W/D box plus the per-storey height stack. The old Total ⇄
- *  Per floor switch is gone — a storeyed structure is ALWAYS sized per floor (one input per
- *  storey with a chain toggle: linked = raise one, raise all), bracketed by a Basement row
- *  below and an Attic row on top when those slots are picked (the attic is the topmost band —
- *  it owns the whole attic + roof zone), with the total height read out as the derived sum. A
- *  non-storeyed structure just gets a single H field. */
+/** The build-size controls: the house FOOTPRINT box plus the per-storey height stack. Two
+ *  boxed sub-panels with comfortable +/- {@link Stepper}s (no more tiny native spinner
+ *  arrows): a Footprint card (W × D, plus H for a non-storeyed type) and — for a storeyed
+ *  structure — a Stories card with one stepper per above-ground floor (a chain toggle moves
+ *  them together) topped by an Attic row when picked (the attic owns the whole attic + roof
+ *  zone), with the total height read out as the derived sum. The basement is sized in its own
+ *  {@link BasementSection} below. */
 function SizeSection({
   details,
   sz,
@@ -280,11 +297,11 @@ function SizeSection({
 }) {
   const heights = details.floorHeights;
   const perFloor = !!heights && heights.length > 0;
-  const axes: (keyof SizeBox)[] = perFloor ? ['w', 'd'] : ['w', 'd', 'h'];
+  const footprintAxes: (keyof SizeBox)[] = perFloor ? ['w', 'd'] : ['w', 'd', 'h'];
   const axisLabel = (a: keyof SizeBox) => (a === 'w' ? t('gen.width') : a === 'd' ? t('gen.depth') : t('gen.height'));
 
   return (
-    <div className="gen-chip-group">
+    <div className="gen-chip-group gen-size-section">
       <div className="gen-size-head">
         <span className="gen-chip-label">
           {t('gen.sizeLabel')}
@@ -292,27 +309,30 @@ function SizeSection({
         </span>
       </div>
 
-      <div className="gen-size">
-        {axes.map((axis) => (
-          <label key={axis} className="gen-size-axis">
-            <span>{axisLabel(axis)[0]}</span>
-            <input
-              type="number"
-              min={3}
-              max={64}
+      {/* Footprint card — the house W × D (and H for a non-storeyed type). */}
+      <div className="gen-size-card">
+        <span className="gen-size-card-head">{t('gen.footprintLabel')}</span>
+        {footprintAxes.map((axis) => (
+          <div key={axis} className="gen-size-row">
+            <span className="gen-size-row-tag">{axisLabel(axis)}</span>
+            <Stepper
               value={sz[axis]}
+              min={SIZE_MIN}
+              max={SIZE_MAX}
               disabled={busy}
-              title={axisLabel(axis)}
-              onChange={(e) => onSize(axis, Math.trunc(Number(e.target.value)) || sz[axis], sz)}
+              ariaLabel={axisLabel(axis)}
+              size="sm"
+              onChange={(n) => onSize(axis, n, sz)}
             />
-          </label>
+          </div>
         ))}
       </div>
 
+      {/* Stories card — per-floor heights (above ground) + the attic band, with the chain. */}
       {perFloor && heights && (
-        <div className="gen-floor-heights">
-          <div className="gen-floor-heights-head">
-            <span className="gen-chip-label">{t('gen.height')}</span>
+        <div className="gen-size-card">
+          <div className="gen-size-card-headrow">
+            <span className="gen-size-card-head">{t('gen.storiesLabel')}</span>
             <button
               type="button"
               className={`gen-link-toggle${linked ? ' on' : ''}`}
@@ -325,56 +345,42 @@ function SizeSection({
               {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
             </button>
           </div>
-          {details.basement && (
-            <label className="gen-floor-height">
-              <span className="gen-floor-height-tag">
-                <span className="planner-legend-dot" style={{ background: BASEMENT_COLOR }} />
-                {t('gen.fieldBasement')}
-              </span>
-              <input
-                type="number"
-                min={MIN_FLOOR_H}
-                max={MAX_STOREY_H}
-                value={overheads.basement}
-                disabled={busy}
-                onChange={(e) => onBandHeight('basement', Math.trunc(Number(e.target.value)) || overheads.basement)}
-              />
-            </label>
-          )}
           {heights.map((h, i) => (
-            <label key={i} className="gen-floor-height">
-              <span className="gen-floor-height-tag">
+            <div key={i} className="gen-size-row">
+              <span className="gen-size-row-tag">
                 {t('gen.roomFloor')} {i + 1}
               </span>
-              <input
-                type="number"
+              <Stepper
+                value={h}
                 min={MIN_FLOOR_H}
                 max={MAX_STOREY_H}
-                value={h}
                 disabled={busy}
-                onChange={(e) => onFloorHeight(i, Math.trunc(Number(e.target.value)) || h, linked)}
+                ariaLabel={`${t('gen.roomFloor')} ${i + 1}`}
+                size="sm"
+                onChange={(n) => onFloorHeight(i, n, linked)}
               />
-            </label>
+            </div>
           ))}
           {details.attic && (
-            <label className="gen-floor-height">
-              <span className="gen-floor-height-tag">
+            <div className="gen-size-row">
+              <span className="gen-size-row-tag">
                 <span className="planner-legend-dot" style={{ background: ATTIC_COLOR }} />
                 {t('gen.fieldAttic')}
               </span>
-              <input
-                type="number"
+              <Stepper
+                value={overheads.attic}
                 min={MIN_FLOOR_H}
                 max={MAX_STOREY_H}
-                value={overheads.attic}
                 disabled={busy}
-                onChange={(e) => onBandHeight('attic', Math.trunc(Number(e.target.value)) || overheads.attic)}
+                ariaLabel={t('gen.fieldAttic')}
+                size="sm"
+                onChange={(n) => onBandHeight('attic', n)}
               />
-            </label>
+            </div>
           )}
-          <div className="gen-floor-heights-total">
+          <div className="gen-size-total">
             <span>{t('gen.totalHeightLabel')}</span>
-            <span className="gen-floor-heights-total-val">{sz.h}</span>
+            <span className="gen-size-total-val">{sz.h}</span>
           </div>
         </div>
       )}
@@ -382,8 +388,109 @@ function SizeSection({
   );
 }
 
+/** The basement-size controls (shown only when a basement module is picked): a card with a
+ *  LEVELS stepper (how many storeys to dig, 1..{@link MAX_BASEMENT_LEVELS}), one per-level
+ *  HEIGHT stepper (B1 = the level just under the ground, deeper levels below; a chain toggle
+ *  links them), and a FOOTPRINT W × D pair (the basement's own area — enlarging it past the
+ *  house grows the compiled box and excavates the undercroft beyond the house walls). */
+function BasementSection({
+  details,
+  struct,
+  busy,
+  t,
+  onBasementLevels,
+  onBasementLevelHeight,
+  onBasementArea,
+}: {
+  details: BuildDetails;
+  struct: GenerationModule | undefined;
+  busy: boolean;
+  t: T;
+  onBasementLevels: (n: number) => void;
+  onBasementLevelHeight: (index: number, value: number, linked: boolean) => void;
+  onBasementArea: (axis: 'w' | 'd', value: number, base: { w: number; d: number }) => void;
+}) {
+  const [linked, setLinked] = useState(true);
+  const levels = basementHeightsOf(details);
+  const area = basementAreaOf(details, struct) ?? { w: SIZE_MIN, d: SIZE_MIN };
+
+  return (
+    <div className="gen-chip-group gen-size-section">
+      <div className="gen-size-head">
+        <span className="gen-chip-label">
+          <span className="planner-legend-dot" style={{ background: BASEMENT_COLOR }} />
+          {t('gen.fieldBasement')}
+        </span>
+      </div>
+
+      <div className="gen-size-card">
+        <div className="gen-size-row">
+          <span className="gen-size-row-tag">{t('gen.basementLevels')}</span>
+          <Stepper
+            value={levels.length}
+            min={1}
+            max={MAX_BASEMENT_LEVELS}
+            disabled={busy}
+            ariaLabel={t('gen.basementLevels')}
+            size="sm"
+            onChange={onBasementLevels}
+          />
+        </div>
+        <div className="gen-size-card-headrow gen-size-card-subhead">
+          <span className="gen-size-card-head">{t('gen.height')}</span>
+          {levels.length > 1 && (
+            <button
+              type="button"
+              className={`gen-link-toggle${linked ? ' on' : ''}`}
+              aria-pressed={linked}
+              disabled={busy}
+              title={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
+              aria-label={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
+              onClick={() => setLinked(!linked)}
+            >
+              {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
+            </button>
+          )}
+        </div>
+        {levels.map((h, i) => (
+          <div key={i} className="gen-size-row">
+            <span className="gen-size-row-tag">{t('gen.basementLevelTag').replace('{n}', String(i + 1))}</span>
+            <Stepper
+              value={h}
+              min={MIN_FLOOR_H}
+              max={MAX_STOREY_H}
+              disabled={busy}
+              ariaLabel={t('gen.basementLevelTag').replace('{n}', String(i + 1))}
+              size="sm"
+              onChange={(n) => onBasementLevelHeight(i, n, linked)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="gen-size-card">
+        <span className="gen-size-card-head">{t('gen.basementFootprint')}</span>
+        {(['w', 'd'] as const).map((axis) => (
+          <div key={axis} className="gen-size-row">
+            <span className="gen-size-row-tag">{axis === 'w' ? t('gen.width') : t('gen.depth')}</span>
+            <Stepper
+              value={area[axis]}
+              min={SIZE_MIN}
+              max={SIZE_MAX}
+              disabled={busy}
+              ariaLabel={axis === 'w' ? t('gen.width') : t('gen.depth')}
+              size="sm"
+              onChange={(n) => onBasementArea(axis, n, area)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** The surroundings yard-size control (shown only when a surroundings ring is picked) —
- *  the SAME boxed number-stepper panel as the per-floor heights. Two manual cell inputs:
+ *  the SAME boxed card as the height/footprint panels. Two manual cell {@link Stepper}s:
  *  yard WIDTH (the X / side margins, each side) and yard DEPTH (the Z / front+back margins),
  *  nudged in {@link SURROUND_MARGIN_STEP}-cell steps. The values shown are the current ring
  *  margins (the auto, footprint-scaled ones until the user edits, then their explicit
@@ -401,43 +508,43 @@ function YardSizeSection({
 }) {
   if (!ring) return null;
   return (
-    <div className="gen-chip-group gen-yard-size">
-      <div className="gen-floor-heights">
-        <div className="gen-floor-heights-head">
-          <span className="gen-chip-label">{t('gen.fieldYardSize')}</span>
-        </div>
-        <label className="gen-floor-height">
-          <span className="gen-floor-height-tag">{t('gen.yardWidth')}</span>
-          <input
-            type="number"
-            min={SURROUND_MARGIN_MIN}
-            max={SURROUND_MARGIN_MAX}
-            step={SURROUND_MARGIN_STEP}
+    <div className="gen-chip-group gen-size-section gen-yard-size">
+      <div className="gen-size-head">
+        <span className="gen-chip-label">
+          <span className="planner-legend-dot" style={{ background: 'var(--surround-dot, #4f9e5a)' }} />
+          {t('gen.fieldYardSize')}
+        </span>
+      </div>
+      <div className="gen-size-card">
+        <div className="gen-size-row">
+          <span className="gen-size-row-tag">{t('gen.yardWidth')}</span>
+          <Stepper
             value={ring.side}
-            disabled={busy}
-            onChange={(e) =>
-              onSurroundSize({ side: Math.trunc(Number(e.target.value)) || ring.side, front: ring.front, back: ring.back })
-            }
-          />
-        </label>
-        <label className="gen-floor-height">
-          <span className="gen-floor-height-tag">{t('gen.yardDepth')}</span>
-          <input
-            type="number"
             min={SURROUND_MARGIN_MIN}
             max={SURROUND_MARGIN_MAX}
             step={SURROUND_MARGIN_STEP}
-            value={ring.front}
             disabled={busy}
-            onChange={(e) => {
-              const z = Math.trunc(Number(e.target.value)) || ring.front;
-              onSurroundSize({ side: ring.side, front: z, back: z });
-            }}
+            ariaLabel={t('gen.yardWidth')}
+            size="sm"
+            onChange={(n) => onSurroundSize({ side: n, front: ring.front, back: ring.back })}
           />
-        </label>
-        <div className="gen-floor-heights-total">
+        </div>
+        <div className="gen-size-row">
+          <span className="gen-size-row-tag">{t('gen.yardDepth')}</span>
+          <Stepper
+            value={ring.front}
+            min={SURROUND_MARGIN_MIN}
+            max={SURROUND_MARGIN_MAX}
+            step={SURROUND_MARGIN_STEP}
+            disabled={busy}
+            ariaLabel={t('gen.yardDepth')}
+            size="sm"
+            onChange={(n) => onSurroundSize({ side: ring.side, front: n, back: n })}
+          />
+        </div>
+        <div className="gen-size-total">
           <span>{t('gen.yardRingHint')}</span>
-          <span className="gen-floor-heights-total-val">{ring.side * 2 + ring.front + ring.back}</span>
+          <span className="gen-size-total-val">{ring.side * 2 + ring.front + ring.back}</span>
         </div>
       </div>
     </div>

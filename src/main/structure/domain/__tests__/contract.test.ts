@@ -153,6 +153,60 @@ describe('cross-type INVARIANTS: every house × roof × basement ships a real, c
     }
   });
 
+  it('digs a MULTI-LEVEL, ENLARGED basement for every type — stacked, ladder-linked, no warnings', () => {
+    for (const id of structureTypeIds()) {
+      // A tall box so two 6-deep levels + the house fit; a basement footprint WIDER than
+      // the house, so the undercroft is excavated beyond the walls and the house centred.
+      const size: [number, number, number] = [25, 26, 17];
+      const params: Record<string, unknown> = {
+        floors: 2,
+        seed: 5,
+        basement: 'cellar',
+        basementHeights: [6, 6],
+        basementArea: { w: 23, d: 15 },
+        shellSize: { w: 13, d: 11 },
+      };
+      const authoring: AuthoringStructure = {
+        DataVersion: 3955,
+        size,
+        palette: [{ Name: 'minecraft:air' }],
+        ops: [{ op: 'template', name: id, from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params }],
+      };
+      const resolved = resolveBlocks(authoring);
+      const label = `${id} multi-level enlarged basement`;
+      // Nothing the params asked for was silently dropped.
+      expect(resolved.warnings, `${label}: warnings`).toEqual([]);
+      // ONE continuous descent ladder links the deepest level UP to the ground floor (not a
+      // stray run that stops mid-way) — the climb reaches the house. Depth 12 + 1 ceiling
+      // layer (footprint > house) → groundY = 13.
+      const ladderYs = resolved.blocks
+        .filter((b) => /:ladder$/.test(resolved.palette[b.state]?.Name ?? ''))
+        .map((b) => b.pos[1]);
+      expect(ladderYs.length, `${label}: descent ladder`).toBeGreaterThan(0);
+      expect(Math.min(...ladderYs), `${label}: ladder starts at the bottom level`).toBeLessThanOrEqual(2);
+      expect(Math.max(...ladderYs), `${label}: ladder reaches the ground floor`).toBeGreaterThanOrEqual(13);
+      const solid = new Set(
+        resolved.blocks
+          .filter((b) => resolved.palette[b.state]?.Name && resolved.palette[b.state]?.Name !== 'minecraft:air')
+          .map((b) => b.pos.join(',')),
+      );
+      // The basement is excavated WIDER than the centred house: there's solid stone out at
+      // the basement's own edge (x just inside the 23-wide footprint), below grade.
+      let belowGradeWide = false;
+      const edgeX = Math.floor((size[0] - 23) / 2) + 1; // just inside the basement footprint
+      for (let y = 1; y < 12 && !belowGradeWide; y++) {
+        for (let z = 2; z < 15 && !belowGradeWide; z++) {
+          if (solid.has(`${edgeX},${y},${z}`)) belowGradeWide = true;
+        }
+      }
+      expect(belowGradeWide, `${label}: basement wider than house`).toBe(true);
+      // A DEDICATED ceiling deck (the extra layer): the vault top at groundY-1 (y=12) is solid
+      // across the footprint, distinct from the ground plane at groundY (y=13) above it, so
+      // re-blocking the ceiling never touches the yard/terrain fused on top.
+      expect(solid.has(`${edgeX},12,8`), `${label}: dedicated vault ceiling deck`).toBe(true);
+    }
+  });
+
   it('a pick that genuinely cannot fit WARNS instead of vanishing (the old silent-skip defect)', () => {
     // A box too short to bury a crypt below the gothic manor → the central composer
     // refuses it loudly, with actionable text.

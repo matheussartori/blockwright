@@ -167,15 +167,22 @@ describe('previewOverheads', () => {
     expect(ov.roof).toBe(0); // nothing sits above the attic
   });
   it('honours the user-sized basement/attic bands', () => {
-    const d = details({ structureType: 'house', basement: 'cellar', attic: 'loft', basementH: 7, atticH: 5 });
+    const d = details({ structureType: 'house', basement: 'cellar', attic: 'loft', basementHeights: [7], atticH: 5 });
     const ov = previewOverheads(d, houseModule);
     expect(ov.basement).toBe(7);
+    expect(ov.basementLevels).toEqual([7]);
     expect(ov.attic).toBe(5);
     expect(ov.roof).toBe(0);
   });
+  it('sums the per-level depths for a multi-level basement', () => {
+    const d = details({ structureType: 'house', basement: 'cellar', basementHeights: [6, 7] });
+    const ov = previewOverheads(d, houseModule);
+    expect(ov.basement).toBe(13);
+    expect(ov.basementLevels).toEqual([6, 7]);
+  });
   it('custom bands drive the per-floor total height', () => {
     const base = details({ structureType: 'house', params: { floors: 2 }, basement: 'cellar', floorHeights: [5, 5] });
-    const sized = { ...base, basementH: 8 };
+    const sized = { ...base, basementHeights: [8] };
     expect(effectiveSize(sized, houseModule).h - effectiveSize(base, houseModule).h).toBe(3);
   });
 });
@@ -188,6 +195,12 @@ describe('buildBoxSize', () => {
   it('expands the shell footprint by the ring margins (modern: +8 W, +12 D), height untouched', () => {
     const d = details({ structureType: 'house', surroundings: 'modern', size: { w: 15, d: 13, h: 13 } });
     expect(buildBoxSize(d, houseModule)).toEqual({ w: 23, d: 25, h: 13 });
+  });
+  it('grows W/D to fit an enlarged basement footprint (the house stays its size, centered)', () => {
+    const d = details({ structureType: 'house', basement: 'cellar', basementArea: { w: 21, d: 9 }, size: { w: 15, d: 13, h: 13 } });
+    const box = buildBoxSize(d, houseModule);
+    expect(box.w).toBe(21); // grew to the basement width
+    expect(box.d).toBe(13); // basement depth 9 < house 13 → unchanged
   });
 });
 

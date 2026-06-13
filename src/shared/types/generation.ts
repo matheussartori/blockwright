@@ -33,6 +33,23 @@ export type BuildSelection = Partial<Record<ModuleSlotKey, string>> & {
    *  is picked. Threaded so a code-built shell grows its yard to exactly this footprint and
    *  the house/yard split agrees with the renderer's preview. */
   surroundSizing?: { side: number; front: number; back: number };
+  /** How many below-grade levels the picked basement is dug to (1..MAX_BASEMENT_LEVELS).
+   *  Present only when a basement module is selected; derived from `basementHeights.length`. */
+  basementLevels?: number;
+  /** The user's explicit per-level basement heights (slab-to-slab, top-down: index 0 is the
+   *  level directly beneath the ground floor). Threaded so the code-built shell digs exactly
+   *  this many levels at these depths. Present only when a basement is selected. */
+  basementHeights?: number[];
+  /** The basement FOOTPRINT in cells — its own W×D, independent of the house above. When
+   *  larger than the house the compiled box grows in X/Z and the basement is excavated
+   *  beyond the house walls (the house stays centered over it). Present only when a basement
+   *  is selected; defaults to the house footprint when the user hasn't enlarged it. */
+  basementArea?: { w: number; d: number };
+  /** The HOUSE SHELL footprint [w, d] before any surroundings/basement growth (the user's
+   *  W×D). Threaded so a code-built shell can CENTER the house within a box the basement
+   *  footprint grew wider — present only when an enlarged basement made the box exceed the
+   *  house+yard, so the common case stays untouched. */
+  shellSize?: { w: number; d: number };
 };
 
 /** A display-ready build card shown in the chat. On the USER message it summarises

@@ -32,6 +32,15 @@ export interface ShellSeedOptions {
   /** The selected basement-module id (cellar/crypt/cult-temple), threaded so the shell
    *  digs the chosen below-grade vault — composed centrally by `composeStructure`. */
   basement?: string;
+  /** The user's explicit per-LEVEL basement heights (top-down), threaded so the shell digs
+   *  exactly that many below-grade levels at those depths. */
+  basementHeights?: number[];
+  /** The basement FOOTPRINT [w, d] when enlarged past the house, threaded so the vault is
+   *  excavated to that area (the `size` already grew to contain it). */
+  basementArea?: { w: number; d: number };
+  /** The house SHELL footprint [w, d] (un-grown W/D), threaded so the shell centres the
+   *  house when an enlarged basement grew the box wider. */
+  shellSize?: { w: number; d: number };
   /** The selected surroundings-module id, threaded so the shell wraps the house in its
    *  yard ring (the `size` already includes the ring margins — see
    *  `shared/domain/surroundings.ts`; the type insets its massing by the same margins). */
@@ -70,7 +79,7 @@ export interface ShellSeed {
  * @returns A {@link ShellSeed}: the preamble plus the locked shell cells.
  */
 export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promise<ShellSeed> {
-  const { structureType, decoration, size, roof, basement, surroundings, surroundSizing, floorHeights, floors } = opts;
+  const { structureType, decoration, size, roof, basement, basementHeights, basementArea, shellSize, surroundings, surroundSizing, floorHeights, floors } = opts;
   const type = structureType ? getStructureType(structureType) : undefined;
   if (!type || !type.seedShell) return { preamble: '' };
 
@@ -86,7 +95,17 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   if (roof) params.roof = roof;
   // The basement-module id rides in as `params.basement`; composeStructure reserves the
   // bottom of the box for it and ladders it to the ground floor (central, per-type-free).
-  if (basement && basement !== 'none') params.basement = basement;
+  // The per-level depths + an enlarged footprint ride along so the central path digs the
+  // exact stack the user sized; the house shell size lets it centre the house when the
+  // basement grew the box wider than the house.
+  if (basement && basement !== 'none') {
+    params.basement = basement;
+    if (basementHeights?.length) params.basementHeights = basementHeights;
+    if (basementArea) params.basementArea = basementArea;
+    // The un-grown house shell lets composeStructure centre the house when the basement
+    // footprint grew the box wider than the house + yard.
+    if (shellSize) params.shellSize = shellSize;
+  }
   // The surroundings-module id doubles as the structure's `surroundings` param value, so
   // the type insets its massing and delegates the yard ring around it.
   if (surroundings && surroundings !== 'none') params.surroundings = surroundings;

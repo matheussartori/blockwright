@@ -214,6 +214,11 @@ export const en = {
   'gen.yardDepth': 'Depth (Z)',
   'gen.yardRingHint': 'Yard footprint',
   'gen.totalHeightLabel': 'Total height',
+  'gen.footprintLabel': 'Footprint',
+  'gen.storiesLabel': 'Floor heights',
+  'gen.basementLevels': 'Levels',
+  'gen.basementLevelTag': 'Sub-level {n}',
+  'gen.basementFootprint': 'Footprint',
   'gen.floorPlan': 'Floor plan',
   'gen.floorPlanHint':
     'Auto-detected from the build — adjust a name, its Y range, or type if a storey was read wrong (y=0 is the ground). The ranges are highlighted in the viewer and sent as context, so you can say “redo the basement”.',

@@ -9,10 +9,13 @@ import { presetForScale, scaleForArea } from '@/shared/domain/furnishing';
 import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 import {
   ATTIC_OVERHEAD,
-  BASEMENT_OVERHEAD,
+  DEFAULT_BASEMENT_H,
   DEFAULT_STOREY_H,
+  MAX_BASEMENT_LEVELS,
   MAX_STOREY_H,
   MIN_FLOOR_H,
+  basementCeilingLayer,
+  basementDepth,
   heightOverhead,
 } from '@/shared/domain/storeys';
 import {
@@ -46,10 +49,15 @@ export type BuildDetails = Record<ModuleSlotKey, string> & {
    *  user can make a tall ground floor over a low upper one. Length tracks the `floors`
    *  param (see `setDetailParam`). */
   floorHeights: number[] | null;
-  /** Height of the picked BASEMENT band (cells), or `null` for the default
-   *  ({@link BASEMENT_OVERHEAD}). Edited in the per-floor Height panel; only meaningful
-   *  while a basement is picked and per-floor mode is on. */
-  basementH: number | null;
+  /** Per-LEVEL basement heights (cells, top-down: index 0 is the level directly beneath
+   *  the ground floor), or `null` for the default (a single {@link DEFAULT_BASEMENT_H}
+   *  level). The array length is the level count (1..{@link MAX_BASEMENT_LEVELS}). Only
+   *  meaningful while a basement is picked. */
+  basementHeights: number[] | null;
+  /** The basement FOOTPRINT [w, d] in cells, or `null` to match the house footprint. When
+   *  larger than the house the compiled box grows in X/Z (the basement is excavated beyond
+   *  the house walls). Only meaningful while a basement is picked. */
+  basementArea: { w: number; d: number } | null;
   /** Height of the picked ATTIC band (cells) — the attic is always the TOPMOST level and
    *  its band ENGULFS the roof zone (attic headroom + roof reserve, nothing above it).
    *  `null` = the default (roof reserve + {@link ATTIC_OVERHEAD}). */
@@ -74,7 +82,8 @@ export const EMPTY_DETAILS: BuildDetails = {
   params: {},
   size: null,
   floorHeights: null,
-  basementH: null,
+  basementHeights: null,
+  basementArea: null,
   atticH: null,
   surroundSizing: null,
   rooms: [],
@@ -84,7 +93,7 @@ export const EMPTY_DETAILS: BuildDetails = {
 // (`shared/domain/storeys.ts`) — the SAME constants the structure types build with —
 // re-exported so the composer controls keep importing them from here. MIN_FLOOR_H is
 // the every-floor-≥5-blocks rule.
-export { DEFAULT_STOREY_H, MAX_STOREY_H, MIN_FLOOR_H };
+export { DEFAULT_STOREY_H, MAX_STOREY_H, MIN_FLOOR_H, MAX_BASEMENT_LEVELS, DEFAULT_BASEMENT_H };
 
 /** "m:ss" from a millisecond duration.
  *  @param ms - Elapsed time in milliseconds.
@@ -201,7 +210,7 @@ function roofReserve(params: Record<string, string | number>, w: number, d: numb
 }
 
 /** The non-storey vertical BANDS of the box: the picked basement at the bottom (the
- *  user's custom height or {@link BASEMENT_OVERHEAD}), and the TOP band — when an attic
+ *  sum of its per-level heights, see {@link basementHeightsOf}), and the TOP band — when an attic
  *  is picked it is always the topmost level and ENGULFS the whole roof zone (custom
  *  height or roof reserve + {@link ATTIC_OVERHEAD}; `roof` is then 0, nothing sits above
  *  it), otherwise the roof reserve alone. */
@@ -212,9 +221,41 @@ function bandHeights(
   dd: number,
 ): { basement: number; attic: number; roof: number } {
   const roof = roofReserve(params, w, dd);
-  const basement = d.basement ? (d.basementH ?? BASEMENT_OVERHEAD) : 0;
+  // The vault depth + a dedicated ceiling layer when the basement footprint exceeds the house
+  // (the SAME +1 compose.ts reserves, so the promised box height matches the laid shell).
+  const basement = d.basement ? basementDepth(basementHeightsOf(d)) + basementCeilingLayer(d.basementArea, w, dd) : 0;
   const attic = d.attic ? (d.atticH ?? roof + ATTIC_OVERHEAD) : 0;
   return { basement, attic, roof: d.attic ? 0 : roof };
+}
+
+/** The picked basement's per-LEVEL heights (top-down), defaulting to a single
+ *  {@link DEFAULT_BASEMENT_H} level when the user hasn't sized them. Empty when no
+ *  basement is picked.
+ *  @param d - The current Details state.
+ *  @returns One height per below-grade level (length = the level count), or []. */
+export function basementHeightsOf(d: BuildDetails): number[] {
+  if (!d.basement) return [];
+  return d.basementHeights ?? [DEFAULT_BASEMENT_H];
+}
+
+/** The picked basement's FOOTPRINT [w, d], defaulting to the house footprint (the
+ *  effective W×D) when the user hasn't enlarged it. Null when no basement is picked.
+ *  @param d - The current Details state.
+ *  @param struct - The chosen structure module (drives the default house footprint).
+ *  @returns The basement footprint `{ w, d }`, or null. */
+export function basementAreaOf(
+  d: BuildDetails,
+  struct: GenerationModule | undefined,
+): { w: number; d: number } | null {
+  if (!d.basement) return null;
+  if (d.basementArea) return d.basementArea;
+  const sz = effectiveSize(d, struct);
+  return { w: sz.w, d: sz.d };
+}
+
+/** A fresh default basement: one level at the neutral per-level depth. */
+export function defaultBasementHeights(): number[] {
+  return [DEFAULT_BASEMENT_H];
 }
 
 /** The total build height implied by explicit per-floor storey heights: their sum plus
@@ -258,17 +299,18 @@ export function defaultFloorHeights(d: BuildDetails, struct: GenerationModule | 
  *  and the Height panel's basement/attic rows: the selected basement band at the bottom,
  *  and the TOP band — a picked attic is always the topmost level, engulfing the roof
  *  zone (`roof` is then 0); without one the roof reserve caps the box. Honours the
- *  user's custom `basementH`/`atticH`.
+ *  user's custom per-level basement heights / `atticH`. `basementLevels` carries the
+ *  per-level depths (top-down) so the 3D preview can draw one band per level.
  *  @param d - The current Details state.
  *  @param struct - The chosen structure module.
- *  @returns Heights in cells; zeros for the slots that aren't picked. */
+ *  @returns Heights in cells; zeros/[] for the slots that aren't picked. */
 export function previewOverheads(
   d: BuildDetails,
   struct: GenerationModule | undefined,
-): { basement: number; attic: number; roof: number } {
+): { basement: number; basementLevels: number[]; attic: number; roof: number } {
   const params = paramsWithSlots(d, struct);
   const sz = effectiveSize(d, struct);
-  return bandHeights(d, params, sz.w, sz.d);
+  return { ...bandHeights(d, params, sz.w, sz.d), basementLevels: basementHeightsOf(d) };
 }
 
 /** The effective size: the user's override, else the derived default. The selected
@@ -292,19 +334,24 @@ export function effectiveSize(
 
 /** The compiled BUILD BOX for the picked details: the {@link effectiveSize} building
  *  SHELL expanded by the selected surroundings ring's margins (identity when none is
- *  picked). The composer's size fields keep SHELL semantics — the user's W×D is the
- *  house — so the expansion happens only where the box is consumed: the structured
+ *  picked) AND grown to fit the basement footprint when the user enlarged it beyond the
+ *  house (the basement is excavated underground past the house walls; the house stays
+ *  centered over it). The composer's size fields keep SHELL semantics — the user's W×D
+ *  is the house — so the expansion happens only where the box is consumed: the structured
  *  selection (the shell seed compiles at this size) and the brief/card.
  *  @param d - The current Details state.
  *  @param struct - The chosen structure module.
- *  @returns The compiled box `{ w, d, h }` (≥ the shell on every axis). */
+ *  @returns The compiled box `{ w, d, h }` (≥ the shell + ring + basement on every axis). */
 export function buildBoxSize(
   d: BuildDetails,
   struct: GenerationModule | undefined,
 ): { w: number; d: number; h: number } {
   const sz = effectiveSize(d, struct);
   const grown = expandSizeForSurroundings(sz.w, sz.d, d.surroundings, d.surroundSizing);
-  return { w: grown.w, d: grown.d, h: sz.h };
+  const basement = basementAreaOf(d, struct);
+  const w = Math.max(grown.w, basement?.w ?? 0);
+  const dd = Math.max(grown.d, basement?.d ?? 0);
+  return { w, d: dd, h: sz.h };
 }
 
 /** The surroundings RING margins (per side) the picked yard adds around the building
@@ -435,7 +482,23 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     // The basement/attic bands the user sized in the same panel (the attic band is the
     // TOPMOST level — it owns the whole attic + roof zone, nothing sits above it).
     const bands = previewOverheads(d, s);
-    if (bands.basement) heightLine += `- Basement level: ${bands.basement} blocks deep, below the ground floor.\n`;
+    if (bands.basement) {
+      const levels = bands.basementLevels;
+      const levelClause =
+        levels.length > 1
+          ? `${levels.length} stacked below-grade levels (top-down: ${levels
+              .map((h, i) => `B${i + 1} = ${h} blocks`)
+              .join(', ')}; ${bands.basement} blocks deep total)`
+          : `${bands.basement} blocks deep`;
+      const area = basementAreaOf(d, s);
+      const footprintClause =
+        area && (area.w > sz.w || area.d > sz.d)
+          ? ` Its footprint is ${area.w}×${area.d} (W×D) — LARGER than the house above; ` +
+            `excavate it beyond the house walls and keep the house centered over it.`
+          : '';
+      heightLine +=
+        `- Basement: ${levelClause}, below the ground floor, linked to it by a ladder/stair.${footprintClause}\n`;
+    }
     if (bands.attic) {
       heightLine +=
         `- Attic: the TOPMOST level — ${bands.attic} blocks covering the whole attic + roof zone ` +
@@ -470,9 +533,12 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
     rooms: roomsOnFloor(d, i).map((id) => lbl('room', id)),
   }));
   // One label per picked slot (decoration/roof/basement/attic/surroundings) — generic over
-  // MODULE_SLOTS so a new category's chip appears on the card automatically.
+  // MODULE_SLOTS so a new category's chip appears on the card automatically. The basement
+  // chip also notes its level count when dug more than one deep.
   const slotLabels: Partial<Record<ModuleSlotKey, string>> = {};
   for (const slot of MODULE_SLOTS) if (d[slot.key]) slotLabels[slot.key] = lbl(slot.key, d[slot.key]);
+  const levels = basementHeightsOf(d).length;
+  if (slotLabels.basement && levels > 1) slotLabels.basement += ` · ${levels} levels`;
   return {
     structure: s?.label ?? d.structureType,
     ...slotLabels,
@@ -497,6 +563,15 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
   // unused module's guide is never loaded).
   const slots: Partial<Record<ModuleSlotKey, string>> = {};
   for (const slot of MODULE_SLOTS) if (d[slot.key]) slots[slot.key] = d[slot.key];
+  // Basement sizing rides along only when a basement module is actually picked. Heights
+  // are the per-level depths; the footprint is sent only when the user set it explicitly
+  // (else compose.ts defaults the vault to the house footprint).
+  const hasBasement = !!d.basement && d.basement !== 'none';
+  const basementHeights = hasBasement ? basementHeightsOf(d) : [];
+  // The house SHELL (un-grown W/D) — sent only when an explicit basement footprint could
+  // grow the box past the house+yard, so compose can re-centre the house. effectiveSize is
+  // the shell before the surroundings/basement expansion buildBoxSize applies.
+  const shell = d.structureType ? effectiveSize(d, s) : undefined;
   return {
     structureType: d.structureType || undefined,
     ...slots,
@@ -506,6 +581,10 @@ export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | nul
     // The yard scale rides along only when a surroundings ring is actually picked.
     surroundSizing:
       d.surroundings && d.surroundings !== 'none' && d.surroundSizing ? { ...d.surroundSizing } : undefined,
+    basementLevels: hasBasement ? basementHeights.length : undefined,
+    basementHeights: hasBasement ? [...basementHeights] : undefined,
+    basementArea: hasBasement && d.basementArea ? { ...d.basementArea } : undefined,
+    shellSize: hasBasement && d.basementArea && shell ? { w: shell.w, d: shell.d } : undefined,
   };
 }
 

@@ -7,7 +7,7 @@ import type { AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../
 import type { BuildSelection, FloorDef, GenerationCatalog } from '@/shared/types';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
-import { sanitizeFloorHeights } from '@/shared/domain/storeys';
+import { basementCeilingLayer, basementDepth, sanitizeBasementHeights, sanitizeFloorHeights } from '@/shared/domain/storeys';
 import { sanitizeSurroundSizing } from '@/shared/domain/surroundings';
 import { basementHeight, composeModulePreview, selectedBasement } from './compose';
 import { getModule } from './categories';
@@ -116,21 +116,37 @@ export function structureFloorPlan(
   const floorHeights = sanitizeFloorHeights(rawParams.floorHeights);
   const surroundSizing = sanitizeSurroundSizing(rawParams.surroundSizing);
 
-  // A type WITHOUT its own `basement` param (gothic/modern/farmhouse/sakura) gets its
-  // basement composed CENTRALLY: `composeStructure` reserves the bottom `basementHeight`
-  // of the box and raises the massing onto `groundY`. The floor plan must mirror that —
-  // prepend the basement level and compute the STOREYS from `groundY`, not the box bottom
-  // — else the plan reports the wrong planes (everything read as one "roof" band, the
-  // missing-floor-1/2 defect). A type that owns its `basement` param (classic) already
-  // folds the basement into its own `floors()`.
+  // Every type gets its basement composed CENTRALLY: `composeStructure` reserves the bottom
+  // `basementDepth` of the box (one band per level) and raises the massing onto `groundY`.
+  // The floor plan must mirror that — prepend one basement level per dug level and compute
+  // the STOREYS from `groundY`, not the box bottom — else the plan reports the wrong planes
+  // (everything read as one "roof" band, the missing-floor-1/2 defect).
   let floorBox = b;
   const lead: FloorDef[] = [];
-  if (!('basement' in type.params) && selectedBasement(rawParams)) {
-    const bH = basementHeight(b.H);
-    if (b.H - bH >= 6) {
-      const groundY = b.y0 + bH;
+  if (selectedBasement(rawParams)) {
+    const levelHeights = sanitizeBasementHeights(rawParams.basementHeights) ?? [basementHeight(b.H)];
+    const depth = basementDepth(levelHeights);
+    // The same dedicated ceiling layer compose.ts reserves when the basement footprint exceeds
+    // the house — so the sidecar's groundY matches the laid geometry.
+    const area = rawParams.basementArea as { w?: number; d?: number } | undefined;
+    const shell = rawParams.shellSize as { w?: number; d?: number } | undefined;
+    const ceilingLayer = basementCeilingLayer(
+      area && typeof area.w === 'number' && typeof area.d === 'number' ? { w: area.w, d: area.d } : null,
+      shell?.w ?? b.W,
+      shell?.d ?? b.D,
+    );
+    const reservedDepth = depth + ceilingLayer;
+    if (b.H - reservedDepth >= 6) {
+      const groundY = b.y0 + reservedDepth;
       floorBox = box([b.x0, groundY, b.z0], [b.x1, b.y1, b.z1]);
-      lead.push({ id: 'floor-1', name: 'Floor 1', from: b.y0, to: groundY - 1, role: 'basement' });
+      // One band per level, bottom-up (deepest first). levelHeights is top-down, so the
+      // deepest is the last entry; lay bands from the box bottom up.
+      const depthsBottomUp = [...levelHeights].reverse();
+      let y = b.y0;
+      for (const h of depthsBottomUp) {
+        lead.push({ id: '', name: '', from: y, to: y + h - 1, role: 'basement' });
+        y += h;
+      }
     }
   }
 

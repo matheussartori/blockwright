@@ -75,8 +75,11 @@ export const cultTemple: BasementModule = {
       if (fp.isEdge(x, z)) ops.push({ op: 'fill', from: [x, y0 + 1, z], to: [x, y1 - 1, z], state: wall });
     }
 
-    // Cornice band ringing the wall just under the ceiling.
-    ops.push({ op: 'walls', from: [x0, y1 - 1, z0], to: [x1, y1 - 1, z1], state: cornice });
+    // Cornice band: an INTERIOR slab ledge ringing the chamber one cell inside the wall,
+    // just under the ceiling. It must NOT overwrite the perimeter wall's top course (a
+    // top-slab there left an open slit around the basement — the "vão no topo da parede"
+    // defect), so the structural wall stays full to the ceiling and the cornice is decor.
+    if (W > 2 && D > 2) ops.push({ op: 'walls', from: [x0 + 1, y1 - 1, z0 + 1], to: [x1 - 1, y1 - 1, z1 - 1], state: cornice });
 
     // Summoning circle: an accent ring inlaid in the floor around the altar (radius r+1).
     const r = Math.max(1, Math.min(2, Math.floor(Math.min(W, D) / 2) - 2));

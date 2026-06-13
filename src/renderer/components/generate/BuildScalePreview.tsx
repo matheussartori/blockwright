@@ -23,10 +23,14 @@ export interface ScaleSize {
   h: number;
 }
 
-/** The non-storey vertical segments (cells): a selected basement at the bottom, the attic
- *  headroom + roof reserve at the top. Zeros for unpicked slots. */
+/** The non-storey vertical segments (cells): a selected basement at the bottom (its total
+ *  depth, plus the per-level breakdown), the attic headroom + roof reserve at the top.
+ *  Zeros/[] for unpicked slots. */
 export interface ScaleOverheads {
   basement: number;
+  /** Per-level basement depths (top-down: index 0 is just under the ground floor) — one
+   *  draggable band is drawn per entry. Empty when no basement is picked. */
+  basementLevels: number[];
   attic: number;
   roof: number;
 }
@@ -54,8 +58,13 @@ export interface ScaleSurround {
 /** How many cells tall the ground-level yard plate reads in the preview (landscaping). */
 const SURROUND_PLATE_H = 1;
 
-/** A draggable band: an above-ground storey (by index) or the basement/attic band. */
-export type BandId = number | 'basement' | 'attic';
+/** A draggable band: an above-ground storey (by index), the attic band, or a basement
+ *  LEVEL (top-down index, e.g. `basement:0` is the level just under the ground floor). */
+export type BandId = number | 'attic' | `basement:${number}`;
+
+/** Distinct shades for the stacked basement levels (cycled), keyed off {@link BASEMENT_COLOR}
+ *  so the undercroft reads as one family that gets darker as it goes deeper. */
+const BASEMENT_SHADES = ['#9c7b6c', '#8d6e63', '#7a5e54', '#674f47'];
 
 /** An in-flight band drag (per-floor mode): which band, where it started. */
 interface BandDrag {
@@ -102,22 +111,30 @@ export function BuildScalePreview({
   floors,
   overheads,
   surround,
+  basementSize,
   onBandHeight,
 }: {
   size: ScaleSize | null;
   floors?: number[] | null;
-  /** Basement/attic/roof band heights — a picked basement/attic gets its own colour. */
+  /** Basement/attic/roof band heights — a picked basement/attic gets its own colour, and a
+   *  multi-level basement is drawn as one band per level (top-down). */
   overheads?: ScaleOverheads | null;
   /** The picked surroundings ring's per-side margins, drawn as a ground-level yard plate
    *  around the house footprint. Null when no surroundings module is selected. */
   surround?: ScaleSurround | null;
+  /** The basement FOOTPRINT (cells) when the user enlarged it past the house — the below-grade
+   *  bands are drawn this wide so a bigger undercroft reads at scale. Null = match the house. */
+  basementSize?: { w: number; d: number } | null;
   /** When given (per-floor mode), every band becomes draggable: drag up/down to resize
-   *  that storey (by index) or the basement/attic band. */
+   *  that storey (by index), the attic band, or a basement level (`basement:i`). */
   onBandHeight?: (band: BandId, value: number) => void;
 }) {
   // Stable dependency keys for the (otherwise unstable) heights/overheads.
   const floorsKey = floors && floors.length ? floors.join(',') : '';
+  const basementKey = overheads?.basementLevels?.length ? overheads.basementLevels.join(',') : '';
   const basementH = overheads?.basement ?? 0;
+  const basementW = basementSize?.w ?? 0;
+  const basementD = basementSize?.d ?? 0;
   const atticH = overheads?.attic ?? 0;
   const roofH = overheads?.roof ?? 0;
   const surroundSide = surround?.side ?? 0;
@@ -194,8 +211,12 @@ export function BuildScalePreview({
       const hit = raycaster.intersectObjects(bandMeshesRef.current, false)[0];
       return (hit?.object as THREE.Mesh) ?? null;
     };
-    const bandHeight = (band: BandId): number | undefined =>
-      typeof band === 'number' ? floorsRef.current?.[band] : overheadsRef.current?.[band];
+    const bandHeight = (band: BandId): number | undefined => {
+      if (typeof band === 'number') return floorsRef.current?.[band];
+      if (band === 'attic') return overheadsRef.current?.attic;
+      const level = Number(band.slice('basement:'.length));
+      return overheadsRef.current?.basementLevels?.[level];
+    };
     const setHover = (mesh: THREE.Mesh | null) => {
       if (hoverRef.current === mesh) return;
       const restore = hoverRef.current;
@@ -285,16 +306,19 @@ export function BuildScalePreview({
     const content = new THREE.Group();
 
     // A faint fill + crisp wireframe slab spanning [y, y+height], base on the ground.
-    // Returns the fill mesh so the per-floor bands can be registered for drag picking.
+    // Returns the fill mesh so the per-floor bands can be registered for drag picking. The
+    // footprint defaults to the build's W×D, overridable (a wider basement undercroft).
     const addSlab = (
       y: number,
       height: number,
       color: THREE.Color,
       fillOpacity: number,
       edgeOpacity: number,
+      footW = w,
+      footD = d,
     ): THREE.Mesh | null => {
       if (height <= 0.001) return null;
-      const geo = new THREE.BoxGeometry(w, height, d);
+      const geo = new THREE.BoxGeometry(footW, height, footD);
       const fill = new THREE.Mesh(
         geo,
         new THREE.MeshStandardMaterial({ color, transparent: true, opacity: fillOpacity, depthWrite: false }),
@@ -324,11 +348,23 @@ export function BuildScalePreview({
       bandMeshesRef.current.push(mesh);
     };
     const floorList = floorsKey ? floorsKey.split(',').map(Number) : null;
+    const basementList = basementKey ? basementKey.split(',').map(Number) : null;
     const segmented = basementH > 0 || atticH > 0 || !!floorList?.length;
     if (segmented) {
-      // The basement hangs below the ground plane: [-basementH, 0].
-      if (basementH > 0) {
-        registerBand(addSlab(-basementH, basementH, new THREE.Color(BASEMENT_COLOR), 0.28, 0.9), 'basement');
+      // The basement hangs below the ground plane, stacked downward: level 0 (top-down) sits
+      // just under y=0, deeper levels below it. Each level is its own draggable band, drawn at
+      // the basement footprint (wider than the house when the user enlarged it).
+      if (basementList && basementList.length) {
+        const bw = Math.max(w, basementW);
+        const bd = Math.max(d, basementD);
+        let by = 0;
+        basementList.forEach((lh, i) => {
+          by -= lh;
+          const shade = new THREE.Color(BASEMENT_SHADES[Math.min(i, BASEMENT_SHADES.length - 1)]);
+          registerBand(addSlab(by, lh, shade, 0.28, 0.9, bw, bd), `basement:${i}`);
+        });
+      } else if (basementH > 0) {
+        registerBand(addSlab(-basementH, basementH, new THREE.Color(BASEMENT_COLOR), 0.28, 0.9), 'basement:0');
       }
       const top = h - basementH; // the above-ground extent (the basement lives below y=0)
       let y = 0;
@@ -382,8 +418,10 @@ export function BuildScalePreview({
     player.position.set(w / 2 + surroundSide + 0.95, 0, d / 2 - 0.4);
     content.add(player);
 
-    // Ground grid spanning the box (incl. the yard ring) + the player.
-    const span = Math.ceil(Math.max(w + surroundSide * 2, d + surroundFront + surroundBack) + 4);
+    // Ground grid spanning the box (incl. the yard ring + a wider basement) + the player.
+    const span = Math.ceil(
+      Math.max(w + surroundSide * 2, d + surroundFront + surroundBack, basementW, basementD) + 4,
+    );
     const grid = new THREE.GridHelper(span, span, text, text);
     (grid.material as THREE.Material).transparent = true;
     (grid.material as THREE.Material).opacity = 0.14;
@@ -401,7 +439,7 @@ export function BuildScalePreview({
     scene.add(wrap);
     contentRef.current = wrap;
     frameCamera(cameraRef.current, dims);
-  }, [size?.w, size?.d, size?.h, floorsKey, basementH, atticH, roofH, surroundSide, surroundFront, surroundBack]);
+  }, [size?.w, size?.d, size?.h, floorsKey, basementKey, basementH, basementW, basementD, atticH, roofH, surroundSide, surroundFront, surroundBack]);
 
   return <div className="scale-preview-canvas" ref={mountRef} />;
 }

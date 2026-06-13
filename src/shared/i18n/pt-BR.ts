@@ -216,6 +216,11 @@ export const ptBR: Messages = {
   'gen.yardDepth': 'Profundidade (Z)',
   'gen.yardRingHint': 'Área do quintal',
   'gen.totalHeightLabel': 'Altura total',
+  'gen.footprintLabel': 'Área',
+  'gen.storiesLabel': 'Altura dos andares',
+  'gen.basementLevels': 'Níveis',
+  'gen.basementLevelTag': 'Subsolo {n}',
+  'gen.basementFootprint': 'Área',
   'gen.floorPlan': 'Planta de andares',
   'gen.floorPlanHint':
     'Detectado automaticamente da construção — ajuste um nome, a faixa de Y ou o tipo se algum andar foi lido errado (y=0 é o chão). As faixas são destacadas no visualizador e enviadas como contexto, para você dizer “refaça o porão”.',

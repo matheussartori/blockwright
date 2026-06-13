@@ -89,8 +89,22 @@ function mergedPlanes(
   return { planes: [...set].sort((a, b) => a - b), runTop };
 }
 
-/** The dominant (most common) full block of each given plane — its real floor
- *  material, reused for stringers so a rebuilt stair blends in. */
+/** Ground / loose-fill blocks that read as TERRAIN, never construction: the surroundings
+ *  yard's dirt/grass dominates the grade plane, and reusing it for a stair's treads/stringers
+ *  put DIRT in a stone staircase (the "dirt na escada" defect). A derived stair must blend
+ *  with the BUILD, so these are skipped when picking a plane's material. */
+const GROUND_BLOCKS = new Set([
+  'dirt', 'grass_block', 'coarse_dirt', 'rooted_dirt', 'podzol', 'mycelium', 'dirt_path',
+  'farmland', 'mud', 'sand', 'red_sand', 'gravel', 'clay', 'snow_block', 'grass_path',
+]);
+function isGroundMaterial(name: string): boolean {
+  return GROUND_BLOCKS.has(bareId(name ?? ''));
+}
+
+/** The dominant (most common) full CONSTRUCTION block of each given plane — its real floor
+ *  material, reused for stringers so a rebuilt stair blends in. Terrain (dirt/grass/sand…) is
+ *  excluded so a stair opening onto the yard's grade plane never inherits its dirt. A plane
+ *  with only terrain yields no entry (the caller falls back to the build's stair material). */
 function planeMaterials(
   blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[], planes: Set<number>,
 ): Map<number, number> {
@@ -98,6 +112,7 @@ function planeMaterials(
   for (const b of blocks) {
     const y = b.pos[1];
     if (!planes.has(y) || !isStructuralFull(palette, b.state)) continue;
+    if (isGroundMaterial(palette[b.state]?.Name ?? '')) continue; // never a terrain block
     const m = tally.get(y) ?? new Map<number, number>();
     m.set(b.state, (m.get(b.state) ?? 0) + 1);
     tally.set(y, m);
@@ -106,7 +121,7 @@ function planeMaterials(
   for (const [y, m] of tally) {
     let best = -1, bestCount = -1;
     for (const [state, c] of m) if (c > bestCount) { bestCount = c; best = state; }
-    out.set(y, best);
+    if (best >= 0) out.set(y, best);
   }
   return out;
 }
@@ -235,11 +250,27 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // for): the build's own stairs if it has any, else plain oak.
   const fallbackStairName = palette.find((p) => bareId(p.Name).endsWith('_stairs'))?.Name ?? 'minecraft:oak_stairs';
 
+  // BELOW-GRADE circulation is CODE-OWNED: a structure type's basement vault stack ships
+  // its own descent ladder (composeBasementStack), landing inside the house. This pass must
+  // NOT detect those basement planes as gaps and rebuild a connector in the wrong column
+  // (the "ladder under the yard, levels unreachable" defect). So every gap whose UPPER plane
+  // is at or below grade is skipped — the pass owns only the above-grade storeys. `grade` is
+  // the ground-floor Y (undefined → nothing below grade, the old behaviour).
+  const grade = ctx.grade ?? -Infinity;
+  const belowGrade = (gap: { upperY: number }): boolean => gap.upperY <= grade;
+  // The authoritative code-built SHELL cells (floor decks/roof/walls/tower). A connector may
+  // never occupy or pierce one — the geometric structural test misfires on glass/stairs/slab
+  // walls (a stair then marched straight through the exterior wall, P1). A locked cell that
+  // is a carvable floor SURFACE is left alone here (cellKind still opens the stairwell through
+  // it); only a locked NON-floor block is forced to read as an immovable wall.
+  const lockSet = new Set<string>((ctx.lockCells ?? []).map((c) => posKey(...c.pos)));
+
   // ── Collect every circulation hint, grouped by the storey-gap it serves ─────────
   const byGap = new Map<number, GapWork>();
   const addHint = (h: Hint, strip: string[], gap: { lowerY: number; upperY: number }): void => {
     const H = gap.upperY - gap.lowerY;
     if (H < 3) return; // not a real storey (mezzanine/thin gap)
+    if (belowGrade(gap)) return; // code owns below-grade circulation; don't strip/rebuild it
     // A hint must have climbed MOST of its gap — but in a very tall storey a PARTIAL
     // climb (the model ran out of steam) is still clearly a circulation attempt, never
     // decor, so the bar is capped: 6 treads for a stair, 4 rungs for a ladder. Short
@@ -305,6 +336,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   for (let i = 0; i + 1 < planes.length; i++) {
     const lowerY = planes[i], upperY = planes[i + 1];
     if (upperY - lowerY < 3 || byGap.has(lowerY)) continue;
+    if (belowGrade({ upperY })) continue; // code owns below-grade circulation
     if (upperY === planes[planes.length - 1] && !habitableAbove(upperY)) continue;
     byGap.set(lowerY, { hints: [], strip: new Set() });
   }
@@ -350,7 +382,12 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
       if (isStructuralFull(outPalette, b.state) && structuralAt(x, top + 1, z)) return 'wall';
       return 'plane';
     }
-    if (!isStructuralFull(outPalette, b.state)) return 'thin';
+    if (!isStructuralFull(outPalette, b.state)) {
+      // A locked SHELL block that isn't a full cube (a glass pane, a stairs/slab/wall course
+      // forming the exterior) is still the protected exterior — never carvable. Without this
+      // a connector treated it as thin decor and pierced the wall (P1).
+      return lockSet.has(k) ? 'wall' : 'thin';
+    }
     return 'wall';
   };
   const passable = (x: number, y: number, z: number): boolean => {

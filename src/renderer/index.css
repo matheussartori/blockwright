@@ -3848,93 +3848,155 @@ body.row-resizing {
   to { opacity: 1; transform: none; }
 }
 
-/* Integer param — a compact number field with its allowed range alongside. */
-.gen-stepper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ── Stepper ─────────────────────────────────────────────────────────────────
+   The composer's numeric control: a −/+ button flanking a click-to-type value.
+   Big, comfortable hit targets (the native spinner arrows were unusable). */
+.stepper {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg, var(--panel));
+  overflow: hidden;
+  transition: border-color 0.13s, box-shadow 0.13s;
 }
-.gen-stepper input {
+.stepper:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.stepper.disabled { opacity: 0.5; }
+.stepper-btn {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  border: none;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text-2, var(--text));
+  cursor: pointer;
+  touch-action: none;
+  transition: background 0.12s, color 0.12s;
+}
+.stepper-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+.stepper-btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.stepper-value {
   font: inherit;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  color: var(--text);
-  width: 64px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
-}
-.gen-stepper input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-.gen-stepper input:disabled { opacity: 0.5; }
-.gen-stepper-range {
-  font-size: 11px;
-  font-family: var(--mono, monospace);
-  color: var(--text-muted);
-}
-
-/* Size — three tight W/H/D axis fields on one line. */
-.gen-size {
-  display: flex;
-  gap: 6px;
-}
-.gen-size-axis {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.gen-size-axis > span {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  width: 10px;
+  font-weight: 600;
   text-align: center;
-}
-.gen-size-axis input {
-  font: inherit;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
   color: var(--text);
-  width: 52px;
-  padding: 5px 7px;
-  border-radius: 7px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
+  width: 46px;
+  min-width: 0;
+  padding: 6px 2px;
+  border: none;
+  background: transparent;
+  -moz-appearance: textfield;
 }
-.gen-size-axis input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+.stepper-value:focus { outline: none; }
+.stepper-value:disabled { color: var(--text-muted); }
+.stepper-unit {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
-.gen-size-axis input:disabled { opacity: 0.5; }
+.stepper.sm .stepper-btn { width: 30px; }
+.stepper.sm .stepper-value { width: 40px; font-size: 12px; padding: 5px 2px; }
 
-/* Size header — the "Size" label and the Total ⇄ Per floor height switch on one line. */
+/* A param row whose label and stepper sit on one line (floors, etc.). */
+.gen-chip-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* ── Size section ────────────────────────────────────────────────────────────
+   The build-size controls: a header label plus one or more boxed cards
+   (Footprint / Floor heights / Basement / Yard), each a column of label+stepper
+   rows. Replaces the old cramped inline number fields. */
+.gen-size-section {
+  gap: 8px;
+}
 .gen-size-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.gen-size-head .segmented { font-size: 11px; }
-
-/* Per-floor height editor — one storey-height field per floor + the chain (link) toggle. */
-.gen-floor-heights {
+.gen-size-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 10px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--text) 3%, var(--bg, var(--panel)));
+  gap: 7px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--text) 3.5%, var(--bg, var(--panel)));
   border: 1px solid var(--border);
 }
-.gen-floor-heights-head {
+.gen-size-card + .gen-size-card { margin-top: 2px; }
+.gen-size-card-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.gen-size-card-headrow {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
+.gen-size-card-subhead {
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.gen-size-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gen-size-row-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2, var(--text));
+}
+.gen-size-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.gen-size-total-val {
+  font-family: var(--mono, monospace);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* The chain/link toggle shared by the Floor-heights and Basement cards. */
 .gen-link-toggle {
   -webkit-app-region: no-drag;
   display: inline-flex;
@@ -3956,50 +4018,6 @@ body.row-resizing {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .gen-link-toggle:disabled { opacity: 0.5; cursor: default; }
-.gen-floor-height {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.gen-floor-height-tag {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-2, var(--text));
-}
-.gen-floor-height input {
-  font: inherit;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  width: 56px;
-  padding: 5px 7px;
-  border-radius: 7px;
-  background: var(--bg, var(--panel));
-  border: 1px solid var(--border);
-}
-.gen-floor-height input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-}
-.gen-floor-height input:disabled { opacity: 0.5; }
-.gen-floor-heights-total {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.gen-floor-heights-total-val {
-  font-family: var(--mono, monospace);
-  font-weight: 600;
-  color: var(--text-2, var(--text));
-}
 
 /* Footer link to the module gallery. */
 .gen-details-foot {
