@@ -406,6 +406,21 @@ export const en = {
   'catalog.loading': 'Loading…',
   'catalog.copyId': 'Copy block id',
   'catalog.selectToPreview': 'Select a block to preview it.',
+  // Mod-block dictionary (annotations that let AI generation use the mod's blocks).
+  'catalog.scopeTitle': 'Mod blocks in AI',
+  'catalog.scopeOff': 'Off',
+  'catalog.scopeMix': 'Mix',
+  'catalog.scopePrefer': 'Prefer',
+  'catalog.scopeHintOff': 'Generation uses vanilla blocks only.',
+  'catalog.scopeHintMix': 'Offer this mod’s blocks alongside vanilla.',
+  'catalog.scopeHintPrefer': 'Lean on this mod’s blocks for the main materials.',
+  'catalog.annotateTitle': 'AI annotation',
+  'catalog.roleLabel': 'Role',
+  'catalog.roleAuto': 'Auto',
+  'catalog.roleAutoSuggest': 'Auto ({role})',
+  'catalog.ignoreLabel': 'Hide from AI generation',
+  'catalog.propsLabel': 'Properties',
+  'catalog.dictHint': 'Saved to blockwright/dictionary.json in your mod.',
 
   // Module Gallery.
   'modules.title': 'Module Gallery',

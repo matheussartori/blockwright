@@ -2676,6 +2676,7 @@ body.row-resizing {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--border);
+  overflow-y: auto;
 }
 .catalog-preview {
   flex: none;
@@ -2748,6 +2749,85 @@ body.row-resizing {
 .catalog-detail-empty {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* Mod-block dictionary: the workspace-level generation scope + the per-block annotation. */
+.catalog-scope {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.catalog-scope-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.catalog-scope-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.catalog-note {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 11px;
+  margin-top: 2px;
+  border-top: 1px dashed var(--border);
+}
+.catalog-note-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.catalog-note-desc {
+  width: 100%;
+  resize: vertical;
+  min-height: 56px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.catalog-note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.catalog-note-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.catalog-note-ignore {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.catalog-note-props {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.catalog-note-prop-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.catalog-note-foot {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  word-break: break-all;
 }
 .settings-group {
   padding: 8px 0 12px;

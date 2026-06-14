@@ -4,8 +4,11 @@ import type { AiConfig, AiProviderId, GenerationSettings } from '@/shared/ai';
 import type { LanguageInfo, LanguagePref } from '@/shared/i18n';
 import type {
   AssembleOptions,
+  BlockDictionary,
+  BlockNote,
   BlockwrightApi,
   BuildSelection,
+  ModBlockScope,
   ChatRecord,
   ExportResult,
   FloorDef,
@@ -38,6 +41,11 @@ const api: BlockwrightApi = {
   pathExists: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.pathExists, path),
   listCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.catalogList),
   previewBlock: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.previewBlock, id),
+  getDictionary: (): Promise<BlockDictionary | null> => ipcRenderer.invoke(IPC_CHANNELS.dictionaryGet),
+  setBlockNote: (note: BlockNote): Promise<BlockDictionary | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.dictionarySetNote, note),
+  setDictionaryScope: (scope: ModBlockScope): Promise<BlockDictionary | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.dictionarySetScope, scope),
   generationCatalog: () => ipcRenderer.invoke(IPC_CHANNELS.generationCatalog),
   previewModule: (category: ModuleCategory, id: string): Promise<StructureData> =>
     ipcRenderer.invoke(IPC_CHANNELS.previewModule, category, id),

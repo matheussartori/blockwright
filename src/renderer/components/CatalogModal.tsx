@@ -5,17 +5,28 @@
 // real texture, framed + veiled so it reads like the rest of the app) plus its id
 // to copy (the main action — e.g. into the Generate composer). Built on the shared
 // Modal + Segmented + PreviewFrame primitives so it matches the Module Gallery.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
-import type { CatalogBlock } from '@/shared/types';
+import type { BlockDictEntry, BlockDictionary, CatalogBlock, ModBlockScope } from '@/shared/types';
+import type { TFunction } from '@/shared/i18n';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
+import { Select } from './ui/Select';
 import { PreviewFrame } from './ui/PreviewFrame';
 
 type ViewMode = 'grid' | 'list';
 type NsFilter = 'all' | 'minecraft' | 'mod';
+
+// The semantic role tags a mod block can be assigned (mirrors `structure/domain/roles.ts`,
+// minus `air`). Tagging a role both steers the AI and bridges the block into the role
+// system later. Kept as a flat list here so the renderer needn't import main-side domain.
+const ROLE_IDS = [
+  'wall', 'floor', 'ceiling', 'foundation', 'corner', 'accent', 'trim', 'beam', 'pillar',
+  'roof', 'window', 'bars', 'glass', 'door', 'fence', 'ladder', 'water', 'plant', 'ground',
+  'path', 'soil', 'crop', 'flower', 'light',
+] as const;
 
 /** Deterministic swatch colour for a block with no resolvable texture. */
 function fallbackColor(id: string): string {
@@ -71,6 +82,9 @@ export function CatalogModal() {
   const [view, setView] = useState<ViewMode>('grid');
   const [selected, setSelected] = useState<CatalogBlock | null>(null);
   const [copied, setCopied] = useState(false);
+  // The active mod workspace's block dictionary (annotations + generation scope), loaded
+  // when the modal opens with a workspace; null for a vanilla session.
+  const [dict, setDict] = useState<BlockDictionary | null>(null);
 
   const close = () => store.getState().setCatalogOpen(false);
 
@@ -88,7 +102,21 @@ export function CatalogModal() {
     };
   }, [open, workspace?.root]);
 
+  // The mod-block dictionary (only when a mod workspace is active). Refreshed on open /
+  // workspace change; mutated in place when the user edits an annotation or the scope.
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setDict(null);
+    void api.getDictionary().then((d) => alive && setDict(d));
+    return () => {
+      alive = false;
+    };
+  }, [open, workspace?.root]);
+
   const modNamespace = workspace?.namespace && workspace.namespace !== 'minecraft' ? workspace.namespace : null;
+  // The dictionary row for the selected block (annotation + suggestions + props), if it's a mod block.
+  const selectedEntry = selected ? dict?.entries.find((e) => e.id === selected.id) ?? null : null;
 
   const filtered = useMemo(() => {
     if (!blocks) return [];
@@ -109,6 +137,24 @@ export function CatalogModal() {
   const select = (b: CatalogBlock) => {
     setSelected(b);
     setCopied(false);
+  };
+
+  const changeScope = (scope: ModBlockScope) => {
+    setDict((d) => (d ? { ...d, scope } : d)); // optimistic
+    void api.setDictionaryScope(scope).then((d) => d && setDict(d));
+  };
+
+  // Persist one block's annotation and fold the refreshed dictionary back in.
+  const saveNote = (id: string, patch: { description?: string; role?: string; ignore?: boolean }) => {
+    const cur = dict?.entries.find((e) => e.id === id)?.note ?? null;
+    void api
+      .setBlockNote({
+        id,
+        description: patch.description ?? cur?.description,
+        role: patch.role ?? cur?.role,
+        ignore: patch.ignore ?? cur?.ignore,
+      })
+      .then((d) => d && setDict(d));
   };
 
   return (
@@ -188,6 +234,29 @@ export function CatalogModal() {
         </div>
 
         <aside className="catalog-side">
+          {modNamespace && dict && (
+            <div className="catalog-scope">
+              <span className="catalog-scope-label">{t('catalog.scopeTitle')}</span>
+              <Segmented<ModBlockScope>
+                ariaLabel={t('catalog.scopeTitle')}
+                value={dict.scope}
+                onChange={changeScope}
+                options={[
+                  { value: 'off', label: t('catalog.scopeOff') },
+                  { value: 'mix', label: t('catalog.scopeMix') },
+                  { value: 'prefer', label: t('catalog.scopePrefer') },
+                ]}
+              />
+              <span className="catalog-scope-hint">
+                {dict.scope === 'off'
+                  ? t('catalog.scopeHintOff')
+                  : dict.scope === 'mix'
+                    ? t('catalog.scopeHintMix')
+                    : t('catalog.scopeHintPrefer')}
+              </span>
+            </div>
+          )}
+
           <div className="catalog-preview">
             <PreviewFrame
               src={selected?.texture ? api.textureUrl(selected.texture) : null}
@@ -213,6 +282,9 @@ export function CatalogModal() {
                 <code className="catalog-detail-id">{selected.id}</code>
                 <span className="catalog-id-copy-icon">{copied ? CheckIcon : CopyIcon}</span>
               </button>
+              {selectedEntry && (
+                <BlockNoteEditor key={selectedEntry.id} entry={selectedEntry} onSave={saveNote} t={t} />
+              )}
             </div>
           ) : (
             <div className="catalog-detail catalog-detail-empty">{t('catalog.selectToPreview')}</div>
@@ -220,5 +292,97 @@ export function CatalogModal() {
         </aside>
       </div>
     </Modal>
+  );
+}
+
+/** Title-case a role id for the role select ("light" → "Light"). */
+const roleLabel = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
+
+/** The per-block annotation editor (mod blocks only): a free-text description, a role
+ *  tag, and a "hide from AI" toggle, plus the block's blockstate properties for reference.
+ *  These are what let AI generation use the block; saved (sparsely) to the workspace's
+ *  `blockwright/dictionary.json`. Description writes are debounced; role/ignore save at once. */
+function BlockNoteEditor({
+  entry,
+  onSave,
+  t,
+}: {
+  entry: BlockDictEntry;
+  onSave: (id: string, patch: { description?: string; role?: string; ignore?: boolean }) => void;
+  t: TFunction;
+}) {
+  const [desc, setDesc] = useState(entry.note?.description ?? '');
+  const timer = useRef<number | undefined>(undefined);
+
+  // Keep the field in sync when the dictionary refreshes from outside (a save round-trip).
+  useEffect(() => {
+    setDesc(entry.note?.description ?? '');
+  }, [entry.id, entry.note?.description]);
+
+  const flush = (value: string) => {
+    window.clearTimeout(timer.current);
+    onSave(entry.id, { description: value });
+  };
+  const onDescChange = (value: string) => {
+    setDesc(value);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => onSave(entry.id, { description: value }), 500);
+  };
+
+  const propKeys = Object.keys(entry.props);
+  const rolePlaceholder = entry.suggestedRole
+    ? t('catalog.roleAutoSuggest', { role: roleLabel(entry.suggestedRole) })
+    : t('catalog.roleAuto');
+
+  return (
+    <div className="catalog-note">
+      <span className="catalog-note-head">{t('catalog.annotateTitle')}</span>
+
+      <textarea
+        className="input catalog-note-desc"
+        rows={3}
+        placeholder={entry.suggestedDescription}
+        value={desc}
+        onChange={(e) => onDescChange(e.target.value)}
+        onBlur={(e) => flush(e.target.value)}
+      />
+
+      <div className="catalog-note-row">
+        <span className="catalog-note-label">{t('catalog.roleLabel')}</span>
+        <Select
+          value={entry.note?.role ?? ''}
+          options={[
+            { value: '', label: rolePlaceholder },
+            ...ROLE_IDS.map((r) => ({ value: r, label: roleLabel(r) })),
+          ]}
+          onChange={(role) => onSave(entry.id, { role })}
+          ariaLabel={t('catalog.roleLabel')}
+        />
+      </div>
+
+      <label className="catalog-note-ignore">
+        <input
+          type="checkbox"
+          checked={!!entry.note?.ignore}
+          onChange={(e) => onSave(entry.id, { ignore: e.target.checked })}
+        />
+        <span>{t('catalog.ignoreLabel')}</span>
+      </label>
+
+      {propKeys.length > 0 && (
+        <div className="catalog-note-props">
+          <span className="catalog-note-label">{t('catalog.propsLabel')}</span>
+          <div className="catalog-note-prop-list">
+            {propKeys.map((k) => (
+              <span key={k} className="chip" title={entry.props[k].join(', ')}>
+                {k}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <span className="catalog-note-foot">{t('catalog.dictHint')}</span>
+    </div>
   );
 }

@@ -16,7 +16,7 @@ import type {
   BuildSelection,
   FloorDef,
 } from './generation';
-import type { ExportResult, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
+import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
@@ -123,6 +123,13 @@ export interface BlockwrightApi {
   listCatalog: () => Promise<CatalogBlock[]>;
   /** Resolve a single block into a 1×1×1 StructureData (for the catalog's 3D preview). */
   previewBlock: (id: string) => Promise<StructureData>;
+  /** The active mod workspace's block dictionary (its blocks + AI annotations + generation
+   *  scope), or null when no mod workspace is open. Powers the Catalog's annotation editor. */
+  getDictionary: () => Promise<BlockDictionary | null>;
+  /** Upsert one mod block's annotation (description/role/ignore); returns the refreshed dictionary. */
+  setBlockNote: (note: BlockNote) => Promise<BlockDictionary | null>;
+  /** Set the workspace's mod-block generation scope; returns the refreshed dictionary. */
+  setDictionaryScope: (scope: ModBlockScope) => Promise<BlockDictionary | null>;
   /** The generation module registry (grouped by category) for the composer's selects
    *  and the module gallery. */
   generationCatalog: () => Promise<GenerationCatalog>;

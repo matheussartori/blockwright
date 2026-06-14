@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BuildSelection, ChatRecord, FloorDef, GenerateImage, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -11,6 +11,7 @@ import { isInsideLibrary, librarySidecarPath, metadataFromStructure, readMetadat
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
+import { getDictionary, setBlockNote, setScope } from './structure/assets/block-dictionary';
 import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
 import { localizeCatalog } from '@/shared/i18n/registry';
@@ -217,6 +218,9 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.catalogList, async () => listCatalog());
   ipcMain.handle(IPC_CHANNELS.previewBlock, async (_e, id: string) => previewBlock(id));
+  ipcMain.handle(IPC_CHANNELS.dictionaryGet, async () => getDictionary());
+  ipcMain.handle(IPC_CHANNELS.dictionarySetNote, async (_e, note: BlockNote) => setBlockNote(note));
+  ipcMain.handle(IPC_CHANNELS.dictionarySetScope, async (_e, scope: ModBlockScope) => setScope(scope));
   ipcMain.handle(IPC_CHANNELS.generationCatalog, async () =>
     localizeCatalog(listModuleCatalog(), getLanguage().locale),
   );

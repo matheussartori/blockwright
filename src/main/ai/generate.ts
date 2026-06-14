@@ -9,6 +9,7 @@
 // active provider + model in Settings (see credentials.ts).
 import type { GenerateResult, GenerateProgress, GenerateImage, BuildSelection, FloorDef } from '@/shared/types';
 import { systemPrompt } from './schema';
+import { modBlockGuide } from '../structure/assets/block-dictionary';
 import { phaseAt, PHASES } from './phases';
 import { maxRoundsFor } from './rounds';
 import { beginRun, endRun, getSession } from './session';
@@ -215,7 +216,10 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     const driver = await getDriver(cred.id);
     driverResult = await driver({
       credential: cred,
-      systemPrompt: systemPrompt(prompt, selection),
+      // The base instructions + knowledge base, then (when a mod workspace is open and its
+      // scope isn't off) the mod's annotated blocks — so the model can build with non-vanilla
+      // blocks it has never seen. Empty for a vanilla run, so it costs nothing.
+      systemPrompt: systemPrompt(prompt, selection) + modBlockGuide(),
       userText: effectivePrompt,
       images: images ?? [],
       thinkingBudget,

@@ -408,6 +408,21 @@ export const ptBR: Messages = {
   'catalog.loading': 'Carregando…',
   'catalog.copyId': 'Copiar id do bloco',
   'catalog.selectToPreview': 'Selecione um bloco para visualizá-lo.',
+  // Dicionário de blocos do mod (anotações que permitem a IA usar os blocos do mod).
+  'catalog.scopeTitle': 'Blocos do mod na IA',
+  'catalog.scopeOff': 'Desligado',
+  'catalog.scopeMix': 'Misturar',
+  'catalog.scopePrefer': 'Preferir',
+  'catalog.scopeHintOff': 'A geração usa apenas blocos vanilla.',
+  'catalog.scopeHintMix': 'Oferece os blocos deste mod junto com os vanilla.',
+  'catalog.scopeHintPrefer': 'Prioriza os blocos deste mod nos materiais principais.',
+  'catalog.annotateTitle': 'Anotação para IA',
+  'catalog.roleLabel': 'Função',
+  'catalog.roleAuto': 'Automático',
+  'catalog.roleAutoSuggest': 'Automático ({role})',
+  'catalog.ignoreLabel': 'Ocultar da geração por IA',
+  'catalog.propsLabel': 'Propriedades',
+  'catalog.dictHint': 'Salvo em blockwright/dictionary.json no seu mod.',
 
   // Module Gallery.
   'modules.title': 'Galeria de módulos',

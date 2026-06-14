@@ -9,6 +9,7 @@ import {
   setActiveWorkspace,
 } from './structure/assets/content-pack';
 import { clearModelCache } from './structure/assets/model-loader';
+import { clearDictionaryCache } from './structure/assets/block-dictionary';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
 import { detectMcVersion } from './mc-version-detect';
@@ -37,6 +38,7 @@ export function applyWorkspace(ws: Workspace | null): void {
   setActiveWorkspace(ws);
   clearJsonCache();
   clearModelCache();
+  clearDictionaryCache();
   if (ws) {
     addRecentWorkspace(ws);
     notifyRecentWorkspaces();

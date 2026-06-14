@@ -78,6 +78,12 @@ export const IPC_CHANNELS = {
   catalogList: 'catalog:list',
   /** Resolve a single block (name[+props]) into a 1×1×1 StructureData for the catalog 3D preview. */
   previewBlock: 'catalog:preview-block',
+  /** The active mod workspace's block dictionary (mod blocks + their AI annotations) → BlockDictionary | null. */
+  dictionaryGet: 'catalog:dictionary',
+  /** Upsert one mod block's annotation (payload: BlockNote) → the refreshed BlockDictionary | null. */
+  dictionarySetNote: 'catalog:dictionary-set-note',
+  /** Set the workspace's mod-block generation scope (payload: ModBlockScope) → BlockDictionary | null. */
+  dictionarySetScope: 'catalog:dictionary-set-scope',
   /** The generation module registry, grouped by category → GenerationCatalog. */
   generationCatalog: 'generation:catalog',
   /** Compose + compile a module's representative build → StructureData (gallery 3D

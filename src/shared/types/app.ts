@@ -55,6 +55,57 @@ export interface CatalogBlock {
   texture: string | null;
 }
 
+/** How aggressively AI generation should reach for the active mod workspace's own
+ *  blocks (only meaningful while a workspace is open). A property of the WORKSPACE,
+ *  persisted with its block dictionary: `off` = vanilla only; `mix` = offer the mod's
+ *  blocks alongside vanilla; `prefer` = lean on them for the build's main materials. */
+export type ModBlockScope = 'off' | 'mix' | 'prefer';
+
+/** A user-authored annotation for one mod block, persisted SPARSELY in the workspace's
+ *  `blockwright/dictionary.json` — only blocks the user has actually touched are stored.
+ *  These descriptions/roles are what let AI generation use non-vanilla blocks meaningfully
+ *  (the model has never seen them), so the dictionary doubles as the curation/allowlist. */
+export interface BlockNote {
+  /** Full `namespace:id` (e.g. `theplacebeyond:ashen_brick`). */
+  id: string;
+  /** Plain-language description steering the model: what it looks like / when to use it. */
+  description?: string;
+  /** Optional semantic role tag (a `Role` id like `wall`/`floor`/`light`) — the bridge
+   *  that lets a mod block participate in the role system later. */
+  role?: string;
+  /** When true, never offer this block to AI generation (excluded from the injected set). */
+  ignore?: boolean;
+}
+
+/** One row in the Block Catalog's dictionary editor: a mod block, its saved {@link BlockNote}
+ *  (if any), the auto-derived suggestions shown as placeholders (so annotation is editing,
+ *  not blank-slate typing), and its blockstate properties (so the model can orient it). */
+export interface BlockDictEntry {
+  /** Full `namespace:id`. */
+  id: string;
+  /** The bare block id (no namespace). */
+  block: string;
+  /** Texture key ("namespace/path") for the thumbnail, or null. */
+  texture: string | null;
+  /** The user's saved annotation, or null when untouched. */
+  note: BlockNote | null;
+  /** Humanized id, shown as the description placeholder. */
+  suggestedDescription: string;
+  /** Heuristic role guess (a `Role` id), or null — shown as the role placeholder. */
+  suggestedRole: string | null;
+  /** Blockstate property name → its possible values (for the model to set facing/axis/…). */
+  props: Record<string, string[]>;
+}
+
+/** The active workspace's block dictionary, surfaced to the Catalog editor: the mod's
+ *  namespace, its generation scope, and one {@link BlockDictEntry} per mod block. Null
+ *  when no mod workspace is active. */
+export interface BlockDictionary {
+  namespace: string;
+  scope: ModBlockScope;
+  entries: BlockDictEntry[];
+}
+
 /** The generation module categories. */
 export type ModuleCategory = 'structure' | 'decoration' | 'basement' | 'roof' | 'attic' | 'room' | 'surroundings';
 
