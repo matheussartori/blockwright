@@ -6,9 +6,10 @@
 // navigation (Arrow/Home/End/Enter/Escape) + click-outside / scroll-to-dismiss.
 // Disabled options are greyed with their reason in a tooltip (the conflict gating the
 // chip group used to show as a strike-through). Options can carry a `group` (family)
-// label: contiguous runs get a header/divider in the menu, and — with `searchable` on —
-// a filtered result keeps its group name inline on the row, so a match never loses
-// its family context.
+// label: each contiguous run of same-group options gets a header/divider in the menu —
+// and that holds while a search query FILTERS the list too (the filter preserves order,
+// so groups stay contiguous), so a match like "classic" still shows under "House" and
+// "Tower" headers rather than losing its family context.
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Search } from 'lucide-react';
@@ -21,8 +22,8 @@ export interface SelectOption {
    *  clamped to one line — the full text shows in the option's hover tooltip. */
   description?: string;
   /** The display label of the group (family) this option belongs to (e.g. "House").
-   *  A run of same-group options gets a header/divider in the menu; while a search
-   *  query filters the list, the group instead rides inline on each result row. */
+   *  Each contiguous run of same-group options gets a header/divider in the menu —
+   *  preserved while a search query filters the list, so a match keeps its family header. */
   group?: string;
   disabled?: boolean;
   title?: string;
@@ -289,9 +290,10 @@ export function Select({
             {visible.length === 0 && <div className="bw-select-empty">{noResultsLabel}</div>}
             {visible.map((o, i) => {
               const selected = o.value === value;
-              // A header opens each new GROUP run — but only on the unfiltered list,
-              // where groups are contiguous; a search result names its group inline.
-              const groupHead = !q && o.group && o.group !== visible[i - 1]?.group ? o.group : null;
+              // A header opens each new GROUP run. The filtered list preserves the
+              // original order, so groups stay contiguous and the headers hold during a
+              // search too (so "classic" still shows under "House" then "Tower").
+              const groupHead = o.group && o.group !== visible[i - 1]?.group ? o.group : null;
               return (
                 <Fragment key={o.value || '_neutral'}>
                   {groupHead && (
@@ -313,10 +315,7 @@ export function Select({
                     onClick={() => pick(o)}
                   >
                     <span className="bw-select-option-main">
-                      <span className="bw-select-option-label">
-                        {o.label}
-                        {q && o.group && <span className="bw-select-option-group">{o.group}</span>}
-                      </span>
+                      <span className="bw-select-option-label">{o.label}</span>
                       {o.description && <span className="bw-select-option-desc">{o.description}</span>}
                     </span>
                     {selected && <Check size={13} strokeWidth={2.4} className="bw-select-tick" aria-hidden />}

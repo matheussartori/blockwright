@@ -25,6 +25,9 @@ export interface RoomDef {
   label: string;
   /** One-paragraph gallery description (what it furnishes, when to use it). */
   description: string;
+  /** The room program FAMILY (a `ROOM_GROUPS` id), used to header the picker/gallery.
+   *  Defaults to `'general'` (the everyday rooms); the terror set declares `'horror'`. */
+  group?: string;
   /** The structures this room fits; defaults to {@link DEFAULT_HOSTS} (`['house']`).
    *  Extend it to reuse the room on another structure type (the growing host link). */
   appliesTo?: string[];
@@ -43,6 +46,7 @@ export function defineRoom(def: RoomDef): RoomModule {
     id: def.id,
     label: def.label,
     category: 'room',
+    group: def.group ?? 'general',
     description: def.description,
     knowledge: `nbt/modules/room/${def.id}.md`,
     appliesTo: def.appliesTo ?? [...DEFAULT_HOSTS],

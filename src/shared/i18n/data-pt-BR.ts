@@ -9,6 +9,9 @@ export const dataPtBR: Record<string, string> = {
   // --- structure families (groups) ------------------------------------------
   'group.house': 'Casa',
   'group.tower': 'Torre',
+  // --- room program families (groups) ---------------------------------------
+  'group.general': 'Geral',
+  'group.horror': 'Terror',
 
   // --- structure types ------------------------------------------------------
   'mod.structure.classic.label': 'Clássica',
@@ -262,6 +265,123 @@ export const dataPtBR: Record<string, string> = {
   'room.storage.grand.f3': 'caixotes e sacos empilhados (barris, compostores) preenchendo os cantos',
   'room.storage.grand.f4': 'ferramentas penduradas e uma escada de mão para as prateleiras altas',
   'room.storage.grand.f5': 'lanternas ao longo de cada corredor para iluminação uniforme',
+
+  // --- rooms: horror set ----------------------------------------------------
+  'mod.room.ritual.label': 'Câmara ritual',
+  'mod.room.ritual.desc':
+    'Uma câmara de invocação de culto: um círculo de selagem riscado no chão dentro de um anel de ' +
+    'velas trêmulas, um altar de pedra para sacrifícios, braseiros nos cantos e prateleiras de ' +
+    'reagentes em frascos. Sombria, enfumaçada e perversamente solene — a sala onde o rito é realizado.',
+  'room.ritual.snug.label': 'Santuário oculto',
+  'room.ritual.snug.summary': 'Um pequeno altar com velas, um sigilo riscado no chão, uma prateleira de reagentes.',
+  'room.ritual.snug.f0': 'um altar de pedra baixo encostado na parede do fundo, coberto por um pano, com velas e um crânio em cima',
+  'room.ritual.snug.f1': 'um pequeno sigilo riscado no chão à sua frente (incrustação de tapete/concreto) cercado por velas',
+  'room.ritual.snug.f2': 'uma prateleira de reagentes — garrafas, um suporte de poções, um maço de ervas secas pendurado',
+  'room.ritual.snug.f3': 'uma única fonte de luz fria e fraca para que as chamas das velas carreguem o clima',
+  'room.ritual.standard.label': 'Câmara ritual',
+  'room.ritual.standard.summary': 'Um círculo de selagem central cercado de velas, um altar de sacrifício, braseiros nos cantos.',
+  'room.ritual.standard.f0': 'um CÍRCULO DE SELAGEM central incrustado no chão (um anel de blocos contrastantes com um sigilo no centro), debruado por velas',
+  'room.ritual.standard.f1': 'um altar de pedra elevado à cabeceira do círculo — coberto por um pano, posto com candelabros, um livro ou relíquia acorrentado e os meios do sacrifício',
+  'room.ritual.standard.f2': 'um braseiro (fogo em um caldeirão/bacia de ferro) em cada canto lançando luz baixa',
+  'room.ritual.standard.f3': 'uma parede de prateleiras de reagentes — frascos, suportes de poções, maços pendurados, alguns espécimes engaiolados',
+  'room.ritual.standard.f4': 'grupos de velas com cera escorrida e correntes nas paredes; mantenha a sala enfumaçada e mal iluminada',
+  'room.ritual.grand.label': 'Santuário de culto',
+  'room.ritual.grand.summary':
+    'Um salão com colunas e um grande pentagrama, um estrado de altar em degraus, bancos para os fiéis, ' +
+    'gaiolas suspensas e braseiros.',
+  'room.ritual.grand.f0': 'um GRANDE SIGILO preenchendo o piso — um pentagrama/círculo de múltiplos anéis de blocos incrustados com pilares de velas em cada vértice',
+  'room.ritual.grand.f1': 'um ESTRADO DE ALTAR elevado e em degraus à cabeceira do salão: um grande altar coberto por pano com um candelabro imponente e um ídolo ou relíquia acorrentado acima',
+  'room.ritual.grand.f2': 'fileiras de BANCOS ou assentos de joelhos voltados para o estrado, divididos por um corredor central de procissão',
+  'room.ritual.grand.f3': 'colunas laterais penduradas com correntes, estandartes e arandelas de ferro; braseiros rituais dos dois lados',
+  'room.ritual.grand.f4': 'gaiolas de ferro suspensas e uma laje de sacrifício a um lado; nichos de parede com crânios e frascos de reagentes',
+  'room.ritual.grand.f5': 'luz superior fria e esparsa para que as chamas das velas e o fogo dos braseiros dominem — penumbra com ilhas de brilho',
+
+  'mod.room.dungeon.label': 'Masmorra',
+  'mod.room.dungeon.desc':
+    'Uma masmorra de tortura e bloco de celas: celas gradeadas de ferro com palha e correntes na parede, ' +
+    'um potro central e uma bancada de ferramentas cruéis, gaiolas suspensas e um ralo gradeado no chão. ' +
+    'Úmida, fria e iluminada apenas por tochas trêmulas — confinamento e crueldade em pedra.',
+  'room.dungeon.snug.label': 'Cela',
+  'room.dungeon.snug.summary': 'Uma única cela gradeada com palha e correntes, uma porta gradeada, uma tocha baixa.',
+  'room.dungeon.snug.f0': 'uma pequena cela isolada com grades de ferro e uma porta gradeada',
+  'room.dungeon.snug.f1': 'palha/feno no chão da cela, um balde de madeira e grilhões acorrentados à parede',
+  'room.dungeon.snug.f2': 'um banquinho de guarda e um pequeno suporte de ferramentas do lado de fora das grades',
+  'room.dungeon.snug.f3': 'uma única tocha baixa e fria — mantenha os cantos escuros',
+  'room.dungeon.standard.label': 'Câmara de tortura',
+  'room.dungeon.standard.summary': 'Um par de celas gradeadas, um potro central, uma bancada de ferramentas, um ralo no chão.',
+  'room.dungeon.standard.f0': 'duas CELAS gradeadas ao longo de uma parede, cada uma com palha, grilhões na parede e uma porta gradeada',
+  'room.dungeon.standard.f1': 'um POTRO ou mesa de tortura central — uma armação com correntes nas duas pontas, manchada e sinistra',
+  'room.dungeon.standard.f2': 'uma bancada de ferramentas do carrasco (uma bigorna, um rebolo, instrumentos pendurados, um braseiro de brasas)',
+  'room.dungeon.standard.f3': 'um RALO gradeado embutido no chão no ponto mais baixo da sala',
+  'room.dungeon.standard.f4': 'correntes na parede, uma gaiola de ferro suspensa e tochas trêmulas esparsas para uma luz fria e irregular',
+  'room.dungeon.grand.label': 'Bloco de masmorra',
+  'room.dungeon.grand.summary':
+    'Um corredor de celas, vários instrumentos de tortura, uma gaiola suspensa, um poço-ralo central, ' +
+    'a estação do carrasco.',
+  'room.dungeon.grand.f0': 'um CORREDOR ladeado por celas gradeadas dos dois lados, cada uma com porta gradeada, palha e grilhões na parede',
+  'room.dungeon.grand.f1': 'uma fileira de INSTRUMENTOS DE TORTURA no espaço central aberto — um potro, um pelourinho/tronco, uma roda, uma gaiola de ferro suspensa',
+  'room.dungeon.grand.f2': 'a ESTAÇÃO do carrasco: uma bancada de ferramentas pesada, uma bigorna e um rebolo, um braseiro de carvão, armas e correntes em uma parede de ganchos',
+  'room.dungeon.grand.f3': 'um POÇO-RALO central ou canaleta gradeada correndo ao longo do chão',
+  'room.dungeon.grand.f4': 'alguns barris, um caldeirão de água e ossos espalhados pelas celas',
+  'room.dungeon.grand.f5': 'arandelas de ferro e tochas trêmulas distantes umas das outras para que a maior parte do bloco fique na sombra',
+
+  'mod.room.morgue.label': 'Necrotério',
+  'mod.room.morgue.desc':
+    'Um necrotério e sala de embalsamamento: corpos cobertos por lençóis em lajes frias, uma parede de ' +
+    'gavetas de cadáver, uma mesa de embalsamamento posta com frascos e instrumentos, caixões e potes de ' +
+    'espécimes. Clínico, frio e silenciosamente horrível — onde os mortos são guardados e preparados.',
+  'room.morgue.snug.label': 'Canto de embalsamamento',
+  'room.morgue.snug.summary': 'Uma laje com um corpo coberto, uma prateleira de frascos, um caixão em pé, uma luz fraca.',
+  'room.morgue.snug.f0': 'uma única LAJE fria (uma mesa de pedra/quartzo) com um corpo coberto por um lençol em cima',
+  'room.morgue.snug.f1': 'uma pequena bandeja de instrumentos e uma prateleira de garrafas e potes ao lado',
+  'room.morgue.snug.f2': 'um caixão vazio em pé encostado na parede',
+  'room.morgue.snug.f3': 'uma bacia de lavagem/caldeirão e uma luz fraca e estéril',
+  'room.morgue.standard.label': 'Necrotério',
+  'room.morgue.standard.summary': 'Uma fileira de lajes com lençóis, uma mesa de embalsamamento, gavetas de parede, um caixão aberto.',
+  'room.morgue.standard.f0': 'uma FILEIRA de lajes frias pela sala, com corpos cobertos em algumas delas',
+  'room.morgue.standard.f1': 'uma MESA DE EMBALSAMAMENTO com garrafas, uma bandeja de instrumentos, suportes de poções e uma bacia de lavagem',
+  'room.morgue.standard.f2': 'uma parede de GAVETAS DE CADÁVER (uma grade de compartimentos com frentes e puxadores)',
+  'room.morgue.standard.f3': 'um caixão aberto sobre cavaletes e uma pilha de tampas reservas',
+  'room.morgue.standard.f4': 'iluminação superior fria (lanternas atrás de grades de ferro/foscas), um ralo gradeado no chão',
+  'room.morgue.grand.label': 'Salão mortuário',
+  'room.morgue.grand.summary':
+    'Uma parede de gavetas de corpos, várias lajes de autópsia, uma estação de embalsamamento central, ' +
+    'caixões empilhados, armários de vidro com espécimes.',
+  'room.morgue.grand.f0': 'uma PAREDE DE GAVETAS completa — uma grade alta de compartimentos de cadáver, um par deles entreaberto',
+  'room.morgue.grand.f1': 'várias LAJES DE AUTÓPSIA dispostas em grade, com corpos cobertos, lâmpadas suspensas e um ralo sob cada uma',
+  'room.morgue.grand.f2': 'uma ESTAÇÃO DE EMBALSAMAMENTO central: uma longa mesa de garrafas, fluidos, bandejas de instrumentos, suportes de poções e bacias',
+  'room.morgue.grand.f3': 'uma área de caixões — caixões sobre cavaletes e reservas empilhadas, algumas tampas encostadas de lado',
+  'room.morgue.grand.f4': 'ARMÁRIOS de vidro com potes de espécimes (órgãos/curiosidades) e prateleiras de garrafas etiquetadas',
+  'room.morgue.grand.f5': 'uma mesa de registro com um livro-razão e vela; luz fria, uniforme e estéril com uma canaleta gradeada central',
+
+  'mod.room.seance.label': 'Sala de sessão',
+  'mod.room.seance.desc':
+    'Uma sala de sessão espírita vitoriana e estúdio oculto: uma mesa redonda posta para contatar os mortos ' +
+    'sob um candelabro baixo, cortinas pesadas, armários de curiosidades, um canto de leitura de cristal, ' +
+    'taxidermia e prateleiras de grimórios. Refinada por fora, profundamente inquietante por baixo.',
+  'room.seance.snug.label': 'Canto de leitura',
+  'room.seance.snug.summary': 'Uma pequena mesa redonda com duas cadeiras, velas centrais, cortinas fechadas, uma prateleira de curiosidades.',
+  'room.seance.snug.f0': 'uma pequena MESA REDONDA com duas cadeiras frente a frente e um grupo de velas em seu centro',
+  'room.seance.snug.f1': 'um objeto de adivinhação sobre a mesa — uma peça de leitura de cristal (uma haste de cristal / vidro) ou um tabuleiro espírita incrustado',
+  'room.seance.snug.f2': 'cortinas pesadas fechadas sobre a janela e um pequeno tapete sob os pés',
+  'room.seance.snug.f3': 'uma prateleira de curiosidades — um crânio, frascos, um grimório — e uma luz de velas baixa, quente porém sinistra',
+  'room.seance.standard.label': 'Sala de sessão',
+  'room.seance.standard.summary': 'Uma mesa redonda central cercada de cadeiras, um candelabro suspenso, armários de curiosidades, uma lareira.',
+  'room.seance.standard.f0': 'uma MESA REDONDA central cercada de cadeiras, velas no centro e um tabuleiro espírita / cristal como peça central',
+  'room.seance.standard.f1': 'um CANDELABRO baixo suspenso diretamente sobre a mesa (lanternas/velas em uma armação de corrente)',
+  'room.seance.standard.f2': 'ARMÁRIOS DE CURIOSIDADES contra as paredes — vitrines de frascos, ossos, relíquias e excentricidades',
+  'room.seance.standard.f3': 'uma lareira com uma poltrona de orelhas, um grande tapete e cortinas pesadas até o chão sobre as janelas',
+  'room.seance.standard.f4': 'uma prateleira de grimórios, uma peça de taxidermia montada, arandelas de parede atenuadas para a sessão',
+  'room.seance.grand.label': 'Salão oculto',
+  'room.seance.grand.summary':
+    'Uma grande mesa de sessão sob um enorme candelabro, paredes de armários de curiosidades e grimórios, ' +
+    'um nicho de leitura de cristal, uma sala de estar com lareira, espelhos e cortinas.',
+  'room.seance.grand.f0': 'uma GRANDE MESA REDONDA ao centro, muitas cadeiras ao redor, uma peça central elaborada (tabuleiro espírita, cristal, anel de velas)',
+  'room.seance.grand.f1': 'um grande CANDELABRO/lustre de velas acima dela, lançando uma única poça de luz',
+  'room.seance.grand.f2': 'paredes de ARMÁRIOS — vitrines de espécimes e relíquias, mais estantes de grimórios do piso ao teto com uma escada de mão',
+  'room.seance.grand.f3': 'um NICHO DE LEITURA DE CRISTAL: uma mesa lateral coberta com uma esfera brilhante, almofadas e uma cadeira de vidente',
+  'room.seance.grand.f4': 'uma SALA DE ESTAR com lareira — poltronas de orelhas, uma chaise, um grande tapete estampado — reservada para receber visitas',
+  'room.seance.grand.f5': 'espelhos altos cobertos, taxidermia montada e retratos cujos olhos parecem seguir você; cortinas pesadas e arandelas atenuadas por toda parte',
 
   // --- AI providers (shared/ai.ts) ------------------------------------------
   'aiprov.claude-subscription.label': 'Claude (assinatura)',

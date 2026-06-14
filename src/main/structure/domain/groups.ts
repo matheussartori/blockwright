@@ -23,7 +23,18 @@ export const STRUCTURE_GROUPS: StructureGroup[] = [
   { id: 'tower', label: 'Tower' },
 ];
 
-/** Look up a group by id (undefined if unknown). */
+/** ROOM groups — the family a room PROGRAM belongs to (the everyday `general` rooms vs.
+ *  the `horror` set). Distinct from {@link STRUCTURE_GROUPS}: rooms aren't shared via
+ *  `appliesTo` by these ids, so they only header the room picker/gallery. A room declares
+ *  its group via `defineRoom`; `listModuleCatalog` merges both group lists into the catalog
+ *  so the renderer resolves either id to a label the same way. Reuses {@link StructureGroup}
+ *  ({id,label}). */
+export const ROOM_GROUPS: StructureGroup[] = [
+  { id: 'general', label: 'General' },
+  { id: 'horror', label: 'Horror' },
+];
+
+/** Look up a structure OR room group by id (undefined if unknown). */
 export function getStructureGroup(id: string): StructureGroup | undefined {
-  return STRUCTURE_GROUPS.find((g) => g.id === id);
+  return [...STRUCTURE_GROUPS, ...ROOM_GROUPS].find((g) => g.id === id);
 }

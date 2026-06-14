@@ -37,6 +37,10 @@ export interface ModuleMeta {
   label: string;
   /** Which category this module belongs to. */
   category: ModuleCategory;
+  /** The FAMILY this module belongs to, for headering the picker/gallery: a structure
+   *  type's structure-group id (e.g. `'house'`), or a room's program group (`'general'`
+   *  / `'horror'`). Resolved to a label via the catalog's `groups`. Omit → ungrouped. */
+  group?: string;
   /** One-paragraph description for the gallery screen (what it builds, when to use). */
   description: string;
   /** Path (relative to the knowledge dir, e.g. `nbt/modules/structure/house.md`) of
@@ -71,6 +75,7 @@ export function toSummary(m: ModuleMeta): ModuleSummary {
     id: m.id,
     label: m.label,
     category: m.category,
+    group: m.group,
     description: m.description,
     hasPreview: m.preview !== undefined,
     appliesTo: m.appliesTo,

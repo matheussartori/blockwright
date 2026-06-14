@@ -11,15 +11,33 @@ import type { ModuleSummary } from '../modules';
 import { createRegistry } from '../registry';
 import { bedroom } from './bedroom';
 import { dormitory } from './dormitory';
+import { dungeon } from './dungeon';
 import { kitchen } from './kitchen';
 import { library } from './library';
 import { living } from './living';
+import { morgue } from './morgue';
+import { ritual } from './ritual';
+import { seance } from './seance';
 import { storage } from './storage';
 import type { RoomModule } from './types';
 
 export type { RoomModule } from './types';
 
-export const registry = createRegistry<RoomModule>([living, kitchen, library, bedroom, dormitory, storage]);
+// Registration order is the picker/gallery order: the `general` family first, then the
+// `horror` set — so each group's options stay contiguous and the grouped Select headers
+// them cleanly ("General" then "Horror").
+export const registry = createRegistry<RoomModule>([
+  living,
+  kitchen,
+  library,
+  bedroom,
+  dormitory,
+  storage,
+  ritual,
+  dungeon,
+  morgue,
+  seance,
+]);
 
 /** Look up a room module by id (undefined if unknown). */
 export function getRoom(id: string): RoomModule | undefined {

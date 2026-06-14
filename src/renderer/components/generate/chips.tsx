@@ -11,6 +11,9 @@ export interface ChipOption {
   /** Optional short explanation (e.g. a room module's summary) — surfaced when the option
    *  is rendered in a {@link Select} dropdown. */
   description?: string;
+  /** Optional group (family) label (e.g. "Horror") — headers contiguous runs in a
+   *  {@link Select} dropdown and is preserved while searching. */
+  group?: string;
 }
 
 export function Chip({

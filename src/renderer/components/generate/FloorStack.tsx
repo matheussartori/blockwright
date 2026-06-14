@@ -66,8 +66,16 @@ export function FloorStack({ nFloors, rooms, options, max, busy, t, onAdd, onRem
                   placeholder={t('gen.addRoom')}
                   ariaLabel={t('gen.addRoom')}
                   disabled={busy}
-                  options={options.map((o) => ({ value: o.id, label: o.label, description: o.description }))}
+                  options={options.map((o) => ({
+                    value: o.id,
+                    label: o.label,
+                    description: o.description,
+                    group: o.group,
+                  }))}
                   onChange={(id) => id && onAdd(i, id)}
+                  searchable
+                  searchPlaceholder={t('gen.selectSearch')}
+                  noResultsLabel={t('gen.selectNoResults')}
                 />
               )}
               {full && <span className="gen-floor-full">{t('gen.roomsFull')}</span>}

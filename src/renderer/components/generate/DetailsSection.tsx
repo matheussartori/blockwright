@@ -83,6 +83,9 @@ export function DetailsSection({
   // re-mounts on a structure change (see the `key` below).
   const [linked, setLinked] = useState(true);
   const selStruct = catalog?.structure.find((m) => m.id === details.structureType);
+  // Resolve a module's `group` id (a structure family OR a room program group) to its
+  // label, so both the structure picker and the room picker can header by family.
+  const groupLabel = (gid?: string) => catalog?.groups?.find((g) => g.id === gid)?.label;
   const galleryLink = (
     <button className="link gen-gallery-link" onClick={() => store.getState().setModulesOpen(true)} disabled={busy}>
       {t('gen.detailsGalleryLink')}
@@ -95,7 +98,6 @@ export function DetailsSection({
   // and their FAMILY (the structure group, e.g. "House") — the menu headers each group
   // and a search result keeps the group name on the row.
   if (!details.structureType) {
-    const groupLabel = (gid?: string) => catalog?.groups?.find((g) => g.id === gid)?.label;
     const structOptions: SelectOption[] = (catalog?.structure ?? []).map((m) => ({
       value: m.id,
       label: m.label,
@@ -135,7 +137,7 @@ export function DetailsSection({
   const nFloors = floorCount(selStruct, details.params);
   const roomOptions: ChipOption[] = (catalog?.room ?? [])
     .filter(fits)
-    .map((m) => ({ id: m.id, label: m.label, description: m.description }));
+    .map((m) => ({ id: m.id, label: m.label, description: m.description, group: groupLabel(m.group) }));
 
   // The currently-selected module in each slot, so a conflicting OPTION in another slot
   // (e.g. an attic when the flat roof is picked) can be greyed with a reason — the SAME

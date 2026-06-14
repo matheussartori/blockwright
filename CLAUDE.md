@@ -132,11 +132,17 @@ src/
                            `args.composeModule(...)` — see "Composable generation domain"), so a module is
                            the single source of that geometry. Each declares `appliesTo` (the structures it
                            pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
-        rooms/             Category "room": one file per interior program (living/kitchen/library/
-                           bedroom/dormitory/storage), each a `defineRoom({...})` of PURE DATA +
+        rooms/             Category "room": one file per interior program — the 'general' family
+                           (living/kitchen/library/bedroom/dormitory/storage) + the 'horror' family
+                           (ritual/dungeon/morgue/seance) — each a `defineRoom({...})` of PURE DATA +
                            define.ts (the factory: fills category/knowledge-path/preset-ids + default
-                           hosts) + types.ts (RoomModule = ModuleMeta + required `knowledge` + `presets`,
-                           no geometry) + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`:
+                           hosts + the `group`, default 'general') + types.ts (RoomModule = ModuleMeta +
+                           required `knowledge` + `presets`, no geometry) + index.ts (registry, general
+                           first then horror so each group's options stay contiguous for the grouped
+                           picker). Room program groups live in `groups.ts` `ROOM_GROUPS` (general/horror),
+                           merged with `STRUCTURE_GROUPS` into the catalog's `groups` so the renderer
+                           resolves either id to a label; the per-floor room picker (FloorStack) is a
+                           grouped, searchable `Select`. GUIDANCE-ONLY — no `build()`/`preview`:
                            the user assigns up to two rooms per floor in the composer Details (house;
                            one per floor on the tighter tower), each loads only its knowledge guide and
                            rides into the prompt as a `[Room plan]` line per floor; the AI furnishes the
@@ -326,9 +332,10 @@ src/
                           (the themed single-select dropdown — portal-rendered in `position:fixed` so it's
                           never clipped by a scrolling column, keyboard-navigable, options carry an optional
                           one-line `description` clamped with ellipsis + the full text on hover; options can
-                          also carry a `group` (family) label — contiguous runs get a header/divider, and
-                          the opt-in `searchable` prop adds a sticky search box whose filtered results keep
-                          the group name inline on each row; the OPAQUE
+                          also carry a `group` (family) label — each contiguous run gets a header/divider,
+                          and the opt-in `searchable` prop adds a sticky search box; the filter preserves
+                          order so group headers HOLD while filtering (e.g. searching "classic" still shows
+                          it under "House" then "Tower"); the OPAQUE
                           `--elevated` token backs the menu, never the translucent `--panel`), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).

@@ -26,7 +26,7 @@ import {
   structureGroupOf,
   structureModules,
 } from './structure-types';
-import { STRUCTURE_GROUPS } from './groups';
+import { STRUCTURE_GROUPS, ROOM_GROUPS } from './groups';
 
 export {
   composeStructure,
@@ -48,7 +48,7 @@ export {
   type StructureType,
   type FinalizePass,
 } from './structure-types';
-export { STRUCTURE_GROUPS, getStructureGroup, type StructureGroup } from './groups';
+export { STRUCTURE_GROUPS, ROOM_GROUPS, getStructureGroup, type StructureGroup } from './groups';
 export {
   getDecoration,
   decorationIds,
@@ -86,7 +86,9 @@ export function listModuleCatalog(): ModuleCatalog {
     attic: listAttics(),
     room: listRooms(),
     surroundings: listSurroundings(),
-    groups: STRUCTURE_GROUPS,
+    // Structure families (house/tower) AND room program groups (general/horror) — the
+    // renderer resolves a module's `group` id to a label against this combined list.
+    groups: [...STRUCTURE_GROUPS, ...ROOM_GROUPS],
   };
 }
 
