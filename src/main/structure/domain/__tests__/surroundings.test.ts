@@ -140,11 +140,13 @@ describe('modern surroundings geometry (template expansion)', () => {
     for (const [, c] of hedges) expect(c.props?.persistent).toBe('true');
   });
 
-  it('keeps the ring LOW — landscaping, never construction (max 2 cells above ground)', () => {
+  it('keeps the ring LOW — landscaping, never construction (max 3 cells above ground)', () => {
+    // The modern plot is the most CONSTRUCTED yard (2-tall pillars + slab/lantern cap,
+    // 3-tall topiary), but still landscaping — capped at 3 cells above ground.
     for (const [k, c] of at) {
       const [x, y, z] = k.split(',').map(Number);
       const inRing = x < inner.x0 || x > inner.x1 || z < inner.z0 || z > inner.z1;
-      if (inRing && isSolid(c)) expect(y, `ring block at ${k} (${c.name})`).toBeLessThanOrEqual(2);
+      if (inRing && isSolid(c)) expect(y, `ring block at ${k} (${c.name})`).toBeLessThanOrEqual(3);
     }
   });
 
@@ -163,19 +165,25 @@ describe('modern surroundings geometry (template expansion)', () => {
     expect(isSolid(at.get(`${cx},1,0`))).toBe(false);
   });
 
-  it('cuts every yard corner (the grounds are never the plain rectangle)', () => {
+  it('frames the plot with a modern perimeter wall (corner pillars + iron-bar panels + an open gate)', () => {
+    // The modern yard is rectilinear (not chamfered): every corner carries a white-concrete
+    // pillar, the runs between are dark iron-bar panels, and the door column is left open.
     for (const [x, z] of [[0, 0], [SIZE[0] - 1, 0], [0, SIZE[2] - 1], [SIZE[0] - 1, SIZE[2] - 1]]) {
-      expect(isSolid(at.get(`${x},0,${z}`)), `corner ${x},${z} must be cut`).toBe(false);
-      expect(isSolid(at.get(`${x},1,${z}`)), `corner hedge ${x},${z} must be cut`).toBe(false);
+      expect(at.get(`${x},1,${z}`)?.name, `corner pillar ${x},${z}`).toBe('minecraft:white_concrete');
+      expect(at.get(`${x},2,${z}`)?.name, `corner pillar ${x},${z}`).toBe('minecraft:white_concrete');
     }
+    const bars = [...at.values()].filter((c) => c.name === 'minecraft:iron_bars');
+    expect(bars.length, 'iron-bar fence panels').toBeGreaterThan(8);
+    // The gate: the front wall is open at the door column.
+    expect(isSolid(at.get(`${cx},1,0`)), 'gate stays open').toBe(false);
+    expect(isSolid(at.get(`${cx},2,0`)), 'gate stays open').toBe(false);
   });
 
-  it('seeds vary the outline (two seeds disagree on some hedge cells)', () => {
+  it('is deterministic — a modern plot is manicured, not scattered (two seeds agree exactly)', () => {
     const other = expand(SIZE, { surroundings: 'modern', floors: 2, seed: 8 });
-    const hedgeSet = (m: typeof at) =>
-      new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:oak_leaves').map(([k]) => k));
-    const a = hedgeSet(at), b2 = hedgeSet(other.at);
-    expect([...a].some((k) => !b2.has(k)) || [...b2].some((k) => !a.has(k))).toBe(true);
+    const fingerprint = (m: typeof at) =>
+      [...m.entries()].map(([k, c]) => `${k}=${c.name}`).sort().join('|');
+    expect(fingerprint(at)).toBe(fingerprint(other.at));
   });
 
   it('builds the plain full-footprint villa when surroundings is none (no yard leaks in)', () => {

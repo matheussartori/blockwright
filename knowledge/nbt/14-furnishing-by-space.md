@@ -28,6 +28,26 @@ Rules of thumb for a grand room so it never echoes:
 - **Repeat.** More beds, more shelves, more seating — scale the count to the floor.
 - **Break the span.** Columns, half-walls, planters, or rug runners stop a long bare floor.
 
+## Restraint: storage is strategic, not wallpaper
+
+Density scaling fills a room with the RIGHT furniture — it is **not** a licence to line the
+walls with crates. The most common over-furnishing failure is **chests and barrels used as
+decoration**: a continuous run of `chest`/`barrel` banding a room's perimeter, capping every
+wall, or stacked as a cornice. This reads as a cluttered warehouse, never a furnished room.
+
+- **A `chest`/`barrel` is functional storage — place it only where storage belongs**, and
+  only a FEW: a storeroom/pantry, beside a workbench or kitchen counter, at the foot of a
+  bed, a small stack in a utility corner. A normal living room, bedroom or library wants
+  **at most one or two**, if any.
+- **Never run chests/barrels along a wall as a border or trim.** They are not panelling.
+  For wall texture use shelves, paintings, item frames, trapdoors, banners, slabs — not a
+  row of crates.
+- **A dedicated Storage room is the only place a wall of crates is right** — and even there
+  it's organised shelving (stacked barrels with trapdoor doors, a couple of chests with
+  clear fronts), not every surface covered.
+- The same restraint goes for any single prop repeated to fill space: scale the room with
+  VARIED furniture and zones (above), not by copy-pasting one block around the perimeter.
+
 ## Presets are a base; the decoration re-skins them
 
 Each room module ships **furnishing presets**, one per space tier (e.g. a bedroom's *Cot

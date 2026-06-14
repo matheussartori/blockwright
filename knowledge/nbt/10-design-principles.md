@@ -389,6 +389,9 @@ Catch these in the preview ([`07`](07-workflow.md)):
   solid block; hang things with `chain`+`lantern` or hanging signs instead.
 - ❌ Chest/barrel/furnace floating over a stairwell or facing **into** the wall (back to the room) →
   ✅ on a solid block, front faced at the open room, back to the wall.
+- ❌ Chests/barrels used as **decoration** — a run of crates banding a room, capping the walls, or
+  stacked as a cornice → ✅ storage is strategic: a FEW only, where storage belongs (pantry, workbench,
+  storeroom, bed-foot). For wall texture use shelves/frames/trapdoors/banners, never a row of crates.
 - ❌ Decoration op carved a hole in a wall/floor (a chest-shaped gap, a missing floor tile) → ✅ decor
   placed into empty cells; never overwriting a structural block.
 - ❌ A chest front / stair landing / doorway buried behind decoration → ✅ accesses kept clear and

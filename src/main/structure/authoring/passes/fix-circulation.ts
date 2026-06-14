@@ -24,6 +24,8 @@ import type { Pass } from './types';
 
 const isLadder = (name: string): boolean => bareId(name) === 'ladder';
 const isStair = (name: string): boolean => bareId(name).endsWith('_stairs');
+/** The four lateral neighbours of a cell — used to spot a step-off landing at a ladder top. */
+const LATERAL: readonly [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 // How far below a floor hole a stair/ladder still counts as "this column's shaft": a
 // carved stairwell can break the floor a couple of cells above its top tread.
 const SHAFT_REACH = 4;
@@ -55,8 +57,17 @@ export const fixCirculation: Pass = (blocks, palette) => {
       seen.add(posKey(x, yy, z));
     }
     const [bx, by, bz] = run[0];
+    const [tx, ty, tz] = run[run.length - 1];
     const tooShort = run.length < 2;                          // a lone rung climbs nothing
-    const inRoofVoid = by > ceilY;                            // the whole run sits above the ceiling
+    // A run that tops out on a WALKABLE surface is functional even above the ceiling plane:
+    // a roof-hatch ladder climbing the top storey up onto a walkable deck (the keep's
+    // crown) reaches a deck cell with open air over it to step onto. Only a run with no
+    // such landing at its top is the "attic ladder to nowhere" this rule drops. (The
+    // ceiling heuristic itself collapses to the ground plane on a big-yard build, so the
+    // bare `by > ceilY` test alone would wrongly condemn every legitimate roof hatch.)
+    const stepOffAtTop = LATERAL.some(([dx, dz]) =>
+      isSolidSupport(nameAt(tx + dx, ty, tz + dz)) && isAir(nameAt(tx + dx, ty + 1, tz + dz) ?? 'minecraft:air'));
+    const inRoofVoid = by > ceilY && !stepOffAtTop;           // above the ceiling AND leading nowhere
     const floatingBase = !isSolidSupport(nameAt(bx, by - 1, bz)); // nothing solid to step onto at the foot
     if (tooShort || inRoofVoid || floatingBase) {
       for (const p of run) remove.add(posKey(...p));

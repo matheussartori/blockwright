@@ -568,6 +568,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // Process gaps bottom-up so a lower connector reserves its cells before a higher one
   // (and so a hint-less gap can stack its climb over the connector just laid below).
   let prevArrival: { x: number; z: number } | null = null;
+  const servedGaps: { lowerY: number; upperY: number }[] = []; // gaps that got a clean connector
   for (const lowerY of [...byGap.keys()].sort((a, b) => a - b)) {
     const work = byGap.get(lowerY) as GapWork;
     const gap = gapFor(planes, lowerY);
@@ -592,10 +593,34 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     for (const b of plan.place) { added.push(b); at.set(posKey(...b.pos), b); }
     if (work.hints.length === 0) { if (plan.kind === 'stair') addedStairs++; else addedLadders++; }
     else if (plan.kind === 'stair') stairs++; else ladders++;
+    servedGaps.push({ lowerY: gap.lowerY, upperY: gap.upperY });
     prevArrival = { x: plan.arrive[0], z: plan.arrive[1] };
   }
 
-  if (stairs === 0 && ladders === 0 && addedStairs === 0 && addedLadders === 0 && warnings.length === 0) {
+  // ── One climb per storey (the user's rule): strip GHOST flights ──────────────────
+  // Each served gap now has exactly ONE clean connector. Any OTHER climbing stair flight
+  // the model left inside that gap — a second staircase that "goes up but leads nowhere",
+  // below the per-gap hint threshold or mis-attributed, so it escaped the strip — is a
+  // ghost. Remove it so no storey is ever left with two competing stairs (a recurring
+  // complaint). Only flights inside a SUCCESSFULLY connected gap are swept (an
+  // unconnected gap keeps the model's geometry as its sole access), and never the chosen
+  // connector's own cells (`reserved`).
+  let ghosts = 0;
+  if (servedGaps.length) {
+    for (const f of findFlights(blocks, palette, { ceilFloor })) {
+      const bY = f.chain[0].pos[1], tY = f.chain[f.chain.length - 1].pos[1];
+      if (tY - bY < 3) continue; // a short decorative stub, not a climb
+      const gap = servedGaps.find((g) => bY >= g.lowerY && tY <= g.upperY);
+      if (!gap) continue;
+      const cells = f.chain.map((t) => posKey(...t.pos));
+      if (cells.some((k) => reserved.has(k))) continue; // (part of) the real connector — keep
+      if (cells.every((k) => stripKeys.has(k))) continue; // already removed with its gap
+      for (const k of cells) { stripKeys.add(k); at.delete(k); }
+      ghosts++;
+    }
+  }
+
+  if (stairs === 0 && ladders === 0 && addedStairs === 0 && addedLadders === 0 && ghosts === 0 && warnings.length === 0) {
     return { blocks, palette };
   }
 
@@ -625,6 +650,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   if (addedStairs) fixes.push(`added ${addedStairs} missing staircase(s) between storeys the build left unconnected`);
   if (addedLadders) fixes.push(`added ${addedLadders} missing wall ladder(s) between storeys the build left unconnected`);
   if (patched.filled) fixes.push(`floored over ${patched.filled} orphan stairwell-remnant hole(s) left where the old climb was removed`);
+  if (ghosts) fixes.push(`removed ${ghosts} duplicate/ghost staircase(s) so each storey keeps a single clean climb`);
   return { blocks: result, palette: outPalette, fixes, warnings: warnings.length ? warnings : undefined };
 };
 

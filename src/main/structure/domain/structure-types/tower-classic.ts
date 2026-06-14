@@ -16,7 +16,7 @@ import { planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
 import type { ParamValues } from '../params';
 import { insetHouseBox, yardFor } from '../surroundings';
-import type { Box, FloorPlanEntry, StructureType } from './types';
+import type { Box, FloorPlanEntry, RolePalette, StructureType } from './types';
 import { addStairCore } from './stair-core';
 import { ceilingLanterns, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 
@@ -146,6 +146,12 @@ export const towerClassic: StructureType = {
     // A switchback stair core (falls back to a flush wall ladder when the footprint is too
     // tight — the common case for a narrow tower), linking every walkable storey.
     addStairCore({ ops, box: { x0, y0, z0, x1, y1, z1, W, D, H }, slabYs, palette });
+    // The keep's CROWN is content (the battlemented walkable deck), so it ALWAYS gets its
+    // own access — even a single-storey tower. The stair core only links the interior
+    // storeys; this hatch ladder climbs the TOP storey up THROUGH the deck and pops the
+    // player onto the roof. (The stairwell pass never touches it: the deck isn't a labelled
+    // storey plane, so it sees no gap here.)
+    ops.push(...roofHatch({ x0, z0, x1, z1 }, slabYs[slabYs.length - 1], wallTop, palette));
 
     // --- Decay (cozy keeps this at 0): weather + chip the shaft, sparing corners ------
     if (decay > 0) {
@@ -172,6 +178,32 @@ export const towerClassic: StructureType = {
     return storeyEntries(slabYs, wallTop);
   },
 };
+
+/** Roof-deck access: a code-owned ladder climbing the TOP storey up THROUGH the deck so the
+ *  player can reach the keep's content — the walkable battlemented crown. Hung on the WEST
+ *  wall one cell in from the front-left corner (clear of the front-wall door and the
+ *  back-right stair core), it runs from just above the top floor up to the deck and PUNCHES
+ *  the deck cell at its own column (the hatch); the climber rises out of it and steps onto
+ *  the surrounding deck. Always laid — even a single-storey keep earns a way up top. */
+function roofHatch(
+  rect: { x0: number; z0: number; x1: number; z1: number },
+  topY: number,
+  deckY: number,
+  palette: RolePalette,
+): AuthoringOp[] {
+  const { x0, z0, z1 } = rect;
+  if (deckY - topY < 2) return []; // the deck sits right on the top floor — nothing to climb
+  const cz = Math.floor((z0 + z1) / 2);
+  let lz = z0 + 1; // front-left, a cell off the corner
+  if (lz === cz) lz = Math.min(z1 - 1, z0 + 2); // dodge the centred arrow slit on the west wall
+  const lx = x0 + 1; // one cell in from the west wall, which backs the ladder (faces east)
+  const ladder = palette.get('ladder', { facing: 'east' });
+  const ops: AuthoringOp[] = [];
+  // Rungs from just above the top floor up to (and through) the deck — the top rung replaces
+  // the deck block, opening the hatch the climber emerges from onto the crown.
+  for (let y = topY + 1; y <= deckY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
+  return ops;
+}
 
 /** A crenellated parapet ring at height `y`: a merlon on every other perimeter cell (the
  *  gaps between are the crenels), walked once around the rim so the corners carry merlons. */
