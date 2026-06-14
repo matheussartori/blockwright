@@ -86,6 +86,15 @@ describe('compose: structure types × decorations', () => {
     // A basement pick prepends the below-grade level.
     const withCellar = structureFloorPlan('classic', [11, 18, 9], { floors: 2, basement: 'cellar' });
     expect(withCellar.map((f) => f.role)).toEqual(['basement', 'ground', 'upper', 'roof']);
+    // MULTI-LEVEL basement: the per-level heights MUST drive the plan (one basement band per
+    // level) so `grade` (the first non-basement floor's `from`) sits ABOVE the whole basement.
+    // The bug: omitting `basementHeights` reserved a single default level → grade far too low →
+    // the real basement levels read as above-grade storeys → stairwell pass thrashed (the
+    // "escada estourando a parede / 2 lances por andar" defect).
+    const multi = structureFloorPlan('classic', [20, 48, 16], { floors: 2, basement: 'cellar', basementHeights: [7, 7, 7, 7] });
+    expect(multi.filter((f) => f.role === 'basement')).toHaveLength(4);
+    const grade = multi.find((f) => f.role !== 'basement')!.from;
+    expect(grade).toBe(28); // 4×7 below grade (footprint == house → no extra ceiling layer)
     // A CENTRAL-basement type (gothic owns no basement param) now reports the basement +
     // storeys + roof too — not everything-above-the-cellar as one "roof" band.
     const goth = structureFloorPlan('gothic', [16, 24, 14], { floors: 2, basement: 'crypt' });

@@ -159,6 +159,14 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
           // reports — pass them (the count is the per-floor heights' length) so a basement/
           // multi-storey build isn't flattened to a single detected floor.
           basement: selection.basement,
+          // The PER-LEVEL basement depths + enlarged footprint MUST ride along: without them
+          // the sidecar reserves a single default level, so `grade` lands far too low and the
+          // real basement levels read as above-grade storeys — the stairwell pass then tries to
+          // connect those phantom gaps, fails, and leaves the model's wall-piercing/duplicate
+          // stairs (the recurring "escada estourando a parede / 2 lances" defect).
+          basementHeights: selection.basementHeights,
+          basementArea: selection.basementArea,
+          shellSize: selection.shellSize,
           attic: selection.attic,
           floors: selection.floorHeights?.length,
           surroundings: selection.surroundings,
