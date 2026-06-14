@@ -15,6 +15,7 @@ function scene(): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] }
     { Name: 'minecraft:air' },
     { Name: 'minecraft:stone_bricks' },
     { Name: 'minecraft:ladder', Properties: { facing: 'south' } },
+    { Name: 'minecraft:oak_stairs', Properties: { facing: 'east', half: 'bottom', shape: 'straight' } },
   ];
   const blocks: AuthoringBlock[] = [];
   for (const y of PLANES) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: 1, pos: [x, y, z] });
@@ -35,6 +36,48 @@ describe('rebuildStairwells — below-grade circulation is code-owned', () => {
       out.blocks.some((b) => posKey(...b.pos) === posKey(x, y, z) && (out.palette[b.state]?.Name ?? '').includes('ladder'));
     // The below-grade ladder (y1..6) survives untouched — the pass never strips/rebuilds it.
     for (let y = 1; y <= 6; y++) expect(has(1, y, D - 2), `basement rung y=${y}`).toBe(true);
+  });
+
+  it('strips the model’s competing basement STAIR, keeping the code descent ladder (one way down)', () => {
+    const { blocks, palette } = scene();
+    // The model dug its own stair down to the basement too: a flight y1..5 at z=2.
+    const stairKeys: string[] = [];
+    for (let i = 0; i <= 4; i++) {
+      const pos: [number, number, number] = [2 + i, 1 + i, 2];
+      blocks.push({ state: 3, pos });
+      stairKeys.push(posKey(...pos));
+    }
+    const out = rebuildStairwells(blocks, palette, { size: [W, 16, D], grade: 6, floorPlanes: PLANES });
+    // The model's basement stair is gone…
+    for (const k of stairKeys) {
+      const b = out.blocks.find((bb) => posKey(...bb.pos) === k);
+      expect(b && (out.palette[b.state]?.Name ?? '').endsWith('_stairs'), `stair ${k} removed`).toBeFalsy();
+    }
+    // …while the code descent ladder survives (the single way down).
+    const ladder = (x: number, y: number, z: number) =>
+      out.blocks.some((b) => posKey(...b.pos) === posKey(x, y, z) && (out.palette[b.state]?.Name ?? '').includes('ladder'));
+    for (let y = 1; y <= 6; y++) expect(ladder(1, y, D - 2), `descent rung y=${y}`).toBe(true);
+    expect((out.fixes ?? []).some((f) => f.includes('basement staircase'))).toBe(true);
+  });
+
+  it('WITHOUT a code descent ladder, the model’s basement stair is left as the only access', () => {
+    const { palette } = scene();
+    // Same shell but NO basement ladder + a model basement stair: nothing to strip toward, so
+    // the stair must survive (never leave the basement unreachable).
+    const blocks: AuthoringBlock[] = [];
+    for (const y of PLANES) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: 1, pos: [x, y, z] });
+    for (let y = 1; y < 12; y++) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+      if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push({ state: 1, pos: [x, y, z] });
+    }
+    const stairKeys: string[] = [];
+    for (let i = 0; i <= 4; i++) {
+      const pos: [number, number, number] = [2 + i, 1 + i, 2];
+      blocks.push({ state: 3, pos });
+      stairKeys.push(posKey(...pos));
+    }
+    const out = rebuildStairwells(blocks, palette, { size: [W, 16, D], grade: 6, floorPlanes: PLANES });
+    const kept = stairKeys.filter((k) => out.blocks.some((b) => posKey(...b.pos) === k && (out.palette[b.state]?.Name ?? '').endsWith('_stairs')));
+    expect(kept.length).toBeGreaterThan(0); // the sole basement access is preserved
   });
 
   it('WITHOUT a grade, the basement ladder is fair game (old behaviour preserved)', () => {

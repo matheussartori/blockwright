@@ -89,6 +89,65 @@ function mergedPlanes(
   return { planes: [...set].sort((a, b) => a - b), runTop };
 }
 
+/** The largest 4-connected component of the structural-full FLOOR cells on plane `py`,
+ *  as a bbox + size. Using the LARGEST component (not the raw bbox) rejects a handful of
+ *  stray cells at that level — a stair landing poking out, a yard fixture's top — that
+ *  would otherwise balloon the box past the real floor. Null when the plane has no slab. */
+function planeFootprint(
+  blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[], py: number,
+): { minX: number; maxX: number; minZ: number; maxZ: number; size: number } | null {
+  const cells = new Set<string>();
+  for (const b of blocks) {
+    if (b.pos[1] !== py || !isStructuralFull(palette, b.state)) continue;
+    cells.add(`${b.pos[0]},${b.pos[2]}`);
+  }
+  if (cells.size === 0) return null;
+  const seen = new Set<string>();
+  let best: [number, number][] = [];
+  for (const c of cells) {
+    if (seen.has(c)) continue;
+    const comp: [number, number][] = [];
+    const st = [c];
+    while (st.length) {
+      const k = st.pop() as string;
+      if (seen.has(k) || !cells.has(k)) continue;
+      seen.add(k);
+      const [x, z] = k.split(',').map(Number);
+      comp.push([x, z]);
+      st.push(`${x + 1},${z}`, `${x - 1},${z}`, `${x},${z + 1}`, `${x},${z - 1}`);
+    }
+    if (comp.length > best.length) best = comp;
+  }
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const [x, z] of best) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x; if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  }
+  return { minX, maxX, minZ, maxZ, size: best.length };
+}
+
+/** The HOUSE footprint a connector must stay inside — the union of the ABOVE-GRADE storey
+ *  planes' largest floor components. A build with a big SURROUNDINGS yard fills the whole
+ *  box at grade (the lawn), so the raw block bounds are the YARD, not the house, and a
+ *  derived stair happily climbs out onto the lawn / a graveyard tree (the "escada no
+ *  exterior" defect the user kept hitting). Above-grade planes are house-only (the yard is
+ *  ground-level landscaping), so their floor footprint is the real house. Falls back to the
+ *  raw bounds when nothing above grade is usable — a free-form / yard-less build, where the
+ *  raw bounds ARE the house, so the behaviour is unchanged there. */
+function houseFootprint(
+  blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[], planes: number[], grade: number,
+  fallback: { minX: number; maxX: number; minZ: number; maxZ: number },
+): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const py of planes) {
+    if (py <= grade) continue; // the grade plane carries the yard; above it is house-only
+    const fp = planeFootprint(blocks, palette, py);
+    if (!fp || fp.size < 9) continue; // ignore a sliver (a partial deck / a stray cluster)
+    if (fp.minX < minX) minX = fp.minX; if (fp.maxX > maxX) maxX = fp.maxX;
+    if (fp.minZ < minZ) minZ = fp.minZ; if (fp.maxZ > maxZ) maxZ = fp.maxZ;
+  }
+  return minX === Infinity ? fallback : { minX, maxX, minZ, maxZ };
+}
+
 /** Ground / loose-fill blocks that read as TERRAIN, never construction: the surroundings
  *  yard's dirt/grass dominates the grade plane, and reusing it for a stair's treads/stringers
  *  put DIRT in a stone staircase (the "dirt na escada" defect). A derived stair must blend
@@ -265,6 +324,14 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // it); only a locked NON-floor block is forced to read as an immovable wall.
   const lockSet = new Set<string>((ctx.lockCells ?? []).map((c) => posKey(...c.pos)));
 
+  // The HOUSE footprint (above-grade storey planes), NOT the raw box — which a surroundings
+  // yard inflates to the whole lawn. Every connector's landings/arrival/scan are clamped to
+  // this so a stair can never be planned out on the yard (the "escada no exterior" defect).
+  // `inHouse` is the strict-interior test (excludes the perimeter wall ring).
+  const { minX: hMinX, maxX: hMaxX, minZ: hMinZ, maxZ: hMaxZ } =
+    houseFootprint(blocks, palette, planes, grade, { minX, maxX, minZ, maxZ });
+  const inHouse = (x: number, z: number): boolean => x > hMinX && x < hMaxX && z > hMinZ && z < hMaxZ;
+
   // ── Collect every circulation hint, grouped by the storey-gap it serves ─────────
   const byGap = new Map<number, GapWork>();
   const addHint = (h: Hint, strip: string[], gap: { lowerY: number; upperY: number }): void => {
@@ -281,6 +348,18 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     for (const k of strip) w.strip.add(k);
     byGap.set(gap.lowerY, w);
   };
+
+  // The model often ALSO digs its OWN stair down to a code-owned basement, leaving TWO ways
+  // down (the user's "duas escadas para o basement; a de stairs está bloqueada"). The central
+  // basement ships ONE authoritative descent LADDER (composeBasementStack); below-grade gaps
+  // are never rebuilt here, so when a below-grade ladder is present we strip the model's
+  // competing below-grade STAIR flights (never a ladder, so the real descent always survives)
+  // → exactly one way down. Gated on an existing below-grade ladder so a build whose only
+  // basement access IS a stair is never left unreachable.
+  const ladderRuns = findLadderRuns(blocks, palette);
+  const hasBelowGradeLadder = grade > -Infinity && ladderRuns.some((r) => r.cells.some((c) => c.pos[1] < grade));
+  const belowGradeStripStairs = new Set<string>();
+  let basementStairsRemoved = 0;
 
   // The roof-slope cut for flight detection: the top MERGED storey plane (geometric ∪
   // authoritative). This rescues flights on a yarded build, where the geometric ceiling
@@ -301,10 +380,16 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
         // recognised as floor, never stripped as a stringer.
         if (below && !runTop.has(sy) && isStructuralFull(palette, below.state)) strip.push(posKey(sx, sy, sz));
       }
+      // A below-grade stair flight competing with the code descent ladder → strip it.
+      if (hasBelowGradeLadder && belowGrade(seg.gap) && top[1] - bottom[1] >= 3) {
+        let any = false;
+        for (const k of strip) if (!lockSet.has(k)) { belowGradeStripStairs.add(k); any = true; }
+        if (any) basementStairsRemoved++;
+      }
       addHint({ x: bottom[0], z: bottom[2], dir: f.dir, stairState: seg.cells[0].state, rise: top[1] - bottom[1] }, strip, seg.gap);
     }
   }
-  for (const run of findLadderRuns(blocks, palette)) {
+  for (const run of ladderRuns) {
     for (const seg of segmentByGap(run.cells, planes)) {
       const bottom = seg.cells[0].pos;
       const top = seg.cells[seg.cells.length - 1].pos;
@@ -324,7 +409,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // its own roof.
   const habitableAbove = (py: number): boolean => {
     let floor = 0, standing = 0;
-    for (let x = minX; x <= maxX; x++) for (let z = minZ; z <= maxZ; z++) {
+    for (let x = hMinX; x <= hMaxX; x++) for (let z = hMinZ; z <= hMaxZ; z++) {
       const b = at.get(posKey(x, py, z));
       if (!b || !isStructuralFull(outPalette, b.state)) continue;
       floor++;
@@ -346,7 +431,9 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     byGap.set(lowerY, { hints: [], strip: new Set() });
   }
 
-  if (byGap.size === 0) return { blocks, palette }; // no storey gap needs a connector
+  // No above-grade gap needs a connector — but still apply the basement-stair strip below
+  // (a build can have only a redundant basement staircase to remove and no other work).
+  if (byGap.size === 0 && belowGradeStripStairs.size === 0) return { blocks, palette };
 
   // ── Rebuild one clean connector per gap ─────────────────────────────────────────
   const reserved = new Set<string>(); // every cell any connector occupies — never overlap
@@ -432,10 +519,11 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
       Properties: { facing: ascentFacing(fx, fz), half: 'bottom', shape: 'straight', waterlogged: 'false' },
     });
     const floorMat = mats.get(lowerY);
-    // Treads, landing and arrival must stay strictly INSIDE the build's footprint: the
-    // perimeter line is the wall — a "passable" cell there is a window/door opening,
-    // and a run threading through one would march off into the garden.
-    const inside = (x: number, z: number): boolean => x > minX && x < maxX && z > minZ && z < maxZ;
+    // Treads, landing and arrival must stay strictly INSIDE the HOUSE footprint: the
+    // perimeter line is the wall — a "passable" cell there is a window/door opening, and a
+    // run threading through one would march off into the garden. `inHouse` is the above-grade
+    // house box, so a yard-inflated build can't plan a stair out on the lawn.
+    const inside = inHouse;
     for (let i = 0; i < steps; i++) {
       const x = ax + fx * i, y = lowerY + 1 + i, z = az + fz * i;
       if (!inside(x, z) || !passable(x, y, z)) return null; // the tread would land in/past a wall
@@ -477,6 +565,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // build plan or null when no side offers a solid backing for the whole climb or the
   // shaft would run through a wall.
   const planLadder = (bx: number, bz: number, lowerY: number, upperY: number) => {
+    if (!inHouse(bx, bz)) return null; // a ladder hangs on a wall INSIDE the house, never the yard
     // Every rung cell must be free (air / a floor plane we punch / a thin block we clear).
     for (let y = lowerY + 1; y <= upperY; y++) if (!passable(bx, y, bz)) return null;
     // A side with a solid backing for the whole climb — the outer skin OR a continuous
@@ -519,6 +608,59 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     return { place, carve, occupy, kind: 'ladder' as const, arrive: [bx, bz] as [number, number] };
   };
 
+  // LAST-RESORT ladder for a CLUTTERED interior: lean on a LOCKED shell wall and carve any
+  // NON-LOCKED obstruction (furniture / a model partition) out of the 1-wide shaft. This is
+  // what stops a gap whose interior the model packed with full-block furniture (a morgue's
+  // cabinets, a dungeon's cells) from being abandoned to the model's broken, DOUBLED stairs —
+  // every gap ends with exactly one clean climb. Never carves a locked wall/roof/floor or
+  // leaves the box, so the protected exterior is untouched.
+  const planForcedLadder = (bx: number, bz: number, lowerY: number, upperY: number) => {
+    if (!inHouse(bx, bz)) return null;
+    // A side with a solid backing for the whole climb (the exterior skin or a continuous
+    // interior wall/pillar) — same backing rule as `planLadder`; this is its SUPERSET, adding
+    // only the ability to carve non-locked clutter out of the shaft (below).
+    const wall = FACINGS.find((w) => {
+      for (let y = lowerY + 1; y <= upperY; y++) if (!isSolidSupport(nameAt(bx + w.dx, y, bz + w.dz))) return false;
+      return true;
+    });
+    if (!wall) return null;
+    const facing = FACINGS.find((d) => d.dx === -wall.dx && d.dz === -wall.dz)!.facing;
+    const [fx, fz] = [-wall.dx, -wall.dz];
+    // A cell the shaft / step-off may CLEAR: air, a floor-plane opening (the locked floor
+    // DECK is carvable here — punching the stairwell through it is the whole point — unless a
+    // wall passes through it), thin decor, OR a NON-LOCKED full block (furniture we carve a
+    // niche from). A locked OFF-plane block is the protected wall/roof → never carved.
+    const carvable = (x: number, y: number, z: number): boolean => {
+      if (x < 0 || y < 0 || z < 0 || x >= ctx.size[0] || y >= ctx.size[1] || z >= ctx.size[2]) return false;
+      const k = posKey(x, y, z);
+      if (reserved.has(k)) return false; // never the active route
+      const b = at.get(k);
+      if (!b || isAir(outPalette[b.state]?.Name ?? '')) return true;
+      if (runTop.has(y)) { // a floor plane: carvable opening unless a WALL passes through it
+        const top = runTop.get(y) as number;
+        return !(isStructuralFull(outPalette, b.state) && structuralAt(x, top + 1, z));
+      }
+      if (lockSet.has(k)) return false; // a locked off-plane block is the protected wall/roof
+      return true; // thin decor or non-locked furniture → clear it
+    };
+    for (let y = lowerY + 1; y <= upperY; y++) if (!carvable(bx, y, bz)) return null;
+    if (!carvable(bx + fx, upperY + 1, bz + fz) || !carvable(bx + fx, upperY + 2, bz + fz)) return null;
+    const place: AuthoringBlock[] = [];
+    const occupy: string[] = [];
+    const carve: string[] = [];
+    const ladderIdx = intern({ Name: 'minecraft:ladder', Properties: { facing } });
+    for (let y = lowerY + 1; y <= upperY; y++) {
+      place.push({ state: ladderIdx, pos: [bx, y, bz] });
+      occupy.push(posKey(bx, y, bz));
+      if (occupied(bx, y, bz)) carve.push(posKey(bx, y, bz));
+    }
+    for (const [ex, ey, ez] of [[bx + fx, upperY + 1, bz + fz], [bx + fx, upperY + 2, bz + fz], [bx, upperY + 1, bz]] as const) {
+      occupy.push(posKey(ex, ey, ez));
+      if (occupied(ex, ey, ez)) carve.push(posKey(ex, ey, ez));
+    }
+    return { place, carve, occupy, kind: 'ladder' as const, arrive: [bx, bz] as [number, number] };
+  };
+
   type Plan = NonNullable<ReturnType<typeof planStair>> | NonNullable<ReturnType<typeof planLadder>> | null;
   // Build the single best connector for a gap, preferring a stair (rule 1). `near` is
   // the column the gap below's connector arrives at — a hint-less gap stacks its climb
@@ -547,9 +689,9 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     //    centre): a derived STAIR wherever one fits — rule 1 holds even for a gap the
     //    model never attempted — else a flush wall ladder. So a gap is never left
     //    without a connector while any column can host one.
-    const anchor = hints[0] ?? near ?? { x: Math.round((minX + maxX) / 2), z: Math.round((minZ + maxZ) / 2) };
+    const anchor = hints[0] ?? near ?? { x: Math.round((hMinX + hMaxX) / 2), z: Math.round((hMinZ + hMaxZ) / 2) };
     const cols: { x: number; z: number; d: number }[] = [];
-    for (let x = minX + 1; x <= maxX - 1; x++) for (let z = minZ + 1; z <= maxZ - 1; z++) {
+    for (let x = hMinX + 1; x <= hMaxX - 1; x++) for (let z = hMinZ + 1; z <= hMaxZ - 1; z++) {
       if (cellKind(x, lowerY, z) !== 'plane') continue; // must stand on this floor
       cols.push({ x, z, d: Math.abs(x - anchor.x) + Math.abs(z - anchor.z) });
     }
@@ -560,6 +702,14 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     }
     for (const c of cols) {
       const p = planLadder(c.x, c.z, lowerY, upperY);
+      if (p) return p;
+    }
+    // 5) LAST RESORT — a forced ladder against a locked shell wall, carving non-locked
+    //    clutter from the shaft. Scan the perimeter-adjacent columns first (nearest a wall),
+    //    so a cramped, furniture-packed interior still gets a single clean climb instead of
+    //    being left with the model's broken/doubled geometry.
+    for (const c of cols) {
+      const p = planForcedLadder(c.x, c.z, lowerY, upperY);
       if (p) return p;
     }
     return null;
@@ -620,7 +770,13 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     }
   }
 
-  if (stairs === 0 && ladders === 0 && addedStairs === 0 && addedLadders === 0 && ghosts === 0 && warnings.length === 0) {
+  // Drop the model's competing basement stair(s) — the code descent ladder is the one way
+  // down. Routed through `stripKeys` so `patchOrphanHoles` floors the opening it cut; the
+  // descent ladder column isn't over stripped geometry, so it stays open (never sealed).
+  for (const k of belowGradeStripStairs) if (!reserved.has(k)) { stripKeys.add(k); at.delete(k); }
+
+  if (stairs === 0 && ladders === 0 && addedStairs === 0 && addedLadders === 0 && ghosts === 0
+      && basementStairsRemoved === 0 && warnings.length === 0) {
     return { blocks, palette };
   }
 
@@ -641,7 +797,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // kept finding on every storey but the attic. Find each interior floor-plane hole
   // that (a) no connector passes through and (b) still sits over geometry we stripped,
   // and floor it back with that plane's own material.
-  const patched = patchOrphanHoles(result, outPalette, planes, mats, reserved, stripKeys, minX, maxX, minZ, maxZ);
+  const patched = patchOrphanHoles(result, outPalette, planes, mats, reserved, stripKeys, hMinX, hMaxX, hMinZ, hMaxZ);
   result = patched.blocks;
 
   const fixes: string[] = [];
@@ -651,6 +807,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   if (addedLadders) fixes.push(`added ${addedLadders} missing wall ladder(s) between storeys the build left unconnected`);
   if (patched.filled) fixes.push(`floored over ${patched.filled} orphan stairwell-remnant hole(s) left where the old climb was removed`);
   if (ghosts) fixes.push(`removed ${ghosts} duplicate/ghost staircase(s) so each storey keeps a single clean climb`);
+  if (basementStairsRemoved) fixes.push(`removed ${basementStairsRemoved} redundant basement staircase(s) so the central descent ladder is the single way down`);
   return { blocks: result, palette: outPalette, fixes, warnings: warnings.length ? warnings : undefined };
 };
 

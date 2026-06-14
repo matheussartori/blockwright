@@ -275,7 +275,22 @@ src/
                           when a 45° run fits in the interior (full top step reaching the upper floor,
                           opening sized to the run, 2-block headroom, landings) else a flush wall ladder
                           (hung on the shell OR an interior wall). Connectors reserve their cells so two
-                          can't collide; a gap it can't solve keeps the model's geometry + warns. Roof
+                          can't collide. Every connector is clamped to the HOUSE FOOTPRINT
+                          (`houseFootprint`: the union of the ABOVE-grade storey planes' largest floor
+                          component), NOT the raw block bounds — a build with a SURROUNDINGS yard fills the
+                          whole box at grade with lawn, so the raw bounds are the YARD and a derived stair
+                          used to climb out onto the lawn / a graveyard tree (the "escada no exterior"
+                          defect). A gap whose cluttered interior fits neither a stair nor a normal ladder
+                          falls to a LAST-RESORT forced wall ladder (`planForcedLadder`): leans on any solid
+                          wall like the normal ladder but CARVES non-locked clutter (furniture / a model
+                          partition) out of the 1-wide shaft — never a locked wall/roof, and the locked
+                          floor DECK is still carvable as the stairwell opening — so a furniture-packed
+                          storey (a morgue's cabinets, a dungeon's cells) gets one clean climb instead of
+                          being abandoned to the model's broken, DOUBLED stairs. Below-grade gaps are
+                          code-owned (the central basement ships ONE descent LADDER); when such a ladder
+                          exists the pass STRIPS the model's competing below-grade STAIR flights (never a
+                          ladder, so the real descent always survives), so the basement has exactly one way
+                          down (the "duas escadas para o basement" defect). Roof
                           slopes (gables of stairs) are excluded via findFlights/topCeilingY — whose
                           roof-vs-floor ceiling is the MAX of the geometric guess and the authoritative
                           top storey plane (`ceilFloor`), so a build with a huge surroundings YARD (whose
