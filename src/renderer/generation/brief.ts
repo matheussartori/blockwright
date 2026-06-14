@@ -528,8 +528,13 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
     catalog?.[cat].find((m) => m.id === id)?.label ?? id;
   const sz = buildBoxSize(d, s); // the card shows the compiled box (what actually gets built)
   const n = floorCount(s, resolveDetailParams(d, s));
+  // The structure family label (House / Tower …), so the card disambiguates same-named
+  // types across groups — the catalog's group labels are already localized at the IPC edge.
+  const group = s?.group ? catalog?.groups?.find((g) => g.id === s.group)?.label : undefined;
+  const heights = d.floorHeights;
   const floors = Array.from({ length: n }, (_, i) => ({
     name: `Floor ${i + 1}`,
+    height: heights?.[i],
     rooms: roomsOnFloor(d, i).map((id) => lbl('room', id)),
   }));
   // One label per picked slot (decoration/roof/basement/attic/surroundings) — generic over
@@ -541,6 +546,7 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
   if (slotLabels.basement && levels > 1) slotLabels.basement += ` · ${levels} levels`;
   return {
     structure: s?.label ?? d.structureType,
+    group,
     ...slotLabels,
     size: [sz.w, sz.h, sz.d],
     floors: floors.length ? floors : undefined,

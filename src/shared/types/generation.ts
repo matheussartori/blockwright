@@ -61,10 +61,16 @@ export type BuildSelection = Partial<Record<ModuleSlotKey, string>> & {
 export type BuildBrief = Partial<Record<ModuleSlotKey, string>> & {
   /** Structure-type label, or undefined for a plain free-form prompt with no Details. */
   structure?: string;
+  /** The structure FAMILY label (e.g. "House" / "Tower") — disambiguates same-named
+   *  types across groups (a House "Classic" vs a Tower "Classic"). Undefined when the
+   *  structure has no group or none was picked. */
+  group?: string;
   /** Build box as [W, H, D]. */
   size?: [number, number, number];
-  /** Per-floor room assignment (bottom-up): each floor's label + its room labels (0–2). */
-  floors?: { name: string; rooms: string[] }[];
+  /** Per-floor assignment (bottom-up): each floor's label, its slab-to-slab storey HEIGHT
+   *  in blocks (when the structure is storeyed; undefined otherwise), and its room labels
+   *  (0–2). */
+  floors?: { name: string; height?: number; rooms: string[] }[];
   /** The user's request text (assistant result card) — shown so the card is
    *  self-contained even for a details-only build with an empty chat bubble. */
   prompt?: string;

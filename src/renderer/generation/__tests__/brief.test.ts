@@ -25,7 +25,7 @@ import {
 const catalog: GenerationCatalog = {
   structure: [
     {
-      id: 'house', label: 'House', category: 'structure', description: '', hasPreview: true,
+      id: 'house', label: 'House', category: 'structure', description: '', hasPreview: true, group: 'house',
       params: [
         { name: 'floors', kind: 'int', label: 'Floors', default: 1, min: 1, max: 4 },
         { name: 'attic', kind: 'enum', label: 'Attic', default: 'none', options: [
@@ -299,6 +299,15 @@ describe('buildSummary', () => {
     expect(card.floors).toEqual([
       { name: 'Floor 1', rooms: ['Living Room'] },
       { name: 'Floor 2', rooms: ['Kitchen'] },
+    ]);
+  });
+  it('carries the structure family group + per-floor storey heights', () => {
+    const d = details({ structureType: 'house', params: { floors: 2 }, floorHeights: [6, 5] });
+    const card = buildSummary(d, catalog)!;
+    expect(card.group).toBe('House'); // disambiguates a House "Classic" from a Tower "Classic"
+    expect(card.floors).toEqual([
+      { name: 'Floor 1', height: 6, rooms: [] },
+      { name: 'Floor 2', height: 5, rooms: [] },
     ]);
   });
 });
