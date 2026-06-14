@@ -280,4 +280,38 @@ describe('rebuildStairwells', () => {
       expect(served, `gap y=${lo}→${hi} must keep a climb`).toBe(true);
     }
   });
+
+  it('detects the existing flight (not a double) when a huge yard plane dominates the build', () => {
+    // The yarded-build defect: a big surroundings GROUND plane (here ~41×41 at y=0) dwarfs
+    // the small keep's interior floors, so the geometric ceiling collapses to grade — and
+    // every real interior flight is misread as a roof slope and dropped, making the pass
+    // ADD a second staircase from scratch (a parallel double). The authoritative storey
+    // planes (ctx.floorPlanes) must rescue the flight so it is REBUILT in place, not doubled.
+    const W = 42, D = 42;
+    const blocks: AuthoringBlock[] = [];
+    // A dominating yard ground plane at y=0 across the whole footprint.
+    for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: 2, pos: [x, 0, z] });
+    // A small keep (interior x10..16, z10..16) with floors at y=0/5/10 + walls.
+    for (const fy of [0, 5, 10]) for (let x = 9; x <= 17; x++) for (let z = 9; z <= 17; z++) blocks.push({ state: 2, pos: [x, fy, z] });
+    for (let y = 0; y <= 10; y++) for (let x = 9; x <= 17; x++) for (let z = 9; z <= 17; z++) {
+      if ((x === 9 || x === 17 || z === 9 || z === 17) && ![0, 5, 10].includes(y)) blocks.push({ state: 1, pos: [x, y, z] });
+    }
+    // One real flight in the 0→5 gap (east, at z=11), the kind addStairCore lays.
+    for (let i = 0; i < 5; i++) blocks.push({ state: 3, pos: [11 + i, 1 + i, 11] });
+    const yardCtx = { size: [W, 16, D] as [number, number, number], floorPlanes: [0, 5, 10] };
+    const r = rebuildStairwells(blocks, palette, yardCtx);
+    const joined = r.fixes?.join(' ') ?? '';
+    // The flight was DETECTED (rebuilt in place) — never reported as a from-scratch "added
+    // missing" connector, which is the signature of the geometric ceiling dropping it.
+    expect(joined, joined).toMatch(/rebuilt/);
+    expect(joined, joined).not.toMatch(/added .*missing/);
+    // Exactly one flight remains in the 0→5 gap's region (no parallel duplicate).
+    const flightCols = new Set(
+      r.blocks
+        .filter((b) => (r.palette[b.state]?.Name ?? '').endsWith('_stairs') && b.pos[1] >= 1 && b.pos[1] <= 5)
+        .map((b) => `${b.pos[0]},${b.pos[2]}`),
+    );
+    // A single straight flight occupies 5 distinct columns; a doubled build would show ~10.
+    expect(flightCols.size, [...flightCols].join(' ')).toBeLessThanOrEqual(6);
+  });
 });

@@ -9,7 +9,7 @@ import type { RoomModule } from './types';
 /** The structures a room pairs with unless it says otherwise. A GROWING link: a room
  *  built for the house is reused on another structure by listing it in the room's
  *  `appliesTo` (e.g. `['house', 'tower']`) — see `defineRoom`'s `appliesTo`. */
-const DEFAULT_HOSTS = ['house'];
+const DEFAULT_HOSTS = ['house', 'tower'];
 
 /** A preset as AUTHORED in a room file: a {@link FurnishingPreset} minus its `id`, which
  *  `defineRoom` derives from the room id + the preset's `scale` (`<room>-<scale>`). So a

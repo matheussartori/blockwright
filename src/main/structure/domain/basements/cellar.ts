@@ -19,7 +19,7 @@ export const cellar: BasementModule = {
     'distinct floor and ceiling and a grid of lit support pillars. A versatile undercroft for ' +
     'storage, a workshop, or the start of a larger complex beneath the building.',
   knowledge: 'nbt/modules/basement/cellar.md',
-  appliesTo: ['house'],
+  appliesTo: ['house', 'tower'],
   preview: { size: [11, 6, 11] },
   params: {
     decay: { kind: 'unit', default: 0.25 },

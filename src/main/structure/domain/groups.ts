@@ -20,6 +20,7 @@ export interface StructureGroup {
  *  structure type's `group` at its id. */
 export const STRUCTURE_GROUPS: StructureGroup[] = [
   { id: 'house', label: 'House' },
+  { id: 'tower', label: 'Tower' },
 ];
 
 /** Look up a group by id (undefined if unknown). */

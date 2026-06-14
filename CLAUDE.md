@@ -76,7 +76,7 @@ src/
         geometry-module.ts GeometryModule — the build shape (params/defaults/build/integrations)
                            shared by RoofModule/BasementModule/AtticModule/SurroundingsModule (they extend
                            it + narrow category/appliesTo), declared ONCE instead of N identical copies.
-        groups.ts          STRUCTURE_GROUPS — the structure FAMILIES (currently one: 'house'). Every
+        groups.ts          STRUCTURE_GROUPS — the structure FAMILIES ('house' + 'tower'). Every
                            structure type declares `group`; a module's `appliesTo` can name the GROUP id
                            to pair with the whole family at once (`moduleAppliesTo` resolves the host's
                            group); the UI headers the gallery rail + the structure Select by group.
@@ -90,27 +90,35 @@ src/
                            class): roofFormFor/roofCap (the ROOF GUARANTEE — a pitched pick that can't
                            fit or can't pitch still caps with the flat module, never roofless),
                            storeyEntries (ladder → authoritative FloorPlanEntry[]), seatDoor,
-                           cornerPosts, storeySlabs, ceilingLanterns. Every house type composes its
-                           casco from these; per-type code is only the genuine identity geometry.
-        structure-types/   Category "structure": one file per archetype, ALL FIVE SEEDED with code-built
-                           shells — classic (pitched storeyed home; its seed varies window rhythm/corner
-                           treatment/roof form/chimney side per run) + (modern = flat-roofed
-                           glass villa by default, but HONORS the Roof pick — a gable/hip crowns the upper
-                           volume in white quartz stairs, reserving the pitch height; farmhouse = L plan +
-                           cross-gable + veranda; sakura = pink cherry
+                           cornerPosts, storeySlabs, ceilingLanterns. Every code-built type composes its
+                           casco from these (the tower keep reuses the storey/door/light parts and adds
+                           its own crenellated crown); per-type code is only the genuine identity geometry.
+        structure-types/   Category "structure": one file per archetype, ALL SEEDED with code-built
+                           shells. The 'house' GROUP — classic (pitched storeyed home; its seed varies
+                           window rhythm/corner treatment/roof form/chimney side per run) + (modern =
+                           flat-roofed glass villa by default, but HONORS the Roof pick — a gable/hip crowns
+                           the upper volume in white quartz stairs, reserving the pitch height; farmhouse =
+                           L plan + cross-gable + veranda; sakura = pink cherry
                            cottage RAISED on a visible stone basement with an exterior stair to the upper
                            entry; gothic = black+white manor with a central frontispiece tower, balustraded
-                           front veranda, mini corner tower, glass chapel wing + ivy eaves) + types.ts
-                           (contract: Box/logProps + `seedShell`/`pairedDecoration`/`complex` + `floors()`)
-                           + stair-core.ts (addStairCore — the shared switchback stair core every code-built
-                           house lays, taking the build's RolePalette; a `parts` helper, no cross-type
-                           imports) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts (registry).
+                           front veranda, mini corner tower, glass chapel wing + ivy eaves). The 'tower'
+                           GROUP — tower-classic (a battlemented stone KEEP: a tall square shaft of stacked
+                           storeys, arrow-slit windows, a seated arched door, a stair core, and a crenellated
+                           parapet over a walkable roof deck; OWNS its crown in code, so NO roof/attic slot;
+                           pairs with the new 'castle' decoration; links to every basement/surroundings/room).
+                           + types.ts (contract: Box/logProps + `seedShell`/`pairedDecoration`/`complex` +
+                           `floors()`) + stair-core.ts (addStairCore — the shared switchback stair core every
+                           code-built type lays, taking the build's RolePalette; a `parts` helper, no cross-type
+                           imports — its flights are INSET one cell from the far wall so the global stairwell
+                           pass can seat their landings, see "Seeded archetypes") + farmhouse-parts.ts
+                           (farmhouse-only pieces) + index.ts (registry).
                            A type emits ops in terms of roles (never concrete blocks), composes its casco
                            from shell-kit parts, keeps ONE `plan()` feeding both `build()` and `floors()`,
                            and delegates roof/basement to modules. See "Seeded archetypes" below.
-        decorations/       Category "decoration": one file per look (cozy) + types.ts (Decoration
-                           contract) + index.ts (registry, DEFAULT_DECORATION='cozy'). A decoration
-                           maps roles→blocks + decay + weathering.
+        decorations/       Category "decoration": one file per look (cozy/haunted/modern/farmhouse/sakura/
+                           gothic/castle — castle = a UNIVERSAL dressed-stone/masonry look, the tower's
+                           default) + types.ts (Decoration contract) + index.ts (registry,
+                           DEFAULT_DECORATION='cozy'). A decoration maps roles→blocks + decay + weathering.
         basements/ roofs/  Categories "basement"/"roof"/"attic": one file per typology (roof: gable/
         attics/            hip/flat; basement: cellar/crypt/cult-temple; attic: storage/bedroom)
                            + types.ts + index.ts (registry) each.
@@ -129,9 +137,10 @@ src/
                            define.ts (the factory: fills category/knowledge-path/preset-ids + default
                            hosts) + types.ts (RoomModule = ModuleMeta + required `knowledge` + `presets`,
                            no geometry) + index.ts (registry). GUIDANCE-ONLY — no `build()`/`preview`:
-                           the user assigns up to two rooms per floor in the composer Details (house),
-                           each loads only its knowledge guide and rides into the prompt as a `[Room
-                           plan]` line per floor; the AI furnishes the interior. `appliesTo` = ['house'].
+                           the user assigns up to two rooms per floor in the composer Details (house;
+                           one per floor on the tighter tower), each loads only its knowledge guide and
+                           rides into the prompt as a `[Room plan]` line per floor; the AI furnishes the
+                           interior. `appliesTo` defaults to ['house', 'tower'] (every room fits both).
                            Each room also ships FURNISHING PRESETS tiered by floor SPACE (snug/standard/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
@@ -162,10 +171,11 @@ src/
                            cells tall (landscaping, never construction — the cap is the lamp-post
                            lantern); leaves placed persistent.
                            modern = pool terrace + stepped entry walk aligned with the door + chamfered
-                           hedge rim + planters + seeded bushes/bollards; `appliesTo: ['modern']` (the
-                           villa declares the `surroundings` param, marked `module:'surroundings'`).
-                           garden = the cottage homestead yard for every NON-modern house
-                           (`appliesTo: ['classic','farmhouse','sakura','gothic']`, all four declare
+                           hedge rim + planters + seeded bushes/bollards; `appliesTo: ['modern', 'tower']`
+                           (the host declares the `surroundings` param, marked `module:'surroundings'`).
+                           graveyard = a fenced cemetery yard (`appliesTo: ['gothic', 'tower']`).
+                           garden = the cottage homestead yard for every non-modern house + the tower
+                           (`appliesTo: ['classic','farmhouse','sakura','gothic','tower']`, all declare
                            the param): a cobble-course + oak-fence perimeter whose corners are cut by
                            SEEDED stepped chamfers (the outline varies every build), stone lamp posts,
                            a double-door front gate aligned with the house door, a dirt walk + a loop
@@ -260,7 +270,11 @@ src/
                           opening sized to the run, 2-block headroom, landings) else a flush wall ladder
                           (hung on the shell OR an interior wall). Connectors reserve their cells so two
                           can't collide; a gap it can't solve keeps the model's geometry + warns. Roof
-                          slopes (gables of stairs) are excluded via findFlights/topCeilingY.
+                          slopes (gables of stairs) are excluded via findFlights/topCeilingY — whose
+                          roof-vs-floor ceiling is the MAX of the geometric guess and the authoritative
+                          top storey plane (`ceilFloor`), so a build with a huge surroundings YARD (whose
+                          ground plane dwarfs the small interior floors) no longer collapses the ceiling to
+                          grade and drop every real flight as a "roof slope" (the DOUBLE-staircase defect).
       compile.ts          compileStructure / compileStructureReport / writeStructureFile
                           (validate → resolveBlocks → runPasses → encode), each taking optional
                           CompileOptions {structureType}; `pipelineFor(structureType)` assembles the
@@ -504,7 +518,7 @@ decoration, and a new module is one small file.
   every type declares group/knowledge/preview/defaults; every STOREYED type (a `floors` param) has ONE
   internal `plan()` (box+params → storey ladder/wall top, via the shared `planStoreys`) consumed by BOTH
   `build()` and an authoritative `floors()` (so the viewer bands/sidecar/stairwell pass always match the
-  laid geometry — all five types have `floors()` now); per-type DATA lives ON the module, never as id
+  laid geometry — every type has `floors()`); per-type DATA lives ON the module, never as id
   special-cases in general code (`pairedDecoration` drives the composer's auto-pairing; `complex` drives
   the complex-structures guide gate). A cross-type INVARIANT MATRIX (every type × roof × basement × sizes)
   asserts: dense shell (no "casa sem casco"), every interior column covered overhead (no roofless), and
@@ -551,13 +565,13 @@ decoration, and a new module is one small file.
 - **`appliesTo` is REQUIRED on every roof/basement/room module** (those contracts narrow ModuleMeta's
   optional `appliesTo` to required), so a module must always declare which structures it fits — never
   silently apply to all. The entries are structure-type ids AND/OR GROUP ids (`domain/groups.ts`):
-  `['house']` is the whole family in one tag (gable, flat, the basements, the rooms), while a
-  deliberate narrowing lists ids (hip skips sakura; the attics are classic-only; the yards split
-  modern vs the rest). It's a GROWING link: a future structure type reuses an existing module by
-  joining a group or having its id added (e.g. a `tower` getting a `crypt` basement →
-  `crypt.appliesTo = ['house', 'tower']`). `moduleAppliesTo` then shows it in the tower's
-  Details + loads its guide. (Decorations + structure types don't use `appliesTo` — a decoration crosses
-  with every structure.)
+  a GROUP id is the whole family in one tag, while a deliberate narrowing lists ids (the basements +
+  rooms are `['house', 'tower']`; the attics are classic-only; the roofs are house-only — the tower owns
+  its crown; the yards split modern / the rest / and now all four-plus-tower). It's a GROWING link: the
+  `tower` group is the live example — adding the keep meant tagging the basements/surroundings/rooms with
+  `'tower'` (e.g. `crypt.appliesTo = ['house', 'tower']`), and `moduleAppliesTo` then shows each in the
+  tower's Details + loads its guide. (Decorations + structure types don't use `appliesTo` — a decoration
+  crosses with every structure, e.g. the universal `castle` look.)
 - **A structure type DELEGATES roof/basement geometry to those modules** (the modules are the single
   source — no parallel roof/basement geometry in the type). The type OWNS placement and calls the
   `composeModule(category, id, from, to, extra?)` delegate injected into its `BuildArgs` (built by
@@ -581,7 +595,7 @@ decoration, and a new module is one small file.
   authored via the **`defineRoom` factory** (`rooms/define.ts`) so a room file is PURE DATA (id/label/
   description/presets) and the factory fills the boilerplate ONCE: `category:'room'`, the knowledge path
   (`nbt/modules/room/<id>.md`, derived from id so it can't drift), each preset's id (`<id>-<scale>`,
-  derived from its tier), and the default host link (`['house']`, override to reuse on more structures).
+  derived from its tier), and the default host link (`['house', 'tower']`, override to reuse on more).
   The user assigns up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e.
   the house's `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each
   loads ONLY its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]`
@@ -618,12 +632,13 @@ decoration, and a new module is one small file.
   module:** new file + register in its `index.ts`,
   a `SURROUND_SCALE` entry, `appliesTo` + each host structure declares the `surroundings`
   param value, + a `knowledge/nbt/modules/surroundings/<id>.md` guide.
-  `modern` (hosts: modern) = pool terrace + entry walk + chamfered hedge + planters; `garden` (hosts:
-  classic/farmhouse/sakura/gothic) = the cottage homestead yard — cobble + oak-fence perimeter
+  `modern` (hosts: modern/tower) = pool terrace + entry walk + chamfered hedge + planters; `graveyard`
+  (hosts: gothic/tower) = a fenced cemetery yard; `garden` (hosts:
+  classic/farmhouse/sakura/gothic/tower) = the cottage homestead yard — cobble + oak-fence perimeter
   with SEEDED chamfered corners (the outline varies every build), stone lamp posts, a
   double-door gate aligned with the door, dirt walk + house loop path, facade flower beds, and
   seeded fountain/well/crop-plot/parterre features (uses the `path`/`soil`/`crop`/`flower` roles).
-- **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: ALL FIVE,
+- **Seeded archetypes — code-built shells the AI only FINISHES** (`structure-types/`: ALL of them,
   classic included): the fix for "the style keeps coming out as a wooden pitched box." A
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
   any advisory guide text — so styles the model can't reliably invent are NOT guidance; they're STRUCTURE
@@ -639,16 +654,21 @@ decoration, and a new module is one small file.
   cascades + an upper balcony; **gothic** = a black-with-white-detailing manor (pale belt courses) with a
   central frontispiece tower projecting at the front and rising past the ridge (carrying the grand entrance),
   a balustraded front veranda, a mini corner tower past the roofline, a glass chapel wing down one side + ivy
-  garlands over the eaves, steep slate roof. Each declares its identity decoration as `pairedDecoration`
-  on the MODULE (the composer auto-pairs it from the catalog — no hardcoded map); the classic's is cozy.
+  garlands over the eaves, steep slate roof. **tower-classic** (group 'tower') = a battlemented stone KEEP:
+  a tall square shaft of stacked storeys, arrow-slit windows, a seated arched door on a stone plinth, a stair
+  core, and a crenellated parapet over a walkable roof deck — it OWNS its crown in code (no roof/attic slot;
+  Roof/Attic auto-hide for it), and links Basement/Surroundings/Room (every registered one) via the 'tower'
+  group. Each declares its identity decoration as `pairedDecoration` on the MODULE (the composer auto-pairs
+  it from the catalog — no hardcoded map); the classic's is cozy, the tower's is the new 'castle' (a
+  universal dressed-stone look).
   - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
     shell instead of leaving it free-form: `ai/shell-seed.ts` compiles the shell (a `template` op at the
     requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
     (`ai/seed.ts`: "KEEP this exterior, furnish the interior, don't re-roof/re-clad it"), injected in
     `generate.ts` only on turn one of a fresh session. So the user gets a guaranteed silhouette and the
-    model only finishes it. EVERY house type seeds — the classic included: its run-to-run variety
-    comes from the shell's own seed (window rhythm/corners/roof form/chimney side), not from
-    free-form. Free-form remains the path for a build with NO structure selected.
+    model only finishes it. EVERY structure type seeds — the classic and the tower-classic keep included:
+    run-to-run variety comes from the shell's own seed (window rhythm/corners/roof form/chimney side), not
+    from free-form. Free-form remains the path for a build with NO structure selected.
   - **Every seeded shell is LOCKED** (no separate flag — `seedShell` implies the lock): a seed is only
     CONTEXT the model can ignore, and it does — it deletes the ground-floor slab + strips the roof (the
     "sem chão / sem telhado" defect) or emits a furniture-only delta that "keeps" the exterior by not
@@ -676,7 +696,8 @@ decoration, and a new module is one small file.
   space tier (`RoomScale` = snug / standard / grand, banded by interior floor area in `SCALE_TIERS`). A
   preset is a decoration-AGNOSTIC and host-AGNOSTIC base layout — it names furniture semantically (a hearth,
   a seating cluster, a wardrobe run) and the host structure's decoration (cozy/haunted) re-skins it into
-  blocks + mood, so no N×M data (and the same room reuses across structures — house today, tower/… later). `buildRoomPlan` computes each room's area (the build's interior footprint split by the
+  blocks + mood, so no N×M data (and the same room reuses across structures — the house family and the
+  tower keep today, more later). `buildRoomPlan` computes each room's area (the build's interior footprint split by the
   rooms sharing the floor), picks the matching tier (`scaleForArea`) + preset (`presetForScale`), and folds
   the tier's density steer + the preset's furniture zones into the `[Room plan]` brief — telling the model
   to build that layout, scaled to the room, in the chosen decoration. The model-facing principle lives in
@@ -793,10 +814,12 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with
-  registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic), **Decoration**
-  (cozy/haunted/modern/farmhouse/sakura/gothic), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
-  cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern/garden — required
-  pick, defaults to None, filtered by the chosen structure's hosts; a non-None pick reveals a
+  registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic, tower-classic —
+  grouped by family: House / Tower), **Decoration**
+  (cozy/haunted/modern/farmhouse/sakura/gothic/castle), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
+  cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern/garden/graveyard — required
+  pick, defaults to None, filtered by the chosen structure's hosts — e.g. for tower-classic Roof/Attic hide
+  (it owns its crown) while every Basement/Surroundings/Room shows; a non-None pick reveals a
   **Yard size** control — manual Width-X / Depth-Z cell steppers (2-cell steps) — and EXPANDS the
   compiled box beyond the user's W×D shell via `buildBoxSize`, the composer size fields keep
   SHELL semantics) — plus, for a

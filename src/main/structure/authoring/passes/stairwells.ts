@@ -282,7 +282,12 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     byGap.set(gap.lowerY, w);
   };
 
-  for (const f of findFlights(blocks, palette)) {
+  // The roof-slope cut for flight detection: the top MERGED storey plane (geometric ∪
+  // authoritative). This rescues flights on a yarded build, where the geometric ceiling
+  // alone collapses to the dominating ground plane and every interior stair is misread as
+  // a roof slope (then dropped → the pass adds a SECOND staircase from scratch, doubling).
+  const ceilFloor = planes[planes.length - 1];
+  for (const f of findFlights(blocks, palette, { ceilFloor })) {
     for (const seg of segmentByGap(f.chain, planes)) {
       const bottom = seg.cells[0].pos;
       const top = seg.cells[seg.cells.length - 1].pos;

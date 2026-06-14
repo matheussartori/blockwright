@@ -84,9 +84,18 @@ export interface Flight {
 export function findFlights(
   blocks: AuthoringBlock[],
   palette: AuthoringPaletteEntry[],
-  opts?: { ignoreCeiling?: boolean },
+  opts?: { ignoreCeiling?: boolean; ceilFloor?: number },
 ): Flight[] {
-  const ceilY = opts?.ignoreCeiling ? Infinity : topCeilingY(blocks, palette);
+  // The roof-slope cut is the higher of the geometric ceiling and an AUTHORITATIVE top
+  // storey plane (`ceilFloor`), when the caller knows it. The geometric `topCeilingY` is
+  // fooled LOW by a build whose busiest plane is a huge surroundings YARD ground (the
+  // keep's small interior floors fall under the 70% cut, collapsing the ceiling to grade),
+  // which then misreads every real interior staircase as a roof slope and drops it — the
+  // "double staircase on a yarded build" defect. Taking the MAX only ever RAISES the
+  // ceiling to the real top floor, so genuine roof slopes (above it) stay excluded.
+  const ceilY = opts?.ignoreCeiling
+    ? Infinity
+    : Math.max(topCeilingY(blocks, palette), opts?.ceilFloor ?? -Infinity);
   const at = new Map<string, AuthoringBlock>();
   for (const b of blocks) at.set(posKey(...b.pos), b);
   const stairAt = (x: number, y: number, z: number, facing: string): boolean => {

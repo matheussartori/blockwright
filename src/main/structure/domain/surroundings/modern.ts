@@ -86,7 +86,7 @@ export const modern: SurroundingsModule = {
     'hedge outline is chamfered by seed, so the yard is never a plain rectangle. ' +
     'The build box grows beyond the house shell to fit the ring.',
   knowledge: 'nbt/modules/surroundings/modern.md',
-  appliesTo: ['modern'],
+  appliesTo: ['modern', 'tower'],
   // Previewed as the full modern villa + its grounds (the ring only reads in context).
   preview: { size: [23, 12, 25], params: { floors: 2 } },
   // A self-contained landscaping kit (wins over the decoration, like a basement's stone):

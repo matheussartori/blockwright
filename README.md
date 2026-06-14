@@ -44,13 +44,14 @@ refines through an emit → render → review loop — previewed live in the vie
   that refines the build live — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT
   Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
   to trade quality for spend, configured in Settings ▸ AI
-- Composable generation domain — pick a structure type (classic / modern / farmhouse / sakura /
-  gothic; each compiles a code-built shell with seeded run-to-run variety that the AI furnishes
-  and details, so the silhouette is guaranteed), a decoration, a roof, a basement, an in-roof
+- Composable generation domain — pick a structure type (a **House** — classic / modern / farmhouse /
+  sakura / gothic — or a **Tower** — a battlemented stone keep; each compiles a code-built shell with
+  seeded run-to-run variety that the AI furnishes and details, so the silhouette is guaranteed), a
+  decoration (including a universal dressed-stone **castle** look), a roof, a basement, an in-roof
   attic, the surroundings (a code-built yard
-  laid outside the house shell: a fenced **cottage garden** for the classic houses — stone-and-fence
+  laid outside the building shell: a fenced **cottage garden** — stone-and-fence
   perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop
-  plots and a well or fountain — or a **pool terrace** for the modern villa) and per-floor interior rooms (living
+  plots and a well or fountain — a **pool terrace**, or a fenced **graveyard**) and per-floor interior rooms (living
   room, kitchen, library, bedroom, shared bedrooms, storage) in the full-stage Build Planner (browse
   every part with live 3D previews in the Module Gallery); the selection guides the build and loads
   only the relevant knowledge, and registered structure × decoration modules also cross at compile

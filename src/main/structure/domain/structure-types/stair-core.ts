@@ -54,9 +54,13 @@ export function addStairCore(args: StairCoreArgs): void {
   // height, so the well must fit the LONGEST run.
   const runs = slabYs.slice(1).map((y, k) => y - slabYs[k] - 1);
   const maxRun = runs.length ? Math.max(...runs) : 0;
-  // A 2-wide well needs `maxRun` along one axis and 2 cells on the perpendicular.
-  const fitX = maxRun <= x1 - x0 - 1 && z1 - z0 >= 3;
-  const fitZ = !fitX && maxRun <= z1 - z0 - 1 && x1 - x0 >= 3;
+  // A 2-wide well needs `maxRun` along one axis and 2 cells on the perpendicular. The
+  // run must also leave a cell of landing clearance at BOTH ends inside the walls (the
+  // `- 4`: run treads + a bottom + a top landing, all strictly inside) — otherwise the
+  // global stairwell pass can't seat the step-off landings and downgrades the flight to a
+  // ladder (the "stairs flush to the wall, rebuilt as an incoherent ladder mix" defect).
+  const fitX = maxRun <= x1 - x0 - 4 && z1 - z0 >= 3;
+  const fitZ = !fitX && maxRun <= z1 - z0 - 4 && x1 - x0 >= 3;
 
   if (!fitX && !fitZ) {
     // No room for a stair → a CONTINUOUS wall ladder (rule: stair if it fits, else a
@@ -76,12 +80,15 @@ export function addStairCore(args: StairCoreArgs): void {
     const ty = slabYs[k + 1]; // top step lands on the upper floor
     const run = runs[k]; // this flight's own 45° run
     const fwd = k % 2 === 0; // alternate direction + row → a side-by-side switchback
+    // Inset one cell from the far wall (`hi = x1 - 2`, not `x1 - 1`) so the rebuilt stair
+    // has room for its top step-off landing INSIDE the box: a flight flush to the wall
+    // tops out against it, can't be rebuilt as a stair, and degrades to a ladder.
     if (fitX) {
-      const lo = x1 - 1 - run, hi = x1 - 1;
+      const hi = x1 - 2, lo = hi - run;
       const row = fwd ? z1 - 1 : z1 - 2;
       ops.push({ op: 'stairs', from: [fwd ? lo : hi, by, row], to: [fwd ? hi : lo, ty, row], state: stair, fill, clear: air });
     } else {
-      const lo = z1 - 1 - run, hi = z1 - 1;
+      const hi = z1 - 2, lo = hi - run;
       const row = fwd ? x1 - 1 : x1 - 2;
       ops.push({ op: 'stairs', from: [row, by, fwd ? lo : hi], to: [row, ty, fwd ? hi : lo], state: stair, fill, clear: air });
     }

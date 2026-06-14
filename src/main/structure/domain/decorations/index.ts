@@ -3,6 +3,7 @@
 // `template` op (no decoration param) builds a warm, intact look.
 import type { ModuleSummary } from '../modules';
 import { createRegistry } from '../registry';
+import { castle } from './castle';
 import { cozy } from './cozy';
 import { farmhouse } from './farmhouse';
 import { gothic } from './gothic';
@@ -13,7 +14,7 @@ import type { Decoration } from './types';
 
 export type { Decoration, DecorationTheme } from './types';
 
-export const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic]);
+export const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic, castle]);
 
 /** The decoration used when a `template` op doesn't name one. */
 export const DEFAULT_DECORATION = cozy.id;

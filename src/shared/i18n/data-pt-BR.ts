@@ -8,6 +8,7 @@
 export const dataPtBR: Record<string, string> = {
   // --- structure families (groups) ------------------------------------------
   'group.house': 'Casa',
+  'group.tower': 'Torre',
 
   // --- structure types ------------------------------------------------------
   'mod.structure.classic.label': 'Clássica',
@@ -25,6 +26,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.structure.gothic.label': 'Gótica',
   'mod.structure.gothic.desc':
     'Uma mansão gótica sombria: paredes enegrecidas de madeira e blackstone realçadas por cordões de pedra clara, um telhado íngreme de ardósia, uma torre central de fachada que se projeta à frente e se ergue acima da cumeeira até um remate pontiagudo, uma varanda frontal com balaustrada, uma mini torre de canto, uma ala-capela de vidro com altas janelas cinzas e heras pendendo dos beirais. Soturna, vertical e assimétrica — iluminada por almas e senhorial.',
+  'mod.structure.tower-classic.label': 'Clássica',
+  'mod.structure.tower-classic.desc':
+    'Uma torre de menagem de pedra com ameias: um alto eixo quadrado de andares estreitos empilhados com janelas em fresta, uma porta arqueada assente sobre um embasamento de pedra, um núcleo de escadas em ziguezague conectado e um parapeito ameado coroando um terraço de cobertura praticável. Define a sua própria coroa em código (sem opção de telhado); liga-se a todos os módulos de Porão, Arredores e Cômodo. A decoração fornece os materiais.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',
@@ -45,6 +49,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.decoration.gothic.label': 'Gótica',
   'mod.decoration.gothic.desc':
     'A paleta da mansão sombria: paredes de carvalho escuro e blackstone realçadas por detalhes de pedra polida clara, um telhado íngreme de ardósia deepslate, vidro de capela cinza e lanternas com chama das almas. Soturna, vertical e assimétrica — combine com a estrutura Gótica para a mansão completa com torre, pórtico e capela de vidro.',
+  'mod.decoration.castle.label': 'Castelo',
+  'mod.decoration.castle.desc':
+    'Um visual de pedra lavrada e fortificada: tijolos de pedra cinza-claros sobre uma base de pedregulho, detalhes de pedra cinzelada, madeira escura de spruce e luz quente de lanternas. Alvenaria onde a Aconchegante é madeira. A pedra se desgasta para suas variantes com musgo e rachadas. O padrão da torre de menagem — combina com torres, muralhas e salões de pedra.',
 
   // --- basements ------------------------------------------------------------
   'mod.basement.cellar.label': 'Adega',

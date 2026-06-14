@@ -32,7 +32,7 @@ describe('compose: structure types × decorations', () => {
     expect(isKnownStructure('basement')).toBe(false); // basement is its own category, not a structure type
     expect(isKnownStructure('abandoned_house')).toBe(false); // alias retired
     expect(isKnownStructure('castle')).toBe(false);
-    expect(knownStructureNames()).toEqual(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']);
+    expect(knownStructureNames()).toEqual(['classic', 'modern', 'farmhouse', 'sakura', 'gothic', 'tower-classic']);
   });
 
   it('builds with the default (cozy) decoration and is deterministic for a seed', () => {
@@ -253,12 +253,22 @@ describe('selectedGuides: roof/basement guides respect appliesTo', () => {
     expect(guides).not.toContain('nbt/modules/roof/gable.md');
   });
 
-  it('lists the code-built archetypes as structure types, all in the House group', () => {
+  it('lists the code-built archetypes as structure types, grouped by family', () => {
     const cat = listModuleCatalog();
-    expect(cat.structure.map((m) => m.id)).toEqual(expect.arrayContaining(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']));
-    // The House group families every current structure type, and the catalog ships it.
-    expect(cat.groups).toEqual(expect.arrayContaining([{ id: 'house', label: 'House' }]));
-    for (const m of cat.structure) expect(m.group, `${m.id} must be in the house group`).toBe('house');
+    expect(cat.structure.map((m) => m.id)).toEqual(
+      expect.arrayContaining(['classic', 'modern', 'farmhouse', 'sakura', 'gothic', 'tower-classic']),
+    );
+    // The catalog ships the registered families; each type names a registered group.
+    expect(cat.groups).toEqual(expect.arrayContaining([
+      { id: 'house', label: 'House' },
+      { id: 'tower', label: 'Tower' },
+    ]));
+    const groupIds = new Set(cat.groups.map((g) => g.id));
+    for (const m of cat.structure) {
+      expect(groupIds.has(m.group ?? ''), `${m.id} must name a registered group`).toBe(true);
+    }
+    // The keep belongs to the tower family.
+    expect(cat.structure.find((m) => m.id === 'tower-classic')?.group).toBe('tower');
   });
 
   it('a roof guide loads only for the structures it fits', () => {
