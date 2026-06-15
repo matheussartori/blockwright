@@ -194,6 +194,24 @@ This launches the Vite dev server and Electron together, with hot-module reloadi
 | `npm run package`   | Package the app via Electron Forge                |
 | `npm run make`      | Build distributable installers via Electron Forge |
 
+### Packaging & releases
+
+Releases are built in CI (`.github/workflows/release.yml`, on a `v*` tag) and the installers are
+attached to the [GitHub Release](https://github.com/matheussartori/blockwright/releases). A few
+notes if you package locally:
+
+- **Use Node 22.** Forge's packaging step silently breaks on Node 26 (it dies mid Electron-zip
+  extraction with no `out/`), so `npm run package` / `npm run make` must run on Node 22 — CI uses 22.
+- **macOS signing** is gated on env vars in `forge.config.ts`:
+  - _No vars (default)_ — the app is **ad-hoc signed** (`identity: '-'`, with `identityValidation:
+    false` + `hardenedRuntime: false`). This is required for the app to launch at all on Apple
+    Silicon and swaps the scary _"app is damaged"_ error for the normal _"unidentified developer"_
+    prompt, but it does **not** remove the Gatekeeper warning (see [Usage](#usage)).
+  - _With a real Developer ID cert_ — set `APPLE_SIGNING_IDENTITY` (and `APPLE_ID`,
+    `APPLE_PASSWORD`, `APPLE_TEAM_ID` to also notarize) to ship a clean, no-warning install.
+- **Windows** uses a branded Squirrel installer (`Blockwright-Setup.exe`) that installs per-user and
+  auto-updates. It is **not** code-signed, so SmartScreen still shows an _unknown publisher_ warning.
+
 ### Visual testing
 
 Blockwright can screenshot itself headlessly — useful for verifying renders without granting
