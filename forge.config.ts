@@ -85,6 +85,14 @@ const config: ForgeConfig = {
     },
   },
   packagerConfig: {
+    // Lowercase binary name. The Linux deb/rpm makers (electron-installer-*)
+    // derive the expected binary from the sanitized, lowercased package name
+    // ("blockwright") but packager names the binary after productName
+    // ("Blockwright") by default — so the deb maker can't find it and fails
+    // ("could not find the Electron app binary at .../blockwright"). Pinning
+    // executableName makes the binary lowercase on every platform; the macOS
+    // .app bundle + Windows installer are still named via productName.
+    executableName: 'blockwright',
     // App icon (logo-dark). Forge/packager appends the platform extension:
     // build/icon.icns on macOS, build/icon.ico on Windows.
     icon: './build/icon',
