@@ -332,11 +332,51 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     houseFootprint(blocks, palette, planes, grade, { minX, maxX, minZ, maxZ });
   const inHouse = (x: number, z: number): boolean => x > hMinX && x < hMaxX && z > hMinZ && z < hMaxZ;
 
+  // Is the upper plane a HABITABLE storey (enclosed standing room above it — a usable
+  // attic) rather than an open-air rooftop DECK? A flat house deck and the keep's
+  // battlemented crown both read as a full floor plane, but reaching them is the structure
+  // type's OWN business (the tower ships a code-built roof-hatch ladder), never this pass's
+  // — so a connector is neither forced nor rebuilt up to one (else a cottage grows a ladder
+  // to its own roof, and the tower's clean hatch ladder gets stripped + replaced by a
+  // worse interior climb, the "escada para o roof bloqueada" defect).
+  const habitableAbove = (py: number): boolean => {
+    let floor = 0, standing = 0;
+    for (let x = hMinX; x <= hMaxX; x++) for (let z = hMinZ; z <= hMaxZ; z++) {
+      const b = at.get(posKey(x, py, z));
+      if (!b || !isStructuralFull(outPalette, b.state)) continue;
+      floor++;
+      if (at.has(posKey(x, py + 1, z)) || at.has(posKey(x, py + 2, z))) continue; // no headroom
+      // ENCLOSED standing room only: some structure higher up the column (a roof over an
+      // attic). An uncovered deck is the build's rooftop — open sky doesn't count.
+      let covered = false;
+      for (let y = py + 3; y <= maxY && !covered; y++) covered = at.has(posKey(x, y, z));
+      if (covered) standing++;
+    }
+    return floor > 0 && standing >= 0.3 * floor;
+  };
+  // The topmost plane when it is an open-air rooftop DECK the structure type OWNS access to:
+  // the gap LEADING UP to it belongs to that type, so this pass leaves it wholly alone — no
+  // hint collected (so the type's code-built roof access is never stripped), and no connector
+  // forced (so no ladder to a bare roof). Recognised by two facts together: (a) nothing
+  // habitable sits above it (open sky, not an attic), and (b) it's NOT one of the AUTHORITATIVE
+  // storey planes — a code-built type threads its real storeys via `ctx.floorPlanes`, which
+  // deliberately EXCLUDE the roof band (`storeyPlanesFromFloors`), so the deck shows up only
+  // in the geometric detection. Without authoritative planes (a free-form build that labelled
+  // no storeys) the signal is absent, so the old behaviour holds (the deck stays connectable).
+  // This is what stopped the keep's clean roof-hatch ladder being stripped + rebuilt into a
+  // backing-less ladder that `fixCirculation` then deleted (the "escada para o roof bloqueada"
+  // defect), without changing how a declared top storey is connected.
+  const authoritative = new Set(ctx.floorPlanes ?? []);
+  const topPlane = planes[planes.length - 1];
+  const roofDeck = authoritative.size > 0 && !authoritative.has(topPlane) && !habitableAbove(topPlane)
+    ? topPlane : null;
+
   // ── Collect every circulation hint, grouped by the storey-gap it serves ─────────
   const byGap = new Map<number, GapWork>();
   const addHint = (h: Hint, strip: string[], gap: { lowerY: number; upperY: number }): void => {
     const H = gap.upperY - gap.lowerY;
     if (H < 3) return; // not a real storey (mezzanine/thin gap)
+    if (gap.upperY === roofDeck) return; // the structure type owns access to its own rooftop deck
     if (belowGrade(gap)) return; // code owns below-grade circulation; don't strip/rebuild it
     // A hint must have climbed MOST of its gap — but in a very tall storey a PARTIAL
     // climb (the model ran out of steam) is still clearly a circulation attempt, never
@@ -406,23 +446,7 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
   // (storeys with no stairs at all were left unreachable). The TOPMOST gap is only
   // forced when there is real standing room above its upper plane (a usable attic);
   // otherwise that plane is just the ceiling deck and a cottage would get a ladder to
-  // its own roof.
-  const habitableAbove = (py: number): boolean => {
-    let floor = 0, standing = 0;
-    for (let x = hMinX; x <= hMaxX; x++) for (let z = hMinZ; z <= hMaxZ; z++) {
-      const b = at.get(posKey(x, py, z));
-      if (!b || !isStructuralFull(outPalette, b.state)) continue;
-      floor++;
-      if (at.has(posKey(x, py + 1, z)) || at.has(posKey(x, py + 2, z))) continue; // no headroom
-      // ENCLOSED standing room only: some structure higher up the column (a roof over an
-      // attic). An uncovered deck is the build's rooftop — open sky doesn't count, or a
-      // flat-roofed cottage would grow a ladder to its own roof.
-      let covered = false;
-      for (let y = py + 3; y <= maxY && !covered; y++) covered = at.has(posKey(x, y, z));
-      if (covered) standing++;
-    }
-    return floor > 0 && standing >= 0.3 * floor;
-  };
+  // its own roof (`roofDeck` is the structure-type-owned case of the same rule).
   for (let i = 0; i + 1 < planes.length; i++) {
     const lowerY = planes[i], upperY = planes[i + 1];
     if (upperY - lowerY < 3 || byGap.has(lowerY)) continue;

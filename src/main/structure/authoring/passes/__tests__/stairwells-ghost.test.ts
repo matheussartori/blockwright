@@ -13,6 +13,13 @@ const PLANES = [0, 12];
 
 const STONE = 1, STAIR = 2;
 
+function shell(blocks: AuthoringBlock[]): void {
+  for (const y of PLANES) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: STONE, pos: [x, y, z] });
+  for (let y = 1; y < 12; y++) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
+    if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push({ state: STONE, pos: [x, y, z] });
+  }
+}
+
 function scene(): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] } {
   const palette: AuthoringPaletteEntry[] = [
     { Name: 'minecraft:air' },
@@ -20,10 +27,7 @@ function scene(): { blocks: AuthoringBlock[]; palette: AuthoringPaletteEntry[] }
     { Name: 'minecraft:stone_brick_stairs', Properties: { facing: 'east', half: 'bottom', shape: 'straight' } },
   ];
   const blocks: AuthoringBlock[] = [];
-  for (const y of PLANES) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: STONE, pos: [x, y, z] });
-  for (let y = 1; y < 12; y++) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
-    if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push({ state: STONE, pos: [x, y, z] });
-  }
+  shell(blocks);
   // Flight A (the real climb): a tall east-ascending run at z=3, rising y=1..10.
   for (let i = 0; i <= 9; i++) blocks.push({ state: STAIR, pos: [1 + i, 1 + i, 3] });
   // Flight B (the GHOST): a short east-ascending run at z=9, rising only y=1..4 — under the
@@ -50,10 +54,7 @@ describe('rebuildStairwells — ghost-stair sweep (one climb per storey)', () =>
   it('keeps a lone, single climb untouched by the sweep (no false positive)', () => {
     const { palette } = scene();
     const blocks: AuthoringBlock[] = [];
-    for (const y of PLANES) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) blocks.push({ state: STONE, pos: [x, y, z] });
-    for (let y = 1; y < 12; y++) for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) {
-      if (x === 0 || x === W - 1 || z === 0 || z === D - 1) blocks.push({ state: STONE, pos: [x, y, z] });
-    }
+    shell(blocks);
     // Just one flight — the pass rebuilds it, but never reports a ghost removal.
     for (let i = 0; i <= 9; i++) blocks.push({ state: STAIR, pos: [1 + i, 1 + i, 3] });
     const out = rebuildStairwells(blocks, palette, { size: [W, 16, D], floorPlanes: PLANES });
