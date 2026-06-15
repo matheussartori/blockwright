@@ -81,9 +81,19 @@ refines through an emit → render → review loop — previewed live in the vie
 
 > **Downloads** — packaged installers (macOS `.dmg`/`.zip`, Windows `.exe`, Linux `.deb`/`.rpm`)
 > are attached to each [GitHub Release](https://github.com/matheussartori/blockwright/releases).
-> Builds are **not yet code-signed**, so the first launch shows an OS warning: on macOS, right-click
-> the app ▸ **Open** (or System Settings ▸ Privacy & Security ▸ *Open Anyway*); on Windows, **More
-> info ▸ Run anyway**. You can also run from source — see [Development](#development).
+> Builds are **ad-hoc signed, not notarized** (no paid Apple Developer cert yet), so the first
+> launch shows an OS warning:
+>
+> - **macOS** — right-click the app ▸ **Open**, then **Open** in the dialog (or System Settings ▸
+>   Privacy & Security ▸ *Open Anyway*). If macOS instead says the app **"is damaged and can't be
+>   opened"**, Gatekeeper is blocking the quarantined download — clear the quarantine flag and open
+>   it normally:
+>   ```bash
+>   xattr -dr com.apple.quarantine /Applications/Blockwright.app
+>   ```
+> - **Windows** — **More info ▸ Run anyway**.
+>
+> You can also run from source — see [Development](#development).
 
 ### Content pack
 

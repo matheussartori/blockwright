@@ -11,17 +11,24 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// macOS code signing + notarization, gated entirely on env vars so the app ships
-// UNSIGNED by default (no Apple Developer cert yet). Set these in CI/locally to
-// activate it — Forge then signs with the identity and notarizes via notarytool:
-//   APPLE_SIGNING_IDENTITY   "Developer ID Application: Name (TEAMID)"
-//   APPLE_ID, APPLE_PASSWORD (app-specific), APPLE_TEAM_ID
-// Returns the partial packagerConfig to merge in (empty when unset).
+// macOS code signing, gated on env vars. Two tiers:
+//   1. No Apple Developer cert (default): AD-HOC sign (identity '-'). This produces
+//      a valid-but-anonymous signature — no cost, no account. It does NOT remove the
+//      Gatekeeper warning, but it swaps the scary "app is damaged" error (which only
+//      offers "Move to Trash") for the normal "unidentified developer" prompt, so a
+//      user can open it via right-click ▸ Open. It's also required on Apple Silicon,
+//      where every binary must carry at least an ad-hoc signature to run at all.
+//   2. Real Developer ID cert + notarization: set these to ship a clean, no-warning
+//      double-click install. Forge signs with the identity and notarizes via notarytool:
+//        APPLE_SIGNING_IDENTITY   "Developer ID Application: Name (TEAMID)"
+//        APPLE_ID, APPLE_PASSWORD (app-specific), APPLE_TEAM_ID
+// Returns the partial packagerConfig to merge in.
 type PackagerConfig = NonNullable<ForgeConfig['packagerConfig']>;
 function macSigning(): Partial<Pick<PackagerConfig, 'osxSign' | 'osxNotarize'>> {
   const identity = process.env.APPLE_SIGNING_IDENTITY;
   const { APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID } = process.env;
-  if (!identity) return {};
+  // No real cert → ad-hoc sign so the package isn't flagged as "damaged".
+  if (!identity) return { osxSign: { identity: '-' } };
   return {
     osxSign: { identity },
     ...(APPLE_ID && APPLE_PASSWORD && APPLE_TEAM_ID
@@ -85,14 +92,17 @@ const config: ForgeConfig = {
     },
   },
   packagerConfig: {
-    // Lowercase binary name. The Linux deb/rpm makers (electron-installer-*)
-    // derive the expected binary from the sanitized, lowercased package name
-    // ("blockwright") but packager names the binary after productName
-    // ("Blockwright") by default — so the deb maker can't find it and fails
-    // ("could not find the Electron app binary at .../blockwright"). Pinning
-    // executableName makes the binary lowercase on every platform; the macOS
-    // .app bundle + Windows installer are still named via productName.
-    executableName: 'blockwright',
+    // Lowercase binary name on Linux/Windows ONLY. The Linux deb/rpm makers
+    // (electron-installer-*) derive the expected binary from the sanitized,
+    // lowercased package name ("blockwright") but packager names the binary after
+    // productName ("Blockwright") by default — so the deb maker can't find it and
+    // fails ("could not find the Electron app binary at .../blockwright").
+    //   We must NOT set it on macOS: packager passes executableName as the plist's
+    //   CFBundleDisplayName (@electron/packager mac.js updatePlist), so a lowercase
+    //   executableName makes Finder/Gatekeeper show "blockwright" instead of
+    //   "Blockwright". Leaving it unset on darwin falls back to productName
+    //   ("Blockwright") for the binary, the display name AND the .app bundle.
+    ...(process.platform === 'darwin' ? {} : { executableName: 'blockwright' }),
     // App icon (logo-dark). Forge/packager appends the platform extension:
     // build/icon.icns on macOS, build/icon.ico on Windows.
     icon: './build/icon',
@@ -115,7 +125,20 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    // Windows installer (Squirrel.Windows — the auto-update source update.electronjs.org
+    // reads). Default Squirrel shows a generic borderless install splash with no app
+    // branding, which looks sketchy. Brand it: our icon on the Setup.exe + the install
+    // animation + the Add/Remove Programs entry. (The remaining SmartScreen "unknown
+    // publisher" warning is unavoidable until the installer is code-signed with a
+    // Windows cert — there's no free equivalent of macOS ad-hoc signing here.)
+    new MakerSquirrel({
+      setupIcon: './build/icon.ico',
+      loadingGif: './build/install-spinner.gif',
+      // Icon shown in Add/Remove Programs — Squirrel requires a URL, not a path, so
+      // point at the committed icon on the public repo.
+      iconUrl: 'https://raw.githubusercontent.com/matheussartori/blockwright/main/build/icon.ico',
+      setupExe: 'Blockwright-Setup.exe',
+    }),
     // ZIP for macOS is required for Squirrel.Mac auto-update (update.electronjs.org
     // serves the .zip); the DMG is the human-friendly installer.
     new MakerZIP({}, ['darwin']),
