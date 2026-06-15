@@ -91,7 +91,11 @@ refines through an emit → render → review loop — previewed live in the vie
 >   ```bash
 >   xattr -dr com.apple.quarantine /Applications/Blockwright.app
 >   ```
-> - **Windows** — **More info ▸ Run anyway**.
+> - **Windows** — **More info ▸ Run anyway**. `Blockwright-Setup.exe` is a Squirrel
+>   installer: it installs **per-user, silently** (no wizard or location prompt), then
+>   launches the app right away. It lands in `%LocalAppData%\blockwright`, adds Start
+>   Menu + Desktop shortcuts and an Add/Remove Programs entry, and auto-updates itself
+>   from new releases — so "it just opened without installing" means it *did* install.
 >
 > You can also run from source — see [Development](#development).
 

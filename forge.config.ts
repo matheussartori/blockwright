@@ -27,8 +27,30 @@ type PackagerConfig = NonNullable<ForgeConfig['packagerConfig']>;
 function macSigning(): Partial<Pick<PackagerConfig, 'osxSign' | 'osxNotarize'>> {
   const identity = process.env.APPLE_SIGNING_IDENTITY;
   const { APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID } = process.env;
-  // No real cert → ad-hoc sign so the package isn't flagged as "damaged".
-  if (!identity) return { osxSign: { identity: '-' } };
+  // No real cert → ad-hoc sign so the package isn't flagged as "damaged". Two flags
+  // are BOTH required for a working ad-hoc Apple Silicon build:
+  //   • identityValidation:false — without it @electron/osx-sign treats '-' as a
+  //     keychain identity NAME, runs `security find-identity` for it, finds nothing
+  //     and throws "No identity found for signing", so the ad-hoc sign never runs and
+  //     the app ships with only Electron's default linker signature (which the
+  //     asar-integrity fuse then invalidates → SIGKILL "Code Signature Invalid").
+  //   • hardenedRuntime:false (via optionsForFile) — osx-sign enables the hardened
+  //     runtime by DEFAULT, which turns on Library Validation. Under an ad-hoc
+  //     signature every nested binary has its own cdhash and no Team ID, so the main
+  //     process refuses to load the (ad-hoc) Electron Framework: dyld aborts at launch
+  //     with "have different Team IDs". Hardened runtime is useless without
+  //     notarization anyway. NOTE: the top-level `hardenedRuntime` option is IGNORED by
+  //     osx-sign — its per-file defaults hardcode `hardenedRuntime: true`, so the only
+  //     way to turn it off for every binary is the `optionsForFile` callback.
+  if (!identity) {
+    return {
+      osxSign: {
+        identity: '-',
+        identityValidation: false,
+        optionsForFile: () => ({ hardenedRuntime: false }),
+      },
+    };
+  }
   return {
     osxSign: { identity },
     ...(APPLE_ID && APPLE_PASSWORD && APPLE_TEAM_ID
