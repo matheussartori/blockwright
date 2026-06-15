@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { AuthoringStructure } from '../../structure/authoring';
 import { validateEmit } from '../emit-validate';
 
-// The unknown-block gate resolves ids against the on-disk content pack; point it at
-// the repo's bundled pack so the check runs in the plain Node test env (no Electron
-// `app`). Lazily read by contentDir(), so setting it before the tests run suffices.
-process.env.BW_CONTENT ??= path.join(process.cwd(), 'content');
+// The unknown-block gate resolves ids against the on-disk content pack; point it at a
+// committed test fixture (the repo's real `content/` is user-supplied + gitignored, so
+// it's absent in CI). The fixture only carries the blockstate files these tests need —
+// `isKnownBlock` is an existence check, so their content is nominal. Lazily read by
+// contentDir(), so setting it before the tests run suffices.
+process.env.BW_CONTENT ??= path.join(__dirname, 'fixtures', 'content-pack');
 
 describe('validateEmit', () => {
   it('accepts a structurally valid build of real blocks', () => {

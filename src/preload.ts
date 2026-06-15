@@ -60,6 +60,8 @@ const api: BlockwrightApi = {
   closeWorkspace: (): Promise<null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceClose),
   getWorkspace: (): Promise<Workspace | null> => ipcRenderer.invoke(IPC_CHANNELS.workspaceGet),
   getContentVersion: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentVersion),
+  getContentDir: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentGetDir),
+  chooseContentDir: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentChooseDir),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.appVersion),
   activateWorkspace: (ws: Workspace): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),

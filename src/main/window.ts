@@ -168,6 +168,14 @@ export function createWindow(): BrowserWindow {
     trafficLightPosition: { x: 16, y: 12 }, // centred in the 36px top bar
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      // Secure-by-default renderer: isolate the preload's context, no Node in
+      // the renderer, and a sandboxed renderer process. These match Electron's
+      // current defaults but are set explicitly so a dependency or Electron
+      // upgrade can't silently weaken the boundary. (The renderer reaches main
+      // only through the contextBridge in preload.ts.)
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
 

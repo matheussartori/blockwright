@@ -51,8 +51,9 @@ refines through an emit → render → review loop — previewed live in the vie
   attic, the surroundings (a code-built yard
   laid outside the building shell: a fenced **cottage garden** — stone-and-fence
   perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop
-  plots and a well or fountain — a **pool terrace**, or a fenced **graveyard**) and per-floor interior rooms (living
-  room, kitchen, library, bedroom, shared bedrooms, storage) in the full-stage Build Planner (browse
+  plots and a well or fountain — a **pool terrace**, or a fenced **graveyard**) and per-floor interior rooms — a
+  general family (living room, kitchen, library, bedroom, shared bedrooms, storage) and a horror family
+  (ritual chamber, dungeon, morgue, séance parlour) — in the full-stage Build Planner (browse
   every part with live 3D previews in the Module Gallery); the selection guides the build and loads
   only the relevant knowledge, and registered structure × decoration modules also cross at compile
   time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
@@ -62,7 +63,8 @@ refines through an emit → render → review loop — previewed live in the vie
   along as context on every generation prompt
 - A browsable structure library — each generated build is saved to its own folder (the latest clean
   `.nbt`, every kept version, and a generation log), revealed from the chat's build card
-- Namespace-aware asset resolution from an extracted Minecraft content pack
+- Namespace-aware asset resolution from your own extracted Minecraft content pack (configurable;
+  not bundled)
 - Mod workspace support — render modded structures with their own textures and models, with the
   workspace's target Minecraft version auto-detected
 - Jigsaw assembly preview for worldgen template pools
@@ -77,8 +79,24 @@ refines through an emit → render → review loop — previewed live in the vie
 
 ## Usage
 
-> Blockwright is currently distributed from source. Packaged installers can be built with
-> Electron Forge — see [Development](#development).
+> **Downloads** — packaged installers (macOS `.dmg`/`.zip`, Windows `.exe`, Linux `.deb`/`.rpm`)
+> are attached to each [GitHub Release](https://github.com/matheussartori/blockwright/releases).
+> Builds are **not yet code-signed**, so the first launch shows an OS warning: on macOS, right-click
+> the app ▸ **Open** (or System Settings ▸ Privacy & Security ▸ *Open Anyway*); on Windows, **More
+> info ▸ Run anyway**. You can also run from source — see [Development](#development).
+
+### Content pack
+
+Blockwright renders blocks using the textures and models from a Minecraft **content pack**, which it
+does **not** bundle (those assets belong to Mojang and can't be redistributed). Point it at your own:
+
+1. Extract a Minecraft version's `assets` and `data` folders (e.g. from the version `.jar` in
+   `.minecraft/versions/<version>/`) into a single folder.
+2. In Blockwright, open **Settings ▸ Viewer ▸ Content pack** (or click **Choose folder…** on the
+   welcome screen) and select that folder.
+
+Without a content pack, structures still load but blocks render as flat deterministic colors. The
+`BW_CONTENT` environment variable overrides the configured folder.
 
 ### Opening a structure
 
@@ -188,7 +206,9 @@ src/
                  the authoring/NBT compiler, the composable generation domain, and AI generation
   renderer/      React UI shell (Vite + React) and the imperative Three.js viewer
   shared/        IPC channel names and type-only contracts shared by both bundles
-content/         Extracted Minecraft content pack, shipped as an extraResource
+knowledge/       AI knowledge base (NBT authoring guides), shipped as an extraResource
+content/         A user-supplied Minecraft content pack (configured at runtime, not bundled;
+                 in dev, a local content/ folder here is picked up automatically)
 ```
 
 - **IPC** — `shared/ipc.ts` is the single source of truth for channel/event names; handlers live

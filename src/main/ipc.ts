@@ -9,6 +9,9 @@ import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
 import { isInsideLibrary, librarySidecarPath, metadataFromStructure, readMetadata, writeLoadMetadata } from './structure/metadata';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
+import { getContentDir, setContentDir } from './structure/assets/content-dir';
+import { clearJsonCache } from './structure/assets/content-pack';
+import { clearModelCache } from './structure/assets/model-loader';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
 import { getDictionary, setBlockNote, setScope } from './structure/assets/block-dictionary';
@@ -110,6 +113,20 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IPC_CHANNELS.workspaceGet, async () => getActiveWorkspace());
   ipcMain.handle(IPC_CHANNELS.contentVersion, async () => contentPackVersion());
+  ipcMain.handle(IPC_CHANNELS.contentGetDir, async () => getContentDir());
+  ipcMain.handle(IPC_CHANNELS.contentChooseDir, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      defaultPath: getContentDir() ?? undefined,
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const dir = setContentDir(result.filePaths[0]);
+    // The new pack changes which assets resolve — drop the resolution caches so the
+    // next load reads from it (the renderer re-probes / reopens to pick up textures).
+    clearJsonCache();
+    clearModelCache();
+    return dir;
+  });
   ipcMain.handle(IPC_CHANNELS.appVersion, async () => app.getVersion());
   ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
     listWorkspaceStructures(getActiveWorkspace()),

@@ -1,13 +1,34 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { PublisherGithub } from '@electron-forge/publisher-github';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import fs from 'node:fs';
 import path from 'node:path';
+
+// macOS code signing + notarization, gated entirely on env vars so the app ships
+// UNSIGNED by default (no Apple Developer cert yet). Set these in CI/locally to
+// activate it — Forge then signs with the identity and notarizes via notarytool:
+//   APPLE_SIGNING_IDENTITY   "Developer ID Application: Name (TEAMID)"
+//   APPLE_ID, APPLE_PASSWORD (app-specific), APPLE_TEAM_ID
+// Returns the partial packagerConfig to merge in (empty when unset).
+type PackagerConfig = NonNullable<ForgeConfig['packagerConfig']>;
+function macSigning(): Partial<Pick<PackagerConfig, 'osxSign' | 'osxNotarize'>> {
+  const identity = process.env.APPLE_SIGNING_IDENTITY;
+  const { APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID } = process.env;
+  if (!identity) return {};
+  return {
+    osxSign: { identity },
+    ...(APPLE_ID && APPLE_PASSWORD && APPLE_TEAM_ID
+      ? { osxNotarize: { appleId: APPLE_ID, appleIdPassword: APPLE_PASSWORD, teamId: APPLE_TEAM_ID } }
+      : {}),
+  };
+}
 
 // The AI SDKs are externalized from the Vite main bundle (see vite.main.config.ts)
 // and loaded via dynamic import() at runtime, so they must exist in the packaged
@@ -76,16 +97,36 @@ const config: ForgeConfig = {
       unpack:
         '**/node_modules/{@anthropic-ai/claude-agent-sdk,@anthropic-ai/claude-agent-sdk-*,@openai/codex-sdk,@openai/codex,@openai/codex-*}/**',
     },
-    // Ship the Minecraft content pack and the AI knowledge base alongside the
-    // app (both resolved at runtime).
-    extraResource: ['content', 'knowledge'],
+    // Ship only the AI knowledge base (our own content). The Minecraft content
+    // pack is NOT bundled — redistributing Mojang's assets isn't permitted — so
+    // the user points Blockwright at their own extraction at runtime (see
+    // structure/assets/content-dir.ts).
+    extraResource: ['knowledge'],
+    // Off unless the APPLE_* env vars are set (see macSigning); unsigned otherwise.
+    ...macSigning(),
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({}),
+    // ZIP for macOS is required for Squirrel.Mac auto-update (update.electronjs.org
+    // serves the .zip); the DMG is the human-friendly installer.
     new MakerZIP({}, ['darwin']),
+    new MakerDMG({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
+  ],
+  publishers: [
+    // Publish makers to GitHub Releases (the free, server-less update source that
+    // update.electronjs.org reads). `npm run publish` on a tag uploads here; needs
+    // a GITHUB_TOKEN with repo scope in the environment (CI provides it).
+    new PublisherGithub({
+      repository: { owner: 'matheussartori', name: 'blockwright' },
+      // Created as a draft so you review before publishing; the body is auto-filled
+      // from the commits/PRs since the last tag (GitHub's native generator), so you
+      // don't hand-write release notes — just tweak and hit Publish.
+      draft: true,
+      generateReleaseNotes: true,
+    }),
   ],
   plugins: [
     new VitePlugin({

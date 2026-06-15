@@ -1,6 +1,9 @@
-// Settings ▸ Viewer: scene toggles (grid, block-texture icons) and fly-mode controls
-// (mouse sensitivity, invert Y). Mutates settingsStore; the viewer reads these via
-// App's settings→viewer effect. (Floor bands are auto-detected, not a setting.)
+// Settings ▸ Viewer: the content-pack folder, scene toggles (grid, block-texture
+// icons) and fly-mode controls (mouse sensitivity, invert Y). Mutates settingsStore;
+// the viewer reads these via App's settings→viewer effect. (Floor bands are
+// auto-detected, not a setting.)
+import { useEffect, useState } from 'react';
+import { api } from '../../api';
 import { useSettings, useT } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
 
@@ -8,8 +11,41 @@ export function ViewerTab() {
   const t = useT();
   const settings = useSettings((s) => s);
   const set = settingsStore.getState().set;
+
+  const [contentDir, setContentDir] = useState<string | null>(null);
+  useEffect(() => {
+    void api.getContentDir().then(setContentDir);
+  }, []);
+  const chooseContent = async () => {
+    const picked = await api.chooseContentDir();
+    if (picked) setContentDir(picked);
+  };
+
   return (
     <>
+      <section className="settings-group">
+        <div className="settings-group-name">{t('viewer.contentPack')}</div>
+        <p className="setting-note">{t('viewer.contentPackNote')}</p>
+        <div className="setting-key-row">
+          <input
+            className="input setting-key-input"
+            readOnly
+            value={contentDir ?? ''}
+            placeholder={t('viewer.contentPackNone')}
+            spellCheck={false}
+          />
+          <button className="btn sm no-drag" onClick={() => void chooseContent()}>
+            {t('viewer.contentPackChange')}
+          </button>
+          <button
+            className="btn sm no-drag"
+            onClick={() => contentDir && void api.revealPath(contentDir)}
+            disabled={!contentDir}
+          >
+            {t('library.reveal')}
+          </button>
+        </div>
+      </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.scene')}</div>
         <label className="setting-row">

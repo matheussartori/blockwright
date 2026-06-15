@@ -12,6 +12,7 @@ import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
 import { buildAppMenu } from '@/main/app-menu';
 import { applyWorkspace, detectWorkspace } from '@/main/workspace';
+import { initAutoUpdates } from '@/main/updater';
 
 // Mirror the main-process console into the in-app Console dock from the very
 // first line (covers startup, before the window exists — buffered for the backlog).
@@ -56,6 +57,7 @@ app.on('ready', () => {
   }
   createWindow();
   buildAppMenu();
+  initAutoUpdates();
 });
 
 app.on('window-all-closed', () => {

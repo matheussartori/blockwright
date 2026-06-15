@@ -418,7 +418,9 @@ src/
                           space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
                           makeT/LanguageInfo). Flat dot-keyed `Record<MessageKey,string>`, `{token}`
                           interpolation, fallback locale→en→key. See "Internationalization (i18n)".
-content/                  Extracted Minecraft content pack (assets/minecraft/...). Shipped as extraResource.
+content/                  A user-supplied Minecraft content pack (assets/minecraft/...). NOT shipped
+                          (Mojang's assets can't be redistributed); configured at runtime via
+                          content-dir.ts. A local content/ here is auto-picked-up in dev.
 ```
 
 ### Internationalization (i18n)
@@ -462,8 +464,12 @@ the binding in `preload.ts`.
 
 ### Content pack & namespaces
 
-`content-pack.ts` locates the base pack via `BW_CONTENT` env override → packaged
-`resourcesPath/content` → repo `content/`. Asset resolution is **namespace-aware**: refs are
+The vanilla content pack is **not bundled** (Mojang's assets can't be redistributed) — the user
+points Blockwright at their own extraction. `content-dir.ts` resolves it via `BW_CONTENT` env
+override → the user's saved folder (persisted `content-dir.json` in userData; set in Settings ▸
+Viewer or from the welcome screen, `content:get-dir`/`content:choose-dir` IPC) → (dev only) the
+repo's `content/` if present → none (asset lookups then miss into the flat-color fallback).
+`content-pack.ts` builds the namespace roots on top of that. Asset resolution is **namespace-aware**: refs are
 `namespace:path` (default `minecraft`), and each namespace resolves under its own root — the
 vanilla pack for `minecraft`, the active **mod workspace** for its own namespace. So a mod block
 model with `parent: minecraft:block/cube_all` + `theplacebeyond:block/foo` textures resolves the

@@ -35,6 +35,10 @@ export interface BlockwrightApi {
   getWorkspace: () => Promise<Workspace | null>;
   /** Minecraft version of the active content pack (its version.json), or null. */
   getContentVersion: () => Promise<string | null>;
+  /** The configured content-pack folder, or null if none is set. */
+  getContentDir: () => Promise<string | null>;
+  /** Prompt for a content-pack folder; persists + returns it (null if cancelled). */
+  chooseContentDir: () => Promise<string | null>;
   /** The app's own version (from package.json), for the About panel. */
   getAppVersion: () => Promise<string>;
   /** Activate a known/detected workspace; returns it, or null if it no longer exists. */

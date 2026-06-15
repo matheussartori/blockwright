@@ -96,3 +96,6 @@ out/
 
 # Compiled module-gallery previews (cached by the Module Gallery in dev)
 .module-previews/
+
+# Claude Code local settings (per-machine permission allowlist, paths) — never commit
+.claude/settings.local.json

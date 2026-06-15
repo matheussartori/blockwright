@@ -63,6 +63,7 @@ export const en = {
   'welcome.catalogSub': 'Browse every available block',
   'welcome.packDetected': 'Content pack detected — full textures available',
   'welcome.packMissing': 'No content pack — blocks render as flat colors',
+  'welcome.packChoose': 'Choose folder…',
   'welcome.guideLink': 'New here? Read the guide',
   'welcome.workspaceStructures': 'Workspace structures',
   'welcome.searchPlaceholder': 'Search structures…',
@@ -104,6 +105,11 @@ export const en = {
   'appearance.languageNote': '“System” follows your operating system’s language.',
 
   // Settings ▸ Viewer.
+  'viewer.contentPack': 'Content pack',
+  'viewer.contentPackNote':
+    'Blockwright doesn’t ship Minecraft’s assets. Point it at your own extracted content pack (a folder containing assets/ and data/) to see real block textures.',
+  'viewer.contentPackNone': 'No folder selected — blocks render as flat colors',
+  'viewer.contentPackChange': 'Choose…',
   'viewer.scene': 'Scene',
   'viewer.showGrid': 'Show ground grid',
   'viewer.blockTextures': 'Block textures in the Info list',

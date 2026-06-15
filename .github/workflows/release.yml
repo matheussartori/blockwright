@@ -1,0 +1,44 @@
+name: Release
+
+# Build installers on each OS and publish them to a GitHub Release whenever a
+# version tag is pushed (e.g. `git tag v1.0.0 && git push origin v1.0.0`).
+# update.electronjs.org reads the published release, so auto-update needs no server.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # Forge's GitHub publisher creates/uploads the release
+
+jobs:
+  release:
+    name: Build & publish (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the makers for this OS and upload them to the (draft) GitHub Release.
+      # The publisher dedups by tag, so all three OS jobs attach to one release.
+      - name: Publish
+        run: npm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS signing/notarization activates only if these repo secrets exist;
+          # unset = an unsigned build (see forge.config.ts macSigning()).
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

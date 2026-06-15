@@ -1,11 +1,11 @@
 // Filesystem layer for assets, resolved per namespace across two roots: the
 // bundled vanilla content pack (the "minecraft" namespace) and, when one is
 // open, a mod workspace that supplies its own namespace (e.g. "theplacebeyond").
-import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Workspace } from '@/shared/types';
 import { detectMcVersion } from '../../mc-version-detect';
+import { resolvedContentDir } from './content-dir';
 
 let activeWorkspace: Workspace | null = null;
 
@@ -19,16 +19,12 @@ export function getActiveWorkspace(): Workspace | null {
   return activeWorkspace;
 }
 
-/** Locate the content pack: an explicit override, bundled resource, or repo root. */
+/** The content pack's root folder, resolved from the user's configuration
+ *  (see content-dir.ts). The vanilla pack is NOT shipped — the user points
+ *  Blockwright at their own extraction — so this can be a non-existent sentinel
+ *  when none is set, and asset lookups then miss into the flat-color fallback. */
 export function contentDir(): string {
-  if (process.env.BW_CONTENT) return process.env.BW_CONTENT;
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'content')]
-    : [
-        path.join(app.getAppPath(), 'content'),
-        path.join(process.cwd(), 'content'),
-      ];
-  return candidates.find((c) => fs.existsSync(c)) ?? candidates[0];
+  return resolvedContentDir();
 }
 
 /** The Minecraft version of the active content pack, read from its `version.json`

@@ -41,6 +41,12 @@ export function Welcome({
     void api.hasTexture('minecraft/block/stone').then(setHasPack);
   }, []);
 
+  // Let the user point Blockwright at their own Minecraft extraction (not shipped).
+  const chooseContentPack = async () => {
+    const picked = await api.chooseContentDir();
+    if (picked) setHasPack(await api.hasTexture('minecraft/block/stone'));
+  };
+
   const sortedStructures = useMemo(
     () => [...workspaceStructures].sort((a, b) => basename(a).localeCompare(basename(b))),
     [workspaceStructures],
@@ -111,6 +117,11 @@ export function Welcome({
               <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
                 <span className="welcome-hint-dot" />
                 {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
+                {!hasPack && (
+                  <button className="welcome-hint-action no-drag" onClick={() => void chooseContentPack()}>
+                    {t('welcome.packChoose')}
+                  </button>
+                )}
               </span>
             )}
             <button className="welcome-guide-link" onClick={() => store.getState().setGuideOpen(true)}>

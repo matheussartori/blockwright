@@ -65,6 +65,7 @@ export const ptBR: Messages = {
   'welcome.catalogSub': 'Explorar todos os blocos disponíveis',
   'welcome.packDetected': 'Content pack detectado — texturas completas disponíveis',
   'welcome.packMissing': 'Sem content pack — blocos exibidos como cores chapadas',
+  'welcome.packChoose': 'Escolher pasta…',
   'welcome.guideLink': 'Novo por aqui? Leia o guia',
   'welcome.workspaceStructures': 'Estruturas do workspace',
   'welcome.searchPlaceholder': 'Buscar estruturas…',
@@ -106,6 +107,11 @@ export const ptBR: Messages = {
   'appearance.languageNote': '“Sistema” segue o idioma do seu sistema operacional.',
 
   // Settings ▸ Viewer.
+  'viewer.contentPack': 'Content pack',
+  'viewer.contentPackNote':
+    'O Blockwright não inclui os assets do Minecraft. Aponte para o seu próprio content pack extraído (uma pasta com assets/ e data/) para ver as texturas reais dos blocos.',
+  'viewer.contentPackNone': 'Nenhuma pasta selecionada — blocos exibidos como cores chapadas',
+  'viewer.contentPackChange': 'Escolher…',
   'viewer.scene': 'Cena',
   'viewer.showGrid': 'Mostrar grade do chão',
   'viewer.blockTextures': 'Texturas de blocos na lista de Informações',

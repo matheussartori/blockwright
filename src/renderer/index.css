@@ -659,6 +659,19 @@ body {
 .welcome-hint.warn .welcome-hint-dot {
   background: var(--warn);
 }
+.welcome-hint-action {
+  margin-left: 4px;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.welcome-hint-action:hover {
+  text-decoration: underline;
+}
 
 /* --- Shared floating window chrome (Controls / Inspector / Jigsaw) ---------- */
 

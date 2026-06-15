@@ -1,10 +1,13 @@
 {
   "name": "blockwright",
   "productName": "Blockwright",
-  "version": "0.1.0",
-  "description": "Blockwright",
+  "version": "1.0.0",
+  "description": "Desktop app for viewing, browsing, and AI-generating Minecraft .nbt structures in 3D.",
   "main": ".vite/build/main.js",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -14,6 +17,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -22,23 +26,44 @@
       "vitest related --run --passWithNoTests"
     ]
   },
-  "keywords": [],
+  "keywords": [
+    "minecraft",
+    "nbt",
+    "structure",
+    "viewer",
+    "electron",
+    "three.js",
+    "3d",
+    "ai",
+    "worldgen",
+    "jigsaw"
+  ],
   "author": {
     "name": "Matheus Sartori",
     "email": "ms.sartori@outlook.com.br"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/matheussartori/blockwright.git"
+  },
+  "bugs": {
+    "url": "https://github.com/matheussartori/blockwright/issues"
+  },
+  "homepage": "https://github.com/matheussartori/blockwright#readme",
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@electron-forge/cli": "^7.11.2",
     "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
     "@electron-forge/maker-rpm": "^7.11.2",
     "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
+    "@electron-forge/publisher-github": "^7.11.2",
     "@electron/fuses": "^1.8.0",
     "@eslint/js": "^10.0.1",
     "@types/electron-squirrel-startup": "^1.0.2",
@@ -46,6 +71,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
     "electron": "42.3.0",
     "eslint": "^10.4.1",
     "globals": "^17.6.0",
@@ -68,6 +94,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.184.0",
+    "update-electron-app": "^3.2.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   }

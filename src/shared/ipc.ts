@@ -18,6 +18,10 @@ export const IPC_CHANNELS = {
   workspaceStructures: 'workspace:structures',
   /** The Minecraft version of the active content pack (from its version.json). */
   contentVersion: 'content:version',
+  /** The configured content-pack folder, or null if none is set. */
+  contentGetDir: 'content:get-dir',
+  /** Prompt for a content-pack folder; persists + returns it (or null if cancelled). */
+  contentChooseDir: 'content:choose-dir',
   /** The app's own version (app.getVersion()), for the About panel. */
   appVersion: 'app:version',
   /** Activate a known/detected workspace (payload Workspace) — returns it or null if stale. */

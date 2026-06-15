@@ -10,10 +10,11 @@ import { RunLog } from '../gen-log';
 import { TokenMeter } from '../token-meter';
 
 // The unknown-block gate (reached only for a structurally-valid emit) resolves ids
-// against the on-disk content pack — point it at the bundled pack so it runs without
-// Electron. The rejection branches below short-circuit BEFORE any fs/compile, so this is
-// just belt-and-suspenders.
-process.env.BW_CONTENT ??= path.join(process.cwd(), 'content');
+// against the on-disk content pack — point it at a committed test fixture (the repo's
+// real `content/` is user-supplied + gitignored, so it's absent in CI). The fixture
+// carries the blockstate files these tests reference (air/stone); `isKnownBlock` is an
+// existence check, so their content is nominal.
+process.env.BW_CONTENT ??= path.join(__dirname, 'fixtures', 'content-pack');
 // The compiled-emit tests below mirror into the library — point it at a temp dir so the
 // suite never touches ~/Documents (and never needs Electron's `app`).
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bw-emit-handler-'));
