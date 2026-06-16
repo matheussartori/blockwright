@@ -119,7 +119,6 @@ export const hauntedTower: StructureType = {
     const floors = params.floors as number;
     const decay = params.decay as number;
 
-    const air = palette.air();
     const wall = palette.get('wall');
     const found = palette.get('foundation');
     const floorIdx = palette.get('floor');
@@ -273,7 +272,7 @@ export const hauntedTower: StructureType = {
     }
 
     // --- Pointed gothic DOORWAY on the flared base front, under a GLOWING INVERTED CROSS ----
-    ops.push(...gothicDoor(cx, z0, groundY, tierTop(0), palette, accent, glass, lantern));
+    ops.push(...gothicDoor(cx, z0, groundY, tierTop(0), palette, accent, glass));
 
     // --- Guaranteed light + vertical circulation -------------------------------------------
     ops.push(...ceilingLanterns(slabYs, wallTop, cx, cz, lantern));
@@ -282,7 +281,10 @@ export const hauntedTower: StructureType = {
     // crown (the keep's content always earns a way up, like the classic tower).
     ops.push(...roofHatch(rTop, slabYs[slabYs.length - 1], wallTop, palette));
 
-    // --- Decay (haunted defaults ~0.35): weather + chip the shaft, sparing corners + ribs ---
+    // --- Decay (haunted defaults ~0.35): WEATHER the shaft to mossy, sparing corners + ribs.
+    // Never punch AIR through the single-thickness exterior wall — a hole reads as a see-through
+    // gap to the void, not a haunted patina (the "buraco na parede" defect); weathering carries
+    // the derelict look without breaching the envelope. ------------------------------------
     if (decay > 0) {
       for (let f = 0; f < floors; f++) {
         const m = insetAt(f);
@@ -292,9 +294,7 @@ export const hauntedTower: StructureType = {
             for (let z = r.z0; z <= r.z1; z++) {
               if (x !== r.x0 && x !== r.x1 && z !== r.z0 && z !== r.z1) continue; // walls only
               if ((x === r.x0 || x === r.x1) && (z === r.z0 || z === r.z1)) continue; // keep corners
-              const v = rnd();
-              if (v < decay * 0.07) ops.push({ op: 'block', pos: [x, y, z], state: air });
-              else if (v < decay * 0.07 + decay * 0.3) ops.push({ op: 'block', pos: [x, y, z], state: mossy });
+              if (rnd() < decay * 0.3) ops.push({ op: 'block', pos: [x, y, z], state: mossy });
             }
           }
         }
@@ -391,17 +391,28 @@ function skullFace(cx: number, frontZ: number, yLo: number, yHi: number, glass: 
 /** A pointed gothic DOORWAY on the base front (z = `frontZ`), centred at `cx`: a stepped
  *  pointed-arch opening, a seated double door + a soul lantern inside, pale jambs, and a
  *  GLOWING INVERTED CROSS of gray glass above the lintel (the occult mark of the references). */
-function gothicDoor(cx: number, frontZ: number, groundY: number, tierTop: number, palette: RolePalette, jamb: number, glass: number, lantern: number): AuthoringOp[] {
+function gothicDoor(cx: number, frontZ: number, groundY: number, tierTop: number, palette: RolePalette, jamb: number, glass: number): AuthoringOp[] {
   const air = palette.air();
+  const stand = palette.get('light'); // floor-standing porch lantern (off the walk path)
   const ops: AuthoringOp[] = [];
   const lintel = Math.min(groundY + 3, tierTop - 2);
-  // Carve a 3-wide opening narrowing to 1 at the pointed apex.
+  // Carve a 3-wide opening narrowing to 1 at the pointed apex, in the OUTER plinth/face plane.
   for (let y = groundY + 1; y <= lintel; y++) {
     const half = y >= lintel - 1 ? 0 : 1; // taper to a point at the top
     for (let x = cx - half; x <= cx + half; x++) ops.push({ op: 'block', pos: [x, y, frontZ], state: air });
   }
+  // The front face is DOUBLE-thick here (outer plinth/decoration at `frontZ` + the shaft wall at
+  // `frontZ + 1`). The door is seated in the outer plane, so the shaft wall directly behind it must
+  // also be carved or the entrance dead-ends into a LOCKED wall (the "porta bloqueada" defect — the
+  // door-clearance pass can't open a locked shell cell). Punch a clean 1-wide × 2-tall tunnel
+  // through the shaft wall + into the interior so you can always walk in.
+  for (let dz = 1; dz <= 2; dz++) for (let y = groundY + 1; y <= groundY + 2; y++) {
+    ops.push({ op: 'block', pos: [cx, y, frontZ + dz], state: air });
+  }
   ops.push(...seatDoor(palette, cx, groundY + 1, frontZ));
-  ops.push({ op: 'block', pos: [cx, groundY + 2, frontZ + 1], state: lantern }); // glow inside the porch
+  // Light the porch from a floor lantern set to ONE SIDE, just inside — never a fixture hanging in
+  // the doorway at head height (which reads as a blocker and clutters the entrance).
+  ops.push({ op: 'block', pos: [cx + 1, groundY + 1, frontZ + 2], state: stand });
   // Pale jambs flanking the opening + a pointed apex stone.
   for (const px of [cx - 2, cx + 2]) ops.push({ op: 'fill', from: [px, groundY + 1, frontZ], to: [px, lintel, frontZ], state: jamb });
   ops.push({ op: 'block', pos: [cx, Math.min(lintel + 1, tierTop), frontZ], state: jamb });

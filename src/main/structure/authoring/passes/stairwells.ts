@@ -701,34 +701,79 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
     return { place, carve, occupy, kind: 'ladder' as const, arrive: [bx, bz] as [number, number] };
   };
 
-  type Plan = NonNullable<ReturnType<typeof planStair>> | NonNullable<ReturnType<typeof planLadder>> | null;
-  // Build the single best connector for a gap, preferring a stair (rule 1). `near` is
-  // the column the gap below's connector arrives at — a hint-less gap stacks its climb
-  // there so the route between storeys stays compact.
+  // Plan a multi-flight SWITCHBACK staircase rising lowerY→upperY in a compact 2-wide well,
+  // for a storey too TALL for a single 45° flight to fit the footprint (a tower keep's tall
+  // tiers — a 22-high storey needs a 22-cell straight run, which can't fit a 25-wide tower).
+  // Flights PING-PONG along `primary` in alternating across-rows, connecting tread-to-tread at
+  // the well's two ends, so the footprint stays `run`×2 regardless of storey height. The top
+  // tread lands flush with the upper floor and you step off PERPENDICULAR onto the surrounding
+  // floor (the well is 2 wide, bordered by floor on both sides). Returns the plan, or null when
+  // the well can't fit inside the house. No stringers — stairs are self-supporting.
+  const planSwitchback = (ax: number, az: number, primary: [number, number], lowerY: number, upperY: number) => {
+    const H = upperY - lowerY;
+    if (H < 6) return null; // a single flight already handles short storeys
+    const [px, pz] = primary;
+    const qx = pz !== 0 ? 1 : 0, qz = px !== 0 ? 1 : 0; // positive across (perpendicular) unit
+    // The longest run (≤10) that stays inside the house across both rows from the anchor.
+    let run = 0;
+    for (let p = 0; p < 10; p++) {
+      if (!inHouse(ax + px * p, az + pz * p) || !inHouse(ax + px * p + qx, az + pz * p + qz)) break;
+      run = p + 1;
+    }
+    if (run < 3) return null;
+    const nF = Math.ceil(H / run); // full flights, then the remainder on top
+    const place: AuthoringBlock[] = [];
+    const carve: string[] = [];
+    const occupy: string[] = [];
+    const claim = (x: number, y: number, z: number): boolean => {
+      if (!passable(x, y, z)) return false;
+      occupy.push(posKey(x, y, z));
+      if (occupied(x, y, z)) carve.push(posKey(x, y, z));
+      return true;
+    };
+    const soften = (x: number, y: number, z: number): void => {
+      const k = posKey(x, y, z);
+      if (reserved.has(k)) return;
+      const kind = cellKind(x, y, z);
+      if (kind === 'wall' || kind === 'reserved') return;
+      if (kind === 'plane' && y !== upperY) return;
+      occupy.push(k);
+      if (occupied(x, y, z)) carve.push(k);
+    };
+    let base = lowerY;
+    for (let i = 0; i < nF; i++) {
+      const rise = i < nF - 1 ? run : H - (nF - 1) * run;
+      const fwd = i % 2 === 0;             // alternate direction…
+      const row = i % 2;                   // …and across-row, so flights ping-pong in the well
+      const [dx, dz] = fwd ? [px, pz] : [-px, -pz];
+      const stairIdx = intern({ Name: fallbackStairName, Properties: { facing: ascentFacing(dx, dz), half: 'bottom', shape: 'straight', waterlogged: 'false' } });
+      for (let k = 0; k < rise; k++) {
+        const p = fwd ? k : run - 1 - k;   // forward flights run 0→run-1, back flights run-1→0
+        const x = ax + px * p + qx * row, z = az + pz * p + qz * row, y = base + 1 + k;
+        if (!claim(x, y, z)) return null;  // tread
+        place.push({ state: stairIdx, pos: [x, y, z] });
+        if (!claim(x, y + 1, z) || !claim(x, y + 2, z)) return null; // 2 headroom (cuts the upper-floor opening)
+        // Top tread of the WHOLE climb: open a perpendicular step-off onto the floor either
+        // side of the 2-wide well, so the climber walks out onto the upper storey.
+        if (i === nF - 1 && k === rise - 1) {
+          for (const [ox, oz] of [[qx, qz], [-qx, -qz]] as const) { soften(x + ox, y + 1, z + oz); soften(x + ox, y + 2, z + oz); }
+        }
+      }
+      base += rise;
+    }
+    return { place, carve, occupy, kind: 'stair' as const, arrive: [ax, az] as [number, number] };
+  };
+
+  type Plan = NonNullable<ReturnType<typeof planStair>> | NonNullable<ReturnType<typeof planLadder>>
+    | NonNullable<ReturnType<typeof planSwitchback>> | null;
+  const PRIMARIES: [number, number][] = [[1, 0], [0, 1]];
+  // Build the single best connector for a gap, preferring a real staircase (rule 1) — a single
+  // straight flight first, then a compact SWITCHBACK for a tall storey — and only then a ladder.
+  // `near` is the column the gap below's connector arrives at — a hint-less gap stacks its climb
+  // there so the route between storeys stays compact (and switchbacks align into one shaft).
   const planConnector = (work: GapWork, lowerY: number, upperY: number, near: { x: number; z: number } | null): Plan => {
     const hints = [...work.hints].sort((a, b) => b.rise - a.rise);
-    // 1) The model's own stair flights, strongest first (known-good column + facing).
-    for (const h of hints) {
-      if (!h.dir) continue;
-      const p = planStair(h.x, h.z, h.dir, palette[h.stairState ?? 0]?.Name ?? fallbackStairName, lowerY, upperY);
-      if (p) return p;
-    }
-    // 2) DERIVE a stair: try every hint column in all four directions, so we still get a
-    //    real staircase even where the model only placed a (cramped) ladder.
-    for (const h of hints) for (const d of DIRS) {
-      const p = planStair(h.x, h.z, d, fallbackStairName, lowerY, upperY);
-      if (p) return p;
-    }
-    // 3) No stair fits → a continuous wall ladder at the strongest hint column.
-    for (const h of hints) {
-      const p = planLadder(h.x, h.z, lowerY, upperY);
-      if (p) return p;
-    }
-    // 4) Scan every interior column standing on this storey's floor, nearest the anchor
-    //    first (the model's strongest hint, else the connector below, else the footprint
-    //    centre): a derived STAIR wherever one fits — rule 1 holds even for a gap the
-    //    model never attempted — else a flush wall ladder. So a gap is never left
-    //    without a connector while any column can host one.
+    // Interior columns standing on this storey's floor, nearest the anchor first.
     const anchor = hints[0] ?? near ?? { x: Math.round((hMinX + hMaxX) / 2), z: Math.round((hMinZ + hMaxZ) / 2) };
     const cols: { x: number; z: number; d: number }[] = [];
     for (let x = hMinX + 1; x <= hMaxX - 1; x++) for (let z = hMinZ + 1; z <= hMaxZ - 1; z++) {
@@ -736,18 +781,43 @@ export const rebuildStairwells: Pass = (blocks, palette, ctx) => {
       cols.push({ x, z, d: Math.abs(x - anchor.x) + Math.abs(z - anchor.z) });
     }
     cols.sort((a, b) => a.d - b.d);
+
+    // 1) A single 45° staircase: the model's own flights, then derived from the hints, then any
+    //    interior column — rule 1 holds even for a gap the model never attempted.
+    for (const h of hints) {
+      if (!h.dir) continue;
+      const p = planStair(h.x, h.z, h.dir, palette[h.stairState ?? 0]?.Name ?? fallbackStairName, lowerY, upperY);
+      if (p) return p;
+    }
+    for (const h of hints) for (const d of DIRS) {
+      const p = planStair(h.x, h.z, d, fallbackStairName, lowerY, upperY);
+      if (p) return p;
+    }
     for (const c of cols) for (const d of DIRS) {
       const p = planStair(c.x, c.z, d, fallbackStairName, lowerY, upperY);
+      if (p) return p;
+    }
+    // 2) A SWITCHBACK for a storey too tall for a straight flight: at a hint column, else any
+    //    interior column, along either primary axis. Still a real climbable staircase.
+    for (const h of hints) for (const prim of PRIMARIES) {
+      const p = planSwitchback(h.x, h.z, prim, lowerY, upperY);
+      if (p) return p;
+    }
+    for (const c of cols) for (const prim of PRIMARIES) {
+      const p = planSwitchback(c.x, c.z, prim, lowerY, upperY);
+      if (p) return p;
+    }
+    // 3) No stair fits → a continuous wall ladder, at a hint column then any interior column.
+    for (const h of hints) {
+      const p = planLadder(h.x, h.z, lowerY, upperY);
       if (p) return p;
     }
     for (const c of cols) {
       const p = planLadder(c.x, c.z, lowerY, upperY);
       if (p) return p;
     }
-    // 5) LAST RESORT — a forced ladder against a locked shell wall, carving non-locked
-    //    clutter from the shaft. Scan the perimeter-adjacent columns first (nearest a wall),
-    //    so a cramped, furniture-packed interior still gets a single clean climb instead of
-    //    being left with the model's broken/doubled geometry.
+    // 4) LAST RESORT — a forced ladder against a locked shell wall, carving non-locked clutter
+    //    from the shaft, so a cramped, furniture-packed interior still gets one clean climb.
     for (const c of cols) {
       const p = planForcedLadder(c.x, c.z, lowerY, upperY);
       if (p) return p;

@@ -262,14 +262,21 @@ export const fixPlacement: Pass = (blocks, palette, ctx) => {
       const dir = FACINGS.find((d) => d.facing === props.facing);
       if (dir) {
         let opened = false;
+        // Front (+facing) only needs the single approach cell cleared; the INTERIOR side
+        // (−facing) is cleared TWO cells deep so a wall/furniture the AI placed directly
+        // behind the door can't dead-end the entrance (the "porta bloqueada por blocos"
+        // defect — you need actual space to step inside).
         for (const s of [1, -1]) {        // front (+facing), back (−facing)
-          for (const dy of [0, 1]) {       // both door halves
-            const cx = x + s * dir.dx, cy = y + dy, cz = z + s * dir.dz;
-            if (!isSolidSupport(at(cx, cy, cz))) continue;
-            if (locked.has(posKey(cx, cy, cz))) continue;
-            if (env.isShell(cx, cy, cz) && !env.isOutside(x + 2 * s * dir.dx, cy, z + 2 * s * dir.dz)) continue;
-            carve.add(posKey(cx, cy, cz));
-            opened = true;
+          const depth = s === -1 ? 2 : 1;
+          for (let d = 1; d <= depth; d++) {
+            for (const dy of [0, 1]) {     // both door halves
+              const cx = x + s * d * dir.dx, cy = y + dy, cz = z + s * d * dir.dz;
+              if (!isSolidSupport(at(cx, cy, cz))) continue;
+              if (locked.has(posKey(cx, cy, cz))) continue;
+              if (env.isShell(cx, cy, cz) && !env.isOutside(x + (d + 1) * s * dir.dx, cy, z + (d + 1) * s * dir.dz)) continue;
+              carve.add(posKey(cx, cy, cz));
+              opened = true;
+            }
           }
         }
         if (opened) openedDoorways++;
