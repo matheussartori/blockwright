@@ -32,6 +32,9 @@ export const en = {
   'menu.guide': 'Guide',
   'menu.keyboardShortcuts': 'Keyboard Shortcuts',
   'menu.actualSize': 'Actual Size',
+  'menu.zoomIn': 'Zoom In',
+  'menu.zoomOut': 'Zoom Out',
+  'menu.toggleFullScreen': 'Toggle Full Screen',
   'menu.layout': 'Layout',
   'menu.resetLayout': 'Reset Layout',
   'menu.edit': 'Edit',
@@ -51,6 +54,11 @@ export const en = {
   'menu.zoom': 'Zoom',
   'menu.front': 'Bring All to Front',
   'menu.close': 'Close',
+  'menu.services': 'Services',
+  'menu.hide': 'Hide {app}',
+  'menu.hideOthers': 'Hide Others',
+  'menu.unhide': 'Show All',
+  'menu.quit': 'Quit {app}',
 
   // Native dialogs (main process).
   'dialog.openTitle': 'Open NBT structure',

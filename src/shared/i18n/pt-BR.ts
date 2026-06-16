@@ -34,6 +34,9 @@ export const ptBR: Messages = {
   'menu.guide': 'Guia',
   'menu.keyboardShortcuts': 'Atalhos de teclado',
   'menu.actualSize': 'Tamanho real',
+  'menu.zoomIn': 'Ampliar',
+  'menu.zoomOut': 'Reduzir',
+  'menu.toggleFullScreen': 'Alternar tela cheia',
   'menu.layout': 'Layout',
   'menu.resetLayout': 'Redefinir layout',
   'menu.edit': 'Editar',
@@ -53,6 +56,11 @@ export const ptBR: Messages = {
   'menu.zoom': 'Zoom',
   'menu.front': 'Trazer tudo para a frente',
   'menu.close': 'Fechar',
+  'menu.services': 'Serviços',
+  'menu.hide': 'Ocultar {app}',
+  'menu.hideOthers': 'Ocultar outros',
+  'menu.unhide': 'Mostrar tudo',
+  'menu.quit': 'Encerrar {app}',
 
   // Native dialogs (main process).
   'dialog.openTitle': 'Abrir estrutura NBT',

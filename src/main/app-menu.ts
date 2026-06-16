@@ -146,13 +146,13 @@ export function buildAppMenu(): void {
       settingsItem,
       languageItem,
       { type: 'separator' },
-      { role: 'services' },
+      { role: 'services', label: mt('menu.services') },
       { type: 'separator' },
-      { role: 'hide' },
-      { role: 'hideOthers' },
-      { role: 'unhide' },
+      { role: 'hide', label: mt('menu.hide', { app: app.name }) },
+      { role: 'hideOthers', label: mt('menu.hideOthers') },
+      { role: 'unhide', label: mt('menu.unhide') },
       { type: 'separator' },
-      { role: 'quit' },
+      { role: 'quit', label: mt('menu.quit', { app: app.name }) },
     ],
   };
 
@@ -185,10 +185,10 @@ export function buildAppMenu(): void {
       windowItem('controls', mt('menu.keyboardShortcuts'), 'CmdOrCtrl+/'),
       { type: 'separator' },
       { role: 'resetZoom', label: mt('menu.actualSize') },
-      { role: 'zoomIn' },
-      { role: 'zoomOut' },
+      { role: 'zoomIn', label: mt('menu.zoomIn') },
+      { role: 'zoomOut', label: mt('menu.zoomOut') },
       { type: 'separator' },
-      { role: 'togglefullscreen' },
+      { role: 'togglefullscreen', label: mt('menu.toggleFullScreen') },
       { type: 'separator' },
       {
         label: mt('menu.layout'),
@@ -230,11 +230,13 @@ export function buildAppMenu(): void {
     ],
   };
 
-  // Window menu, built explicitly (instead of `role: 'windowMenu'`) for the same
-  // i18n reason.
+  // Window menu, built explicitly (instead of `role: 'windowMenu'`) for i18n.
+  // We deliberately DON'T set `role: 'window'`: that marks this as the system
+  // Window menu, and macOS then injects its own window-tiling items (Fill,
+  // Center, Move & Resize, …) localized with the OS UI language — never our
+  // app's i18n preference. Dropping the role keeps the menu fully translatable.
   const windowMenu: MenuItemConstructorOptions = {
     label: mt('menu.window'),
-    role: 'window',
     submenu: [
       { role: 'minimize', label: mt('menu.minimize') },
       { role: 'zoom', label: mt('menu.zoom') },
@@ -291,7 +293,9 @@ export function buildAppMenu(): void {
         },
         { type: 'separator' },
         ...(isMac ? [] : [settingsItem, languageItem, { type: 'separator' as const }]),
-        isMac ? { role: 'close' } : { role: 'quit' },
+        isMac
+          ? { role: 'close', label: mt('menu.close') }
+          : { role: 'quit', label: mt('menu.quit', { app: app.name }) },
       ],
     },
     editMenu,
