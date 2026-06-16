@@ -256,6 +256,12 @@ describe('buildRoomPlan', () => {
   it('is empty for a non-storeyed structure', () => {
     expect(buildRoomPlan(details({ structureType: 'monument' }), catalog)).toBe('');
   });
+  it('AUTO-assigns a program to every floor when the user named no rooms', () => {
+    const out = buildRoomPlan(details({ structureType: 'house', params: { floors: 2 } }), catalog);
+    expect(out).toContain('auto-assigned');
+    expect(out).toContain('Floor 1 ·');
+    expect(out).toContain('Floor 2 ·'); // both floors are programmed, not just the ones picked
+  });
   it('scales the tier + preset to the room area', () => {
     // A room with snug + grand presets; pick by the build size.
     const withPresets: GenerationCatalog = {
@@ -319,8 +325,14 @@ describe('buildSelection', () => {
     expect(buildSelection(d, catalog)).toMatchObject({ structureType: 'house', rooms: ['living', 'kitchen'] });
     expect(buildSelection(d, catalog).size).toHaveLength(3);
   });
-  it('omits rooms entirely when none are set', () => {
-    expect(buildSelection(details({ structureType: 'house' }), catalog).rooms).toBeUndefined();
+  it('AUTO-assigns rooms from the catalog when the user sets none (so floors are never empty)', () => {
+    const auto = buildSelection(details({ structureType: 'house' }), catalog).rooms;
+    expect(auto?.length).toBeGreaterThan(0);
+    for (const id of auto ?? []) expect(['living', 'kitchen']).toContain(id);
+  });
+  it('still uses the user rooms verbatim when they ARE set (no auto-assign)', () => {
+    const d = details({ structureType: 'house', rooms: [['kitchen']] });
+    expect(buildSelection(d, catalog).rooms).toEqual(['kitchen']);
   });
   it('sends the build size only alongside a structure', () => {
     expect(buildSelection(details({ structureType: 'house' }), catalog).size).toHaveLength(3);

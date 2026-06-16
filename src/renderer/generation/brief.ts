@@ -6,6 +6,7 @@
 // unit-testable in isolation and the component stays a thin view. No React, no IO.
 import type { BuildBrief, BuildSelection, GenerationCatalog, GenerationModule } from '@/shared/types';
 import { presetForScale, scaleForArea } from '@/shared/domain/furnishing';
+import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { MODULE_SLOTS, type ModuleSlotKey } from '@/shared/domain/module-slots';
 import {
   ATTIC_OVERHEAD,
@@ -381,13 +382,74 @@ export function roomArea(size: { w: number; d: number; h: number }, roomsOnFloor
   return Math.round(interior / Math.max(1, roomsOnFloor));
 }
 
+/** Small string→seed hash + a tiny seeded PRNG, so the auto room assignment is STABLE for a
+ *  given structure/decoration/size (re-rendering the same build picks the same rooms) without
+ *  pulling in the main-process rng (this is renderer-pure). */
+function hashSeed(str: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function seededRng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+/** Decorations whose mood is dark/occult — an unspecified floor of such a build should be
+ *  programmed from the HORROR room family (ritual/dungeon/morgue/seance), not the everyday set. */
+const DARK_DECORATIONS = new Set(['haunted', 'cursed', 'gothic']);
+const DARK_STRUCTURES = new Set(['gothic', 'haunted-tower']);
+
+/**
+ * The per-floor rooms used to PROGRAM the build. When the user assigned rooms by hand they win
+ * (verbatim). When they DIDN'T — the common "I just picked a structure + decoration" case that
+ * left giant floors empty — rooms are AUTO-ASSIGNED from the structure + decoration: appropriate
+ * to the structure (`appliesTo`), in the right MOOD family (horror for dark looks, else general),
+ * seeded for stable variety, and DOUBLED on a "grand" floor (so a huge storey gets two programs
+ * → twice the furnishing). This is what stops an unspecified big floor coming out bare; the
+ * specified case already had the space×preset treatment.
+ *
+ * @returns The per-floor room-id rows + whether they were auto-assigned (so the brief can say so).
+ */
+function effectiveRoomRows(
+  d: BuildDetails, s: GenerationModule | undefined, catalog: GenerationCatalog | null, n: number,
+): { rows: string[][]; auto: boolean } {
+  const userRows = Array.from({ length: n }, (_, i) => roomsOnFloor(d, i));
+  if (userRows.some((r) => r.length)) return { rows: userRows, auto: false };
+  if (!s || !catalog) return { rows: userRows, auto: false };
+  // Rooms that fit this structure (via appliesTo + its group), preferring the mood family.
+  const fits = catalog.room.filter((r) => moduleAppliesTo(r.appliesTo, s.id, s.group));
+  if (!fits.length) return { rows: userRows, auto: false };
+  const horror = DARK_DECORATIONS.has(d.decoration ?? '') || DARK_STRUCTURES.has(s.id);
+  const moodPool = fits.filter((r) => r.group === (horror ? 'horror' : 'general'));
+  const pool = (moodPool.length ? moodPool : fits).map((r) => r.id);
+  // Seeded shuffle so the same build is stable but different builds vary.
+  const size = effectiveSize(d, s);
+  const rng = seededRng(hashSeed(`${s.id}|${d.decoration ?? ''}|${size.w}x${size.d}x${size.h}|${n}`));
+  const order = [...pool];
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  const maxPer = maxRoomsForStructure(s);
+  const grandFloor = scaleForArea(roomArea(size, 1)).scale === 'grand'; // a one-room floor already huge
+  const rows: string[][] = [];
+  let cursor = 0;
+  for (let i = 0; i < n; i++) {
+    const count = grandFloor && maxPer >= 2 && order.length >= 2 ? 2 : 1;
+    const row: string[] = [];
+    for (let c = 0; c < count; c++) { row.push(order[cursor % order.length]); cursor++; }
+    rows.push([...new Set(row)]); // distinct within a floor
+  }
+  return { rows, auto: true };
+}
+
 /** The per-floor interior program, in plain language for the model: one line per floor
  *  that has rooms assigned (bottom-up), naming each room AND — the SPACE × DECORATION
  *  organism — its computed space tier and the matching furnishing PRESET (a decoration-
  *  agnostic base layout the chosen decoration re-skins). This is what stops a big floor
  *  coming out empty: the area is computed from the build size, a tier is picked, and the
  *  preset's furniture zones are spelled out so the model furnishes to the room, not below
- *  it. '' if the structure isn't storeyed or no rooms were picked.
+ *  it. When the user assigned NO rooms, they're auto-assigned from the structure +
+ *  decoration (see {@link effectiveRoomRows}) so an unspecified build still gets programmed
+ *  floors. '' if the structure isn't storeyed.
  *  @param d - The current Details state.
  *  @param catalog - The module catalog (for room id → label/presets), or null.
  *  @returns A "Room plan" brief fragment, or '' when there are no per-floor rooms. */
@@ -398,9 +460,10 @@ export function buildRoomPlan(d: BuildDetails, catalog: GenerationCatalog | null
   const size = effectiveSize(d, s);
   const deco = d.decoration ? catalog?.decoration.find((m) => m.id === d.decoration) : undefined;
   const roomOf = (id: string) => catalog?.room.find((m) => m.id === id);
+  const { rows, auto } = effectiveRoomRows(d, s, catalog, n);
   const lines: string[] = [];
   for (let i = 0; i < n; i++) {
-    const ids = roomsOnFloor(d, i);
+    const ids = rows[i] ?? [];
     if (!ids.length) continue;
     const area = roomArea(size, ids.length);
     const tier = scaleForArea(area);
@@ -421,8 +484,15 @@ export function buildRoomPlan(d: BuildDetails, catalog: GenerationCatalog | null
   const skin = deco
     ? `The presets are a BASE layout only — re-skin every piece in the "${deco.label}" decoration's materials and mood. `
     : `The presets are a BASE layout only — re-skin every piece in the chosen decoration's materials and mood. `;
+  // When the user named no rooms, the plan was inferred from the structure + decoration — tell
+  // the model it's a SUGGESTED program it should commit to (and may vary the look of), so an
+  // unspecified build still comes back with fully furnished floors rather than empty halls.
+  const intro = auto
+    ? `- Room plan (auto-assigned — the user named no rooms, so these are inferred from the ` +
+      `structure + decoration; treat them as the intended program and fully furnish each floor). `
+    : `- Room plan — furnish each floor to its SPACE (see each room's module guide). `;
   return (
-    `- Room plan — furnish each floor to its SPACE (see each room's module guide). ` +
+    `${intro}` +
     `Up to two rooms share a floor; partition the storey so each is a real, separated space. ` +
     `${skin}Match the furnishing density to the space — never leave a large room half-empty, and never cram a small one:\n` +
     `${lines.join('\n')}\n`
@@ -560,8 +630,14 @@ export function buildSummary(d: BuildDetails, catalog: GenerationCatalog | null)
  *  @param catalog - The module catalog (to resolve the effective size), or null.
  *  @returns A {@link BuildSelection} with only the fields the user actually picked. */
 export function buildSelection(d: BuildDetails, catalog: GenerationCatalog | null): BuildSelection {
-  const rooms = [...new Set(d.rooms.flat().filter(Boolean))];
   const s = d.structureType ? catalog?.structure.find((m) => m.id === d.structureType) : undefined;
+  // The room ids that drive knowledge-guide loading: the user's picks (all floors), else the
+  // AUTO-assigned program (so an unspecified build still loads the relevant room guides —
+  // matching what buildRoomPlan folds into the prompt).
+  const userRooms = [...new Set(d.rooms.flat().filter(Boolean))];
+  const rooms = userRooms.length
+    ? userRooms
+    : [...new Set(effectiveRoomRows(d, s, catalog, floorCount(s, resolveDetailParams(d, s))).rows.flat().filter(Boolean))];
   // The selection's size is the COMPILED box (shell + surroundings margins) — it's what
   // a shell-seeded archetype compiles its starting shell at.
   const sz = d.structureType ? buildBoxSize(d, s) : undefined;

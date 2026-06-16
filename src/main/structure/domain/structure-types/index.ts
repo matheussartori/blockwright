@@ -9,6 +9,7 @@ import { createRegistry } from '../registry';
 import { classic } from './classic';
 import { farmhouse } from './farmhouse';
 import { gothic } from './gothic';
+import { hauntedTower } from './haunted-tower';
 import { modern } from './modern';
 import { sakura } from './sakura';
 import { towerClassic } from './tower-classic';
@@ -16,7 +17,7 @@ import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-export const registry = createRegistry<StructureType>([classic, modern, farmhouse, sakura, gothic, towerClassic]);
+export const registry = createRegistry<StructureType>([classic, modern, farmhouse, sakura, gothic, towerClassic, hauntedTower]);
 
 /** Look up a structure type by id (undefined if unknown). */
 export function getStructureType(id: string): StructureType | undefined {

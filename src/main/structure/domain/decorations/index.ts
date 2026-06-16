@@ -5,6 +5,7 @@ import type { ModuleSummary } from '../modules';
 import { createRegistry } from '../registry';
 import { castle } from './castle';
 import { cozy } from './cozy';
+import { cursed } from './cursed';
 import { farmhouse } from './farmhouse';
 import { gothic } from './gothic';
 import { haunted } from './haunted';
@@ -14,7 +15,7 @@ import type { Decoration } from './types';
 
 export type { Decoration, DecorationTheme } from './types';
 
-export const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic, castle]);
+export const registry = createRegistry<Decoration>([cozy, haunted, modern, farmhouse, sakura, gothic, castle, cursed]);
 
 /** The decoration used when a `template` op doesn't name one. */
 export const DEFAULT_DECORATION = cozy.id;

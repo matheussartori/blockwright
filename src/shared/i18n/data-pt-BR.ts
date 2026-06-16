@@ -32,6 +32,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.structure.tower-classic.label': 'Clássica',
   'mod.structure.tower-classic.desc':
     'Uma torre de menagem de pedra com ameias: um alto eixo quadrado de andares estreitos empilhados com janelas em fresta, uma porta arqueada assente sobre um embasamento de pedra, um núcleo de escadas em ziguezague conectado e um parapeito ameado coroando um terraço de cobertura praticável. Define a sua própria coroa em código (sem opção de telhado); liga-se a todos os módulos de Porão, Arredores e Cômodo. A decoração fornece os materiais.',
+  'mod.structure.haunted-tower.label': 'Assombrada',
+  'mod.structure.haunted-tower.desc':
+    'Um pináculo gótico em ruínas: um embasamento alargado, um eixo nervurado verticalmente que recua em degraus à medida que se ergue, braços de lanterna em gaiola pendurados por correntes, um rosto de caveira esculpido numa frente larga, uma porta gótica em ogiva sob uma cruz invertida luminosa, janelas em fresta iluminadas pela chama das almas, contrafortes de canto de altura plena rematados por pináculos acesos e uma coroa de ameias espinhada. O exterior esculpido cresce com a largura — uma torre larga fica densamente articulada, nunca uma caixa. Define a sua própria coroa em código (sem opção de telhado); liga-se a todos os módulos de Porão, Arredores e Cômodo. Melhor com a decoração Assombrada.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',
@@ -55,6 +58,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.decoration.castle.label': 'Castelo',
   'mod.decoration.castle.desc':
     'Um visual de pedra lavrada e fortificada: tijolos de pedra cinza-claros sobre uma base de pedregulho, detalhes de pedra cinzelada, madeira escura de spruce e luz quente de lanternas. Alvenaria onde a Aconchegante é madeira. A pedra se desgasta para suas variantes com musgo e rachadas. O padrão da torre de menagem — combina com torres, muralhas e salões de pedra.',
+  'mod.decoration.cursed.label': 'Amaldiçoada',
+  'mod.decoration.cursed.desc':
+    'A paleta da ruína gótica em pedra escura: um eixo de tijolos de blackstone realçado por cordões de pedra cinzelada e contrafortes de blackstone polido, fundações de pedregulho com musgo, vidro cinza encardido e a chama azul e fria das lanternas das almas. A contraparte em pedra da Assombrada — um monólito de blackstone em ruínas, não um chalé de madeira. A pedra se desgasta para suas variantes rachadas e com musgo, e ela se deteriora intensamente por padrão. Combine com a torre Assombrada; ideal para criptas, templos de culto e qualquer santuário de pedra amaldiçoado.',
 
   // --- basements ------------------------------------------------------------
   'mod.basement.cellar.label': 'Adega',

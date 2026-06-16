@@ -125,27 +125,43 @@ function planeFootprint(
   return { minX, maxX, minZ, maxZ, size: best.length };
 }
 
-/** The HOUSE footprint a connector must stay inside — the union of the ABOVE-GRADE storey
- *  planes' largest floor components. A build with a big SURROUNDINGS yard fills the whole
- *  box at grade (the lawn), so the raw block bounds are the YARD, not the house, and a
- *  derived stair happily climbs out onto the lawn / a graveyard tree (the "escada no
- *  exterior" defect the user kept hitting). Above-grade planes are house-only (the yard is
- *  ground-level landscaping), so their floor footprint is the real house. Falls back to the
- *  raw bounds when nothing above grade is usable — a free-form / yard-less build, where the
- *  raw bounds ARE the house, so the behaviour is unchanged there. */
+/** The HOUSE footprint a connector must stay inside — the INTERSECTION of the ABOVE-GRADE
+ *  storey planes' largest floor components (the area common to EVERY storey). Two defects
+ *  drive this:
+ *   - A build with a big SURROUNDINGS yard fills the whole box at grade (the lawn), so the raw
+ *     block bounds are the YARD, not the house, and a derived stair happily climbs out onto the
+ *     lawn (the "escada no exterior" defect). Above-grade planes are house-only.
+ *   - A TAPERING structure (the haunted tower steps inward as it rises) has a WIDER base than
+ *     crown. The old UNION footprint let a connector sit near the wide base edge — which at a
+ *     higher, stepped-in storey is OUTSIDE the wall (a stair dangling in open air) or buried
+ *     INSIDE the thick stepped wall. Both are the user's "never a stair outside / inside the
+ *     wall" rule. The INTERSECTION is the column present at every storey, so a connector
+ *     clamped to it is interior at EVERY floor — never pokes out, never embeds in a wall.
+ *  For a uniform build the intersection equals the union, so nothing changes there. Falls back
+ *  to the raw bounds when nothing above grade is usable (a free-form / yard-less build), and to
+ *  the union if the intersection has no interior (degenerate, non-concentric storeys). */
 function houseFootprint(
   blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[], planes: number[], grade: number,
   fallback: { minX: number; maxX: number; minZ: number; maxZ: number },
 ): { minX: number; maxX: number; minZ: number; maxZ: number } {
-  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  let uMinX = Infinity, uMaxX = -Infinity, uMinZ = Infinity, uMaxZ = -Infinity; // union (fallback)
+  let iMinX = -Infinity, iMaxX = Infinity, iMinZ = -Infinity, iMaxZ = Infinity; // intersection
+  let n = 0;
   for (const py of planes) {
     if (py <= grade) continue; // the grade plane carries the yard; above it is house-only
     const fp = planeFootprint(blocks, palette, py);
     if (!fp || fp.size < 9) continue; // ignore a sliver (a partial deck / a stray cluster)
-    if (fp.minX < minX) minX = fp.minX; if (fp.maxX > maxX) maxX = fp.maxX;
-    if (fp.minZ < minZ) minZ = fp.minZ; if (fp.maxZ > maxZ) maxZ = fp.maxZ;
+    n++;
+    if (fp.minX < uMinX) uMinX = fp.minX; if (fp.maxX > uMaxX) uMaxX = fp.maxX;
+    if (fp.minZ < uMinZ) uMinZ = fp.minZ; if (fp.maxZ > uMaxZ) uMaxZ = fp.maxZ;
+    if (fp.minX > iMinX) iMinX = fp.minX; if (fp.maxX < iMaxX) iMaxX = fp.maxX;
+    if (fp.minZ > iMinZ) iMinZ = fp.minZ; if (fp.maxZ < iMaxZ) iMaxZ = fp.maxZ;
   }
-  return minX === Infinity ? fallback : { minX, maxX, minZ, maxZ };
+  if (n === 0) return fallback;
+  // The intersection must keep a real interior (≥3 cells across so `inHouse`'s strict-interior
+  // test leaves a usable column); else the storeys don't share a central core — use the union.
+  if (iMaxX - iMinX >= 2 && iMaxZ - iMinZ >= 2) return { minX: iMinX, maxX: iMaxX, minZ: iMinZ, maxZ: iMaxZ };
+  return { minX: uMinX, maxX: uMaxX, minZ: uMinZ, maxZ: uMaxZ };
 }
 
 /** Ground / loose-fill blocks that read as TERRAIN, never construction: the surroundings
