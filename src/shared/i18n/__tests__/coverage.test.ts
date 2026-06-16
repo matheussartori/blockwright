@@ -16,7 +16,7 @@ import { moduleKey, paramKey, paramOptionKey, groupKey, presetKey, aiProviderKey
 /** Chrome keys whose pt-BR value is LEGITIMATELY identical to English — proper
  *  nouns, loanwords, or words spelled the same in both languages. */
 const CHROME_IDENTICAL_OK = new Set<string>([
-  'menu.jigsaw', 'menu.console', 'menu.layout', 'panel.jigsaw', 'inspector.jigsaws', 'jigsaw.seed',
+  'menu.jigsaw', 'menu.console', 'menu.layout', 'menu.zoom', 'panel.jigsaw', 'inspector.jigsaws', 'jigsaw.seed',
   'statusbar.jigsawLabel',
   'console.title', 'catalog.namespace', 'workspace.label', 'modules.presetsCount', 'modules.universal',
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',

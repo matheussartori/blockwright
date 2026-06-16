@@ -197,6 +197,56 @@ export function buildAppMenu(): void {
     ],
   };
 
+  // Edit menu, built explicitly (instead of `role: 'editMenu'`) so its labels
+  // follow the app's i18n preference, not the OS locale.
+  const editMenu: MenuItemConstructorOptions = {
+    label: mt('menu.edit'),
+    submenu: [
+      { role: 'undo', label: mt('menu.undo') },
+      { role: 'redo', label: mt('menu.redo') },
+      { type: 'separator' },
+      { role: 'cut', label: mt('menu.cut') },
+      { role: 'copy', label: mt('menu.copy') },
+      { role: 'paste', label: mt('menu.paste') },
+      ...(isMac
+        ? [
+            { role: 'pasteAndMatchStyle' as const, label: mt('menu.pasteAndMatchStyle') },
+            { role: 'delete' as const, label: mt('menu.delete') },
+            { role: 'selectAll' as const, label: mt('menu.selectAll') },
+            { type: 'separator' as const },
+            {
+              label: mt('menu.speech'),
+              submenu: [
+                { role: 'startSpeaking' as const, label: mt('menu.startSpeaking') },
+                { role: 'stopSpeaking' as const, label: mt('menu.stopSpeaking') },
+              ],
+            },
+          ]
+        : [
+            { role: 'delete' as const, label: mt('menu.delete') },
+            { type: 'separator' as const },
+            { role: 'selectAll' as const, label: mt('menu.selectAll') },
+          ]),
+    ],
+  };
+
+  // Window menu, built explicitly (instead of `role: 'windowMenu'`) for the same
+  // i18n reason.
+  const windowMenu: MenuItemConstructorOptions = {
+    label: mt('menu.window'),
+    role: 'window',
+    submenu: [
+      { role: 'minimize', label: mt('menu.minimize') },
+      { role: 'zoom', label: mt('menu.zoom') },
+      ...(isMac
+        ? [
+            { type: 'separator' as const },
+            { role: 'front' as const, label: mt('menu.front') },
+          ]
+        : [{ role: 'close' as const, label: mt('menu.close') }]),
+    ],
+  };
+
   const template: MenuItemConstructorOptions[] = [
     ...(isMac ? [appMenu] : []),
     {
@@ -244,11 +294,12 @@ export function buildAppMenu(): void {
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
-    { role: 'editMenu' },
+    editMenu,
     viewMenu,
-    { role: 'windowMenu' },
+    windowMenu,
     {
       role: 'help',
+      label: mt('menu.help'),
       submenu: [
         {
           label: mt('menu.guide'),
