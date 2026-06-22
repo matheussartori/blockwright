@@ -100,6 +100,28 @@ export async function viewVersion(docId: string, version: number): Promise<void>
   await docLoader?.(docId, entry.path, { preserveCamera: true, recent: false, working: false });
 }
 
+/** Commit a manually-edited build (from the block editor) as a new version: record it,
+ *  adopt the saved library file if this was an Untitled doc, then load it as the working
+ *  latest — the same finish an AI-emitted version goes through. */
+export async function commitManualVersion(
+  docId: string,
+  version: number,
+  scratchPath: string,
+  libraryPath: string | null,
+): Promise<void> {
+  const docs = documentsStore.getState();
+  const doc = docs.documents.find((d) => d.id === docId);
+  if (!doc) return;
+  recordVersion(docId, version, scratchPath);
+  docs.patchDoc(docId, { version, viewingVersion: null });
+  if (!doc.filePath && libraryPath) {
+    docs.patchDoc(docId, { filePath: libraryPath, title: basename(libraryPath), generated: true });
+    api.addRecent(libraryPath);
+  }
+  await docLoader?.(docId, scratchPath, { preserveCamera: true, recent: false });
+  persistDoc(docId);
+}
+
 let progressBound = false;
 /** Bind the single global progress listener once; routes each update to the
  *  document running that session (so a background tab updates its own spinner). */

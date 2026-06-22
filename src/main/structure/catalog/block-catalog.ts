@@ -6,7 +6,7 @@
 // and mod-block-aware generation.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CatalogBlock, PaletteEntry, StructureData } from '@/shared/types';
+import type { CatalogBlock, PaletteEntry, ResolveBlockResult, StructureData } from '@/shared/types';
 import { assetsDir, getActiveWorkspace, hasContent, loadJson } from '../assets/content-pack';
 import { parseRef, buildResolvedModel, collectTextures } from '../assets/model-loader';
 import { isAir, resolveBlock } from '../assets/blockstate-resolver';
@@ -95,6 +95,21 @@ export function listCatalog(): CatalogBlock[] {
   ];
   cache = { key, blocks };
   return blocks;
+}
+
+/** Resolve a block (name + optional blockstate properties) into a renderable palette
+ *  entry + its texture keys, so the editor can intern a newly-picked block (Replace /
+ *  Stairs) into the live structure and have the viewer draw it. */
+export function resolveBlockEntry(name: string, properties: Record<string, string> = {}): ResolveBlockResult {
+  const { namespace, path: rel } = parseRef(name);
+  const fullName = `${namespace}:${rel}`;
+  const air = isAir(fullName);
+  const canResolve = hasContent() || getActiveWorkspace() !== null;
+  const models = !air && canResolve ? resolveBlock(fullName, properties) : [];
+  const entry: PaletteEntry = { name: fullName, properties, models, color: fallbackColor(fullName), air };
+  const textures = new Set<string>();
+  collectTextures(models, textures);
+  return { entry, textures: [...textures] };
 }
 
 /** Resolve one block into a minimal 1×1×1 StructureData so the renderer can show

@@ -10,6 +10,7 @@ import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REV
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
+import { SelectionOverlay } from './selection-overlay';
 import { TextureLoader } from './texture-loader';
 
 export type { FloorRegion } from './floor-regions';
@@ -33,6 +34,10 @@ export class Viewer {
   private textures = new TextureLoader();
   /** Transient box over a block the user clicked in the inspector. */
   private highlight = new FocusHighlight(this.scene);
+
+  private selectionOverlay = new SelectionOverlay(this.scene);
+
+  private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
   private floors = new FloorRegionsOverlay(this.scene);
 
@@ -186,9 +191,39 @@ export class Viewer {
   }
 
   /** Remove the current structure and grid from the scene (back to empty). */
+  /** The WebGL canvas, so the editor can attach its own pointer/keyboard listeners. */
+  get domElement(): HTMLCanvasElement {
+    return this.renderer.domElement;
+  }
+
+  /** Map a screen point to the block cell under it (the editor's picker). Raycasts the
+   *  merged geometry, then steps a hair PAST the hit point along the ray — just INSIDE the
+   *  surface the click landed on — and floors it. Using the ray (not the face normal) makes
+   *  this robust: a merged face whose normal points the wrong way would otherwise pick the
+   *  empty cell in front of the block. Null when the click misses the structure. */
+  pickBlock(clientX: number, clientY: number): [number, number, number] | null {
+    if (!this.current) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.nav.camera);
+    const hits = this.raycaster.intersectObject(this.current, true);
+    if (!hits.length) return null;
+    const p = hits[0].point.clone().addScaledVector(this.raycaster.ray.direction, 0.05);
+    return [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+  }
+
+  /** Highlight the given cells ("x,y,z") as the editor selection. */
+  setSelection(cells: string[]): void {
+    this.selectionOverlay.set(cells);
+  }
+
   clear() {
     this.lastPieces = null;
     this.highlight.clear();
+    this.selectionOverlay.clear();
     // Drop the live band meshes but keep the desired regions so the next build
     // re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();

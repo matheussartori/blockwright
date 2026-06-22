@@ -40,6 +40,11 @@ export const IPC_CHANNELS = {
   /** Write a structure + its worldgen JSON into the active workspace (payload: ExportRequest)
    *  → ExportResult. */
   workspaceExport: 'workspace:export',
+  /** Resolve a block (name + properties) into renderable models + texture keys, so the
+   *  editor can intern a newly-picked block into the live structure → ResolveBlockResult. */
+  resolveBlock: 'structure:resolve-block',
+  /** Save the edited structure as a new version (payload: SaveVersionRequest) → SaveVersionResult. */
+  saveVersion: 'structure:save-version',
   /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */
   jigsawAssemble: 'jigsaw:assemble',
   /** Candidate pieces for one connector of a structure (payload: path + index). */

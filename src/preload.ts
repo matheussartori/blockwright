@@ -14,6 +14,9 @@ import type {
   WorkspaceExportRequest,
   WorkspaceExportPlan,
   WorkspaceExportResult,
+  ResolveBlockResult,
+  SaveVersionRequest,
+  SaveVersionResult,
   FloorDef,
   GenerateImage,
   GenerateProgress,
@@ -83,6 +86,10 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.workspaceExportPlan, req),
   exportToWorkspace: (req: WorkspaceExportRequest): Promise<WorkspaceExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceExport, req),
+  resolveBlock: (name: string, properties?: Record<string, string>): Promise<ResolveBlockResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.resolveBlock, name, properties),
+  saveVersion: (req: SaveVersionRequest): Promise<SaveVersionResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.saveVersion, req),
   assembleJigsaw: (path: string, options: AssembleOptions): Promise<JigsawPlan> =>
     ipcRenderer.invoke(IPC_CHANNELS.jigsawAssemble, path, options),
   jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>

@@ -18,6 +18,7 @@ import type {
 } from './generation';
 import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
 import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
+import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
@@ -60,6 +61,11 @@ export interface BlockwrightApi {
   planWorkspaceExport: (req: WorkspaceExportRequest) => Promise<WorkspaceExportPlan>;
   /** Write the structure + its worldgen JSON into the active workspace. */
   exportToWorkspace: (req: WorkspaceExportRequest) => Promise<WorkspaceExportResult>;
+  /** Resolve a block (name + properties) into renderable models + texture keys, so the
+   *  editor can intern a newly-picked block (Replace / Stairs) into the live structure. */
+  resolveBlock: (name: string, properties?: Record<string, string>) => Promise<ResolveBlockResult>;
+  /** Save the edited structure as a new version (`vN.nbt`), like an AI build version. */
+  saveVersion: (req: SaveVersionRequest) => Promise<SaveVersionResult>;
   /** Plan a full jigsaw assembly starting from a structure file. */
   assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
   /** Candidate pieces that can attach to one connector of a structure (manual mode). */

@@ -7,6 +7,7 @@ import { settingsStore, type SettingsState } from '../state/settings';
 import { i18nStore, type I18nState } from '../state/i18n';
 import { windowsStore, type WindowsStore } from '../state/windows';
 import { plannerStore, type PlannerStore } from '../state/planner';
+import { editorStore, type EditorState } from '../state/editor';
 import { logsStore, type LogsState } from '../state/logs';
 import {
   documentsStore,
@@ -42,6 +43,10 @@ export function useLogs<T>(selector: (s: LogsState) => T): T {
 
 export function usePlanner<T>(selector: (s: PlannerStore) => T): T {
   return useStore(plannerStore, selector);
+}
+
+export function useEditor<T>(selector: (s: EditorState) => T): T {
+  return useStore(editorStore, selector);
 }
 
 export function useI18n<T>(selector: (s: I18nState) => T): T {

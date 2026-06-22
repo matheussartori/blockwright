@@ -5,7 +5,7 @@
 // (useViewerSync). Each open `.nbt` is a tab (a Document) with its own structure,
 // chat and AI session; the on-screen viewer follows the active tab, while a headless
 // capture viewer screenshots builds generating in background tabs.
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
 import { plannerStore } from './state/planner';
@@ -33,6 +33,9 @@ import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { GuideModal } from './components/GuideModal';
 import { ExportModal } from './components/ExportModal';
+import { EditorPanel } from './components/editor/EditorPanel';
+import { EditorLayer } from './components/editor/EditorLayer';
+import { editorStore } from './state/editor';
 
 function Shell() {
   const viewer = useViewer();
@@ -62,6 +65,11 @@ function Shell() {
   useAiRenderBridge(viewerRef, captureRef);
   useAppIpc(flow);
   useViewerSync(viewer);
+
+  // Leave edit mode when the active tab changes, so a selection never bleeds across docs.
+  useEffect(() => {
+    editorStore.getState().setActive(false);
+  }, [activeDoc?.id]);
 
   return (
     <>
@@ -95,6 +103,8 @@ function Shell() {
                 )
               )}
               <FloatingPanels availability={availability} />
+              {fileOpen && <EditorLayer />}
+              {fileOpen && <EditorPanel />}
               {/* The Generate surface (new-build planner / building stage) puts its config
                   column on the left, so the badge sits bottom-right there to stay clear of it. */}
               <WorkspaceBadge side={activeDoc && !fileOpen ? 'right' : 'left'} />

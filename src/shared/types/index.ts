@@ -6,5 +6,6 @@ export * from './workspace';
 export * from './jigsaw';
 export * from './generation';
 export * from './export';
+export * from './edit';
 export * from './app';
 export * from './api';

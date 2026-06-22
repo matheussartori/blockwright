@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -13,7 +13,8 @@ import { getContentDir, setContentDir } from './structure/assets/content-dir';
 import { clearJsonCache } from './structure/assets/content-pack';
 import { clearModelCache } from './structure/assets/model-loader';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
-import { listCatalog, previewBlock } from './structure/catalog/block-catalog';
+import { listCatalog, previewBlock, resolveBlockEntry } from './structure/catalog/block-catalog';
+import { saveEditedVersion } from './ai/save-version';
 import { getDictionary, setBlockNote, setScope } from './structure/assets/block-dictionary';
 import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
@@ -156,6 +157,11 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.workspaceBiomes, async () => listWorkspaceBiomes(getActiveWorkspace()));
   ipcMain.handle(IPC_CHANNELS.workspaceExportPlan, async (_e, req: WorkspaceExportRequest) => planExport(req));
   ipcMain.handle(IPC_CHANNELS.workspaceExport, async (_e, req: WorkspaceExportRequest) => runExport(req));
+
+  ipcMain.handle(IPC_CHANNELS.resolveBlock, async (_e, name: string, properties?: Record<string, string>) =>
+    resolveBlockEntry(name, properties ?? {}),
+  );
+  ipcMain.handle(IPC_CHANNELS.saveVersion, async (_e, req: SaveVersionRequest) => saveEditedVersion(req));
 
   ipcMain.handle(IPC_CHANNELS.jigsawAssemble, async (_e, filePath: string, options: AssembleOptions) =>
     assembleJigsaw(filePath, structureIdFromPath(filePath), options),
