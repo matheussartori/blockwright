@@ -108,6 +108,15 @@ export const editorStore = createStore<EditorState>((set, get) => {
     });
   };
 
+  /** Run a synchronous op against the active structure + selection and commit its result
+   *  (a `null` result is a no-op — e.g. nothing selected). */
+  const editActive = (run: (d: EditData, selection: string[]) => OpResult | null): void => {
+    const doc = activeDocument(documentsStore.getState());
+    if (!doc?.structure) return;
+    const result = run(editData(doc.structure), get().selection);
+    if (result) commit(result);
+  };
+
   return {
     active: false,
     tool: 'select',
@@ -150,21 +159,9 @@ export const editorStore = createStore<EditorState>((set, get) => {
     setStairsSteps: (stairsSteps) => set({ stairsSteps: Math.max(1, Math.min(64, stairsSteps)) }),
     setExtrudeCount: (extrudeCount) => set({ extrudeCount: Math.max(1, Math.min(64, extrudeCount)) }),
 
-    move: (delta) => {
-      const doc = activeDocument(documentsStore.getState());
-      if (!doc?.structure || !get().selection.length) return;
-      commit(moveSelection(editData(doc.structure), get().selection, delta));
-    },
-    extrude: (axis, dir) => {
-      const doc = activeDocument(documentsStore.getState());
-      if (!doc?.structure || !get().selection.length) return;
-      commit(extrudeSelection(editData(doc.structure), get().selection, axis, dir * get().extrudeCount));
-    },
-    remove: () => {
-      const doc = activeDocument(documentsStore.getState());
-      if (!doc?.structure || !get().selection.length) return;
-      commit(deleteSelection(editData(doc.structure), get().selection));
-    },
+    move: (delta) => editActive((d, sel) => (sel.length ? moveSelection(d, sel, delta) : null)),
+    extrude: (axis, dir) => editActive((d, sel) => (sel.length ? extrudeSelection(d, sel, axis, dir * get().extrudeCount) : null)),
+    remove: () => editActive((d, sel) => (sel.length ? deleteSelection(d, sel) : null)),
     replace: async () => {
       const doc = activeDocument(documentsStore.getState());
       if (!doc?.structure || !get().selection.length) return;

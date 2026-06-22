@@ -32,7 +32,7 @@ import { StageBuilding } from './components/generate/StageBuilding';
 import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { GuideModal } from './components/GuideModal';
-import { ExportModal } from './components/ExportModal';
+import { ExportModal } from './components/export/ExportModal';
 import { EditorPanel } from './components/editor/EditorPanel';
 import { EditorLayer } from './components/editor/EditorLayer';
 import { editorStore } from './state/editor';

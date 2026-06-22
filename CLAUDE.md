@@ -30,8 +30,14 @@ src/
     app-menu.ts           Native application menu (OS menu bar): File ▸ Open / Open Recent / Workspace
     recents.ts            Persisted "recently opened" files (last 10) in userData
     recent-workspaces.ts  Persisted "recently opened" mod workspaces (last 10) in userData
-    workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one)
+    workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one,
+                          listWorkspaceStructures/listWorkspaceBiomes for the export dialog)
     texture-protocol.ts   Custom bw-texture:// privileged scheme serving namespaced PNGs
+    export/               "Export to mod": write a structure into the active workspace's data pack.
+                          worldgen-json.ts (pure builders: jigsaw structure def / template_pool /
+                          structure_set / has_structure biome tag — spawn_overrides is REQUIRED in the
+                          1.21 codec even when empty) + index.ts (planExport = live preview of the files
+                          + problems; runExport = write them). See "Export to mod workspace" below.
     structure/              Grouped by responsibility (one subdir per concern):
       io/
         load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
@@ -227,6 +233,11 @@ src/
                             per session (`reserveLibraryDir`/`mirrorToLibrary` — best-effort copy):
                             the latest clean `<slug>.nbt`, every kept `versions/vN.nbt`, and the build's
                             `generation.log` (the AI/fix play-by-play, see gen-log.ts `RunLog`)
+      save-version.ts       Persist a MANUALLY-edited structure (the block editor) as a new `vN.nbt`:
+                            re-encode the edited blocks straight via `encodeStructure` — BYPASSING the
+                            AI-repair passes so edits are faithful — re-attaching block-entity NBT +
+                            entities + DataVersion by position from the source file, then mirror to the
+                            same session scratch + library as AI versions. See "Block editor" below.
       providers/            One Driver per backend (claude-sdk, codex — the only two) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt in THREE
@@ -343,7 +354,21 @@ src/
                           over an open `.nbt`). Both modes + the dock's free-text composer build the SAME
                           brief/selection (generation/brief.ts) and hand off to runGeneration — generating and
                           editing are one unified loop. State lives in state/planner.ts (the shared draft).
-    components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Select
+    components/export/    The "Export to mod" dialog, decomposed (orchestrator + view parts, like
+                          generate/): ExportModal (orchestrator — owns the live plan + the write +
+                          the no-workspace/form/success state switch), ExportConfig (the config column —
+                          owns the form state, emits a draft of {name, resourceName, worldgen}),
+                          BiomePicker (the mod/vanilla biome source toggle + multi-select), ExportPreview
+                          (the file tree + the checks footer), ExportFileRow (one filename+folder row,
+                          shared), ExportStates (the empty + success states). See "Export to mod workspace".
+    components/editor/    The block editor's UI: EditorPanel (orchestrator — the FAB / tool rail / selection
+                          readout / Save·Undo·Redo), ToolRail (the tool icons), ToolControls (the active
+                          tool's controls — a focused branch per tool), AxisPad (the ± move/extrude pad),
+                          BlockField (block-id autocomplete), EditorLayer (the imperative viewer bridge:
+                          click-picks a block, keyboard nudge/delete/undo, selection overlay, re-show on
+                          edit), useBlockIds (catalog ids for autocomplete). See "Block editor" below.
+    components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Switch
+                          (on/off pill toggle), Select
                           (the themed single-select dropdown — portal-rendered in `position:fixed` so it's
                           never clipped by a scrolling column, keyboard-navigable, options carry an optional
                           one-line `description` clamped with ellipsis + the full text on hover; options can
@@ -373,12 +398,20 @@ src/
                           per-floor heights; a structure pick pairs the module's declared `pairedDecoration`
                           and seeds the per-floor heights), attachments.ts (reference-
                           image intake) and floors.ts (normalizeFloor + buildFloorPlan).
+    editor/               Pure (no-React, no-Three) block-editing ops over {size, palette, blocks}:
+                          ops.ts (move/extrude/delete/replace/buildStairs + selectBox/cuboidCells/intern,
+                          unit-tested) — the geometry rules behind the block editor. Orientation is
+                          preserved for free because ops only COPY a block's palette `state`, never
+                          re-derive it (the bug WorldEdit never fixed). See "Block editor" below.
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
                           windows.ts (floating-window layout + the Console dock visibility/height,
                           persisted), logs.ts (the Console dock store: patches the renderer console,
-                          pulls main's backlog + tails its live lines, capped + deduped), theme.ts
+                          pulls main's backlog + tails its live lines, capped + deduped), theme.ts,
+                          editor.ts (the block editor: mode/tool/selection/anchor/tool-params + an
+                          undo/redo snapshot stack; ops patch the active doc's StructureData; save
+                          re-encodes via IPC → a new version)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
                           bridge) + mesh/geometry/texture building. Focused concerns split out of the
@@ -388,12 +421,15 @@ src/
                           re-sent/accumulating review images cheap; cutaways scale ~1/storey and yield 0
                           for a shallow single-volume build the section already reveals), floor-regions.ts
                           (FloorRegionsOverlay — the floor-plan
-                          bands), highlight.ts (FocusHighlight — the inspector focus box).
+                          bands), highlight.ts (FocusHighlight — the inspector focus box),
+                          selection-overlay.ts (SelectionOverlay — the block editor's outlined+filled
+                          selection boxes). The Viewer also exposes `pickBlock(x,y)` (raycast → block cell,
+                          via stepping along the ray) + `setSelection` for the editor.
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain
-                          (structure, workspace, jigsaw, generation, app, api = BlockwrightApi) +
-                          an index.ts barrel — so `@/shared/types` stays the one import path
+                          (structure, workspace, jigsaw, generation, export, edit, app, api =
+                          BlockwrightApi) + an index.ts barrel — so `@/shared/types` stays the one import path
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
                           two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
@@ -412,7 +448,11 @@ src/
                           the renderer's size math and every structure type consume the SAME functions,
                           so the height the composer promises is what the shell lays) + furnishing.ts (the SPACE × DECORATION
                           model: RoomScale tiers + scaleForArea + FurnishingPreset + presetForScale — the
-                          room-plan brief picks a preset by area, the gallery lists them; thresholds once).
+                          room-plan brief picks a preset by area, the gallery lists them; thresholds once) +
+                          worldgen.ts (the export dialog's presets + PURE helpers: terrain/biome/rarity
+                          presets, sanitizeResourceName, structureFolder = the 1.21 `structure`/`structures`
+                          decision, plannedFiles, validateOptions — so the dialog preview and main's writer
+                          can't drift).
     mc-version.ts         Parse/normalize MC versions + the supported-for-jigsaw predicate
     i18n/                 Tiny framework-free i18n shared by both processes: en.ts (canonical key
                           space) + pt-BR.ts (typed complete) + index.ts (resolveLocale/translate/
@@ -905,6 +945,63 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   thinking) with a chars/4 estimate of the streamed tool JSON (during building, since `message_delta`
   only reports the count at turn end). Cancel aborts a per-session `AbortController` via `aiCancel` →
   `cancelGeneration`.
+
+### Export to mod workspace
+
+"Export to Mod Workspace…" (the chat build card's button, or **File ▸ Export to Mod Workspace…** for
+any open `.nbt` via `notifyExportToWorkspace` → `IPC_EVENTS.exportToWorkspace` → `exportToWorkspaceActive`)
+writes a structure into the active workspace's data pack, so a generated build becomes a usable mod
+artifact instead of an orphan in the library. The dialog (`components/export/`, opened via
+`store.exportTarget`) writes the `.nbt` into the **version-correct** structure folder — `structure/`
+for 1.21+, legacy `structures/` before (the #1 silent breakage when a pack moves versions) — and
+OPTIONALLY the four worldgen JSON files that make Minecraft spawn it: a jigsaw **structure** def, a
+**template_pool**, a **structure_set**, and a `has_structure` **biome tag**. The "Generate worldgen
+files" switch is **OFF by default** (`DEFAULT_WORLDGEN.generate`), so a plain export just drops the
+`.nbt` and leaves any hand-authored worldgen untouched.
+
+- **Single source of truth, no drift:** `shared/domain/worldgen.ts` holds the presets + the PURE
+  helpers (`plannedFiles`/`validateOptions`/`structureFolder`). Main's `planExport` (live preview:
+  files with overwrite flags + problems) and `runExport` (the write) both build from those, adding
+  only the disk-aware bits (exists / source-missing / legacy-folder). The dialog is a thin view over
+  the plan; `worldgen-json.ts` are the pure JSON builders.
+- **1.21 gotcha (test-enforced):** a `minecraft:jigsaw` structure def REQUIRES `spawn_overrides` (even
+  `{}`) — it's `.fieldOf`, not optional, in the codec — or the datapack fails to load. `start_height:
+  {absolute:0}` + `project_start_to_heightmap: WORLD_SURFACE_WG` is the vanilla village surface pattern.
+- **Reads the mod's own biomes:** `listWorkspaceBiomes` (workspace.ts) walks `worldgen/biome/**` →
+  `ns:path` ids; the dialog's Biomes control has a Mod/Vanilla source toggle, defaulting to a
+  multi-select of the mod's biomes (a mod build usually belongs in the mod's biomes).
+- **Validation catches the silent killers** (the pains that fail with NO in-game error): empty biome
+  list, `separation ≥ spacing`, overwrites (shown as per-file REPLACE badges), the legacy folder.
+- **Add a worldgen file / preset:** extend `plannedFiles` + a builder in `worldgen-json.ts` (+ test),
+  or add a preset to `worldgen.ts`. **Add an export option:** it rides through `WorldgenOptions`.
+
+### Block editor
+
+"Edit" (the FAB on the stage when a structure is open) opens an in-viewer block editor — the last-mile
+cleanup kit for AI builds (recess walls for depth, raise missing walls, fix circulation) and direct
+hand-editing, attacking the documented pains of WorldEdit/Litematica/Axiom (lost selections, orientation
+corrupted on transform, capped/corrupting undo).
+
+- **Pure ops** (`renderer/editor/ops.ts`, unit-tested) rewrite `{size, palette, blocks}`:
+  select (single / box / toggle), move, extrude (raise walls / stack), build stairs (facing-correct),
+  replace, delete. Orientation is preserved FOR FREE because ops only copy a block's palette `state`,
+  never re-derive it. The **store** (`state/editor.ts`) holds mode/tool/selection/anchor/params + an
+  undo/redo SNAPSHOT stack, patches the active doc's `StructureData`, and the viewer re-shows on change
+  (EditorLayer). Move/extrude use precise ±1 axis buttons + arrow keys (no fiddly gizmo, by design).
+- **Picking:** the geometry is merged per-material (no per-block meshes), so `Viewer.pickBlock(x,y)`
+  raycasts and steps a hair ALONG THE RAY past the hit point — `floor(point + dir·ε)` — which is robust
+  where the face normal isn't (a wrong-way normal would pick the empty cell in front). A click that
+  didn't move >4px is a pick; a drag still orbits. `SelectionOverlay` draws the cobalt selection boxes.
+- **Rendering a NEW block** (Replace / Stairs) needs resolved models → IPC `structure:resolve-block`
+  (`resolveBlockEntry` in block-catalog.ts) returns {entry, textures}; the store interns it + merges
+  textures, then re-shows.
+- **Save = a new version, never fatal:** IPC `structure:save-version` (`ai/save-version.ts`) re-encodes
+  the edited blocks straight via `encodeStructure` — BYPASSING the AI-repair passes so edits are faithful
+  — re-attaching block-entity NBT/entities/DataVersion by position from the source `.nbt`, lands as
+  `vN.nbt` in the session scratch + library, recorded via `commitManualVersion` (generation.ts) like an
+  AI version. Plus full undo/redo. Edit mode auto-exits on tab change (App effect on `activeDoc.id`).
+- **Add a tool:** a pure op in `ops.ts` (+ test) + a store action + a `ToolControls` branch + a
+  `ToolRail` entry + its `editor.*` i18n labels.
 
 ## Conventions / gotchas
 

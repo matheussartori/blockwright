@@ -7,13 +7,14 @@ import { useState, type ReactNode } from 'react';
 import {
   Compass, Sparkles, Orbit, Blocks, MessagesSquare, FolderTree,
   MousePointer2, Move3D, Scan, Eye, Layers, PencilLine, SlidersHorizontal, History,
+  Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { Modal } from './ui/Modal';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
-type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'workspaces';
+type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'workspaces';
 
 const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'overview', icon: Compass, label: 'guide.navOverview' },
@@ -21,6 +22,7 @@ const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'viewer', icon: Orbit, label: 'guide.navViewer' },
   { id: 'details', icon: Blocks, label: 'guide.navDetails' },
   { id: 'edit', icon: MessagesSquare, label: 'guide.navEdit' },
+  { id: 'blocks', icon: Boxes, label: 'guide.navBlocks' },
   { id: 'workspaces', icon: FolderTree, label: 'guide.navWorkspaces' },
 ];
 
@@ -62,6 +64,7 @@ export function GuideModal() {
         {section === 'viewer' && <Viewer t={t} />}
         {section === 'details' && <Details t={t} />}
         {section === 'edit' && <Edit t={t} />}
+        {section === 'blocks' && <BlockTools t={t} />}
         {section === 'workspaces' && <Workspaces t={t} />}
       </div>
     </Modal>
@@ -156,12 +159,29 @@ function Edit({ t }: { t: TFunction }) {
   );
 }
 
+function BlockTools({ t }: { t: TFunction }) {
+  return (
+    <Block icon={<Boxes size={18} strokeWidth={1.8} />} title={t('guide.blocks.title')}>
+      <p className="guide-lead">{t('guide.blocks.lead')}</p>
+      <ul className="guide-list">
+        <li><MousePointer2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.selectT')}</b> {t('guide.blocks.select')}</span></li>
+        <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.moveT')}</b> {t('guide.blocks.move')}</span></li>
+        <li><ArrowUpFromLine size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.extrudeT')}</b> {t('guide.blocks.extrude')}</span></li>
+        <li><TrendingUp size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.stairsT')}</b> {t('guide.blocks.stairs')}</span></li>
+        <li><Replace size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.replaceT')}</b> {t('guide.blocks.replace')}</span></li>
+      </ul>
+      <p className="guide-tip"><Save size={14} strokeWidth={1.9} aria-hidden />{t('guide.blocks.tip')}</p>
+    </Block>
+  );
+}
+
 function Workspaces({ t }: { t: TFunction }) {
   return (
     <Block icon={<FolderTree size={18} strokeWidth={1.8} />} title={t('guide.workspaces.title')}>
       <p className="guide-lead">{t('guide.workspaces.lead')}</p>
       <p className="guide-p">{t('guide.workspaces.p1')}</p>
       <p className="guide-p">{t('guide.workspaces.p2')}</p>
+      <p className="guide-tip"><Upload size={14} strokeWidth={1.9} aria-hidden />{t('guide.workspaces.export')}</p>
     </Block>
   );
 }

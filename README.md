@@ -67,6 +67,11 @@ refines through an emit → render → review loop — previewed live in the vie
   time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
   **furnishing presets** (snug / standard / grand) that the chosen decoration re-skins — so a big room
   is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
+- In-app **block editor** — edit a structure directly in the 3D viewer: click to select (Shift-click
+  for a box), move and extrude the selection (raise a footprint into walls), build facing-correct
+  stairs, replace and delete blocks, with real undo/redo and arrow-key nudging. Orientation stays
+  correct on every transform, and **Save version** writes the edit as a new `.nbt` version, so a
+  mistake is never fatal
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - A browsable structure library — each generated build is saved to its own folder (the latest clean
@@ -74,7 +79,9 @@ refines through an emit → render → review loop — previewed live in the vie
 - Namespace-aware asset resolution from your own extracted Minecraft content pack (configurable;
   not bundled)
 - Mod workspace support — render modded structures with their own textures and models, with the
-  workspace's target Minecraft version auto-detected
+  workspace's target Minecraft version auto-detected, and **export** a structure into a workspace as a
+  version-correct `.nbt` plus the worldgen JSON (jigsaw structure / template pool / structure set /
+  biome tag) that makes it spawn in-world — reading the mod's own biomes and validating it before writing
 - Jigsaw assembly preview for worldgen template pools
 - Block Catalog browser with live 3D block previews
 - Block-entity rendering (chests, beds, banners, skulls, decorated pots) and animated fluids
@@ -153,6 +160,23 @@ Every finished build is saved to a browsable library — one folder per build, h
 becomes that saved project, so the chat's build card has a **Reveal** action (show the folder in your
 file manager); the library root is configurable in **Settings ▸ AI**.
 
+### Editing a structure
+
+With a structure open, click **Edit** on the stage (top-left) to open the block editor and tweak it
+directly in the 3D view:
+
+- **Select** — click a block; **Shift-click** a second to select the whole box between them; **⌘/Ctrl-click**
+  toggles one. The selection is outlined live, and the panel shows its size + the block name(s).
+- **Move** — nudge the selection one block along any axis (buttons or arrow keys).
+- **Extrude** — duplicate the selection along an axis by _N_ blocks: raise a floor outline into walls,
+  or stack a column up.
+- **Stairs** — pick a start block, a direction and a length to lay an ascending stair run with every
+  stair facing the right way.
+- **Replace / Delete** — swap the selected blocks for another (with autocomplete), or carve them away.
+
+Edits keep block orientation correct, support **undo/redo** (no small cap), and **Save version** writes
+the result as a new `.nbt` version in the same version chain as AI builds — so an edit is never fatal.
+
 ## Mod Workspaces
 
 Modded structures reference blocks and textures that don't exist in the vanilla content pack.
@@ -166,6 +190,16 @@ A **mod workspace** points Blockwright at a mod project folder so those assets r
 - Opening a loose `.nbt` that lives inside a mod prompts you to activate that mod's workspace.
 
 Opened workspaces are remembered under **File ▸ Open Recent Workspace**.
+
+### Exporting into a workspace
+
+With a workspace open, **Export to Mod Workspace…** (the build card's button, or **File ▸ Export to Mod
+Workspace…** for any open `.nbt`) writes the structure into the mod's data pack — the `.nbt` in the
+version-correct structure folder (the 1.21 `structures/` → `structure/` rename is handled for you). Turn
+on **Generate worldgen files** to also write the four JSON files that make Minecraft spawn it: a jigsaw
+**structure** definition, a **template pool**, a **structure set**, and a biome tag. Pick how it sits on
+the terrain, how often it spawns, and which biomes (the dialog reads your mod's own biomes), then see
+every file — and any problems (an empty biome list, `separation ≥ spacing`, overwrites) — before writing.
 
 ## Development
 
