@@ -54,6 +54,9 @@ export interface AppState {
   versionPromptName: string | null;
   /** A chat image being shown full-size in the lightbox overlay, or null. */
   imagePreview: string | null;
+  /** The structure being exported to a mod workspace (its `.nbt` path + a suggested
+   *  resource name), or null when the export dialog is closed. */
+  exportTarget: { path: string; name: string } | null;
 
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
@@ -70,6 +73,7 @@ export interface AppState {
   setGuideOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
+  setExportTarget: (target: { path: string; name: string } | null) => void;
 }
 
 /** Fallback content-pack version until main reports the real one (its
@@ -92,6 +96,7 @@ export const store = createStore<AppState>((set) => ({
   guideOpen: false,
   versionPromptName: null,
   imagePreview: null,
+  exportTarget: null,
 
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
@@ -108,6 +113,7 @@ export const store = createStore<AppState>((set) => ({
   setGuideOpen: (guideOpen) => set({ guideOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),
+  setExportTarget: (exportTarget) => set({ exportTarget }),
 }));
 
 /** Subscribe to one derived slice, invoking `run` immediately and on change.

@@ -10,9 +10,12 @@ import { documentsStore, activeDocument } from '../state/documents';
 import type { DocumentFlow } from './useDocumentFlow';
 
 /** The document handlers the IPC listeners dispatch to. */
-type IpcHandlers = Pick<DocumentFlow, 'openFile' | 'close' | 'newDoc' | 'exportActive' | 'onWorkspaceChanged'>;
+type IpcHandlers = Pick<
+  DocumentFlow,
+  'openFile' | 'close' | 'newDoc' | 'exportActive' | 'exportToWorkspaceActive' | 'onWorkspaceChanged'
+>;
 
-export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceChanged }: IpcHandlers): void {
+export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
   // One-time IPC wiring + initial loads.
   useEffect(() => {
     const st = store.getState();
@@ -25,6 +28,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceCh
     });
     api.onNewStructure(() => newDoc());
     api.onExportFile(() => void exportActive());
+    api.onExportToWorkspace(() => exportToWorkspaceActive());
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
     api.onOpenGuide(() => st.setGuideOpen(true));
@@ -48,7 +52,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, onWorkspaceCh
       const version = await api.getContentVersion();
       if (version) st.setContentVersion(version);
     })();
-  }, [openFile, close, newDoc, onWorkspaceChanged, exportActive]);
+  }, [openFile, close, newDoc, onWorkspaceChanged, exportActive, exportToWorkspaceActive]);
 
   // Mirror file-open + window state to main (drives Close File and the View menu).
   // Only re-sends when the *reported* shape changes.

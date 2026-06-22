@@ -32,6 +32,7 @@ import { StageBuilding } from './components/generate/StageBuilding';
 import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { GuideModal } from './components/GuideModal';
+import { ExportModal } from './components/ExportModal';
 
 function Shell() {
   const viewer = useViewer();
@@ -94,7 +95,9 @@ function Shell() {
                 )
               )}
               <FloatingPanels availability={availability} />
-              <WorkspaceBadge />
+              {/* The Generate surface (new-build planner / building stage) puts its config
+                  column on the left, so the badge sits bottom-right there to stay clear of it. */}
+              <WorkspaceBadge side={activeDoc && !fileOpen ? 'right' : 'left'} />
               <WorkspaceSuggest
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}
@@ -114,6 +117,7 @@ function Shell() {
       <ModulesModal />
       <VersionSelectModal />
       <GuideModal />
+      <ExportModal />
       <ImagePreview />
     </>
   );

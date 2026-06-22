@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -30,10 +30,12 @@ import {
   activateWorkspace,
   applyWorkspace,
   detectWorkspaceForFile,
+  listWorkspaceBiomes,
   listWorkspaceStructures,
   promptOpenWorkspace,
   setWorkspaceVersion,
 } from './workspace';
+import { planExport, runExport } from './export';
 import { exportStructure, notifyRecentWorkspaces, openFileDialog } from './window';
 import { getLogBacklog } from './logger';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
@@ -151,6 +153,9 @@ export function registerIpc(): void {
     buildAppMenu();
     return ws;
   });
+  ipcMain.handle(IPC_CHANNELS.workspaceBiomes, async () => listWorkspaceBiomes(getActiveWorkspace()));
+  ipcMain.handle(IPC_CHANNELS.workspaceExportPlan, async (_e, req: WorkspaceExportRequest) => planExport(req));
+  ipcMain.handle(IPC_CHANNELS.workspaceExport, async (_e, req: WorkspaceExportRequest) => runExport(req));
 
   ipcMain.handle(IPC_CHANNELS.jigsawAssemble, async (_e, filePath: string, options: AssembleOptions) =>
     assembleJigsaw(filePath, structureIdFromPath(filePath), options),

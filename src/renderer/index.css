@@ -1240,6 +1240,10 @@ body.row-resizing {
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   box-shadow: var(--shadow);
 }
+.workspace-badge.right {
+  left: auto;
+  right: 12px;
+}
 .workspace-badge.hidden {
   display: none;
 }
@@ -5344,5 +5348,353 @@ body.row-resizing {
 @media (max-width: 720px) {
   .guide-nav {
     width: 168px;
+  }
+}
+
+/* ───────────────────────── Export to mod workspace ───────────────────────── */
+/* A two-column dialog: the decisions on the left, a live preview of the exact files +
+   the validation checks on the right, so a mod dev sees what lands in the data pack. */
+/* The shared modal shell ships a zero-padding body (each dialog pads its own), so give
+   this one comfortable gutters. */
+.export-modal .modal-body {
+  padding: 20px 22px 22px;
+}
+.export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  align-items: stretch;
+}
+.export-config {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  min-width: 0;
+}
+.export-subtitle {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.export-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.export-hint {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.export-name-input {
+  -webkit-app-region: no-drag;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.export-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+/* The worldgen on/off switch, sitting in its own carded row so it reads as the
+   pivot the rest of the form hangs off. */
+.export-switch-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 13px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.export-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.export-switch {
+  -webkit-app-region: no-drag;
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 23px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-strong);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.export-switch.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.export-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.export-switch-knob {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 17px;
+  height: 17px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: left 0.16s ease;
+}
+.export-switch.on .export-switch-knob {
+  left: 19px;
+}
+.export-worldgen {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+/* The mod-biome multi-select: a wrap of toggleable chips read from the workspace. */
+.export-biome-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 124px;
+  overflow: auto;
+  margin-top: 6px;
+}
+.export-biome-chip {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.export-biome-chip:hover {
+  color: var(--text);
+}
+.export-biome-chip.on {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.export-biome-chip > svg {
+  color: var(--accent);
+}
+.export-biome-all {
+  -webkit-app-region: no-drag;
+  align-self: flex-start;
+  margin-top: 7px;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.export-biome-all:hover {
+  text-decoration: underline;
+}
+.export-grid-steppers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.export-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.export-grid-hint {
+  margin: 0;
+}
+
+/* The preview pane: an inset card that reads like a file tree. */
+.export-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.export-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.export-file-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.export-file {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+.export-file:hover {
+  background: var(--panel);
+}
+.export-file > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+.export-file-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0; /* lets the children ellipsis instead of forcing the row wider */
+}
+/* Filename leads (never wraps); the folder sits beneath, muted, and disambiguates the
+   otherwise-identical `<name>.json` files. Both truncate with an ellipsis if too long;
+   the row's title attribute carries the full path on hover. */
+.export-file-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.export-file-dir {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.export-file > svg.export-file-ok {
+  color: var(--ok);
+}
+.export-file-badge {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.export-file-badge.replace {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+
+/* Validation footer: errors block the Export button, warnings inform, and an all-clear
+   "ready" line confirms otherwise. Pinned to the bottom of the preview card
+   (margin-top:auto) so it reads as files-on-top, checks-at-foot and fills the column. */
+.export-checks {
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.export-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.export-issue > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.export-issue.error {
+  color: var(--danger);
+}
+.export-issue.warning {
+  color: var(--warn);
+}
+.export-issue.ok {
+  color: var(--ok);
+}
+
+/* The no-workspace and success states share a centered, calm layout. */
+.export-empty,
+.export-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 11px;
+  padding: 30px 22px;
+}
+.export-empty > svg,
+.export-success > svg {
+  color: var(--accent);
+}
+.export-empty h3,
+.export-success h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+.export-empty p,
+.export-success p {
+  margin: 0;
+  max-width: 400px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.export-empty .btn,
+.export-success .btn {
+  margin-top: 6px;
+}
+.export-success .export-file-tree {
+  width: 100%;
+  max-width: 440px;
+  margin-top: 8px;
+  text-align: left;
+}
+
+/* Stack the two columns on a narrow window. */
+@media (max-width: 720px) {
+  .export-grid {
+    grid-template-columns: 1fr;
   }
 }

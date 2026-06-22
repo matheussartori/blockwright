@@ -5,6 +5,7 @@
 import { useCallback, useEffect, type MutableRefObject } from 'react';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
+import { sanitizeResourceName } from '@/shared/domain/worldgen';
 import { basename } from '../ui/path';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
@@ -29,6 +30,7 @@ export interface DocumentFlow {
   close: () => void;
   closeDocById: (id: string) => void;
   exportActive: () => Promise<void>;
+  exportToWorkspaceActive: () => void;
   acceptSuggest: () => Promise<void>;
   onWorkspaceChanged: (ws: Workspace | null) => Promise<void>;
 }
@@ -160,6 +162,21 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     }
   }, []);
 
+  // Open the "Export to mod" dialog for the active tab's current build. Same source
+  // selection as exportActive (a previewed version or the working build); the dialog
+  // (ExportModal) then writes it + the worldgen JSON into the active workspace.
+  const exportToWorkspaceActive = useCallback(() => {
+    const doc = activeDocument(documentsStore.getState());
+    if (!doc) return;
+    const preview = doc.viewingVersion != null
+      ? doc.versions.find((v) => v.version === doc.viewingVersion)
+      : null;
+    const src = preview?.path ?? doc.path;
+    if (!src) return;
+    const stem = doc.filePath ? basename(doc.filePath).replace(/\.nbt$/i, '') : doc.title || 'structure';
+    store.getState().setExportTarget({ path: src, name: sanitizeResourceName(stem) });
+  }, []);
+
   // Close the active tab; the active-tab effect re-points the viewer afterwards.
   const close = useCallback(() => {
     const id = documentsStore.getState().activeId;
@@ -212,5 +229,5 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     bindGenerationProgress();
   }, [load]);
 
-  return { load, openFile, open, newDoc, close, closeDocById, exportActive, acceptSuggest, onWorkspaceChanged };
+  return { load, openFile, open, newDoc, close, closeDocById, exportActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
 }

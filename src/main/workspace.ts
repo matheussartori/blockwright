@@ -125,6 +125,32 @@ export function listWorkspaceStructures(ws: Workspace | null): string[] {
   return out.sort((a, b) => a.localeCompare(b));
 }
 
+/** List the custom biome ids a workspace defines under
+ *  `data/<namespace>/worldgen/biome/**`, as `namespace:path` (e.g.
+ *  `theplacebeyond:bleak/void`), sorted. Empty when there's no workspace/folder. So the
+ *  export dialog can offer the mod's own biomes, not just vanilla. */
+export function listWorkspaceBiomes(ws: Workspace | null): string[] {
+  if (!ws) return [];
+  const root = path.join(ws.root, 'data', ws.namespace, 'worldgen', 'biome');
+  const out: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(full, childRel);
+      else if (e.isFile() && e.name.endsWith('.json')) out.push(`${ws.namespace}:${childRel.slice(0, -5)}`);
+    }
+  };
+  walk(root, '');
+  return out.sort((a, b) => a.localeCompare(b));
+}
+
 export interface OpenResult {
   workspace: Workspace | null;
   error?: string;

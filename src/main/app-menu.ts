@@ -14,6 +14,7 @@ import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './worksp
 import {
   notifyClose,
   notifyExportFile,
+  notifyExportToWorkspace,
   notifyOpenCatalog,
   notifyOpenGuide,
   notifyOpenModules,
@@ -274,6 +275,11 @@ export function buildAppMenu(): void {
           accelerator: 'CmdOrCtrl+Shift+S',
           enabled: fileOpen,
           click: () => notifyExportFile(),
+        },
+        {
+          label: mt('menu.exportToWorkspace'),
+          enabled: fileOpen,
+          click: () => notifyExportToWorkspace(),
         },
         { label: mt('menu.closeFile'), enabled: fileOpen, click: () => notifyClose() },
         { type: 'separator' },

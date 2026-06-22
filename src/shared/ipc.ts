@@ -32,6 +32,14 @@ export const IPC_CHANNELS = {
   recentWorkspacesClear: 'recent-workspaces:clear',
   /** Persist a user-chosen Minecraft version for the active workspace. */
   workspaceSetVersion: 'workspace:set-version',
+  /** Custom biome ids the active workspace defines (`worldgen/biome/**`) → string[]. */
+  workspaceBiomes: 'workspace:biomes',
+  /** Live preview of exporting a structure into the active workspace (payload: ExportRequest)
+   *  → ExportPlan (the files that would be written + any problems). */
+  workspaceExportPlan: 'workspace:export-plan',
+  /** Write a structure + its worldgen JSON into the active workspace (payload: ExportRequest)
+   *  → ExportResult. */
+  workspaceExport: 'workspace:export',
   /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */
   jigsawAssemble: 'jigsaw:assemble',
   /** Candidate pieces for one connector of a structure (payload: path + index). */
@@ -130,6 +138,9 @@ export const IPC_EVENTS = {
   /** Ask the renderer to export the current build (File ▸ Export File). The
    *  renderer picks the source path + suggested name and calls IPC_CHANNELS.exportFile. */
   exportFile: 'export-file',
+  /** Ask the renderer to open the "Export to mod" dialog for the active document
+   *  (File ▸ Export to Workspace). */
+  exportToWorkspace: 'export-to-workspace',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
   /** Ask the renderer to load a just-generated `.nbt` into the viewer and return

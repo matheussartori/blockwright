@@ -11,6 +11,9 @@ import type {
   ModBlockScope,
   ChatRecord,
   ExportResult,
+  WorkspaceExportRequest,
+  WorkspaceExportPlan,
+  WorkspaceExportResult,
   FloorDef,
   GenerateImage,
   GenerateProgress,
@@ -75,6 +78,11 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.workspaceStructures),
   setWorkspaceVersion: (version: string): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceSetVersion, version),
+  listWorkspaceBiomes: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.workspaceBiomes),
+  planWorkspaceExport: (req: WorkspaceExportRequest): Promise<WorkspaceExportPlan> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceExportPlan, req),
+  exportToWorkspace: (req: WorkspaceExportRequest): Promise<WorkspaceExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceExport, req),
   assembleJigsaw: (path: string, options: AssembleOptions): Promise<JigsawPlan> =>
     ipcRenderer.invoke(IPC_CHANNELS.jigsawAssemble, path, options),
   jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>
@@ -165,6 +173,9 @@ const api: BlockwrightApi = {
   },
   onExportFile: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportFile, () => cb());
+  },
+  onExportToWorkspace: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.exportToWorkspace, () => cb());
   },
   getLogBacklog: () => ipcRenderer.invoke(IPC_CHANNELS.logBacklog),
   onLogEntry: (cb: (entry: LogEntry) => void) => {

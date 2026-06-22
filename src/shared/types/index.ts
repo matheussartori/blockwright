@@ -5,5 +5,6 @@ export * from './structure';
 export * from './workspace';
 export * from './jigsaw';
 export * from './generation';
+export * from './export';
 export * from './app';
 export * from './api';

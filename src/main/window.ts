@@ -82,6 +82,11 @@ export function notifyExportFile(): void {
   mainWindow?.webContents.send(IPC_EVENTS.exportFile);
 }
 
+/** Ask the renderer to open the "Export to mod" dialog for the active document. */
+export function notifyExportToWorkspace(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.exportToWorkspace);
+}
+
 /** Push the current recents list to the renderer (keeps the welcome view in sync). */
 export function notifyRecents(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());

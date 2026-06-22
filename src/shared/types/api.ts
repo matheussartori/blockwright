@@ -17,6 +17,7 @@ import type {
   FloorDef,
 } from './generation';
 import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
+import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 
 export interface BlockwrightApi {
   platform: NodeJS.Platform;
@@ -52,6 +53,13 @@ export interface BlockwrightApi {
   listWorkspaceStructures: () => Promise<string[]>;
   /** Persist a user-chosen Minecraft version for the active workspace; returns it. */
   setWorkspaceVersion: (version: string) => Promise<Workspace | null>;
+  /** Custom biome ids the active workspace defines (`worldgen/biome/**`), `ns:path`. */
+  listWorkspaceBiomes: () => Promise<string[]>;
+  /** Live preview of exporting a structure into the active workspace: the files that
+   *  would be written + any problems, recomputed as the dialog's options change. */
+  planWorkspaceExport: (req: WorkspaceExportRequest) => Promise<WorkspaceExportPlan>;
+  /** Write the structure + its worldgen JSON into the active workspace. */
+  exportToWorkspace: (req: WorkspaceExportRequest) => Promise<WorkspaceExportResult>;
   /** Plan a full jigsaw assembly starting from a structure file. */
   assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
   /** Candidate pieces that can attach to one connector of a structure (manual mode). */
@@ -175,6 +183,9 @@ export interface BlockwrightApi {
   /** Notified when File ▸ Export File is chosen; the handler picks the build to
    *  save and calls `exportStructure`. */
   onExportFile: (cb: () => void) => void;
+  /** Notified when File ▸ Export to Mod Workspace is chosen; the handler opens the
+   *  export dialog for the active document. */
+  onExportToWorkspace: (cb: () => void) => void;
   /** The main-process log backlog buffered before the renderer mounted, so the
    *  Console dock starts with the full session history. */
   getLogBacklog: () => Promise<LogEntry[]>;

@@ -4,7 +4,9 @@
 // card: the request PLUS the result (version/size/blocks) and a Reveal action for the
 // saved library file — so the user can jump straight to the build's folder on disk.
 import { api } from '../../api';
-import { dirname } from '../../ui/path';
+import { basename, dirname } from '../../ui/path';
+import { store } from '../../state/store';
+import { sanitizeResourceName } from '@/shared/domain/worldgen';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import type { MessageKey } from '@/shared/i18n';
 import type { BuildBrief } from '@/shared/types';
@@ -67,6 +69,20 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
       )}
       {build.libraryPath && (
         <div className="gen-build-card-actions">
+          {/* The headline action for a mod dev: drop this build straight into the active
+              workspace's data pack (the .nbt + its worldgen JSON), via the export dialog. */}
+          <button
+            className="btn sm primary no-drag"
+            onClick={() =>
+              store.getState().setExportTarget({
+                path: build.libraryPath!,
+                name: sanitizeResourceName(basename(build.libraryPath!).replace(/\.nbt$/i, '')),
+              })
+            }
+            title={t('gen.exportBuildTitle')}
+          >
+            {t('gen.exportBuild')}
+          </button>
           {/* This tab IS the saved build now (the project file is open here), so there's
               no "Open" — only Reveal, to find the folder + its versions/generation.log. */}
           <button
