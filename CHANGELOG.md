@@ -4,6 +4,30 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-23
+
+### Added
+
+- In-app block editor — select, move, mirror/rotate, extrude, build stairs,
+  place, replace and delete blocks directly in the 3D viewer, with live
+  symmetry, undo/redo and save-as-new-version.
+- Export to mod workspace — write a structure into the active workspace's data
+  pack as a version-correct `.nbt`, optionally generating the jigsaw worldgen
+  files (structure def, template pool, structure set and biome tag) that make
+  Minecraft spawn it.
+- WorldEdit `.schem` (Sponge) and Litematica `.litematic` interop — open and
+  export both formats, with block entities carried through every conversion.
+- A new haunted tower structure type.
+
+### Changed
+
+- Reworked structure parsing and editing internals.
+- Dependency upgrades.
+
+### Fixed
+
+- Localization (i18n) corrections.
+
 ## [1.0.0] - 2026-06-15
 
 First public release.
@@ -30,4 +54,5 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[1.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.0
 [1.0.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.0.0
