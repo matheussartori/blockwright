@@ -4,6 +4,9 @@
 // preserved for free on move/extrude/stairs because we only ever copy a block's palette
 // `state` (its blockstate), never re-derive it — the bug WorldEdit never fully fixed.
 import type { PaletteEntry, StructureBlock } from '@/shared/types';
+import { transformProps, type PropXform } from '@/shared/structure/orientation';
+
+export type { PropXform };
 
 export type Cell = [number, number, number];
 export type Axis = 'x' | 'y' | 'z';
@@ -84,21 +87,23 @@ export function moveSelection(d: EditData, selection: string[], delta: Cell): Op
   return { blocks: [...kept, ...moved], palette: d.palette, selection: moved.map((b) => cellKey(b.pos)) };
 }
 
-/** Duplicate the selected blocks `count` cells along an axis (sign = direction),
- *  overwriting the target cells — raise walls from a footprint, stack columns up. The
- *  original selection stays highlighted so you can extrude again. */
-export function extrudeSelection(d: EditData, selection: string[], axis: Axis, count: number): OpResult {
+/** Duplicate the selected blocks `count` times along an axis (sign = direction), each copy
+ *  `step` cells further on, overwriting the target cells. `step` 1 = a contiguous run (raise
+ *  walls / stack a column); `step` > 1 = a repeating array with gaps. The original selection
+ *  stays highlighted so you can extrude again. */
+export function extrudeSelection(d: EditData, selection: string[], axis: Axis, count: number, step = 1): OpResult {
   const ai = AXIS[axis];
   const dir = Math.sign(count) || 1;
-  const steps = Math.abs(count);
+  const copies = Math.abs(count);
+  const span = Math.max(1, step);
   const occ = occupancy(d);
   const seeds = selection.map((k) => occ.get(k)).filter((i): i is number => i != null).map((i) => d.blocks[i]);
   const added: StructureBlock[] = [];
   const targets = new Set<string>();
-  for (let n = 1; n <= steps; n++)
+  for (let n = 1; n <= copies; n++)
     for (const b of seeds) {
       const pos = [...b.pos] as Cell;
-      pos[ai] += n * dir;
+      pos[ai] += n * dir * span;
       added.push({ state: b.state, pos });
       targets.add(cellKey(pos));
     }
@@ -120,6 +125,69 @@ export function replaceSelection(d: EditData, selection: string[], entry: Palett
     sel.has(cellKey(b.pos)) && !d.palette[b.state]?.air ? { state: index, pos: b.pos } : b,
   );
   return { blocks, palette, selection };
+}
+
+/** Where one block lands under a mirror/rotate, and the block it becomes. The block's
+ *  PROPERTIES change (a stair flips its facing), so the caller resolves the new model. */
+export interface Placement {
+  pos: Cell;
+  name: string;
+  props: Record<string, string>;
+}
+
+const bbox = (cells: StructureBlock[]) => {
+  const lo: Cell = [Infinity, Infinity, Infinity];
+  const hi: Cell = [-Infinity, -Infinity, -Infinity];
+  for (const b of cells)
+    for (let i = 0; i < 3; i++) {
+      lo[i] = Math.min(lo[i], b.pos[i]);
+      hi[i] = Math.max(hi[i], b.pos[i]);
+    }
+  return { lo, hi };
+};
+
+/** Plan a mirror/rotate of the selection about its OWN centre (not a corner — the pivot
+ *  Litematica gets wrong), rewriting each block's position AND its directional blockstate
+ *  (facing/axis/shape/hinge/rotation) via the shared `transformProps`, so stairs/logs/doors
+ *  stay physically consistent — the transform WorldEdit never fully fixed. */
+export function planTransform(d: EditData, selection: string[], xform: PropXform): Placement[] {
+  const occ = occupancy(d);
+  const cells = selection.map((k) => occ.get(k)).filter((i): i is number => i != null).map((i) => d.blocks[i]);
+  if (!cells.length) return [];
+  const { lo, hi } = bbox(cells);
+  const cx = (lo[0] + hi[0]) / 2;
+  const cz = (lo[2] + hi[2]) / 2;
+  const cwTurn = (p: Cell): Cell => [cx - (p[2] - cz), p[1], cz + (p[0] - cx)]; // one 90° CW about +Y
+
+  const placePos = (p: Cell): Cell => {
+    if (xform.kind === 'mirror') {
+      return xform.axis === 'x' ? [lo[0] + hi[0] - p[0], p[1], p[2]] : [p[0], p[1], lo[2] + hi[2] - p[2]];
+    }
+    let q = p;
+    for (let i = 0, n = (((xform.turns % 4) + 4) % 4); i < n; i++) q = cwTurn(q);
+    return [Math.round(q[0]), q[1], Math.round(q[2])];
+  };
+
+  return cells.map((b) => {
+    const entry = d.palette[b.state];
+    return {
+      pos: placePos([...b.pos] as Cell),
+      name: entry.name,
+      props: (transformProps(entry.properties, xform) ?? {}) as Record<string, string>,
+    };
+  });
+}
+
+/** Reflect a cell across the structure's centre plane on an axis (live symmetry). */
+export function mirrorCell(cell: Cell, axis: 'x' | 'z', size: [number, number, number]): Cell {
+  return axis === 'x' ? [size[0] - 1 - cell[0], cell[1], cell[2]] : [cell[0], cell[1], size[2] - 1 - cell[2]];
+}
+
+/** Add (or overwrite) a single block at a cell — the Place tool. */
+export function placeBlock(d: EditData, cell: Cell, entry: PaletteEntry): OpResult {
+  const { palette, index } = internEntry(d.palette, entry);
+  const k = cellKey(cell);
+  return { blocks: [...d.blocks.filter((b) => cellKey(b.pos) !== k), { state: index, pos: cell }], palette, selection: [k] };
 }
 
 /** A straight stair run: from `start`, step `dir` horizontally and +1 up each block,

@@ -9,6 +9,7 @@ import { Select, type SelectOption } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
 import { Switch } from '../ui/Switch';
 import { BiomePicker, type BiomeSource } from './BiomePicker';
+import { TerrainPreview } from './TerrainPreview';
 import {
   BIOME_PRESETS,
   DEFAULT_WORLDGEN,
@@ -35,11 +36,13 @@ interface ExportConfigProps {
   workspaceName: string;
   namespace: string;
   defaultName: string;
+  /** The structure's [w, h, d], to proportion the terrain preview. */
+  structureSize: [number, number, number];
   onChange: (draft: ExportDraft) => void;
   t: TFunction;
 }
 
-export function ExportConfig({ workspaceName, namespace, defaultName, onChange, t }: ExportConfigProps) {
+export function ExportConfig({ workspaceName, namespace, defaultName, structureSize, onChange, t }: ExportConfigProps) {
   const [name, setName] = useState(defaultName);
   const [generate, setGenerate] = useState(DEFAULT_WORLDGEN.generate);
   const [terrain, setTerrain] = useState<TerrainAdaptation>(DEFAULT_WORLDGEN.terrainAdaptation);
@@ -136,6 +139,7 @@ export function ExportConfig({ workspaceName, namespace, defaultName, onChange, 
           <label className="export-field">
             <span className="export-label">{t('export.terrainLabel')}</span>
             <Select value={terrain} options={terrainOptions} onChange={(v) => setTerrain(v as TerrainAdaptation)} />
+            <TerrainPreview size={structureSize} adaptation={terrain} t={t} />
           </label>
           <BiomePicker
             source={biomeSource}

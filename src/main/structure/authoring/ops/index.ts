@@ -5,7 +5,7 @@
 import { composeStructure } from '../../domain';
 import { cellsInBox, inBounds, lineCells, posKey, rotXZ } from '../geometry';
 import { isAir, makeIntern } from '../palette';
-import { transformProps, type PropXform } from '../orientation';
+import { transformProps, type PropXform } from '@/shared/structure/orientation';
 import type { AuthoringBlock, AuthoringOp, AuthoringPaletteEntry, AuthoringStructure } from '../types';
 import { applyRoof } from './roof';
 import { applyStairs } from './stairs';

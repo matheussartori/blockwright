@@ -5,8 +5,9 @@
 import { useMemo } from 'react';
 import { Boxes, Pencil, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useActiveDoc, useEditor, useT } from '../../hooks/useStores';
-import { editorStore } from '../../state/editor';
+import { editorStore, type Symmetry } from '../../state/editor';
 import { cellKey, parseCell } from '../../editor/ops';
+import { Segmented } from '../ui/Segmented';
 import { ToolRail } from './ToolRail';
 import { ToolControls } from './ToolControls';
 
@@ -19,6 +20,7 @@ export function EditorPanel() {
   const saving = useEditor((s) => s.saving);
   const canUndo = useEditor((s) => s.past.length > 0);
   const canRedo = useEditor((s) => s.future.length > 0);
+  const symmetry = useEditor((s) => s.symmetry);
   const structure = useActiveDoc()?.structure ?? null;
   const ed = editorStore.getState;
 
@@ -73,6 +75,20 @@ export function EditorPanel() {
       </header>
 
       <ToolRail tool={tool} onTool={(id) => ed().setTool(id)} t={t} />
+
+      <div className="editor-sym">
+        <span className="editor-sym-label">{t('editor.symmetry')}</span>
+        <Segmented
+          value={symmetry}
+          ariaLabel={t('editor.symmetry')}
+          onChange={(v) => ed().setSymmetry(v as Symmetry)}
+          options={[
+            { value: 'none', label: t('editor.symOff') },
+            { value: 'x', label: 'X' },
+            { value: 'z', label: 'Z' },
+          ]}
+        />
+      </div>
 
       <div className="editor-context">
         <ToolControls tool={tool} t={t} />

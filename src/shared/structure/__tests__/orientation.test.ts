@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mirrorFacing, rotFacing, transformProps } from '../orientation';
+import { mirrorFacing, rotFacing, transformProps } from '@/shared/structure/orientation';
 
 describe('rotFacing', () => {
   it('rotates clockwise one quarter-turn', () => {

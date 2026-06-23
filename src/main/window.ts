@@ -10,6 +10,7 @@ import { mt } from './language';
 import { getRecents } from './recents';
 import { getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/assets/content-pack';
+import { convertStructure } from './structure/io/convert';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
@@ -32,7 +33,12 @@ export async function openFileDialog(): Promise<string | null> {
   const options: OpenDialogOptions = {
     title: mt('dialog.openTitle'),
     properties: ['openFile'],
-    filters: [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }],
+    filters: [
+      { name: mt('dialog.structureFilter'), extensions: ['nbt', 'schem', 'litematic'] },
+      { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
+      { name: mt('dialog.schemFilter'), extensions: ['schem'] },
+      { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
+    ],
   };
   const result = mainWindow
     ? await dialog.showOpenDialog(mainWindow, options)
@@ -52,10 +58,10 @@ export async function openDirectoryDialog(): Promise<string | null> {
   return result.canceled ? null : result.filePaths[0];
 }
 
-/** Copy the current build's compiled `.nbt` (`srcPath`) to a user-chosen location
- *  via the native Save dialog. `suggestedName` seeds the dialog's filename. The
- *  source is a real file on disk (the opened `.nbt` or a generated temp version),
- *  so exporting is a plain copy — no re-encoding. */
+/** Export the current build (`srcPath`, a real `.nbt`/`.schem` on disk) to a user-chosen
+ *  location + FORMAT via the native Save dialog. The chosen extension drives the encoding:
+ *  `.nbt` (vanilla structure) or `.schem` (WorldEdit/Sponge). `.nbt`→`.nbt` is a lossless
+ *  copy; anything else converts via `convertStructure`. */
 export async function exportStructure(srcPath: string, suggestedName: string): Promise<ExportResult> {
   if (!fs.existsSync(srcPath)) {
     return { ok: false, error: 'The structure file no longer exists on disk.' };
@@ -63,14 +69,18 @@ export async function exportStructure(srcPath: string, suggestedName: string): P
   const options: SaveDialogOptions = {
     title: mt('dialog.exportTitle'),
     defaultPath: suggestedName,
-    filters: [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }],
+    filters: [
+      { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
+      { name: mt('dialog.schemFilter'), extensions: ['schem'] },
+      { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
+    ],
   };
   const result = mainWindow
     ? await dialog.showSaveDialog(mainWindow, options)
     : await dialog.showSaveDialog(options);
   if (result.canceled || !result.filePath) return { ok: false, canceled: true };
   try {
-    await fs.promises.copyFile(srcPath, result.filePath);
+    await convertStructure(srcPath, result.filePath);
     return { ok: true, path: result.filePath };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

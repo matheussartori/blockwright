@@ -5531,6 +5531,52 @@ body.row-resizing {
   margin: 0;
 }
 
+/* The terrain-fit preview: a side-elevation schematic of how the build sits on the ground
+   for the chosen adaptation (themed via CSS vars so it tracks light/dark). */
+.export-terrain {
+  margin-top: 8px;
+}
+.tp-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel-strong));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.tp-earth,
+.tp-earth-over {
+  fill: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+.tp-ground {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+.tp-structure {
+  fill: color-mix(in srgb, var(--accent) 80%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1;
+}
+.tp-door {
+  fill: color-mix(in srgb, var(--accent) 30%, var(--elevated));
+}
+.tp-beard {
+  fill: color-mix(in srgb, var(--warn) 55%, transparent);
+  stroke: var(--warn);
+  stroke-width: 0.75;
+}
+.tp-gap {
+  stroke: var(--danger);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+.tp-caption {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 /* The preview pane: an inset card that reads like a file tree. */
 .export-preview {
   display: flex;
@@ -5733,7 +5779,7 @@ body.row-resizing {
   top: 12px;
   left: 12px;
   z-index: 60;
-  width: 250px;
+  width: 264px;
   display: flex;
   flex-direction: column;
   color: var(--text);
@@ -5784,11 +5830,29 @@ body.row-resizing {
 }
 
 /* The tool rail: equal-width icon buttons, the active one filled with the accent. */
+/* The tool rail: a 4×2 grid so all 8 tools stay comfortably sized (a single row would
+   cram them), nothing clipped. */
 .editor-tools {
-  display: flex;
-  gap: 4px;
-  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 9px 10px;
   border-bottom: 1px solid var(--border);
+}
+/* The transform tool's 2×2 button grid (mirror X/Z, rotate CW/CCW). */
+.editor-btngrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+/* Two side-by-side fields (e.g. extrude's count + spacing). */
+.editor-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.editor-btngrid .btn {
+  justify-content: center;
 }
 .editor-tool {
   -webkit-app-region: no-drag;
@@ -5813,11 +5877,56 @@ body.row-resizing {
   border-color: var(--accent);
 }
 
+/* The live-symmetry row (a thin global control under the tool rail). */
+.editor-sym {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.editor-sym-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .editor-context {
   display: flex;
   flex-direction: column;
   gap: 11px;
   padding: 12px;
+}
+/* A block-id field with its 3D swatch preview (Replace / Place). */
+.editor-blockrow {
+  display: flex;
+  align-items: stretch;
+  gap: 9px;
+}
+.editor-swatch {
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+}
+.editor-blockrow .editor-field {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+.editor-eyedrop {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+}
+.editor-eyedrop.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .editor-hint {
   margin: 0;

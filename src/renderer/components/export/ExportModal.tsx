@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { api } from '../../api';
-import { useApp, useT } from '../../hooks/useStores';
+import { useActiveDoc, useApp, useT } from '../../hooks/useStores';
 import { store } from '../../state/store';
 import { ExportConfig, type ExportDraft } from './ExportConfig';
 import { ExportPreview } from './ExportPreview';
@@ -19,6 +19,11 @@ export function ExportModal() {
   const target = useApp((s) => s.exportTarget);
   const workspace = useApp((s) => s.workspace);
   const open = target !== null;
+  // The structure being exported is the active doc (export is triggered from it) — used to
+  // proportion the terrain preview and to warn if it carries jigsaw connectors.
+  const structure = useActiveDoc()?.structure ?? null;
+  const structureSize = structure?.size ?? [9, 7, 9];
+  const hasJigsaws = (structure?.jigsaws.length ?? 0) > 0;
 
   const [draft, setDraft] = useState<ExportDraft | null>(null);
   const [plan, setPlan] = useState<WorkspaceExportPlan | null>(null);
@@ -94,10 +99,17 @@ export function ExportModal() {
             workspaceName={workspace.name}
             namespace={workspace.namespace}
             defaultName={target?.name ?? ''}
+            structureSize={structureSize}
             onChange={setDraft}
             t={t}
           />
-          <ExportPreview plan={plan} namespace={workspace.namespace} result={result} t={t} />
+          <ExportPreview
+            plan={plan}
+            namespace={workspace.namespace}
+            result={result}
+            jigsawWarning={hasJigsaws && (draft?.worldgen.generate ?? false)}
+            t={t}
+          />
         </div>
       )}
     </Modal>

@@ -11,10 +11,12 @@ interface ExportPreviewProps {
   plan: WorkspaceExportPlan | null;
   namespace: string;
   result: WorkspaceExportResult | null;
+  /** The source structure carries jigsaw connectors — the single-piece pool won't follow them. */
+  jigsawWarning: boolean;
   t: TFunction;
 }
 
-export function ExportPreview({ plan, namespace, result, t }: ExportPreviewProps) {
+export function ExportPreview({ plan, namespace, result, jigsawWarning, t }: ExportPreviewProps) {
   const errors = plan?.issues.filter((i) => i.level === 'error') ?? [];
   const warnings = plan?.issues.filter((i) => i.level === 'warning' && i.code !== 'overwrite') ?? [];
   const files = plan?.files ?? [];
@@ -63,6 +65,12 @@ export function ExportPreview({ plan, namespace, result, t }: ExportPreviewProps
             <span>{issueText(iss.code, iss.detail)}</span>
           </p>
         ))}
+        {jigsawWarning && (
+          <p className="export-issue warning">
+            <TriangleAlert size={14} strokeWidth={2} aria-hidden />
+            <span>{t('export.jigsawWarning')}</span>
+          </p>
+        )}
         {result && !result.ok && (
           <p className="export-issue error">
             <XCircle size={14} strokeWidth={2} aria-hidden />

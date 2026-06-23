@@ -40,7 +40,17 @@ src/
                           + problems; runExport = write them). See "Export to mod workspace" below.
     structure/              Grouped by responsibility (one subdir per concern):
       io/
-        load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData
+        load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData (extension-aware: a `.schem`
+                            decodes via schematic.ts). `buildStructureData` = the raw {size,palette,blocks}
+                            → resolved StructureData step, shared by every source format.
+        schematic.ts        Sponge `.schem` (WorldEdit) interop: decodeSchem (v2/v3, varint-packed) +
+                            encodeSchem (v2) + block-state string ↔ {Name,Properties} + the shared
+                            RawStructure type. Decodes to the SAME raw shape as `.nbt`. See "Schematic interop".
+        litematica.ts       Litematica `.litematic` interop: decodeLitematic (multi-region, bit-packed long
+                            array, SPANNING) + encodeLitematic (single region) + the BigInt bit-array
+                            helpers (bitsForPalette/pack/unpackBlockStates, unit-tested).
+        convert.ts          Format-aware export: readRaw (.nbt|.schem|.litematic → raw) + convertStructure
+                            (writes by the dest extension; .nbt→.nbt copies losslessly, else re-encodes). Export As.
       assets/               The resource/model layer (block name+props → resolved models + textures):
         content-pack.ts      Namespace-aware asset roots (vanilla pack + workspace) + JSON cache
         blockstate-resolver.ts / model-loader.ts  block name+props → resolved models
@@ -253,7 +263,6 @@ src/
                           __tests__/ (run `npm run test`). Public API via the barrel `index.ts`.
       types.ts            AuthoringStructure/Op/PaletteEntry/Block/Entity (shared contracts)
       geometry.ts         pure integer geometry (posKey, inBounds, lineCells, cellsInBox, rotXZ)
-      orientation.ts      directional-blockstate transforms for mirror/rotate (facing/axis/…)
       palette.ts          paletteKey, makeIntern (get-or-create dedup), isAir, bareId
       nbt-encode.ts/-decode.ts  tag-typed encode → gzipped .nbt; readAuthoring (.nbt → JSON)
       ops/                applyOp dispatcher + resolveBlocks; roof.ts/stairs.ts builders.
@@ -399,10 +408,12 @@ src/
                           and seeds the per-floor heights), attachments.ts (reference-
                           image intake) and floors.ts (normalizeFloor + buildFloorPlan).
     editor/               Pure (no-React, no-Three) block-editing ops over {size, palette, blocks}:
-                          ops.ts (move/extrude/delete/replace/buildStairs + selectBox/cuboidCells/intern,
-                          unit-tested) — the geometry rules behind the block editor. Orientation is
-                          preserved for free because ops only COPY a block's palette `state`, never
-                          re-derive it (the bug WorldEdit never fixed). See "Block editor" below.
+                          ops.ts (move/extrude/delete/replace/buildStairs/placeBlock + planTransform
+                          [mirror/rotate] + selectBox/cuboidCells/intern, unit-tested) — the geometry rules
+                          behind the block editor. Move/extrude preserve orientation for free (they only COPY
+                          a block's `state`); mirror/rotate rewrite the directional blockstate via the shared
+                          `structure/orientation.ts` (`transformProps`) — the transform WorldEdit never fixed.
+                          See "Block editor" below.
     windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
@@ -983,15 +994,23 @@ hand-editing, attacking the documented pains of WorldEdit/Litematica/Axiom (lost
 corrupted on transform, capped/corrupting undo).
 
 - **Pure ops** (`renderer/editor/ops.ts`, unit-tested) rewrite `{size, palette, blocks}`:
-  select (single / box / toggle), move, extrude (raise walls / stack), build stairs (facing-correct),
-  replace, delete. Orientation is preserved FOR FREE because ops only copy a block's palette `state`,
-  never re-derive it. The **store** (`state/editor.ts`) holds mode/tool/selection/anchor/params + an
-  undo/redo SNAPSHOT stack, patches the active doc's `StructureData`, and the viewer re-shows on change
-  (EditorLayer). Move/extrude use precise ±1 axis buttons + arrow keys (no fiddly gizmo, by design).
-- **Picking:** the geometry is merged per-material (no per-block meshes), so `Viewer.pickBlock(x,y)`
-  raycasts and steps a hair ALONG THE RAY past the hit point — `floor(point + dir·ε)` — which is robust
-  where the face normal isn't (a wrong-way normal would pick the empty cell in front). A click that
-  didn't move >4px is a pick; a drag still orbits. `SelectionOverlay` draws the cobalt selection boxes.
+  select (single / box / toggle), move, mirror/rotate (`planTransform`), extrude (spacing 1 = raise
+  walls / stack; spacing > 1 = a repeating array), build stairs (facing-correct), place, replace, delete. Move/extrude/place preserve orientation FOR FREE
+  (they only copy a block's `state`); **mirror/rotate** rewrite the directional blockstate (facing/axis/
+  shape/hinge/rotation) via the shared `structure/orientation.ts` `transformProps`, pivoting about the
+  selection's OWN centre — the transform WorldEdit never fully fixed. The **store** (`state/editor.ts`)
+  holds mode/tool/selection/anchor/params + an undo/redo SNAPSHOT stack, patches the active doc's
+  `StructureData`, and the viewer re-shows on change (EditorLayer). Move/extrude use precise ±1 axis
+  buttons + arrow keys (no fiddly gizmo, by design); mirror/rotate are buttons too.
+- **Picking:** the geometry is merged per-material (no per-block meshes), so the Viewer raycasts and
+  steps a hair ALONG THE RAY past the hit point — robust where the face normal isn't (a wrong-way normal
+  would pick the wrong side). `pickBlock` steps INTO the surface (`+dir·ε`) for the solid cell; `pickPlacement`
+  steps BACK (`−dir·ε`) for the empty cell in front (the Place tool). A click that didn't move >4px is a
+  pick; a drag still orbits. `SelectionOverlay` draws the cobalt selection boxes.
+- **Live symmetry** (`symmetry` off/x/z in the store, a global Segmented under the tool rail): Place + Delete
+  are mirrored across the structure's centre on that axis, with the placed block's directional blockstate
+  flipped (`mirrorCell` + `transformProps`). **Replace v2:** a 3D swatch (`BlockPreview`) of the target block
+  + an **eyedropper** (`eyedropper` flag → next click `sample`s the block under the cursor into `replaceBlock`).
 - **Rendering a NEW block** (Replace / Stairs) needs resolved models → IPC `structure:resolve-block`
   (`resolveBlockEntry` in block-catalog.ts) returns {entry, textures}; the store interns it + merges
   textures, then re-shows.
@@ -1002,6 +1021,37 @@ corrupted on transform, capped/corrupting undo).
   AI version. Plus full undo/redo. Edit mode auto-exits on tab change (App effect on `activeDoc.id`).
 - **Add a tool:** a pure op in `ops.ts` (+ test) + a store action + a `ToolControls` branch + a
   `ToolRail` entry + its `editor.*` i18n labels.
+
+### Schematic interop
+
+Blockwright opens + exports **WorldEdit `.schem`** (Sponge) AND **Litematica `.litematic`** schematics,
+not just vanilla `.nbt` — widening the audience to every WorldEdit/Litematica builder. The whole app is format-agnostic
+because everything funnels through the shared raw `{size, palette, blocks}` shape: `loadStructure`
+detects the extension and a `.schem` is decoded by `io/schematic.ts` → `buildStructureData` (the
+same resolution a `.nbt` gets), so a schematic renders, edits (the block editor), and exports
+identically. The open + Export-As dialogs (`main/window.ts`) list both formats; `io/convert.ts`
+writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re-encode through raw).
+
+- **`.schem` format (test-enforced round-trip):** gzipped NBT like `.nbt`, but blocks are a **varint
+  (LEB128) palette-index stream** in `x + z*W + y*W*L` order, not an explicit list. v2 keeps blocks at
+  the root; v3 nests them under `Schematic` › `Blocks` (and renames `BlockData`→`Data`) — `decodeSchem`
+  handles both, `encodeSchem` writes v2 (widest reader support). The palette is block-state STRINGS
+  (`minecraft:oak_stairs[facing=east]`) ↔ `{Name, Properties}` (`parseBlockState`/`blockStateString`).
+  Gotchas: unsigned varint (`>>> 7`, mask `& 0x7f` on signed bytes), unsigned `Width/Height/Length`
+  shorts, air is explicit in the stream (dropped on import to match `.nbt`'s sparse list).
+- **`.litematic` format (test-enforced round-trip):** gzipped NBT with a MULTI-region `Regions` map; each
+  region's blocks are a **bit-packed long array** in the pre-1.16 **SPANNING** scheme (entries cross long
+  boundaries — do NOT apply vanilla-1.16 non-spanning padding). `bits = max(2, ceil(log2(palette)))`; cell
+  order `y*sx*sz + z*sx + x`. 64-bit math uses **BigInt** (prismarine-nbt stores each long as a `[high,low]`
+  signed-int32 pair → reassemble unsigned, split back signed). `decodeLitematic` reads every region (palette
+  is `{Name,Properties}` compounds) and normalises to the declared region BOUNDS (air margins survive, so the
+  size matches a `.nbt`); `encodeLitematic` writes one region. `Size` axes can be negative (drag direction).
+- **Block entities ARE carried** through every conversion: `RawStructure.blockEntities` ({pos, id, nbt}) is
+  read from each format (`.nbt` block `nbt`; `.schem` `BlockEntities` Id+Pos+fields; `.litematic` region
+  `TileEntities` x/y/z+fields) and written back, re-attached to the block by position on a `.nbt` write — so
+  chest contents / sign text / structure-block data survive `.nbt`↔`.schem`↔`.litematic`. The arbitrary NBT
+  fields serialise via `inferCompound` (exported from `nbt-encode.ts`). (Rendering doesn't need them — block
+  entities draw from the block NAME — so the import/render path ignores them; they ride the convert path.)
 
 ## Conventions / gotchas
 

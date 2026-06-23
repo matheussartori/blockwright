@@ -68,10 +68,15 @@ refines through an emit → render → review loop — previewed live in the vie
   **furnishing presets** (snug / standard / grand) that the chosen decoration re-skins — so a big room
   is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
 - In-app **block editor** — edit a structure directly in the 3D viewer: click to select (Shift-click
-  for a box), move and extrude the selection (raise a footprint into walls), build facing-correct
-  stairs, replace and delete blocks, with real undo/redo and arrow-key nudging. Orientation stays
-  correct on every transform, and **Save version** writes the edit as a new `.nbt` version, so a
-  mistake is never fatal
+  for a box), move and extrude the selection (raise a footprint into walls), **mirror and rotate** it,
+  build facing-correct stairs, place, replace and delete blocks, with real undo/redo and arrow-key
+  nudging. Orientation stays correct on every transform — mirror a wing and its stairs/logs/doors flip
+  the right way (the bug WorldEdit never fully fixed) — and **Save version** writes the edit as a new
+  `.nbt` version, so a mistake is never fatal
+- **Schematic interop** — open **WorldEdit `.schem`** (Sponge) and **Litematica `.litematic`** schematics
+  directly: they decode, render, and edit exactly like a native `.nbt`, and **Export As…** writes any of
+  the three formats (block entities like chest contents and sign text are preserved through the conversion)
+  — so a schematic can be brought in, tweaked, and saved back out (or converted to a mod-ready `.nbt`)
 - Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - A browsable structure library — each generated build is saved to its own folder (the latest clean
@@ -130,8 +135,10 @@ Without a content pack, structures still load but blocks render as flat determin
 ### Opening a structure
 
 1. Launch the app (see [Development](#development) below).
-2. Use **File ▸ Open…** (or the welcome screen) and pick a `.nbt` structure file.
-3. The structure renders in 3D — orbit, zoom and inspect it in the viewer.
+2. Use **File ▸ Open…** (or the welcome screen) and pick a `.nbt` structure, a WorldEdit `.schem`, or a
+   Litematica `.litematic` schematic.
+3. The structure renders in 3D — orbit, zoom and inspect it in the viewer. **Export As…** (Cmd/Ctrl+Shift+S)
+   writes it back out as `.nbt`, `.schem`, or `.litematic`.
 
 Recently opened files are remembered and listed under **File ▸ Open Recent** and on the welcome
 screen.
@@ -168,11 +175,16 @@ directly in the 3D view:
 - **Select** — click a block; **Shift-click** a second to select the whole box between them; **⌘/Ctrl-click**
   toggles one. The selection is outlined live, and the panel shows its size + the block name(s).
 - **Move** — nudge the selection one block along any axis (buttons or arrow keys).
-- **Extrude** — duplicate the selection along an axis by _N_ blocks: raise a floor outline into walls,
-  or stack a column up.
+- **Mirror / rotate** — flip the selection across X or Z, or rotate it 90° — directional blockstates
+  (stairs/logs/doors) stay correct, and it pivots around the selection's own centre.
+- **Extrude / array** — duplicate the selection along an axis: spacing 1 raises a floor outline into
+  walls or stacks a column; spacing > 1 makes a repeating array.
 - **Stairs** — pick a start block, a direction and a length to lay an ascending stair run with every
   stair facing the right way.
-- **Replace / Delete** — swap the selected blocks for another (with autocomplete), or carve them away.
+- **Place / Replace / Delete** — click a face to add a block, swap the selected blocks for another
+  (pick from the catalog, with a 3D swatch, or **eyedrop** a block from the build), or carve them away.
+- **Live symmetry** — turn on an X or Z mirror plane and your placements + deletions are mirrored across
+  the build's centre as you work, with correct blockstates.
 
 Edits keep block orientation correct, support **undo/redo** (no small cap), and **Save version** writes
 the result as a new `.nbt` version in the same version chain as AI builds — so an edit is never fatal.

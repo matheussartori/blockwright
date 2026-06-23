@@ -56,13 +56,15 @@ function inferTag(value: unknown): Tag | null {
   return null;
 }
 
-function inferCompound(obj: Record<string, unknown>): Tag {
+/** Best-effort plain-JSON → NBT compound, for free-form block-entity/entity data. Exported
+ *  so the schematic codecs can serialise the block-entity fields they carry. */
+export function inferCompound(obj: Record<string, unknown>): { type: string; value: Record<string, Tag> } {
   const value: Record<string, Tag> = {};
   for (const [k, v] of Object.entries(obj)) {
     const tag = inferTag(v);
     if (tag) value[k] = tag;
   }
-  return compound(value);
+  return { type: 'compound', value };
 }
 
 function paletteEntry(entry: AuthoringPaletteEntry): Record<string, Tag> {

@@ -39,9 +39,22 @@ export function EditorLayer() {
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
       down = null;
       if (moved > CLICK_SLOP) return;
+      const s = editorStore.getState();
+      // Eyedropper: the next click samples the block's type instead of acting.
+      if (s.eyedropper) {
+        const cell = viewer.pickBlock(e.clientX, e.clientY);
+        if (cell) s.sample(cell);
+        return;
+      }
+      // Place drops a block against the clicked face; every other tool selects.
+      if (s.tool === 'place') {
+        const cell = viewer.pickPlacement(e.clientX, e.clientY);
+        if (cell) void s.placeAt(cell);
+        return;
+      }
       const cell = viewer.pickBlock(e.clientX, e.clientY);
       const mode: PickMode = e.shiftKey ? 'box' : e.metaKey || e.ctrlKey ? 'add' : 'single';
-      editorStore.getState().pick(cell, mode);
+      s.pick(cell, mode);
     };
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointerup', onUp);

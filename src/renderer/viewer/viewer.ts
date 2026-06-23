@@ -196,12 +196,11 @@ export class Viewer {
     return this.renderer.domElement;
   }
 
-  /** Map a screen point to the block cell under it (the editor's picker). Raycasts the
-   *  merged geometry, then steps a hair PAST the hit point along the ray — just INSIDE the
-   *  surface the click landed on — and floors it. Using the ray (not the face normal) makes
-   *  this robust: a merged face whose normal points the wrong way would otherwise pick the
-   *  empty cell in front of the block. Null when the click misses the structure. */
-  pickBlock(clientX: number, clientY: number): [number, number, number] | null {
+  /** Raycast a screen point against the structure and return the cell `step` units along
+   *  the ray from the hit (positive = into the surface, negative = back into the empty cell
+   *  in front of it). Using the ray (not the face normal) is robust: a merged face whose
+   *  normal points the wrong way would otherwise pick the wrong side. Null on a miss. */
+  private rayCell(clientX: number, clientY: number, step: number): [number, number, number] | null {
     if (!this.current) return null;
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
@@ -211,8 +210,18 @@ export class Viewer {
     this.raycaster.setFromCamera(ndc, this.nav.camera);
     const hits = this.raycaster.intersectObject(this.current, true);
     if (!hits.length) return null;
-    const p = hits[0].point.clone().addScaledVector(this.raycaster.ray.direction, 0.05);
+    const p = hits[0].point.clone().addScaledVector(this.raycaster.ray.direction, step);
     return [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+  }
+
+  /** The solid block cell under a screen point (Select/etc.). */
+  pickBlock(clientX: number, clientY: number): [number, number, number] | null {
+    return this.rayCell(clientX, clientY, 0.05);
+  }
+
+  /** The empty cell adjacent to the clicked face (Place — drop a block against a surface). */
+  pickPlacement(clientX: number, clientY: number): [number, number, number] | null {
+    return this.rayCell(clientX, clientY, -0.05);
   }
 
   /** Highlight the given cells ("x,y,z") as the editor selection. */

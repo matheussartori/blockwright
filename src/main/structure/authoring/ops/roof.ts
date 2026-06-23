@@ -1,5 +1,5 @@
 import { inBounds, posKey } from '../geometry';
-import type { Horiz } from '../orientation';
+import type { Horiz } from '@/shared/structure/orientation';
 import type { AuthoringOp } from '../types';
 import type { OpCtx } from './context';
 

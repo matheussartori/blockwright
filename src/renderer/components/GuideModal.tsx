@@ -7,7 +7,7 @@ import { useState, type ReactNode } from 'react';
 import {
   Compass, Sparkles, Orbit, Blocks, MessagesSquare, FolderTree,
   MousePointer2, Move3D, Scan, Eye, Layers, PencilLine, SlidersHorizontal, History,
-  Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload,
+  Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload, FlipHorizontal2,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
@@ -166,6 +166,7 @@ function BlockTools({ t }: { t: TFunction }) {
       <ul className="guide-list">
         <li><MousePointer2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.selectT')}</b> {t('guide.blocks.select')}</span></li>
         <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.moveT')}</b> {t('guide.blocks.move')}</span></li>
+        <li><FlipHorizontal2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.transformT')}</b> {t('guide.blocks.transform')}</span></li>
         <li><ArrowUpFromLine size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.extrudeT')}</b> {t('guide.blocks.extrude')}</span></li>
         <li><TrendingUp size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.stairsT')}</b> {t('guide.blocks.stairs')}</span></li>
         <li><Replace size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.replaceT')}</b> {t('guide.blocks.replace')}</span></li>

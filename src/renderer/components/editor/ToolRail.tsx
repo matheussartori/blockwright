@@ -1,13 +1,15 @@
 // The editor's tool rail: one icon button per tool, the active one filled with the accent.
-import { ArrowUpFromLine, Move, MousePointer2, Replace, Trash2, TrendingUp } from 'lucide-react';
+import { ArrowUpFromLine, FlipHorizontal2, Move, MousePointer2, Replace, SquarePlus, Trash2, TrendingUp } from 'lucide-react';
 import type { Tool } from '../../state/editor';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
 const TOOLS: { id: Tool; Icon: typeof Move }[] = [
   { id: 'select', Icon: MousePointer2 },
   { id: 'move', Icon: Move },
+  { id: 'transform', Icon: FlipHorizontal2 },
   { id: 'extrude', Icon: ArrowUpFromLine },
   { id: 'stairs', Icon: TrendingUp },
+  { id: 'place', Icon: SquarePlus },
   { id: 'replace', Icon: Replace },
   { id: 'delete', Icon: Trash2 },
 ];

@@ -7,8 +7,11 @@ import {
   deleteSelection,
   extrudeSelection,
   internEntry,
+  mirrorCell,
   moveSelection,
   occupancy,
+  placeBlock,
+  planTransform,
   replaceSelection,
   selectBox,
   type EditData,
@@ -74,6 +77,11 @@ describe('extrudeSelection', () => {
     const r = extrudeSelection(data(), ['0,0,0'], 'x', -1);
     expect(r.blocks.some((b) => cellKey(b.pos) === '-1,0,0')).toBe(true);
   });
+  it('makes a spaced array when step > 1 (gaps between copies)', () => {
+    const r = extrudeSelection(data(), ['0,0,0'], 'y', 2, 3); // 2 copies, 3 cells apart
+    const ys = r.blocks.filter((b) => b.pos[0] === 0).map((b) => b.pos[1]).sort((a, b) => a - b);
+    expect(ys).toEqual([0, 3, 6]); // original + two copies at +3, +6
+  });
 });
 
 describe('deleteSelection', () => {
@@ -98,6 +106,43 @@ describe('replaceSelection / internEntry', () => {
     const planks = r.palette.findIndex((p) => p.name === 'minecraft:oak_planks');
     expect(r.blocks.find((b) => cellKey(b.pos) === '0,0,0')?.state).toBe(planks);
     expect(r.blocks.find((b) => cellKey(b.pos) === '1,0,0')?.state).toBe(0); // untouched
+  });
+});
+
+describe('planTransform', () => {
+  const stairs = (facing: string): EditData => ({
+    size: [3, 1, 3],
+    palette: [entry('minecraft:oak_stairs', false, { facing })],
+    blocks: [block(0, [0, 0, 0]), block(0, [1, 0, 0]), block(0, [2, 0, 0])],
+  });
+
+  it('mirrors across X and flips facing east↔west', () => {
+    const out = planTransform(stairs('east'), ['0,0,0', '2,0,0'], { kind: 'mirror', axis: 'x' });
+    const facingByPos = new Map(out.map((p) => [cellKey(p.pos), p.props.facing]));
+    expect(facingByPos.get('2,0,0')).toBe('west'); // (0,0,0) reflected to x=2
+    expect(facingByPos.get('0,0,0')).toBe('west'); // (2,0,0) reflected to x=0
+  });
+
+  it('rotates 90° CW about the centre and turns facing east→south', () => {
+    const out = planTransform(stairs('east'), ['0,0,0', '1,0,0', '2,0,0'], { kind: 'rotate', turns: 1 });
+    expect(out.map((p) => cellKey(p.pos)).sort()).toEqual(['1,0,-1', '1,0,0', '1,0,1']); // X-line → Z-line
+    expect(out[0].props.facing).toBe('south');
+  });
+});
+
+describe('mirrorCell', () => {
+  it('reflects a cell across the structure centre on X / Z', () => {
+    expect(mirrorCell([0, 0, 0], 'x', [5, 1, 5])).toEqual([4, 0, 0]);
+    expect(mirrorCell([0, 0, 1], 'z', [5, 1, 7])).toEqual([0, 0, 5]);
+    expect(mirrorCell([1, 2, 3], 'z', [5, 9, 7])).toEqual([1, 2, 3]); // on the centre plane → unchanged
+  });
+});
+
+describe('placeBlock', () => {
+  it('adds (or overwrites) a block at the cell and selects it', () => {
+    const r = placeBlock(data(), [2, 0, 0], entry('minecraft:glass'));
+    expect(r.blocks.find((b) => cellKey(b.pos) === '2,0,0')?.state).toBe(r.palette.findIndex((p) => p.name === 'minecraft:glass'));
+    expect(r.selection).toEqual(['2,0,0']);
   });
 });
 
