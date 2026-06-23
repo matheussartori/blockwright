@@ -114,7 +114,7 @@ export function Welcome({
 
           <div className="welcome-meta">
             {hasPack !== null && (
-              <span className={`welcome-hint${hasPack ? '' : ' warn'}`}>
+              <span className={`welcome-hint${hasPack ? '' : ' info'}`}>
                 <span className="welcome-hint-dot" />
                 {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
                 {!hasPack && (

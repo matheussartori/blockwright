@@ -31,6 +31,10 @@ export interface ExportDraft {
 }
 
 const BIOME_IDS = BIOME_PRESETS.map((p) => p.id);
+// The rarity the dialog opens on — spacing/separation are seeded from THIS preset (below), so
+// the dropdown's label and the actual numbers can't silently disagree.
+const DEFAULT_RARITY = 'uncommon';
+const DEFAULT_RARITY_PRESET = RARITY_PRESETS.find((r) => r.id === DEFAULT_RARITY);
 
 interface ExportConfigProps {
   workspaceName: string;
@@ -50,9 +54,9 @@ export function ExportConfig({ workspaceName, namespace, defaultName, structureS
   const [modBiomes, setModBiomes] = useState<string[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
   const [preset, setPreset] = useState(BIOME_IDS[0]);
-  const [rarity, setRarity] = useState('uncommon');
-  const [spacing, setSpacing] = useState(DEFAULT_WORLDGEN.spacing);
-  const [separation, setSeparation] = useState(DEFAULT_WORLDGEN.separation);
+  const [rarity, setRarity] = useState(DEFAULT_RARITY);
+  const [spacing, setSpacing] = useState(DEFAULT_RARITY_PRESET?.spacing ?? DEFAULT_WORLDGEN.spacing);
+  const [separation, setSeparation] = useState(DEFAULT_RARITY_PRESET?.separation ?? DEFAULT_WORLDGEN.separation);
 
   // Read the mod's own biomes; default to picking all of them (a mod build usually
   // belongs in the mod's biomes, not vanilla ones).

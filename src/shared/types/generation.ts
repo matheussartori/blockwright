@@ -82,6 +82,9 @@ export type BuildBrief = Partial<Record<ModuleSlotKey, string>> & {
    *  card's Reveal-in-folder action (assistant result card). The build's own tab is
    *  already this file, so there is no "Open". */
   libraryPath?: string;
+  /** Placement repairs the compile pipeline applied (assistant result card) — surfaced so
+   *  the auto-fixes aren't silent. */
+  fixes?: string[];
 };
 
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and
@@ -100,6 +103,11 @@ export type GenerateResult =
       summary: string;
       size: [number, number, number];
       blockCount: number;
+      /** Placement repairs the compile pipeline applied (stairwells, doors, shell restore…),
+       *  surfaced on the build card so the auto-fixes aren't silent. */
+      fixes: string[];
+      /** Issues the passes flagged but left for the model to address. */
+      warnings: string[];
       /** The SDK conversation id, so the renderer can persist it for resume. */
       sdkSessionId: string | null;
       /** Prompt (input) tokens consumed across the whole turn, incl. cached context. */

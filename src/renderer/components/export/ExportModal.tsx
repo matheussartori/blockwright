@@ -12,6 +12,7 @@ import { store } from '../../state/store';
 import { ExportConfig, type ExportDraft } from './ExportConfig';
 import { ExportPreview } from './ExportPreview';
 import { ExportEmpty, ExportSuccess } from './ExportStates';
+import { splitIssues } from '@/shared/domain/worldgen';
 import type { WorkspaceExportPlan, WorkspaceExportResult } from '@/shared/types';
 
 export function ExportModal() {
@@ -51,7 +52,7 @@ export function ExportModal() {
   }, [open, target, workspace, draft]);
 
   const close = () => store.getState().setExportTarget(null);
-  const errors = plan?.issues.filter((i) => i.level === 'error') ?? [];
+  const { errors } = splitIssues(plan?.issues ?? []);
   const canExport = !!workspace && !!target && !!draft && errors.length === 0 && !busy;
 
   const doExport = async () => {

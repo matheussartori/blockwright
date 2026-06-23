@@ -5,10 +5,11 @@
 // `state` (its blockstate), never re-derive it — the bug WorldEdit never fully fixed.
 import type { PaletteEntry, StructureBlock } from '@/shared/types';
 import { transformProps, type PropXform } from '@/shared/structure/orientation';
+import { cellKey, parseCell, type Cell } from './cell-key';
 
 export type { PropXform };
+export { cellKey, parseCell, type Cell };
 
-export type Cell = [number, number, number];
 export type Axis = 'x' | 'y' | 'z';
 const AXIS: Record<Axis, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
 
@@ -20,12 +21,6 @@ export const HORIZONTALS = {
   west: { step: [-1, 0, 0] as Cell, facing: 'west' },
 } as const;
 export type Horizontal = keyof typeof HORIZONTALS;
-
-export const cellKey = (p: readonly number[]): string => `${p[0]},${p[1]},${p[2]}`;
-export const parseCell = (k: string): Cell => {
-  const [x, y, z] = k.split(',').map(Number);
-  return [x, y, z];
-};
 
 /** The mutable slice of a structure an op rewrites. */
 export interface EditData {

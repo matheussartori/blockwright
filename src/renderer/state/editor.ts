@@ -106,7 +106,9 @@ export interface EditorState {
 
 const editData = (s: StructureData): EditData => ({ size: s.size, palette: s.palette, blocks: s.blocks });
 const snapshot = (s: StructureData): Snapshot => ({ blocks: s.blocks, palette: s.palette, textures: s.textures });
-const nonAir = (r: OpResult): number => r.blocks.filter((b) => !r.palette[b.state]?.air).length;
+/** Count non-air blocks — the `blockCount` shown for the structure (shared by commit + restore). */
+const countSolid = (blocks: { state: number }[], palette: { air?: boolean }[]): number =>
+  blocks.filter((b) => !palette[b.state]?.air).length;
 
 export const editorStore = createStore<EditorState>((set, get) => {
   /** Apply an op result to the active doc: snapshot for undo, patch the structure
@@ -119,7 +121,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
       ? [...new Set([...doc.structure.textures, ...extraTextures])]
       : doc.structure.textures;
     documentsStore.getState().patchDoc(doc.id, {
-      structure: { ...doc.structure, blocks: result.blocks, palette: result.palette, textures, blockCount: nonAir(result) },
+      structure: { ...doc.structure, blocks: result.blocks, palette: result.palette, textures, blockCount: countSolid(result.blocks, result.palette) },
     });
     set({ selection: result.selection, past, future: [], dirty: true });
   };
@@ -127,7 +129,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
   const restore = (snap: Snapshot): void => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc?.structure) return;
-    const blockCount = snap.blocks.filter((b) => !snap.palette[b.state]?.air).length;
+    const blockCount = countSolid(snap.blocks, snap.palette);
     documentsStore.getState().patchDoc(doc.id, {
       structure: { ...doc.structure, blocks: snap.blocks, palette: snap.palette, textures: snap.textures, blockCount },
     });
@@ -170,7 +172,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
         set({ selection: [], anchor: null });
         return;
       }
-      const key = `${cell[0]},${cell[1]},${cell[2]}`;
+      const key = cellKey(cell);
       if (mode === 'add') {
         const has = get().selection.includes(key);
         set({ selection: has ? get().selection.filter((k) => k !== key) : [...get().selection, key], anchor: key });

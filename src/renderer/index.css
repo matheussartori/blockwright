@@ -659,6 +659,10 @@ body {
 .welcome-hint.warn .welcome-hint-dot {
   background: var(--warn);
 }
+/* A missing content pack is OPTIONAL, not a warning — an accent dot, not amber. */
+.welcome-hint.info .welcome-hint-dot {
+  background: var(--accent);
+}
 .welcome-hint-action {
   margin-left: 4px;
   padding: 0;
@@ -4453,8 +4457,9 @@ body.row-resizing {
   gap: 7px;
 }
 .gen-build-card-icon {
-  font-size: 14px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent);
 }
 .gen-build-card-titles {
   display: flex;
@@ -4499,6 +4504,20 @@ body.row-resizing {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 1px;
+}
+/* The auto-fixes note on a finished build card — informational, full list on hover. */
+.gen-build-fixes {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: default;
+}
+.gen-build-fixes > svg {
+  flex: none;
+  color: var(--ok);
 }
 .gen-build-card-chips {
   display: flex;

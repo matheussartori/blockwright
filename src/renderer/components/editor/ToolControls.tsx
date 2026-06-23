@@ -29,7 +29,7 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
   const replaceBlock = useEditor((s) => s.replaceBlock);
   const placeBlock = useEditor((s) => s.placeBlock);
   const eyedropper = useEditor((s) => s.eyedropper);
-  const blockIds = useBlockIds(true);
+  const blockIds = useBlockIds();
   const stairIds = useMemo(() => blockIds.filter((id) => id.endsWith('_stairs')), [blockIds]);
   const hasSel = selection.length > 0;
 

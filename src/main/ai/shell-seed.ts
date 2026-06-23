@@ -13,6 +13,7 @@ import { readAuthoring, writeStructureFile } from '../structure/authoring';
 import { isAir } from '../structure/authoring/palette';
 import type { AuthoringStructure } from '../structure/authoring/types';
 import type { ShellLockCell } from '../structure/authoring/passes';
+import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
 import { shellPreamble } from './seed';
 
 /** A sensible default shell box when the user didn't pick an explicit size. */
@@ -116,7 +117,7 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // them and the type's storey ladder lays its decks at exactly those heights.
   if (floorHeights?.length) params.floorHeights = floorHeights;
   const authoring: AuthoringStructure = {
-    DataVersion: 3955,
+    DataVersion: DEFAULT_DATA_VERSION,
     size: [W, H, D],
     palette: [{ Name: 'minecraft:air' }],
     ops: [{ op: 'template', name: structureType!, from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params }],

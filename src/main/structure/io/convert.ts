@@ -2,12 +2,13 @@
 // is a plain copy (lossless — keeps block entities); anything else round-trips through the
 // shared raw {size, palette, blocks} shape: `.nbt`/`.schem` in, `.nbt`/`.schem` out.
 import fs from 'node:fs/promises';
-import { decodeSchem, encodeSchem, omitKeys, type RawBlockEntity, type RawStructure } from './schematic';
+import { omitKeys, type RawBlockEntity, type RawStructure } from './raw';
+import { decodeSchem, encodeSchem } from './schematic';
 import { decodeLitematic, encodeLitematic } from './litematica';
 import { readAuthoring } from '../authoring/nbt-decode';
 import { encodeStructure } from '../authoring/nbt-encode';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
-const DEFAULT_DATA_VERSION = 3955;
 type Format = 'nbt' | 'schem' | 'litematic';
 const formatOf = (p: string): Format => {
   const l = p.toLowerCase();

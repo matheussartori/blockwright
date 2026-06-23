@@ -82,11 +82,26 @@ export function hasContent(): boolean {
 // validation of the same palette is cheap.
 const knownBlockCache = new Map<string, boolean>();
 
-/** Whether `name` (`[namespace:]id`) is a real block in the resolvable content. */
+/** Whether a namespace's blocks can be VERIFIED — i.e. its `blockstates` dir exists. When it
+ *  doesn't (no content pack / no workspace for that namespace), we can't tell a real block from
+ *  a typo, so callers must not flag its ids as unknown. */
+const canVerifyCache = new Map<string, boolean>();
+function canVerifyNamespace(namespace: string): boolean {
+  const hit = canVerifyCache.get(namespace);
+  if (hit !== undefined) return hit;
+  const ok = fs.existsSync(path.join(assetsDir(namespace), 'blockstates'));
+  canVerifyCache.set(namespace, ok);
+  return ok;
+}
+
+/** Whether `name` (`[namespace:]id`) is a real block in the resolvable content. Returns true
+ *  for an UNVERIFIABLE namespace (no assets to check against) — absence of proof isn't proof
+ *  of absence, so generation still works with no content pack (blocks just render flat). */
 export function isKnownBlock(name: string): boolean {
   const colon = name.indexOf(':');
   const namespace = colon >= 0 ? name.slice(0, colon) : 'minecraft';
   const id = colon >= 0 ? name.slice(colon + 1) : name;
+  if (!canVerifyNamespace(namespace)) return true;
   const key = `${namespace}:${id}`;
   const hit = knownBlockCache.get(key);
   if (hit !== undefined) return hit;
@@ -97,7 +112,8 @@ export function isKnownBlock(name: string): boolean {
 
 /** The subset of `names` that aren't real blocks (typos / wrong variant), deduped
  *  in input order — so the generator can reject them with actionable feedback
- *  instead of shipping a flat fallback-coloured block that's missing in-game. */
+ *  instead of shipping a flat fallback-coloured block that's missing in-game. Only blocks
+ *  whose namespace is VERIFIABLE are flagged, so a pack-less first run still generates. */
 export function unknownBlockIds(names: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -133,4 +149,5 @@ export function loadJson(file: string): unknown {
 export function clearJsonCache(): void {
   jsonCache.clear();
   knownBlockCache.clear(); // a workspace change adds/removes valid block IDs
+  canVerifyCache.clear(); // …and can change whether a namespace is verifiable at all
 }

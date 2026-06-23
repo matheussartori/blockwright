@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import * as nbt from 'prismarine-nbt';
 import { isAir } from './palette';
 import type { AuthoringBlock, AuthoringPaletteEntry, AuthoringStructure } from './types';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
 /** Read an existing `.nbt` into authoring JSON. Air cells are dropped (the
  *  authoring format omits air by convention; compile re-materialises it), which
@@ -37,7 +38,7 @@ export async function readAuthoring(filePath: string): Promise<AuthoringStructur
       ...(b.nbt && Object.keys(b.nbt).length > 0 ? { nbt: b.nbt } : {}),
     }));
   return {
-    DataVersion: root.DataVersion ?? 3955,
+    DataVersion: root.DataVersion ?? DEFAULT_DATA_VERSION,
     size: (root.size ?? [0, 0, 0]) as [number, number, number],
     palette,
     blocks,

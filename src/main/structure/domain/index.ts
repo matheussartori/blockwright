@@ -27,6 +27,7 @@ import {
   structureModules,
 } from './structure-types';
 import { STRUCTURE_GROUPS, ROOM_GROUPS } from './groups';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
 export {
   composeStructure,
@@ -258,7 +259,7 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     const [w, h, d] = meta.preview.size;
     const palette: AuthoringPaletteEntry[] = [];
     const ops: AuthoringOp[] = composeModulePreview(category, id, [0, 0, 0], [w - 1, h - 1, d - 1], localIntern(palette));
-    return { DataVersion: 3955, size: [w, h, d], palette, ops };
+    return { DataVersion: DEFAULT_DATA_VERSION, size: [w, h, d], palette, ops };
   }
   if (category === 'surroundings') {
     // A yard only reads in context: render the module's first applicable host STRUCTURE
@@ -270,7 +271,7 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
     if (!host) return null;
     const [w, h, d] = meta.preview.size;
     return {
-      DataVersion: 3955,
+      DataVersion: DEFAULT_DATA_VERSION,
       size: [w, h, d],
       palette: [{ Name: 'minecraft:air' }],
       ops: [
@@ -300,7 +301,7 @@ export function buildModulePreview(category: ModuleCategory, id: string): Author
   if (!meta?.preview) return null;
   const [w, h, d] = meta.preview.size;
   return {
-    DataVersion: 3955,
+    DataVersion: DEFAULT_DATA_VERSION,
     size: [w, h, d],
     palette: [{ Name: 'minecraft:air' }],
     ops: [

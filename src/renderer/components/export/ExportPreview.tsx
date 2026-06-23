@@ -4,6 +4,7 @@
 // computed; overwrite warnings are omitted here since each file already carries a badge.
 import { CheckCircle2, FileBox, FileJson, FolderTree, TriangleAlert, XCircle } from 'lucide-react';
 import { ExportFileRow } from './ExportFileRow';
+import { splitIssues } from '@/shared/domain/worldgen';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 import type { WorkspaceExportPlan, WorkspaceExportResult } from '@/shared/types';
 
@@ -17,8 +18,7 @@ interface ExportPreviewProps {
 }
 
 export function ExportPreview({ plan, namespace, result, jigsawWarning, t }: ExportPreviewProps) {
-  const errors = plan?.issues.filter((i) => i.level === 'error') ?? [];
-  const warnings = plan?.issues.filter((i) => i.level === 'warning' && i.code !== 'overwrite') ?? [];
+  const { errors, warnings } = splitIssues(plan?.issues ?? []);
   const files = plan?.files ?? [];
   const issueText = (code: string, detail?: string) =>
     t(`export.issue.${code}` as MessageKey, detail ? { detail } : undefined);

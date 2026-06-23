@@ -92,16 +92,31 @@ export function EditorLayer() {
     };
     window.addEventListener('keydown', onKey);
 
+    // Mirror the live-symmetry plane into the viewer from the editor mode + the doc's size.
+    const applySymmetry = () => {
+      const sym = editorStore.getState().symmetry;
+      const struct = activeDocument(documentsStore.getState())?.structure;
+      viewer.setSymmetryPlane(sym === 'none' || !struct ? null : sym, struct?.size ?? [0, 0, 0]);
+    };
+
     viewer.setSelection(editorStore.getState().selection);
+    applySymmetry();
     const unsubSel = editorStore.subscribe((s, prev) => {
       if (s.selection !== prev.selection) viewer.setSelection(s.selection);
+      if (s.symmetry !== prev.symmetry) applySymmetry();
     });
 
-    // Re-show the viewer when an edit replaces the active doc's structure object.
+    // Re-show the viewer when an edit replaces the active doc's structure object — `show`
+    // clears the scene's overlays, so re-apply the selection + symmetry plane after it.
     let last = activeDocument(documentsStore.getState())?.structure ?? null;
     const unsubDoc = documentsStore.subscribe(() => {
       const struct = activeDocument(documentsStore.getState())?.structure ?? null;
-      if (struct && struct !== last) void viewer.show(struct, true);
+      if (struct && struct !== last) {
+        void viewer.show(struct, true).then(() => {
+          viewer.setSelection(editorStore.getState().selection);
+          applySymmetry();
+        });
+      }
       last = struct;
     });
 
@@ -112,6 +127,7 @@ export function EditorLayer() {
       unsubSel();
       unsubDoc();
       viewer.setSelection([]);
+      viewer.setSymmetryPlane(null, [0, 0, 0]);
     };
   }, [viewer, active]);
 

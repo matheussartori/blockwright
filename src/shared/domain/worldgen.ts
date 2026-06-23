@@ -167,6 +167,16 @@ export interface ValidationIssue {
   detail?: string;
 }
 
+/** Split issues into the BLOCKING errors and the informational warnings (per-file overwrite
+ *  warnings are shown as file badges, so they're excluded). The export GATE (`canExport`) and
+ *  the preview LIST both derive from this, so the button and the message can't disagree. */
+export function splitIssues(issues: ValidationIssue[]): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
+  return {
+    errors: issues.filter((i) => i.level === 'error'),
+    warnings: issues.filter((i) => i.level === 'warning' && i.code !== 'overwrite'),
+  };
+}
+
 /** The non-fs checks (name + worldgen numbers + biomes). Overwrite / missing-source /
  *  legacy-folder checks need the disk and are added by main's planner. */
 export function validateOptions(name: string, worldgen: WorldgenOptions): ValidationIssue[] {

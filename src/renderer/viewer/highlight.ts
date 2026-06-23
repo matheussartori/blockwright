@@ -3,6 +3,7 @@
 // depth-testing so it shows through other blocks, and faded out over ~1s. The camera
 // move that centres the block stays in the Viewer; this owns only the box + its fade.
 import * as THREE from 'three';
+import { FOCUS } from './overlay-colors';
 
 /** How long the focus highlight stays on screen (ms). */
 const HIGHLIGHT_MS = 1000;
@@ -18,7 +19,7 @@ export class FocusHighlight {
     this.clear();
     const geo = new THREE.BoxGeometry(1.06, 1.06, 1.06);
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xffd54a,
+      color: FOCUS,
       transparent: true,
       opacity: 0.75,
       depthTest: false,

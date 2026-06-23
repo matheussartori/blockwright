@@ -11,6 +11,7 @@ import {
   type Pass, type ShellLockCell,
 } from './passes';
 import type { AuthoringBlock, AuthoringPaletteEntry, AuthoringStructure } from './types';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 import { validateAuthoring } from './validate';
 
 /** Informational result of a compile: auto-applied `fixes` (shown to the user/model),
@@ -87,7 +88,7 @@ export function compileStructureReport(s: AuthoringStructure, opts?: CompileOpti
   const ctx = { size, structureType: opts?.structureType, grade, floorPlanes, log: opts?.log, lockCells: opts?.lockCells };
   const result = runPasses(resolved.blocks, resolved.palette, ctx, pipelineFor(opts?.structureType));
   const buffer = encodeStructure({
-    dataVersion: s.DataVersion ?? 3955,
+    dataVersion: s.DataVersion ?? DEFAULT_DATA_VERSION,
     size,
     palette: result.palette,
     blocks: result.blocks,

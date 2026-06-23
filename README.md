@@ -183,8 +183,8 @@ directly in the 3D view:
   stair facing the right way.
 - **Place / Replace / Delete** — click a face to add a block, swap the selected blocks for another
   (pick from the catalog, with a 3D swatch, or **eyedrop** a block from the build), or carve them away.
-- **Live symmetry** — turn on an X or Z mirror plane and your placements + deletions are mirrored across
-  the build's centre as you work, with correct blockstates.
+- **Live symmetry** — turn on an X or Z mirror and a translucent plane in the viewer shows where it is;
+  your placements + deletions are mirrored across the build's centre as you work, with correct blockstates.
 
 Edits keep block orientation correct, support **undo/redo** (no small cap), and **Save version** writes
 the result as a new `.nbt` version in the same version chain as AI builds — so an edit is never fatal.

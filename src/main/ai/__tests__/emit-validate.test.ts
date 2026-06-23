@@ -47,6 +47,15 @@ describe('validateEmit', () => {
     expect(r?.reason).toContain('minecraft:not_a_real_block_xyz');
   });
 
+  it('does NOT flag blocks in an unverifiable namespace (no assets to check) — so a pack-less first run still generates', () => {
+    const r = validateEmit({
+      size: [1, 1, 1],
+      palette: [{ Name: 'minecraft:air' }, { Name: 'unknownmod:some_block' }],
+      ops: [{ op: 'block', pos: [0, 0, 0], state: 1 }],
+    });
+    expect(r).toBeNull();
+  });
+
   it('runs the gates in order: validity is reported before the block-id check', () => {
     // A structure that is BOTH invalid and uses an unknown block reports the
     // structural failure first (so the model fixes the shape before the ids).

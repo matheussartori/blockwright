@@ -3,6 +3,7 @@
 // per-floor rooms). On the ASSISTANT message of a finished build it's the COMPLETE
 // card: the request PLUS the result (version/size/blocks) and a Reveal action for the
 // saved library file — so the user can jump straight to the build's folder on disk.
+import { Boxes, Wrench } from 'lucide-react';
 import { api } from '../../api';
 import { basename, dirname } from '../../ui/path';
 import { store } from '../../state/store';
@@ -30,7 +31,9 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
   return (
     <div className="gen-build-card">
       <div className="gen-build-card-head">
-        <span className="gen-build-card-icon" aria-hidden>🏠</span>
+        <span className="gen-build-card-icon" aria-hidden>
+          <Boxes size={18} strokeWidth={1.8} />
+        </span>
         <span className="gen-build-card-titles">
           {/* The structure FAMILY (House / Tower …) above the type, so a "Classic" is never
               ambiguous between a house and a tower. */}
@@ -66,6 +69,16 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
             </li>
           ))}
         </ul>
+      )}
+      {/* Auto-repairs the compile pipeline applied (stairwells, doors, shell restore…) —
+          surfaced so the fixes aren't silent; the full list is on hover. */}
+      {build.fixes && build.fixes.length > 0 && (
+        <div className="gen-build-fixes" title={build.fixes.join('\n')}>
+          <Wrench size={13} strokeWidth={1.9} aria-hidden />
+          <span>
+            {build.fixes.length} {t('gen.autoFixes')}
+          </span>
+        </div>
       )}
       {build.libraryPath && (
         <div className="gen-build-card-actions">

@@ -40,12 +40,19 @@ src/
                           + problems; runExport = write them). See "Export to mod workspace" below.
     structure/              Grouped by responsibility (one subdir per concern):
       io/
-        load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData (extension-aware: a `.schem`
-                            decodes via schematic.ts). `buildStructureData` = the raw {size,palette,blocks}
+        raw.ts              The format-NEUTRAL `RawStructure` shape ({size,palette,blocks,blockEntities?})
+                            + RawPaletteEntry/RawBlock/RawBlockEntity + `blockStateString` + `omitKeys`. Every
+                            codec decodes to / encodes from this; kept in its own module so no codec owns the
+                            shared contract (load-structure + schematic re-export for back-compat).
+        nbt-tags.ts         Shared NBT tag builders (int/str/compound/compoundList/longArray/xyz/longFromMs…)
+                            + `createPaletteInterner` — the helpers the `.schem`/`.litematic` encoders had
+                            copy-pasted verbatim, now declared once.
+        load-structure.ts   Parse .nbt (prismarine-nbt) → StructureData (extension-aware: a `.schem`/`.litematic`
+                            decodes via its codec). `buildStructureData` = the raw {size,palette,blocks}
                             → resolved StructureData step, shared by every source format.
         schematic.ts        Sponge `.schem` (WorldEdit) interop: decodeSchem (v2/v3, varint-packed) +
-                            encodeSchem (v2) + block-state string ↔ {Name,Properties} + the shared
-                            RawStructure type. Decodes to the SAME raw shape as `.nbt`. See "Schematic interop".
+                            encodeSchem (v2) + parseBlockState. Decodes to the SAME raw shape as `.nbt`
+                            (from raw.ts/nbt-tags.ts). See "Schematic interop".
         litematica.ts       Litematica `.litematic` interop: decodeLitematic (multi-region, bit-packed long
                             array, SPANNING) + encodeLitematic (single region) + the BigInt bit-array
                             helpers (bitsForPalette/pack/unpackBlockStates, unit-tested).
@@ -210,6 +217,8 @@ src/
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
+    structure/mc-data-version.ts  The single DEFAULT_DATA_VERSION (3955 = MC 1.21.1) every codec/compiler/
+                            AI-schema stamps, so a version bump is one edit (was ~10 scattered literals)
     ai/                     AI structure generation (File ▸ New Structure)
       generate.ts           Provider-agnostic orchestrator: owns sessions, the round budget + live
                             progress, and the shared EmitRunState; wires the per-emit handler and
@@ -433,9 +442,12 @@ src/
                           for a shallow single-volume build the section already reveals), floor-regions.ts
                           (FloorRegionsOverlay — the floor-plan
                           bands), highlight.ts (FocusHighlight — the inspector focus box),
-                          selection-overlay.ts (SelectionOverlay — the block editor's outlined+filled
-                          selection boxes). The Viewer also exposes `pickBlock(x,y)` (raycast → block cell,
-                          via stepping along the ray) + `setSelection` for the editor.
+                          selection-overlay.ts + symmetry-overlay.ts (SelectionOverlay = the block editor's
+                          outlined+filled selection boxes; SymmetryOverlay = the live mirror plane) — both
+                          extend scene-overlay.ts (SceneOverlay, the shared scene/group/clear lifecycle) and
+                          read overlay-colors.ts (ACCENT/FOCUS, mirroring the CSS tokens). The Viewer also
+                          exposes `pickBlock(x,y)` (raycast → block cell, via stepping along the ray) +
+                          `setSelection`/`setSymmetryPlane` for the editor.
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain
@@ -934,7 +946,10 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   with no Details. `openLibraryFile` (wired by App via `setFileOpener` → `useDocumentFlow.openFile`) opens the
   library `.nbt` as a normal document; Reveal calls `revealPath` on its folder. `runGeneration` takes a
   `GenerationInput` that keeps `aiPrompt` (model) separate from `userText` + `build` (chat). The assistant
-  `meta` footer keeps only the run cost (time + tokens) — version/size/blocks live on the card now.
+  `meta` footer keeps only the run cost (time + tokens) — version/size/blocks live on the card now. The
+  card also surfaces the compile pipeline's AUTO-FIXES (a "N auto-fixes" note, full list on hover): the
+  passes' `report.fixes` ride on `GenerateResult.fixes` → `BuildBrief.fixes` → `BuildCard`, so the
+  silent repairs (stairwells/doors/shell restore) are visible (modders distrust silent behaviour).
 - **Floor plan (`▦ Floors`):** the composer's "Floors" section lets the user define named vertical
   levels (`FloorDef` = `{id,name,from,to}`, an inclusive y range — `normalizeFloor` migrates legacy
   `{y}` records). They live on the Document (`state/documents.ts`, `setFloors`) and persist with the
@@ -1007,9 +1022,12 @@ corrupted on transform, capped/corrupting undo).
   would pick the wrong side). `pickBlock` steps INTO the surface (`+dir·ε`) for the solid cell; `pickPlacement`
   steps BACK (`−dir·ε`) for the empty cell in front (the Place tool). A click that didn't move >4px is a
   pick; a drag still orbits. `SelectionOverlay` draws the cobalt selection boxes.
-- **Live symmetry** (`symmetry` off/x/z in the store, a global Segmented under the tool rail): Place + Delete
+- **Live symmetry** (`symmetry` off/x/z in the store, a Segmented shown under the rail ONLY for the Place +
+  Delete tools, since it only affects those — no phantom control elsewhere): Place + Delete
   are mirrored across the structure's centre on that axis, with the placed block's directional blockstate
-  flipped (`mirrorCell` + `transformProps`). **Replace v2:** a 3D swatch (`BlockPreview`) of the target block
+  flipped (`mirrorCell` + `transformProps`). While symmetry is on, the viewer draws a translucent cobalt
+  **mirror plane** through the structure centre (`SymmetryOverlay`, mirrored from the store by `EditorLayer`)
+  so you SEE where placements land. **Replace v2:** a 3D swatch (`BlockPreview`) of the target block
   + an **eyedropper** (`eyedropper` flag → next click `sample`s the block under the cursor into `replaceBlock`).
 - **Rendering a NEW block** (Replace / Stairs) needs resolved models → IPC `structure:resolve-block`
   (`resolveBlockEntry` in block-catalog.ts) returns {entry, textures}; the store interns it + merges

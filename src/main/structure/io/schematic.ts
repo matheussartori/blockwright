@@ -6,30 +6,15 @@
 // Spec: https://github.com/SpongePowered/Schematic-Specification (v2 + v3).
 import zlib from 'node:zlib';
 import * as nbt from 'prismarine-nbt';
-import type { RawBlock, RawPaletteEntry } from './load-structure';
+import { AIR, blockStateString, omitKeys, type RawBlock, type RawBlockEntity, type RawPaletteEntry, type RawStructure } from './raw';
+import { byteArray, compound, compoundList, createPaletteInterner, emptyList, int, intArray, short, str, type Tag } from './nbt-tags';
 import { inferCompound } from '../authoring/nbt-encode';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
-/** A block entity (chest contents, sign text, …) at a structure-local position. `nbt` is the
- *  data fields only — `id` (the block-entity type) and the position are kept separate. */
-export interface RawBlockEntity {
-  pos: [number, number, number];
-  id: string;
-  nbt: Record<string, unknown>;
-}
+// Re-exported so existing `from './schematic'` importers (tests, convert) keep resolving the
+// shared raw shape + the block-state helpers, now owned by ./raw.
+export { blockStateString, type RawBlockEntity, type RawStructure } from './raw';
 
-export interface RawStructure {
-  size: [number, number, number];
-  palette: RawPaletteEntry[];
-  blocks: RawBlock[];
-  /** Block-entity data preserved through conversions (absent = none carried). */
-  blockEntities?: RawBlockEntity[];
-}
-
-/** Drop the given keys from a plain object (the BE id/position live separately). */
-export const omitKeys = (obj: Record<string, unknown>, keys: string[]): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(obj).filter(([k]) => !keys.includes(k)));
-
-const AIR = 'minecraft:air';
 const withNamespace = (name: string): string => (name.includes(':') ? name : `minecraft:${name}`);
 
 /** Parse a block-state string (`minecraft:oak_stairs[facing=east,half=bottom]`) into the
@@ -45,17 +30,6 @@ export function parseBlockState(s: string): RawPaletteEntry {
     if (eq > 0) Properties[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
   }
   return Object.keys(Properties).length ? { Name: name, Properties } : { Name: name };
-}
-
-/** Build a block-state string from {Name, Properties} (keys sorted for clean round-trips). */
-export function blockStateString(entry: RawPaletteEntry): string {
-  const props = entry.Properties;
-  if (!props || !Object.keys(props).length) return entry.Name;
-  const inner = Object.keys(props)
-    .sort()
-    .map((k) => `${k}=${props[k]}`)
-    .join(',');
-  return `${entry.Name}[${inner}]`;
 }
 
 /** Append `value` (a palette index) as an unsigned LEB128 varint. */
@@ -96,16 +70,16 @@ export async function decodeSchem(buffer: Buffer): Promise<RawStructure> {
   const blocks: RawBlock[] = [];
   let i = 0;
   for (let cell = 0; cell < total && i < data.length; cell++) {
-    // read one unsigned varint
+    // read one unsigned LEB128 varint — accumulate in a JS number (not 32-bit `<<`, which
+    // overflows into the sign bit past 28 bits) so any palette index decodes cleanly.
     let id = 0;
     let bits = 0;
     for (;;) {
       const b = data[i++] & 0xff;
-      id |= (b & 0x7f) << bits;
+      id += (b & 0x7f) * 2 ** bits;
       bits += 7;
       if ((b & 0x80) === 0 || bits > 35) break;
     }
-    id >>>= 0;
     const entry = palette[id];
     if (!entry || entry.Name === AIR) continue;
     const y = Math.floor(cell / wl);
@@ -129,46 +103,20 @@ export async function decodeSchem(buffer: Buffer): Promise<RawStructure> {
 
 // ── Encode ────────────────────────────────────────────────────────────────────────
 
-type Tag = { type: string; value: unknown };
-const int = (v: number): Tag => ({ type: 'int', value: Math.trunc(v) });
-const str = (v: string): Tag => ({ type: 'string', value: v });
-const short = (v: number): Tag => ({ type: 'short', value: Math.trunc(v) });
-const intArray = (v: number[]): Tag => ({ type: 'intArray', value: v.map(Math.trunc) });
-const byteArray = (v: number[]): Tag => ({ type: 'byteArray', value: v });
-const compound = (value: Record<string, Tag>): Tag => ({ type: 'compound', value });
-const emptyList = (): Tag => ({ type: 'list', value: { type: 'end', value: [] } });
-function compoundList(items: Record<string, Tag>[]): Tag {
-  return { type: 'list', value: items.length ? { type: 'compound', value: items } : { type: 'end', value: [] } };
-}
-
 /** A Sponge v2 BlockEntity compound: `Id` + relative `Pos` + the data fields, flat. */
 function blockEntityTag(be: RawBlockEntity): Record<string, Tag> {
   return { Id: str(be.id), Pos: intArray(be.pos), ...inferCompound(be.nbt).value };
 }
 
-/** The Minecraft 1.21.1 data version we stamp when encoding. */
-const DEFAULT_DATA_VERSION = 3955;
-
-/** Encode raw {size, palette, blocks} into a gzipped `.schem` (Sponge v2). Every cell is
- *  written (absent cells become air); block entities are not carried in this pass. */
+/** Encode raw {size, palette, blocks, blockEntities} into a gzipped `.schem` (Sponge v2).
+ *  Every cell is written (absent cells become air); block entities ARE carried. */
 export function encodeSchem(s: RawStructure, dataVersion = DEFAULT_DATA_VERSION): Buffer {
   const [w, h, l] = s.size;
   const total = Math.max(0, w * h * l);
 
   // Intern each used block-state into a fresh palette (air first, so it's id 0).
-  const idByState = new Map<string, number>();
-  const entries: RawPaletteEntry[] = [];
-  const intern = (entry: RawPaletteEntry): number => {
-    const key = blockStateString(entry);
-    let id = idByState.get(key);
-    if (id === undefined) {
-      id = entries.length;
-      idByState.set(key, id);
-      entries.push(entry);
-    }
-    return id;
-  };
-  const airId = intern({ Name: AIR });
+  const { intern, entries } = createPaletteInterner(true);
+  const airId = 0;
 
   const grid = new Array<number>(total).fill(airId);
   for (const b of s.blocks) {

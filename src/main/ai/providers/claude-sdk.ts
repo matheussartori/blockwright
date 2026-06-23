@@ -11,6 +11,7 @@ import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { GenerateImage } from '@/shared/types';
 import { EMIT_TOOL_NAME, EMIT_TOOL_DESCRIPTION, normalizeMode } from '../schema';
 import type { EmitArgs } from '../schema';
+import { DEFAULT_DATA_VERSION } from '../../structure/mc-data-version';
 import { criticSystemPrompt, criticUserText, parseCritique } from '../critic';
 import { authEnv, claudeExecutablePath } from '../credentials';
 import type { Critic, Driver, DriverParams, NeutralBlock } from './types';
@@ -74,7 +75,7 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
         ),
       structure: z
         .object({
-          DataVersion: z.number().int().optional().describe('Always 3955 for 1.21.1. Omit in a patch.'),
+          DataVersion: z.number().int().optional().describe(`Always ${DEFAULT_DATA_VERSION} for 1.21.1. Omit in a patch.`),
           size: z.array(z.number().int()).optional().describe('[sx,sy,sz] bounding box. Omit in a patch unless resizing.'),
           palette: z
             .array(z.object({ Name: z.string(), Properties: z.record(z.string(), z.string()).optional() }))

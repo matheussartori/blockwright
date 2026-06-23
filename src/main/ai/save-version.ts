@@ -12,11 +12,11 @@ import type { SaveVersionRequest, SaveVersionResult } from '@/shared/types';
 import type { AuthoringBlock, AuthoringEntity } from '../structure/authoring/types';
 import { encodeStructure } from '../structure/authoring/nbt-encode';
 import { readAuthoring } from '../structure/authoring/nbt-decode';
+import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
 import { getSession } from './session';
 import { mirrorToLibrary } from './output-dir';
 
 /** The structure DataVersion to stamp when the source file has none (1.21.1). */
-const DEFAULT_DATA_VERSION = 3955;
 const posKey = (p: readonly number[]): string => `${p[0]},${p[1]},${p[2]}`;
 
 export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVersionResult> {

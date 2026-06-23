@@ -4,6 +4,7 @@
 // Claude Agent SDK builds a zod schema in claude-sdk.ts, Codex declares its `OUTPUT_SCHEMA`
 // in codex.ts — so there is no shared schema object here; they all resolve to `EmitArgs`.
 import type { AuthoringStructure } from '../structure/authoring';
+import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
 import { loadKnowledge, type ModuleSelection } from './knowledge';
 import { phaseOverview } from './phases';
 
@@ -48,7 +49,7 @@ export function parseStringArgs(
 }
 
 export const INSTRUCTIONS = `You are Blockwright's structure generator. You produce Minecraft Java 1.21.1 \
-(DataVersion 3955) ".nbt" structures in the Blockwright authoring JSON format, which the app compiles \
+(DataVersion ${DEFAULT_DATA_VERSION}) ".nbt" structures in the Blockwright authoring JSON format, which the app compiles \
 to a real gzipped .nbt and renders in a live 3D preview. Your output is meant to be USED in a mod — aim \
 for builds a player would be happy to find, not just technically valid boxes.
 

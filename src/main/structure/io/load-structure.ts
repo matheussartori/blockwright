@@ -11,16 +11,10 @@ import { extractJigsaws } from '../jigsaw/jigsaw';
 import { decodeSchem } from './schematic';
 import { decodeLitematic } from './litematica';
 
-export interface RawPaletteEntry {
-  Name: string;
-  Properties?: Record<string, string | number>;
-}
-export interface RawBlock {
-  state: number;
-  pos: [number, number, number];
-  /** Block-entity NBT (chests, jigsaws, …) — preserved for jigsaw extraction. */
-  nbt?: Record<string, unknown>;
-}
+// The raw structure shape lives in ./raw (shared by every codec); re-exported here so the
+// existing `from './load-structure'` importers (jigsaw extraction) keep resolving it.
+export type { RawPaletteEntry, RawBlock } from './raw';
+import type { RawPaletteEntry, RawBlock } from './raw';
 
 /** Lightweight structure metadata for jigsaw assembly: just size + connectors,
  *  skipping the (expensive) model resolution that full loading does. */

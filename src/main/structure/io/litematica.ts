@@ -7,13 +7,12 @@
 // Spec: Litematica LitematicaBitArray / LitematicaBlockStateContainer / LitematicaSchematic.
 import zlib from 'node:zlib';
 import * as nbt from 'prismarine-nbt';
-import type { RawBlock, RawPaletteEntry } from './load-structure';
-import { blockStateString, omitKeys, type RawBlockEntity, type RawStructure } from './schematic';
+import { AIR, omitKeys, type RawBlock, type RawBlockEntity, type RawStructure } from './raw';
+import { compound, compoundList, createPaletteInterner, emptyList, int, longArray, longFromMs, str, xyz, type Tag } from './nbt-tags';
 import { inferCompound } from '../authoring/nbt-encode';
+import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
-const AIR = 'minecraft:air';
 const U64 = (1n << 64n) - 1n;
-const DEFAULT_DATA_VERSION = 3955;
 
 // ── bit-packed long array (the spanning scheme) ─────────────────────────────────────
 
@@ -90,18 +89,7 @@ export async function decodeLitematic(buffer: Buffer): Promise<RawStructure> {
   const root = nbt.simplify(parsed) as { Regions?: Record<string, RegionNBT> };
   const regions = Object.values(root.Regions ?? {});
 
-  const palette: RawPaletteEntry[] = [];
-  const idByState = new Map<string, number>();
-  const intern = (entry: RawPaletteEntry): number => {
-    const key = blockStateString(entry);
-    let id = idByState.get(key);
-    if (id === undefined) {
-      id = palette.length;
-      idByState.set(key, id);
-      palette.push(entry);
-    }
-    return id;
-  };
+  const { intern, entries: palette } = createPaletteInterner();
 
   const placed: { pos: [number, number, number]; state: number }[] = [];
   const tiles: { pos: [number, number, number]; id: string; nbt: Record<string, unknown> }[] = [];
@@ -166,37 +154,14 @@ export async function decodeLitematic(buffer: Buffer): Promise<RawStructure> {
 
 // ── Encode ──────────────────────────────────────────────────────────────────────────
 
-type Tag = { type: string; value: unknown };
-const int = (v: number): Tag => ({ type: 'int', value: Math.trunc(v) });
-const str = (v: string): Tag => ({ type: 'string', value: v });
-const long = (ms: number): Tag => ({ type: 'long', value: [Math.floor(ms / 0x100000000) | 0, ms % 0x100000000 | 0] });
-const compound = (value: Record<string, Tag>): Tag => ({ type: 'compound', value });
-const longArray = (pairs: [number, number][]): Tag => ({ type: 'longArray', value: pairs });
-const xyz = (x: number, y: number, z: number): Tag => compound({ x: int(x), y: int(y), z: int(z) });
-const emptyList = (): Tag => ({ type: 'list', value: { type: 'end', value: [] } });
-function compoundList(items: Record<string, Tag>[]): Tag {
-  return { type: 'list', value: items.length ? { type: 'compound', value: items } : { type: 'end', value: [] } };
-}
-
-/** Encode raw {size, palette, blocks} into a gzipped single-region `.litematic`.
- *  `now` is the create/modify timestamp (ms); block entities are not carried this pass. */
+/** Encode raw {size, palette, blocks, blockEntities} into a gzipped single-region `.litematic`.
+ *  `now` is the create/modify timestamp (ms); block entities ARE carried (region TileEntities). */
 export function encodeLitematic(s: RawStructure, now: number, dataVersion = DEFAULT_DATA_VERSION): Buffer {
   const [sx, sy, sz] = s.size;
   const volume = Math.max(0, sx * sy * sz);
 
-  const idByState = new Map<string, number>();
-  const entries: RawPaletteEntry[] = [];
-  const intern = (entry: RawPaletteEntry): number => {
-    const key = blockStateString(entry);
-    let id = idByState.get(key);
-    if (id === undefined) {
-      id = entries.length;
-      idByState.set(key, id);
-      entries.push(entry);
-    }
-    return id;
-  };
-  const airId = intern({ Name: AIR });
+  const { intern, entries } = createPaletteInterner(true);
+  const airId = 0;
 
   const grid = new Array<number>(volume).fill(airId);
   let nonAir = 0;
@@ -255,8 +220,8 @@ export function encodeLitematic(s: RawStructure, now: number, dataVersion = DEFA
         RegionCount: int(1),
         TotalVolume: int(volume),
         TotalBlocks: int(nonAir),
-        TimeCreated: long(now),
-        TimeModified: long(now),
+        TimeCreated: longFromMs(now),
+        TimeModified: longFromMs(now),
         EnclosingSize: xyz(sx, sy, sz),
       }),
       Regions: compound({ main: region }),

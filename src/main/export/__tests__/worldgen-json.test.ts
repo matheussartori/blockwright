@@ -44,7 +44,7 @@ describe('structureSetJson', () => {
 describe('saltFor', () => {
   it('is deterministic and non-negative', () => {
     expect(saltFor('mymod:tower')).toBe(saltFor('mymod:tower'));
-    expect(saltFor('mymod:tower')).toBeGreaterThanOrEqual(0);
+    expect(saltFor('mymod:tower')).toBeGreaterThanOrEqual(1);
     expect(saltFor('a')).not.toBe(saltFor('b'));
   });
 });

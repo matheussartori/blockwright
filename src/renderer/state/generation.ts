@@ -272,6 +272,7 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
         size: result.size,
         blockCount: result.blockCount,
         libraryPath: result.libraryPath ?? undefined,
+        fixes: result.fixes.length ? result.fixes : undefined,
       };
       docs.appendChat(docId, {
         role: 'assistant',

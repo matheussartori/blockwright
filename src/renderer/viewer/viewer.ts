@@ -11,6 +11,7 @@ import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
 import { SelectionOverlay } from './selection-overlay';
+import { SymmetryOverlay } from './symmetry-overlay';
 import { TextureLoader } from './texture-loader';
 
 export type { FloorRegion } from './floor-regions';
@@ -36,6 +37,8 @@ export class Viewer {
   private highlight = new FocusHighlight(this.scene);
 
   private selectionOverlay = new SelectionOverlay(this.scene);
+
+  private symmetryOverlay = new SymmetryOverlay(this.scene);
 
   private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
@@ -229,10 +232,16 @@ export class Viewer {
     this.selectionOverlay.set(cells);
   }
 
+  /** Show the live-symmetry mirror plane for `axis` over a `size`-bounded structure (null = off). */
+  setSymmetryPlane(axis: 'x' | 'z' | null, size: [number, number, number]): void {
+    this.symmetryOverlay.set(axis, size);
+  }
+
   clear() {
     this.lastPieces = null;
     this.highlight.clear();
     this.selectionOverlay.clear();
+    this.symmetryOverlay.clear();
     // Drop the live band meshes but keep the desired regions so the next build
     // re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();

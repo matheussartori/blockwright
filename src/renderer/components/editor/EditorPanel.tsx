@@ -76,19 +76,23 @@ export function EditorPanel() {
 
       <ToolRail tool={tool} onTool={(id) => ed().setTool(id)} t={t} />
 
-      <div className="editor-sym">
-        <span className="editor-sym-label">{t('editor.symmetry')}</span>
-        <Segmented
-          value={symmetry}
-          ariaLabel={t('editor.symmetry')}
-          onChange={(v) => ed().setSymmetry(v as Symmetry)}
-          options={[
-            { value: 'none', label: t('editor.symOff') },
-            { value: 'x', label: 'X' },
-            { value: 'z', label: 'Z' },
-          ]}
-        />
-      </div>
+      {/* Symmetry mirrors Place + Delete across the build's centre, so it only shows for
+          those tools — no phantom control under tools it doesn't affect. */}
+      {(tool === 'place' || tool === 'delete') && (
+        <div className="editor-sym">
+          <span className="editor-sym-label">{t('editor.symmetry')}</span>
+          <Segmented
+            value={symmetry}
+            ariaLabel={t('editor.symmetry')}
+            onChange={(v) => ed().setSymmetry(v as Symmetry)}
+            options={[
+              { value: 'none', label: t('editor.symOff') },
+              { value: 'x', label: 'X' },
+              { value: 'z', label: 'Z' },
+            ]}
+          />
+        </div>
+      )}
 
       <div className="editor-context">
         <ToolControls tool={tool} t={t} />

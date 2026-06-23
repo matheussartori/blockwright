@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { basename, dirname } from '../../ui/path';
 
 /** Drop the `data/<ns>/` prefix so a row reads as the path INSIDE the data pack. */
-export const insidePack = (rel: string, namespace: string): string =>
+const insidePack = (rel: string, namespace: string): string =>
   namespace ? rel.replace(`data/${namespace}/`, '') : rel;
 
 interface ExportFileRowProps {

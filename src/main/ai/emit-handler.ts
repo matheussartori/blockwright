@@ -272,11 +272,13 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       path: nbtPath,
       libraryPath: session.library.latest,
       version,
-      summary: [(args.summary ?? '').trim(), report.fixes.length ? `(auto-fixed placement: ${report.fixes.join('; ')})` : '']
-        .filter(Boolean)
-        .join(' '),
+      // The summary stays the model's own note; the auto-fixes now ride their own field,
+      // surfaced as a distinct element on the build card (not buried in the prose).
+      summary: (args.summary ?? '').trim(),
       size,
       blockCount,
+      fixes: report.fixes,
+      warnings: report.warnings,
       sdkSessionId: session.sdkSessionId,
       // Final token totals are filled in once the driver run completes (in generate.ts).
       tokensIn: 0,
@@ -360,8 +362,10 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
               ? `Critic verdict: ${c.failed.length} check(s) need more work — ${c.failed.map((f) => labelFor(f.check)).join(', ')}.`
               : 'Critic verdict: every audit check passed.',
           );
-        } catch {
-          /* critic unavailable this round — fall back to the self-report below */
+        } catch (err) {
+          // Surface it (don't swallow) so a BROKEN critic is diagnosable in the Console dock
+          // rather than looking like "no critic configured"; we still fall back to self-report.
+          run.ai(`Critic errored this round (${errMessage(err)}); falling back to the self-report.`);
         }
       }
       if (!auditReported) {

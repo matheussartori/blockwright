@@ -8,6 +8,7 @@ import {
   Compass, Sparkles, Orbit, Blocks, MessagesSquare, FolderTree,
   MousePointer2, Move3D, Scan, Eye, Layers, PencilLine, SlidersHorizontal, History,
   Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload, FlipHorizontal2,
+  SquarePlus, Columns2,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
@@ -95,6 +96,7 @@ function Overview({ t }: { t: TFunction }) {
         <div className="guide-card"><FolderTree size={18} strokeWidth={1.7} aria-hidden /><span>{t('guide.overview.cardMods')}</span></div>
       </div>
       <p className="guide-p">{t('guide.overview.p1')}</p>
+      <p className="guide-p">{t('guide.overview.formats')}</p>
     </Block>
   );
 }
@@ -166,10 +168,12 @@ function BlockTools({ t }: { t: TFunction }) {
       <ul className="guide-list">
         <li><MousePointer2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.selectT')}</b> {t('guide.blocks.select')}</span></li>
         <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.moveT')}</b> {t('guide.blocks.move')}</span></li>
+        <li><SquarePlus size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.placeT')}</b> {t('guide.blocks.place')}</span></li>
         <li><FlipHorizontal2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.transformT')}</b> {t('guide.blocks.transform')}</span></li>
         <li><ArrowUpFromLine size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.extrudeT')}</b> {t('guide.blocks.extrude')}</span></li>
         <li><TrendingUp size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.stairsT')}</b> {t('guide.blocks.stairs')}</span></li>
         <li><Replace size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.replaceT')}</b> {t('guide.blocks.replace')}</span></li>
+        <li><Columns2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.symmetryT')}</b> {t('guide.blocks.symmetry')}</span></li>
       </ul>
       <p className="guide-tip"><Save size={14} strokeWidth={1.9} aria-hidden />{t('guide.blocks.tip')}</p>
     </Block>

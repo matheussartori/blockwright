@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 
-export function useBlockIds(enabled: boolean): string[] {
+export function useBlockIds(): string[] {
   const [ids, setIds] = useState<string[]>([]);
   useEffect(() => {
-    if (!enabled || ids.length) return;
+    if (ids.length) return;
     void api.listCatalog().then((blocks) => setIds(blocks.map((b) => b.id)));
-  }, [enabled, ids.length]);
+  }, [ids.length]);
   return ids;
 }

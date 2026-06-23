@@ -13,7 +13,8 @@ export function saltFor(id: string): number {
     h ^= id.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return Math.abs(h | 0) % 2147483647;
+  // ≥1: 0 is Minecraft's "no salt" sentinel, so keep the placement salt out of it.
+  return (Math.abs(h | 0) % 2147483646) + 1;
 }
 
 /** `worldgen/structure/<name>.json` — the jigsaw structure definition. `spawn_overrides`
