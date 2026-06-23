@@ -33,6 +33,7 @@ export const ptBR: Messages = {
   'menu.moduleGallery': 'Galeria de módulos',
   'menu.help': 'Ajuda',
   'menu.guide': 'Guia',
+  'menu.checkForUpdates': 'Verificar atualizações…',
   'menu.keyboardShortcuts': 'Atalhos de teclado',
   'menu.actualSize': 'Tamanho real',
   'menu.zoomIn': 'Ampliar',
@@ -152,6 +153,14 @@ export const ptBR: Messages = {
   // Settings ▸ About.
   'about.version': 'Versão {version}',
   'about.tagline': 'Crie, visualize e gere estruturas de Minecraft em 3D com IA.',
+  'about.update.title': 'Verificar atualizações',
+  'about.update.idleSub': 'Veja se há uma versão mais recente.',
+  'about.update.checking': 'Verificando atualizações…',
+  'about.update.availableSub': 'Uma nova versão está pronta para baixar.',
+  'about.update.errorTitle': 'Não foi possível verificar atualizações',
+  'about.update.errorSub': 'Verifique sua conexão e tente novamente.',
+  'about.update.check': 'Verificar agora',
+  'about.update.checkAgain': 'Verificar de novo',
   'about.appVersion': 'Versão do app',
   'about.targetMinecraft': 'Minecraft alvo',
   'about.renderer': 'Renderizador',
@@ -164,6 +173,15 @@ export const ptBR: Messages = {
   'workspace.label': 'Workspace',
   'workspace.partOfMod': 'Parte do mod',
   'workspace.loadWorkspace': 'Carregar workspace',
+
+  // Update check (banner + manual menu check dialogs).
+  'update.available': 'Atualização disponível',
+  'update.versionLabel': 'Versão {version}',
+  'update.download': 'Baixar',
+  'update.title': 'Verificar atualizações',
+  'update.upToDate': 'Você está atualizado',
+  'update.upToDateDetail': 'O Blockwright {version} é a versão mais recente.',
+  'update.checkFailed': 'Não foi possível verificar atualizações. Tente novamente mais tarde.',
 
   // Minecraft version prompt.
   'version.title': 'Versão do Minecraft',

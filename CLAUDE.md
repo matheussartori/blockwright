@@ -28,6 +28,17 @@ src/
                           (backlog for the Console dock) + tails it live to the renderer over IPC,
                           still calling the original so the terminal keeps working
     app-menu.ts           Native application menu (OS menu bar): File ▸ Open / Open Recent / Workspace
+                          + Help ▸ Check for Updates…
+    updater.ts            Update strategy, two layers (see "Updates" below): Squirrel auto-install
+                          (update-electron-app) + a notify-only GitHub-release check. initAutoUpdates
+                          wires both at launch (the notify check gated on the window finishing load
+                          so its push can't race the renderer's subscription).
+    update-check.ts       GitHub Releases API check: `detect` (fetch → cache → push banner) feeds the
+                          three call sites — background (silent), quiet (About card, inline), manual
+                          (Help menu, native dialog). `getPendingUpdate` is the renderer's mount-pull.
+                          BW_FORCE_UPDATE_CHECK is the dev escape hatch (see "Updates").
+    update-version.ts     Pure semver-ish compare (`isNewer`/`parseVersion`) — no electron import so
+                          it's unit-testable (update-version.test.ts).
     recents.ts            Persisted "recently opened" files (last 10) in userData
     recent-workspaces.ts  Persisted "recently opened" mod workspaces (last 10) in userData
     workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one,
@@ -1070,6 +1081,37 @@ writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re
   chest contents / sign text / structure-block data survive `.nbt`↔`.schem`↔`.litematic`. The arbitrary NBT
   fields serialise via `inferCompound` (exported from `nbt-encode.ts`). (Rendering doesn't need them — block
   entities draw from the block NAME — so the import/render path ignores them; they ride the convert path.)
+
+### Updates
+
+Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) at launch:
+
+1. **Auto-install** via `update-electron-app` → update.electronjs.org (serves the latest published
+   GitHub Release through Squirrel). Self-installs IN PLACE only where Squirrel can: **Windows**, and a
+   **signed + notarized macOS** build. No-op in dev, on Linux (distro package manager), and on the
+   current ad-hoc-signed mac (see [macOS signing](#) in `forge.config.ts`).
+2. **Notify-only** GitHub-release check (`main/update-check.ts`) — for the platforms layer 1 can't
+   auto-install (unsigned macOS + Linux), it DETECTS a newer release and tells the user; it never
+   installs. Runs at launch (skipped on Windows, which Squirrel covers) + every 6h.
+
+- **One detection path:** `detect()` does fetch → cache → push the banner; `fetchUpdateInfo` is the
+  PURE detector (no side effects, throws on error). Three call sites share `detect`: `checkForUpdatesInBackground`
+  (silent, swallows errors), `checkForUpdatesQuiet` (the About card — returns the result for INLINE
+  status, no dialog), `checkForUpdatesManually` (Help ▸ Check for Updates… — adds the native
+  "up to date"/error dialogs). Version compare is the pure, unit-tested `update-version.ts`.
+- **Surfaces:** a dismissible bottom-centered **banner** (`UpdateBanner.tsx`, store `update`) and the
+  Settings ▸ About **`UpdateCard`** (a self-managing, state-driven card: idle/checking/upToDate/
+  available/error — only `available` spends the accent; version shown in `--mono`). Both open the
+  release page via `shell:open-external` (https-only). A detection drives both (the card also sets the
+  global `update` so the banner follows).
+- **Push/pull race:** the launch push (`IPC_EVENTS.updateAvailable`) can fire before the renderer
+  subscribes, so main caches the last hit (`getPendingUpdate`) and the renderer PULLS it on mount
+  (`IPC_CHANNELS.updatePending`) in addition to listening for the push. The launch check is also
+  deferred until the window's `did-finish-load` (`runAfterRendererReady`).
+- **`BW_FORCE_UPDATE_CHECK` (dev hatch):** truthy runs the notify check unpackaged on any platform; set
+  it to a version like `9.9.9` to FORGE a synthetic newer release so the banner + card can be tested
+  without a real release. Verify the banner via `BW_CAPTURE`; verify the card states via a standalone
+  HTML preview (the modal isn't reachable headlessly).
 
 ## Conventions / gotchas
 

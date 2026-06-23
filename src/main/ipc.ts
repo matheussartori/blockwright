@@ -39,6 +39,7 @@ import {
 import { planExport, runExport } from './export';
 import { exportStructure, notifyRecentWorkspaces, openFileDialog } from './window';
 import { getLogBacklog } from './logger';
+import { checkForUpdatesManually, checkForUpdatesQuiet, getPendingUpdate } from './update-check';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
 
 /** Pending preview-render requests, keyed by requestId, resolved when the
@@ -131,6 +132,14 @@ export function registerIpc(): void {
     return dir;
   });
   ipcMain.handle(IPC_CHANNELS.appVersion, async () => app.getVersion());
+  ipcMain.handle(IPC_CHANNELS.checkUpdate, async () => checkForUpdatesManually());
+  ipcMain.handle(IPC_CHANNELS.checkUpdateQuiet, async () => checkForUpdatesQuiet());
+  ipcMain.handle(IPC_CHANNELS.updatePending, async () => getPendingUpdate());
+  // Open an external link in the default browser — only https, so a compromised
+  // renderer can't coax the main process into launching arbitrary URI schemes.
+  ipcMain.handle(IPC_CHANNELS.openExternal, async (_e, url: string) => {
+    if (typeof url === 'string' && /^https:\/\//i.test(url)) await shell.openExternal(url);
+  });
   ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
     listWorkspaceStructures(getActiveWorkspace()),
   );

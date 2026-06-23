@@ -3,7 +3,7 @@
 import { app, BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import type { ExportResult } from '@/shared/types';
+import type { ExportResult, UpdateInfo } from '@/shared/types';
 import type { LanguageInfo } from '@/shared/i18n';
 import { IPC_EVENTS } from '@/shared/ipc';
 import { mt } from './language';
@@ -156,6 +156,10 @@ export function notifyOpenGuide(): void {
 /** Push the new language to the renderer (it re-renders the UI in that locale). */
 export function notifyLanguageChanged(info: LanguageInfo): void {
   mainWindow?.webContents.send(IPC_EVENTS.languageChanged, info);
+}
+
+export function notifyUpdateAvailable(info: UpdateInfo): void {
+  mainWindow?.webContents.send(IPC_EVENTS.updateAvailable, info);
 }
 
 /** Window icon (the standardized logo-dark) for Windows/Linux — macOS uses the

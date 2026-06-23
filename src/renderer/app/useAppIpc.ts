@@ -32,6 +32,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorks
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
     api.onOpenGuide(() => st.setGuideOpen(true));
+    api.onUpdateAvailable((info) => st.setUpdate(info));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
@@ -51,6 +52,9 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorks
       st.setRecentWorkspaces(await api.listRecentWorkspaces());
       const version = await api.getContentVersion();
       if (version) st.setContentVersion(version);
+      // Pull any launch-time update detection the push may have raced past.
+      const pending = await api.getPendingUpdate();
+      if (pending) st.setUpdate(pending);
     })();
   }, [openFile, close, newDoc, onWorkspaceChanged, exportActive, exportToWorkspaceActive]);
 

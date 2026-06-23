@@ -24,6 +24,19 @@ export const IPC_CHANNELS = {
   contentChooseDir: 'content:choose-dir',
   /** The app's own version (app.getVersion()), for the About panel. */
   appVersion: 'app:version',
+  /** Check GitHub Releases for a newer version (manual "Check for Updates").
+   *  Shows a native "up to date"/error dialog and, if newer, pushes
+   *  IPC_EVENTS.updateAvailable. Returns the UpdateInfo or null. */
+  checkUpdate: 'update:check',
+  /** Like checkUpdate but WITHOUT the native dialog — the About panel renders the
+   *  result inline. Returns UpdateInfo or null; rejects on a network/API error. */
+  checkUpdateQuiet: 'update:check-quiet',
+  /** Open an external https URL in the user's default browser (e.g. the release
+   *  download page) — payload: url. */
+  openExternal: 'shell:open-external',
+  /** The last newer-release detected by the background check, or null — pulled by
+   *  the renderer on mount so a launch-time detection isn't lost to the push race. */
+  updatePending: 'update:pending',
   /** Activate a known/detected workspace (payload Workspace) — returns it or null if stale. */
   workspaceActivate: 'workspace:activate',
   /** Detect whether a `.nbt` path belongs to a mod project — returns a Workspace or null. */
@@ -164,4 +177,7 @@ export const IPC_EVENTS = {
   openGuide: 'open-guide',
   /** The language changed in main (menu picker) — payload is the new LanguageInfo. */
   languageChanged: 'language-changed',
+  /** A newer release is available — payload is an UpdateInfo. Pushed by the
+   *  startup auto-check (macOS/Linux) and the manual menu check. */
+  updateAvailable: 'update-available',
 } as const;

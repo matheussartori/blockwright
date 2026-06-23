@@ -1,9 +1,11 @@
-// Settings ▸ About: app/Minecraft versions + credits. The single "About" surface —
-// the native macOS About menu item routes here too (no separate Electron panel).
+// Settings ▸ About: app/Minecraft versions + the update-check card + credits. The
+// single "About" surface — the native macOS About menu item routes here too (no
+// separate Electron panel).
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { useApp, useT } from '../../hooks/useStores';
 import { Logo } from '../ui/Logo';
+import { UpdateCard } from './UpdateCard';
 
 export function AboutTab() {
   const t = useT();
@@ -35,6 +37,8 @@ export function AboutTab() {
           <dd className="stat-num">Three.js</dd>
         </div>
       </dl>
+
+      <UpdateCard appVersion={appVersion} />
 
       <div className="about-credits">
         <p>

@@ -1331,6 +1331,35 @@ body.row-resizing {
   color: var(--text);
 }
 
+/* Update banner — same chrome as the workspace suggest, but bottom-CENTERED so it
+   clears the workspace suggest (bottom-left) and the workspace badge (bottom-*). */
+.update-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel-strong));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: var(--shadow);
+}
+.update-banner .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* --- Welcome lists (workspace structures / recents) ------------------------ */
 
 .welcome-lists {
@@ -1962,6 +1991,97 @@ body.row-resizing {
 }
 .about-meta > div:last-child {
   border-bottom: 1px solid var(--border);
+}
+/* Software-update status card (Settings ▸ About). One calm row: a state chip, a
+   title + sub, and a single action. Neutral in every state except `available`,
+   which earns a soft accent wash — the one moment worth emphasizing. */
+.update-card {
+  margin-top: 20px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 14px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.update-card-chip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: var(--text-2);
+  background: var(--panel-strong);
+}
+.update-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.update-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+}
+.update-card-version {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--accent-text);
+  background: var(--accent);
+}
+.update-card-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.update-card-action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Up to date — a quiet positive: the chip carries the accent, the card stays calm. */
+.update-card.ok .update-card-chip {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Update available — the emphasis state: soft accent wash + filled chip. */
+.update-card.available {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.update-card.available .update-card-chip {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+/* Error — danger-tinted chip, card stays neutral so it doesn't alarm. */
+.update-card.error .update-card-chip {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.update-card .spin {
+  animation: spin 0.8s linear infinite;
+}
+@media (max-width: 420px) {
+  .update-card {
+    flex-wrap: wrap;
+  }
+  .update-card-action {
+    margin-left: 49px; /* align under the body, past the chip + gap */
+  }
 }
 .about-credits {
   margin-top: 18px;

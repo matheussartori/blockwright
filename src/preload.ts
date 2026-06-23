@@ -28,6 +28,7 @@ import type {
   JigsawPlan,
   LogEntry,
   StructureData,
+  UpdateInfo,
   VersionInfo,
   Workspace,
   WindowId,
@@ -69,6 +70,13 @@ const api: BlockwrightApi = {
   getContentDir: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentGetDir),
   chooseContentDir: (): Promise<string | null> => ipcRenderer.invoke(IPC_CHANNELS.contentChooseDir),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.appVersion),
+  checkForUpdates: (): Promise<UpdateInfo | null> => ipcRenderer.invoke(IPC_CHANNELS.checkUpdate),
+  checkForUpdatesQuiet: (): Promise<UpdateInfo | null> => ipcRenderer.invoke(IPC_CHANNELS.checkUpdateQuiet),
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
+  getPendingUpdate: (): Promise<UpdateInfo | null> => ipcRenderer.invoke(IPC_CHANNELS.updatePending),
+  onUpdateAvailable: (cb: (info: UpdateInfo) => void) => {
+    ipcRenderer.on(IPC_EVENTS.updateAvailable, (_e, info: UpdateInfo) => cb(info));
+  },
   activateWorkspace: (ws: Workspace): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),
   detectFileWorkspace: (path: string): Promise<Workspace | null> =>

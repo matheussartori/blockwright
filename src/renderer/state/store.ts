@@ -6,7 +6,7 @@
 // Uses Zustand's framework-agnostic vanilla store, consumed in components via
 // `useStore`.
 import { createStore } from 'zustand/vanilla';
-import type { Workspace } from '@/shared/types';
+import type { UpdateInfo, Workspace } from '@/shared/types';
 
 export type NavMode = 'orbit' | 'fly';
 
@@ -39,6 +39,8 @@ export interface AppState {
   notice: Notice | null;
   /** Bottom-left prompt offering to load a detected mod workspace, or null. */
   suggest: Suggestion | null;
+  /** A newer release detected by the update check, or null. Drives the update banner. */
+  update: UpdateInfo | null;
   /** Whether the Settings modal is open. */
   settingsOpen: boolean;
   /** Which Settings section to show when it opens (e.g. routed to 'about' from
@@ -66,6 +68,7 @@ export interface AppState {
   setContentVersion: (version: string | null) => void;
   setNotice: (notice: Notice | null) => void;
   setSuggest: (suggest: Suggestion | null) => void;
+  setUpdate: (update: UpdateInfo | null) => void;
   setSettingsOpen: (open: boolean) => void;
   setSettingsSection: (section: string | null) => void;
   setCatalogOpen: (open: boolean) => void;
@@ -89,6 +92,7 @@ export const store = createStore<AppState>((set) => ({
   contentVersion: FALLBACK_CONTENT_VERSION,
   notice: null,
   suggest: null,
+  update: null,
   settingsOpen: false,
   settingsSection: null,
   catalogOpen: false,
@@ -106,6 +110,7 @@ export const store = createStore<AppState>((set) => ({
   setContentVersion: (contentVersion) => set({ contentVersion }),
   setNotice: (notice) => set({ notice }),
   setSuggest: (suggest) => set({ suggest }),
+  setUpdate: (update) => set({ update }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setSettingsSection: (settingsSection) => set({ settingsSection }),
   setCatalogOpen: (catalogOpen) => set({ catalogOpen }),

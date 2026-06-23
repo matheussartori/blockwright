@@ -94,6 +94,9 @@ refines through an emit → render → review loop — previewed live in the vie
 - Deterministic color fallback for blocks with missing textures
 - Floating, dockable tool windows (Controls / Inspector / Jigsaw) and a light/dark themed UI
 - Recently opened files and workspaces, surfaced in the welcome screen and native menu
+- Update aware — Windows auto-updates itself; on macOS and Linux the app checks GitHub Releases and
+  surfaces a new version (a banner + a status card in Settings ▸ About, or Help ▸ Check for Updates…)
+  with a one-click link to the download
 - Headless self-screenshot for visual testing (no screen-recording permission needed)
 - Full TypeScript source across all three Electron contexts
 
@@ -266,6 +269,20 @@ notes if you package locally:
 - **Windows** uses a branded Squirrel installer (`Blockwright-Setup.exe`) that installs per-user and
   auto-updates. It is **not** code-signed, so SmartScreen still shows an _unknown publisher_ warning.
 
+### Updates
+
+Two layers, wired at launch in `src/main/updater.ts`:
+
+- **Auto-install** (`update-electron-app` → update.electronjs.org, reads the latest GitHub Release):
+  installs updates in place where Squirrel can — **Windows**, and a signed + notarized macOS build.
+- **Notify-only** (`src/main/update-check.ts`): on the platforms the auto-installer can't serve (the
+  ad-hoc-signed macOS build and Linux), the app polls the GitHub Releases API, compares versions, and
+  surfaces a newer release without installing it — a dismissible banner, a status card in
+  Settings ▸ About, and Help ▸ Check for Updates…, each linking to the download page.
+
+For development, set `BW_FORCE_UPDATE_CHECK` to run the notify check unpackaged; give it a version
+like `9.9.9` to force a synthetic "newer release" so the UI can be tested without a real one.
+
 ### Visual testing
 
 Blockwright can screenshot itself headlessly — useful for verifying renders without granting
@@ -278,6 +295,7 @@ screen-recording permission. Set these env vars when launching:
 | `BW_CAPTURE_DELAY`| Override the capture delay in ms (raise it on cold starts) |
 | `BW_CONTENT`      | Override the content-pack location                        |
 | `BW_WORKSPACE`    | Activate a mod workspace on startup                       |
+| `BW_FORCE_UPDATE_CHECK` | Run the update check in dev; a version (e.g. `9.9.9`) forces a synthetic newer release |
 
 ## Architecture
 

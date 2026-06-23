@@ -21,6 +21,7 @@ import { Loading } from './components/Loading';
 import { Welcome } from './components/Welcome';
 import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
+import { UpdateBanner } from './components/UpdateBanner';
 import { SettingsModal } from './components/SettingsModal';
 import { CatalogModal } from './components/CatalogModal';
 import { ModulesModal } from './components/ModulesModal';
@@ -112,6 +113,7 @@ function Shell() {
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}
               />
+              <UpdateBanner />
               <ShortcutsHelp available={fileOpen} />
               <Loading />
             </div>

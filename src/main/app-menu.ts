@@ -7,6 +7,7 @@ import type { WindowId, WindowsReport } from '@/shared/types';
 import { LOCALE_LABELS, SUPPORTED_LOCALES, type LanguagePref } from '@/shared/i18n';
 import { getLanguage, mt, setLanguage } from './language';
 import { notifyLanguageChanged } from './window';
+import { checkForUpdatesManually } from './update-check';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { getActiveWorkspace } from './structure/assets/content-pack';
@@ -315,6 +316,11 @@ export function buildAppMenu(): void {
           label: mt('menu.guide'),
           accelerator: 'CmdOrCtrl+Shift+/',
           click: () => notifyOpenGuide(),
+        },
+        { type: 'separator' },
+        {
+          label: mt('menu.checkForUpdates'),
+          click: () => void checkForUpdatesManually(),
         },
       ],
     },

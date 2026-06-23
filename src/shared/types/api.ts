@@ -16,7 +16,7 @@ import type {
   BuildSelection,
   FloorDef,
 } from './generation';
-import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry } from './app';
+import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
 import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
@@ -43,6 +43,19 @@ export interface BlockwrightApi {
   chooseContentDir: () => Promise<string | null>;
   /** The app's own version (from package.json), for the About panel. */
   getAppVersion: () => Promise<string>;
+  /** Manually check GitHub Releases for a newer version. Surfaces a native
+   *  "up to date"/error dialog and, if newer, fires onUpdateAvailable. */
+  checkForUpdates: () => Promise<UpdateInfo | null>;
+  /** Like checkForUpdates but WITHOUT the native dialog (the About panel shows the
+   *  result inline). Resolves to UpdateInfo or null; rejects on a check error. */
+  checkForUpdatesQuiet: () => Promise<UpdateInfo | null>;
+  /** Open an https URL in the user's default browser (e.g. a release page). */
+  openExternal: (url: string) => Promise<void>;
+  /** The last newer-release detected by the launch/background check, or null —
+   *  pulled on mount so a launch-time detection isn't lost to the event race. */
+  getPendingUpdate: () => Promise<UpdateInfo | null>;
+  /** A newer release was detected (startup auto-check or the manual menu check). */
+  onUpdateAvailable: (cb: (info: UpdateInfo) => void) => void;
   /** Activate a known/detected workspace; returns it, or null if it no longer exists. */
   activateWorkspace: (workspace: Workspace) => Promise<Workspace | null>;
   /** Detect whether a `.nbt` path belongs to a mod project (returns its Workspace or null). */

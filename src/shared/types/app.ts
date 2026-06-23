@@ -13,6 +13,19 @@ export type ExportResult =
  *  bottom log dock (see `LogEntry`); like `controls` it tracks visibility only. */
 export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions' | 'console';
 
+/** A newer GitHub Release than the running app, surfaced as the update banner.
+ *  Carries enough to tell the user what's new + send them to the download page
+ *  (the actual install is Squirrel's job on Windows / a manual download on
+ *  macOS+Linux, since an unsigned mac build can't self-apply — see main/updater.ts). */
+export interface UpdateInfo {
+  /** The release version, normalized (no leading `v`), e.g. "1.2.0". */
+  version: string;
+  /** The GitHub Release page URL, opened externally by the Download action. */
+  url: string;
+  /** The release notes/body, if any (shown truncated in the banner tooltip). */
+  notes?: string;
+}
+
 /** A captured console message, shared from either process into the in-app Console
  *  dock so packaged builds surface the same logs the dev terminal shows. */
 export type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';

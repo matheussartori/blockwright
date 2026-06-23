@@ -31,6 +31,7 @@ export const en = {
   'menu.moduleGallery': 'Module Gallery',
   'menu.help': 'Help',
   'menu.guide': 'Guide',
+  'menu.checkForUpdates': 'Check for Updates…',
   'menu.keyboardShortcuts': 'Keyboard Shortcuts',
   'menu.actualSize': 'Actual Size',
   'menu.zoomIn': 'Zoom In',
@@ -150,6 +151,14 @@ export const en = {
   // Settings ▸ About.
   'about.version': 'Version {version}',
   'about.tagline': 'Build, view, and AI-generate Minecraft structures in 3D.',
+  'about.update.title': 'Check for updates',
+  'about.update.idleSub': 'See if a newer version is available.',
+  'about.update.checking': 'Checking for updates…',
+  'about.update.availableSub': 'A new version is ready to download.',
+  'about.update.errorTitle': 'Couldn’t check for updates',
+  'about.update.errorSub': 'Check your connection and try again.',
+  'about.update.check': 'Check now',
+  'about.update.checkAgain': 'Check again',
   'about.appVersion': 'App version',
   'about.targetMinecraft': 'Target Minecraft',
   'about.renderer': 'Renderer',
@@ -162,6 +171,15 @@ export const en = {
   'workspace.label': 'Workspace',
   'workspace.partOfMod': 'Part of mod',
   'workspace.loadWorkspace': 'Load workspace',
+
+  // Update check (banner + manual menu check dialogs).
+  'update.available': 'Update available',
+  'update.versionLabel': 'Version {version}',
+  'update.download': 'Download',
+  'update.title': 'Check for Updates',
+  'update.upToDate': 'You’re up to date',
+  'update.upToDateDetail': 'Blockwright {version} is the latest version.',
+  'update.checkFailed': 'Couldn’t check for updates. Please try again later.',
 
   // Minecraft version prompt.
   'version.title': 'Minecraft version',
