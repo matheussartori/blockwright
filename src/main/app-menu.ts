@@ -138,12 +138,21 @@ export function buildAppMenu(): void {
     submenu: languageSubmenu(),
   };
 
+  // Check for Updates… lives where each OS expects it: under the app menu on
+  // macOS (the Apple convention — right below About), and under Help on
+  // Windows/Linux. Both route to the same manual update check.
+  const checkUpdatesItem: MenuItemConstructorOptions = {
+    label: mt('menu.checkForUpdates'),
+    click: () => void checkForUpdatesManually(),
+  };
+
   const appMenu: MenuItemConstructorOptions = {
     label: app.name,
     submenu: [
       // Route the native About to the in-app About (Settings ▸ About) so there's
       // one place for version/credits, not the default Electron panel.
       { label: mt('menu.about', { app: app.name }), click: () => notifyOpenSettings('about') },
+      checkUpdatesItem,
       { type: 'separator' },
       settingsItem,
       languageItem,
@@ -317,11 +326,9 @@ export function buildAppMenu(): void {
           accelerator: 'CmdOrCtrl+Shift+/',
           click: () => notifyOpenGuide(),
         },
-        { type: 'separator' },
-        {
-          label: mt('menu.checkForUpdates'),
-          click: () => void checkForUpdatesManually(),
-        },
+        // On macOS, Check for Updates lives in the app menu (above); Windows/Linux
+        // keep it here in Help, the platform-conventional spot.
+        ...(isMac ? [] : [{ type: 'separator' as const }, checkUpdatesItem]),
       ],
     },
   ];

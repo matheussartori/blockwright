@@ -1206,9 +1206,16 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
 - **App icon / logos:** the in-app logos live in `public/` (`logo-dark.png`, `logo-light.png`),
   referenced relatively (`logo-dark.png`, not `/logo-dark.png`) so they resolve under `file://` when
   packaged; the `Logo` component swaps them by theme. The app/dock icon is the standardized
-  **logo-dark**: `build/icon-master.png` (a trimmed, centered 1024² master) → `build/icon.icns` (the
-  packaged bundle icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`).
-  Regenerate the icon from `build/icon-master.png` (or re-trim from `public/logo-dark.png`).
+  **logo-dark**: `build/icon-master.png` (a trimmed, centered 1024² rounded-squircle master) drives the
+  Windows `build/icon.ico` (Windows draws the icon as-is, so the rounded squircle is correct there).
+  **macOS gets a FULL-BLEED master** instead — `build/icon-master-fullbleed.png` (the squircle scaled to
+  COVER the canvas + opaque navy corners, no transparent margin) → `build/icon.icns` (the packaged bundle
+  icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`, darwin-only). The
+  full bleed is REQUIRED on macOS 26 (Tahoe): the OS composites every app icon onto a standardized rounded
+  tile and masks it to the squircle, so an icon with transparent padding leaves the system tile showing as
+  a WHITE BORDER around the artwork — a full-bleed square masked by the OS avoids it. Regenerate from the
+  full-bleed master (rebuild the iconset → `iconutil -c icns`); re-derive the full-bleed master from
+  `icon-master.png` (cover-scale the squircle, fill corners navy).
 - **Boot splash:** static markup + inline `<style>` in `index.html` inside `#app`; React's
   `createRoot(...).render()` replaces it on mount, so the window never shows empty. Its background
   is hardcoded to the same values as `--bg` (light/dark via `prefers-color-scheme`) — keep them in
