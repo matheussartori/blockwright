@@ -4,6 +4,29 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-24
+
+### Added
+
+- Paint and air/void tools in the block editor — a paint tool with brush,
+  recolor and flood-fill modes (with a hover preview ghost and live symmetry),
+  plus a void tool and a "Show voids" toggle that reveal the otherwise-invisible
+  `air` and `structure_void` cells (air in blue, void in red, matching
+  Minecraft's show-invisible-blocks colors).
+- Tooltip primitive — a richer hover/focus bubble that replaces bare `title=`
+  attributes, portal-rendered so it can't be clipped by the 3D canvas.
+- macOS dock icon, and a "Check for Updates…" item under the application menu.
+
+### Changed
+
+- Reworked the tooltip implementation.
+- Dependency upgrades.
+
+### Fixed
+
+- Render blocks taller than two cells correctly.
+- Void rendering and the air/void overlay toggle.
+
 ## [1.1.1] - 2026-06-23
 
 ### Fixed
@@ -65,5 +88,7 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[1.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.2.0
+[1.1.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.1
 [1.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.0
 [1.0.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.0.0
