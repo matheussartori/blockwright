@@ -4,8 +4,8 @@
 // never disturbs a grid/flex layout), renders the bubble through a portal in
 // `position: fixed` so the WebGL canvas can't clip it, flips to the opposite side when
 // there's no room, and shows after a short delay on hover but instantly on keyboard
-// focus. The trigger keeps its `aria-label` for screen readers; the description is a
-// sighted-only affordance.
+// focus. The trigger keeps its `aria-label` (its name) for screen readers, and while the
+// bubble is shown it's linked via `aria-describedby` so the description is announced too.
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactElement, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -28,10 +28,22 @@ interface TooltipProps {
 const EST_W = 240;
 const EST_H = 72;
 
+// The trigger's props we read/compose: DOM event handlers + aria, plus its own ref (a
+// regular prop in React 19) so we can merge ours without clobbering it.
+type TriggerProps = React.HTMLAttributes<HTMLElement> & { ref?: Ref<HTMLElement> };
+
 /** Merge our measuring ref with whatever ref the child already carries. */
-function setRef<T>(ref: Ref<T> | undefined, value: T) {
+function setRef(ref: Ref<HTMLElement> | undefined, value: HTMLElement | null) {
   if (typeof ref === 'function') ref(value);
-  else if (ref && typeof ref === 'object') (ref as React.MutableRefObject<T | null>).current = value;
+  else if (ref && typeof ref === 'object') (ref as React.RefObject<HTMLElement | null>).current = value;
+}
+
+/** Compose the child's existing handler (if any) with ours — theirs first, then ours. */
+function chain<E>(theirs: ((e: E) => void) | undefined, ours: (e: E) => void) {
+  return (e: E) => {
+    theirs?.(e);
+    ours(e);
+  };
 }
 
 export function Tooltip({ label, description, placement = 'top', delay = 350, children }: TooltipProps) {
@@ -97,38 +109,23 @@ export function Tooltip({ label, description, placement = 'top', delay = 350, ch
   }, [coords, hide]);
 
   if (!isValidElement(children)) return children;
-  const child = children as ReactElement<Record<string, unknown>>;
-  const childProps = child.props;
+  const child = children as ReactElement<TriggerProps>;
+  const p = child.props;
 
   const trigger = cloneElement(child, {
     ref: (node: HTMLElement | null) => {
       triggerRef.current = node;
-      setRef((child as unknown as { ref?: Ref<HTMLElement> }).ref, node);
+      setRef(p.ref, node);
     },
-    'aria-label': childProps['aria-label'] ?? label,
-    onMouseEnter: (e: React.MouseEvent) => {
-      (childProps.onMouseEnter as ((e: React.MouseEvent) => void) | undefined)?.(e);
-      show(false);
-    },
-    onMouseLeave: (e: React.MouseEvent) => {
-      (childProps.onMouseLeave as ((e: React.MouseEvent) => void) | undefined)?.(e);
-      hide();
-    },
-    onFocus: (e: React.FocusEvent) => {
-      (childProps.onFocus as ((e: React.FocusEvent) => void) | undefined)?.(e);
-      show(true);
-    },
-    onBlur: (e: React.FocusEvent) => {
-      (childProps.onBlur as ((e: React.FocusEvent) => void) | undefined)?.(e);
-      hide();
-    },
+    'aria-label': p['aria-label'] ?? label,
+    'aria-describedby': coords ? id : p['aria-describedby'],
+    onMouseEnter: chain(p.onMouseEnter, () => show(false)),
+    onMouseLeave: chain(p.onMouseLeave, hide),
+    onFocus: chain(p.onFocus, () => show(true)),
+    onBlur: chain(p.onBlur, hide),
     // A click that activates the control (e.g. picking a tool) dismisses the bubble so it
     // doesn't linger over the now-selected button.
-    onClick: (e: React.MouseEvent) => {
-      (childProps.onClick as ((e: React.MouseEvent) => void) | undefined)?.(e);
-      hide();
-    },
-    'aria-describedby': coords ? id : childProps['aria-describedby'],
+    onClick: chain(p.onClick, hide),
   });
 
   return (

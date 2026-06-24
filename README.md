@@ -192,17 +192,21 @@ directly in the 3D view:
   swatch) or **eyedrop** one from the build, and a hover ghost previews the target cell. In paint mode
   the left button paints and the right button orbits, so a stroke never fights the camera.
 - **Replace / Delete** — swap the selected blocks for another, or carve them away.
-- **Air / void** — toggle **Show voids** to surface the otherwise-invisible markers, colored like
-  Minecraft's "show invisible blocks": **air is blue** (clears the cell when pasted), **void is red**
-  (leaves the terrain untouched, for non-cuboid footprints). "Void" covers both `minecraft:structure_void`
-  and cells simply omitted from the structure — so a region you carved out as structure void in-world shows
-  up even though Minecraft saved it as omitted blocks. Then use the **Air / void** tool to paint air or
-  void; it only ever touches empty cells, so your solid blocks are never overwritten.
+- **Air / void** — toggle the **eye** (Show air / void cells) in the panel header to surface the
+  otherwise-invisible markers, colored like Minecraft's "show invisible blocks": **air is blue** (clears
+  the cell when pasted), **void is red** (leaves the terrain untouched, for non-cuboid footprints). "Void"
+  covers both `minecraft:structure_void` and cells simply omitted from the structure — so a region you
+  carved out as structure void in-world shows up even though Minecraft saved it as omitted blocks. Then use
+  the **Air / void** tool to paint air or void; it only ever touches empty cells, so your solid blocks are
+  never overwritten. While that tool is active the markers are always on (the eye is locked); switch away
+  and the overlay returns to whatever you had it set to before.
 - **Live symmetry** — turn on an X or Z mirror and a translucent plane in the viewer shows where it is;
   your paint + delete edits are mirrored across the build's centre as you work, with correct blockstates.
 
-Edits keep block orientation correct, support **undo/redo** (no small cap), and **Save version** writes
-the result as a new `.nbt` version in the same version chain as AI builds — so an edit is never fatal.
+Every tool button — and the header's eye / close controls — has a **hover tooltip** with its name and a
+one-line note on what it does. Edits keep block orientation correct, support **undo/redo** (no small cap),
+and **Save version** writes the result as a new `.nbt` version in the same version chain as AI builds — so
+an edit is never fatal.
 
 ## Mod Workspaces
 

@@ -1065,7 +1065,11 @@ corrupted on transform, capped/corrupting undo).
   void (red), boundary-only, ALWAYS — THIS is the common "my `.nbt` has a structure_void region but no void
   block": a structure block drops the region from the list, so it survives only as omission; (3) explicit
   `minecraft:air` → bulk (a captured `.nbt` stores it for the whole volume — the fog problem), shown only
-  when sparse (≤ `AIR_OVERLAY_CAP` = 256) or `revealAir` (the Void tool is active), boundary-only (blue).
+  when sparse (≤ `AIR_OVERLAY_CAP` = 256) or `revealAir`, boundary-only (blue). `EditorLayer` passes
+  `revealAir = showVoids` — the header eye explicitly promises "air / void", so turning it ON reveals bulk
+  air too (under ANY tool), not just void; turning it off drops the fog. The `void` tool FORCES the overlay
+  on while active (the eye is disabled — it always shows there) and RESTORES the prior eye state on exit
+  (`setTool` saves it into a `voidPrevShowVoids` closure: hidden → forced on → hidden again; shown → stays).
   `VoidOverlay` draws small wireframe markers with depthTest ON, so they're OCCLUDED by the build like real
   blocks. `setVoidCell` is GUARDED to touch only empty cells (a stroke runs harmlessly over
   solids), so void editing can't gut real geometry. A **cursor readout** (`describeCell` → the store's
