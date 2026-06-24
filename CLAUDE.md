@@ -1190,6 +1190,16 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   - **Tinting:** grayscale textures (water's still, the white banner cloth) are colored via
     `ModelFace.tint` (explicit sRGB `[r,g,b]`), which the renderer multiplies in; it takes
     precedence over the grass-green `tintindex` path. Lava/chests/bed textures are already colored.
+- **Empty model ≠ unresolved (the "corrupted second block" defect):** a model that LOADS but
+  declares no `elements` is INTENTIONALLY empty — the standard Minecraft "all geometry in the base,
+  empty placeholder on top" convention for tall blocks (umbrellas, statues): the lower model's
+  elements overflow past y=16 into the cell above, and the upper half is a geometry-less model that
+  must render NOTHING. So `buildResolvedModel` (`model-loader.ts`) returns null ONLY when the model
+  file is missing (genuinely unresolved → the renderer stamps a `fallback-color` cube); a loaded but
+  element-less model resolves to `{ elements: [] }`, NOT null. That keeps the entry's `models.length`
+  ≥ 1, so `mesh-builder.ts` skips the fallback-cube branch and `addModel` draws nothing for the empty
+  cell — instead of a default-colored box sitting on top of the (correctly tall) lower geometry.
+  Tested in `assets/__tests__/model-loader.test.ts`.
 - **JSDoc convention:** a function with **≥4 positional params, or non-trivial branching /
   multiple return shapes** carries explicit `@param`/`@returns` (and `@throws` where it
   matters) — e.g. `composeStructure`/`composeModule` (`domain/compose.ts`), `mergePatch`,

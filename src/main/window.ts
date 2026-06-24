@@ -219,10 +219,32 @@ function onDidFinishLoad() {
   }
   // Dev-only: render to a PNG and exit (used for automated visual checks).
   if (process.env.BW_CAPTURE) {
-    setTimeout(async () => {
-      const img = await mainWindow!.webContents.capturePage();
-      fs.writeFileSync(process.env.BW_CAPTURE!, img.toPNG());
-      app.quit();
-    }, Number(process.env.BW_CAPTURE_DELAY) || 2500);
+    const out = process.env.BW_CAPTURE;
+    setTimeout(() => void captureToFileAndExit(out), Number(process.env.BW_CAPTURE_DELAY) || 2500);
+  }
+}
+
+/** Dev-only headless screenshot: grab the window to a PNG, then exit. `capturePage()` can
+ *  reject transiently at the Chromium Viz/GPU layer ("UnknownVizError") in the moments after
+ *  the window appears, so we retry a few times. Either way we ALWAYS `app.quit()` in `finally`
+ *  — an unhandled rejection here used to leave the app running, zombying the dev port. */
+async function captureToFileAndExit(out: string): Promise<void> {
+  try {
+    const win = mainWindow;
+    if (!win) return;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const img = await win.webContents.capturePage();
+        fs.writeFileSync(out, img.toPNG());
+        return;
+      } catch (err) {
+        lastErr = err;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+    console.error('[BW_CAPTURE] capturePage failed after retries:', lastErr);
+  } finally {
+    app.quit();
   }
 }

@@ -85,9 +85,15 @@ export function buildResolvedModel(
   transform: { x?: number; y?: number; uvlock?: boolean },
 ): ResolvedModel | null {
   const raw = loadModel(modelRef);
-  if (!raw || !raw.elements) return null;
+  if (!raw) return null; // model file missing / parse failed → genuinely unresolved
+  // A model that loaded but declares no elements is an INTENTIONALLY empty model — e.g. the
+  // upper half of a tall block (umbrella, statue) whose geometry lives entirely in the lower
+  // half and overflows up into this cell. Resolve it to an empty-elements model, NOT null, so
+  // the renderer draws nothing for it instead of mistaking it for an unresolved block and
+  // stamping a fallback cube (the "corrupted second block" defect).
+  const rawElements = raw.elements ?? [];
 
-  const elements: ModelElement[] = raw.elements.map((el) => {
+  const elements: ModelElement[] = rawElements.map((el) => {
     const faces: Partial<Record<FaceDir, ModelFace>> = {};
     for (const dir of FACES) {
       const f = el.faces?.[dir];
