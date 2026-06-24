@@ -53,9 +53,11 @@ refines through an emit → render → review loop — previewed live in the vie
   Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
   to trade quality for spend, configured in Settings ▸ AI
 - Composable generation domain — pick a structure type (a **House** — classic / modern / farmhouse /
-  sakura / gothic — or a **Tower** — a battlemented stone keep; each compiles a code-built shell with
+  sakura / gothic — or a **Tower** — a battlemented stone keep or a derelict gothic spire; each compiles a
+  code-built shell with
   seeded run-to-run variety that the AI furnishes and details, so the silhouette is guaranteed), a
-  decoration (including a universal dressed-stone **castle** look), a roof, a basement, an in-roof
+  decoration (including a universal dressed-stone **castle** look and a dark-stone gothic-ruin **cursed**
+  look), a roof, a basement, an in-roof
   attic, the surroundings (a code-built yard
   laid outside the building shell: a fenced **cottage garden** — stone-and-fence
   perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop

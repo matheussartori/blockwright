@@ -139,7 +139,12 @@ src/
                            GROUP — tower-classic (a battlemented stone KEEP: a tall square shaft of stacked
                            storeys, arrow-slit windows, a seated arched door, a stair core, and a crenellated
                            parapet over a walkable roof deck; OWNS its crown in code, so NO roof/attic slot;
-                           pairs with the new 'castle' decoration; links to every basement/surroundings/room).
+                           pairs with the 'castle' decoration; links to every basement/surroundings/room) +
+                           haunted-tower (a derelict gothic SPIRE: a flared plinth, a vertically RIBBED shaft
+                           that steps inward in tiers, projecting iron-cage lantern arms, a carved SKULL FACE on a
+                           wide front, a gothic doorway under a glowing inverted cross, soul-lit lancet windows,
+                           buttress piers tipped with lit spires, a spiky crenellated crown — the carved detail
+                           SCALES WITH WIDTH; also owns its crown, links the same modules, pairs with 'cursed').
                            + types.ts (contract: Box/logProps + `seedShell`/`pairedDecoration`/`complex` +
                            `floors()`) + stair-core.ts (addStairCore — the shared switchback stair core every
                            code-built type lays, taking the build's RolePalette; a `parts` helper, no cross-type
@@ -150,8 +155,10 @@ src/
                            from shell-kit parts, keeps ONE `plan()` feeding both `build()` and `floors()`,
                            and delegates roof/basement to modules. See "Seeded archetypes" below.
         decorations/       Category "decoration": one file per look (cozy/haunted/modern/farmhouse/sakura/
-                           gothic/castle — castle = a UNIVERSAL dressed-stone/masonry look, the tower's
-                           default) + types.ts (Decoration contract) + index.ts (registry,
+                           gothic/castle/cursed — castle = a UNIVERSAL dressed-stone/masonry look, the
+                           tower-classic's default; cursed = the dark-stone gothic-RUIN palette (blackstone
+                           shaft, mossy footings, soul flame), the haunted-tower's default + the stone
+                           counterpart to haunted) + types.ts (Decoration contract) + index.ts (registry,
                            DEFAULT_DECORATION='cozy'). A decoration maps roles→blocks + decay + weathering.
         basements/ roofs/  Categories "basement"/"roof"/"attic": one file per typology (roof: gable/
         attics/            hip/flat; basement: cellar/crypt/cult-temple; attic: storage/bedroom)
@@ -770,9 +777,16 @@ decoration, and a new module is one small file.
   a tall square shaft of stacked storeys, arrow-slit windows, a seated arched door on a stone plinth, a stair
   core, and a crenellated parapet over a walkable roof deck — it OWNS its crown in code (no roof/attic slot;
   Roof/Attic auto-hide for it), and links Basement/Surroundings/Room (every registered one) via the 'tower'
-  group. Each declares its identity decoration as `pairedDecoration` on the MODULE (the composer auto-pairs
-  it from the catalog — no hardcoded map); the classic's is cozy, the tower's is the new 'castle' (a
-  universal dressed-stone look).
+  group. **haunted-tower** (group 'tower') = a derelict gothic SPIRE: a battered flared plinth, a vertically
+  RIBBED shaft (organ-pipe buttress pilasters) that STEPS inward in tiers as it rises, projecting iron-cage
+  lantern arms on chains, a carved SKULL FACE on a wide front, a pointed gothic doorway under a glowing
+  inverted cross, soul-lit lancet windows, full-height corner buttress piers tipped with lit spires, and a
+  spiky crenellated crown — the carved exterior detail SCALES WITH WIDTH (a fat tower is densely articulated,
+  the skull only carving when the front is wide/tall enough), so it never reads as a plain dark cube; it owns
+  its crown in code like the keep and links the same Basement/Surroundings/Room modules via the 'tower' group;
+  pairs with 'cursed'. Each declares its identity decoration as `pairedDecoration` on the MODULE (the composer
+  auto-pairs it from the catalog — no hardcoded map); the classic's is cozy, the tower-classic's is 'castle'
+  (a universal dressed-stone look), the haunted-tower's is 'cursed' (a dark-stone gothic-ruin palette).
   - **`seedShell: true`** (`StructureType`) makes a FRESH build SEED the model with this type's compiled
     shell instead of leaving it free-form: `ai/shell-seed.ts` compiles the shell (a `template` op at the
     requested `BuildSelection.size` + decoration) → temp `.nbt` → `readAuthoring` → `shellPreamble`
@@ -926,9 +940,9 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   overrides) are validated against the real content pack in `generate.ts` (templates intern their
   own palette, so those names never reach `palette`).
 - **Build details (modules):** `NewStructurePanel`'s composer has a "⚙ Details" section with
-  registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic, tower-classic —
-  grouped by family: House / Tower), **Decoration**
-  (cozy/haunted/modern/farmhouse/sakura/gothic/castle), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
+  registry-backed selects — **Structure** (classic, modern, farmhouse, sakura, gothic, tower-classic,
+  haunted-tower — grouped by family: House / Tower), **Decoration**
+  (cozy/haunted/modern/farmhouse/sakura/gothic/castle/cursed), **Roof** (gable/hip/flat), **Basement** (cellar/crypt/
   cult-temple), **Attic** (storage/bedroom) and **Surroundings** (none/modern/garden/graveyard — required
   pick, defaults to None, filtered by the chosen structure's hosts — e.g. for tower-classic Roof/Attic hide
   (it owns its crown) while every Basement/Surroundings/Room shows; a non-None pick reveals a
