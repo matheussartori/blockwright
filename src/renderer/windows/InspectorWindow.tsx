@@ -45,12 +45,14 @@ function representativeTexture(entry: PaletteEntry): string | null {
   return null;
 }
 
-/** Group every non-air block instance by its (namespace-stripped) name. */
+/** Group every block instance by its (namespace-stripped) name — including air-like entries
+ *  (`air`, `structure_void`), since they're real palette entries the `.nbt` carries and the
+ *  inspector should report them faithfully (structure_void in particular is intentional). */
 function groupBlocks(data: StructureData): BlockGroup[] {
   const groups = new Map<string, BlockGroup>();
   for (const b of data.blocks) {
     const entry = data.palette[b.state];
-    if (!entry || entry.air) continue;
+    if (!entry) continue;
     const name = entry.name.replace('minecraft:', '');
     let g = groups.get(name);
     if (!g) {
@@ -81,10 +83,8 @@ export function InspectorContent() {
   const textureIcons = useSettings((s) => s.blockTextureIcons);
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
-  const paletteCount = useMemo(
-    () => (structure ? structure.palette.filter((p) => !p.air).length : 0),
-    [structure],
-  );
+  // The file's full palette size (air-like entries included — they're real palette entries).
+  const paletteCount = structure?.palette.length ?? 0;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
 

@@ -23,8 +23,8 @@ export function Statusbar() {
     );
   }
 
-  // Distinct block types, matching the Info panel (air excluded).
-  const typeCount = structure.palette.filter((p) => !p.air).length;
+  // Palette size, matching the Info panel (the file's full palette, air-like entries included).
+  const typeCount = structure.palette.length;
   const jigsawCount = structure.jigsaws.length;
 
   return (

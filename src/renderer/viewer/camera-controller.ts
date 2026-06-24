@@ -150,6 +150,14 @@ export class CameraController {
     this.controls.update();
   }
 
+  /** Paint mode: free the LEFT button for painting and rotate with the RIGHT button instead
+   *  (the MagicaVoxel convention), so a left-drag paints a stroke rather than orbiting. Off
+   *  restores the orbit defaults (LEFT rotate, RIGHT pan). */
+  setPaintNav(on: boolean): void {
+    this.controls.mouseButtons.LEFT = on ? (null as unknown as THREE.MOUSE) : THREE.MOUSE.ROTATE;
+    this.controls.mouseButtons.RIGHT = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+  }
+
   /** Mouse-look multiplier in fly mode (Settings). */
   setLookSensitivity(value: number): void {
     this.lookSensitivity = value;

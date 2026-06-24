@@ -5967,6 +5967,16 @@ body.row-resizing {
   opacity: 0.4;
   cursor: default;
 }
+.editor-icon.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+/* The header's right-side action cluster (show-voids toggle + exit). */
+.editor-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
 
 /* The tool rail: equal-width icon buttons, the active one filled with the accent. */
 /* The tool rail: a 4×2 grid so all 8 tools stay comfortably sized (a single row would
@@ -6072,6 +6082,36 @@ body.row-resizing {
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--text-muted);
+}
+/* A quieter sub-note under a hint (e.g. the Void tool's "solids are never overwritten"). */
+.editor-note {
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.85;
+}
+/* The cursor readout (Paint/Void): what's under the pointer — coords + what it is. */
+.editor-hoverinfo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+}
+.editor-hoverpos {
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+.editor-hoverwhat {
+  font-weight: 600;
+  color: var(--text);
+}
+/* Paint/Void mode toggles span the panel width. */
+.editor-context > .segmented {
+  width: 100%;
+}
+.editor-context > .segmented .segmented-option {
+  flex: 1;
 }
 .editor-field {
   display: flex;

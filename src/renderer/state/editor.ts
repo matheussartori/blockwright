@@ -17,27 +17,41 @@ import {
   cellKey,
   deleteSelection,
   extrudeSelection,
+  floodFill,
   HORIZONTALS,
   internEntry,
   mirrorCell,
   moveSelection,
   parseCell,
-  placeBlock,
+  placeCells,
   planTransform,
+  recolorCell,
   replaceSelection,
   selectBox,
+  setVoidCell,
   type Axis,
   type Cell,
+  type CellContent,
   type EditData,
   type Horizontal,
   type OpResult,
   type PropXform,
 } from '../editor/ops';
+import type { PaletteEntry } from '@/shared/types';
 
 /** The live-symmetry plane: none, or a mirror across the structure's centre on X or Z. */
 export type Symmetry = 'none' | 'x' | 'z';
 
-export type Tool = 'select' | 'move' | 'extrude' | 'transform' | 'stairs' | 'place' | 'replace' | 'delete';
+export type Tool = 'select' | 'move' | 'extrude' | 'transform' | 'stairs' | 'paint' | 'replace' | 'void' | 'delete';
+
+/** Paint sub-mode: add blocks against surfaces (brush), repaint existing ones (recolor),
+ *  or flood-fill a connected region (fill). */
+export type PaintMode = 'brush' | 'recolor' | 'fill';
+
+/** What the Void tool writes into a cell: explicit air (clears terrain on paste) or structure
+ *  void (preserves it). There's no "clear" — an omitted cell preserves terrain exactly like
+ *  structure_void, so Void already covers that intent. */
+export type VoidKind = 'air' | 'void';
 
 /** How a pick combines with the current selection (decided by modifier keys). */
 export type PickMode = 'single' | 'add' | 'box';
@@ -60,16 +74,24 @@ export interface EditorState {
   anchor: string | null;
   /** Tool parameters. */
   replaceBlock: string;
-  placeBlock: string;
+  paintBlock: string;
+  /** Paint sub-mode (brush / recolor / fill). */
+  paintMode: PaintMode;
+  /** What the Void tool writes (air = clears terrain / structure void = preserves it). */
+  voidKind: VoidKind;
+  /** Show the air + structure-void cells as ghost markers (any tool). */
+  showVoids: boolean;
+  /** What's under the cursor while painting/editing voids (the readout), or null. */
+  hoverInfo: { key: string; content: CellContent } | null;
   stairsBlock: string;
   stairsDir: Horizontal;
   stairsSteps: number;
   extrudeCount: number;
   /** Cells between extrude copies — 1 = a contiguous run, >1 = a repeating array. */
   extrudeStep: number;
-  /** Eyedropper active — the next click samples a block's type into `replaceBlock`. */
+  /** Eyedropper active — the next click samples a block's type into the active tool's block. */
   eyedropper: boolean;
-  /** Live symmetry: mirror Place + Delete across the structure's centre (off / X / Z). */
+  /** Live symmetry: mirror Paint + Delete across the structure's centre (off / X / Z). */
   symmetry: Symmetry;
   /** Unsaved edits since the last save. */
   dirty: boolean;
@@ -82,7 +104,11 @@ export interface EditorState {
   pick: (cell: Cell | null, mode: PickMode) => void;
   clearSelection: () => void;
   setReplaceBlock: (id: string) => void;
-  setPlaceBlock: (id: string) => void;
+  setPaintBlock: (id: string) => void;
+  setPaintMode: (mode: PaintMode) => void;
+  setVoidKind: (kind: VoidKind) => void;
+  setShowVoids: (on: boolean) => void;
+  setHoverInfo: (info: { key: string; content: CellContent } | null) => void;
   setStairsBlock: (id: string) => void;
   setStairsDir: (dir: Horizontal) => void;
   setStairsSteps: (n: number) => void;
@@ -90,12 +116,20 @@ export interface EditorState {
   setExtrudeStep: (n: number) => void;
   setEyedropper: (on: boolean) => void;
   setSymmetry: (s: Symmetry) => void;
-  /** Set `replaceBlock` from the block at a cell (the eyedropper). */
+  /** Set the active tool's block from the block at a cell (the eyedropper). */
   sample: (cell: Cell) => void;
   move: (delta: Cell) => void;
   extrude: (axis: Axis, dir: 1 | -1) => void;
   transform: (xform: PropXform) => Promise<void>;
-  placeAt: (cell: Cell) => Promise<void>;
+  /** Begin a paint/void stroke: resolve the brush block once (so each painted cell is a
+   *  synchronous edit) and arm the one-undo-step coalescing. */
+  strokeBegin: () => Promise<void>;
+  /** Paint one cell into the current stroke — brush adds, recolor repaints, void marks. */
+  strokePaint: (cell: Cell) => void;
+  /** End the current stroke (the next stroke starts a fresh undo step). */
+  strokeEnd: () => void;
+  /** Flood-fill from a cell (Paint's Fill) — its own one-shot undo step. */
+  fillAt: (cell: Cell) => Promise<void>;
   remove: () => void;
   replace: () => Promise<void>;
   stairs: () => Promise<void>;
@@ -111,20 +145,30 @@ const countSolid = (blocks: { state: number }[], palette: { air?: boolean }[]): 
   blocks.filter((b) => !palette[b.state]?.air).length;
 
 export const editorStore = createStore<EditorState>((set, get) => {
-  /** Apply an op result to the active doc: snapshot for undo, patch the structure
-   *  (merging any new textures), update the selection. */
-  const commit = (result: OpResult, extraTextures: string[] = []): void => {
+  // A paint/void STROKE coalesces a drag into one undo step: the brush block is resolved
+  // once at `strokeBegin` (so each dragged cell is a synchronous edit), and only the
+  // stroke's FIRST committed cell snapshots for undo.
+  let stroke: { entry: PaletteEntry; textures: string[]; mirror: { entry: PaletteEntry; textures: string[] } | null } | null = null;
+  let strokeSnapped = false;
+
+  /** Patch the active doc with an op result (merging any new textures + recomputing the
+   *  block count) and update the selection. Snapshots for undo first unless `snap` is false
+   *  — a stroke snapshots once, then patches in place for the rest of the drag. */
+  const applyResult = (result: OpResult, extraTextures: string[], snap: boolean): void => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc?.structure) return;
-    const past = [...get().past, snapshot(doc.structure)].slice(-UNDO_CAP);
+    const past = snap ? [...get().past, snapshot(doc.structure)].slice(-UNDO_CAP) : get().past;
     const textures = extraTextures.length
       ? [...new Set([...doc.structure.textures, ...extraTextures])]
       : doc.structure.textures;
     documentsStore.getState().patchDoc(doc.id, {
       structure: { ...doc.structure, blocks: result.blocks, palette: result.palette, textures, blockCount: countSolid(result.blocks, result.palette) },
     });
-    set({ selection: result.selection, past, future: [], dirty: true });
+    set({ selection: result.selection, past, future: snap ? [] : get().future, dirty: true });
   };
+
+  /** Apply an op result as its own one-undo-step edit (the default for a discrete action). */
+  const commit = (result: OpResult, extraTextures: string[] = []): void => applyResult(result, extraTextures, true);
 
   const restore = (snap: Snapshot): void => {
     const doc = activeDocument(documentsStore.getState());
@@ -150,7 +194,11 @@ export const editorStore = createStore<EditorState>((set, get) => {
     selection: [],
     anchor: null,
     replaceBlock: 'minecraft:stone',
-    placeBlock: 'minecraft:stone',
+    paintBlock: 'minecraft:stone',
+    paintMode: 'brush',
+    voidKind: 'air',
+    showVoids: false,
+    hoverInfo: null,
     stairsBlock: 'minecraft:oak_stairs',
     stairsDir: 'east',
     stairsSteps: 4,
@@ -163,8 +211,16 @@ export const editorStore = createStore<EditorState>((set, get) => {
     past: [],
     future: [],
 
-    setActive: (active) => set(active ? { active } : { active, selection: [], anchor: null, eyedropper: false }),
-    setTool: (tool) => set({ tool }),
+    setActive: (active) => {
+      if (!active) {
+        stroke = null;
+        strokeSnapped = false;
+      }
+      set(active ? { active } : { active, selection: [], anchor: null, eyedropper: false, hoverInfo: null });
+    },
+    // Picking the Void tool reveals the markers so you can see what you're editing (the
+    // global toggle still lets you hide them again).
+    setTool: (tool) => set(tool === 'void' ? { tool, showVoids: true } : { tool }),
     clearSelection: () => set({ selection: [], anchor: null }),
 
     pick: (cell, mode) => {
@@ -185,7 +241,11 @@ export const editorStore = createStore<EditorState>((set, get) => {
     },
 
     setReplaceBlock: (replaceBlock) => set({ replaceBlock }),
-    setPlaceBlock: (placeBlock) => set({ placeBlock }),
+    setPaintBlock: (paintBlock) => set({ paintBlock }),
+    setPaintMode: (paintMode) => set({ paintMode }),
+    setVoidKind: (voidKind) => set({ voidKind }),
+    setShowVoids: (showVoids) => set({ showVoids }),
+    setHoverInfo: (hoverInfo) => set({ hoverInfo }),
     setStairsBlock: (stairsBlock) => set({ stairsBlock }),
     setStairsDir: (stairsDir) => set({ stairsDir }),
     setStairsSteps: (stairsSteps) => set({ stairsSteps: Math.max(1, Math.min(64, stairsSteps)) }),
@@ -201,7 +261,12 @@ export const editorStore = createStore<EditorState>((set, get) => {
       }
       const block = doc.structure.blocks.find((b) => cellKey(b.pos) === cellKey(cell));
       const entry = block ? doc.structure.palette[block.state] : undefined;
-      set(entry && !entry.air ? { replaceBlock: entry.name, eyedropper: false } : { eyedropper: false });
+      if (!entry || entry.air) {
+        set({ eyedropper: false });
+        return;
+      }
+      // Sample into whichever tool's block field is in play.
+      set(get().tool === 'paint' ? { paintBlock: entry.name, eyedropper: false } : { replaceBlock: entry.name, eyedropper: false });
     },
 
     move: (delta) => editActive((d, sel) => (sel.length ? moveSelection(d, sel, delta) : null)),
@@ -240,44 +305,64 @@ export const editorStore = createStore<EditorState>((set, get) => {
       const placed = placements.map((pl) => ({ state: indexByCombo.get(combo(pl.name, pl.props))!, pos: pl.pos }));
       commit({ blocks: [...kept, ...placed], palette, selection: placed.map((p) => cellKey(p.pos)) }, extraTextures);
     },
-    placeAt: async (cell) => {
-      if (!activeDocument(documentsStore.getState())?.structure) return;
-      const { entry, textures } = await api.resolveBlock(get().placeBlock);
+    strokeBegin: async () => {
+      strokeSnapped = false;
+      stroke = null;
+      // The Void tool builds its (air/void) entry locally per cell — no resolve needed.
+      if (get().tool === 'void') return;
+      // Resolve the brush block once, plus its mirrored variant when symmetry is on, so
+      // every dragged cell is a synchronous, model-ready edit.
+      const { entry, textures } = await api.resolveBlock(get().paintBlock);
       const sym = get().symmetry;
-      // Live symmetry: also place the mirror, with its directional blockstate flipped.
-      let mirror: { cell: Cell; entry: typeof entry; textures: string[] } | null = null;
-      const symDoc = sym !== 'none' ? activeDocument(documentsStore.getState()) : null;
-      if (symDoc?.structure && sym !== 'none') {
-        const mc = mirrorCell(cell, sym, symDoc.structure.size);
-        if (cellKey(mc) !== cellKey(cell)) {
-          const mprops = (transformProps(entry.properties, { kind: 'mirror', axis: sym }) ?? {}) as Record<string, string>;
-          const same = JSON.stringify(mprops) === JSON.stringify(entry.properties ?? {});
-          const m = same ? { entry, textures: [] } : await api.resolveBlock(entry.name, mprops);
-          mirror = { cell: mc, entry: m.entry, textures: m.textures };
-        }
+      let mirror: { entry: PaletteEntry; textures: string[] } | null = null;
+      if (sym !== 'none' && get().paintMode === 'brush') {
+        const mprops = (transformProps(entry.properties, { kind: 'mirror', axis: sym }) ?? {}) as Record<string, string>;
+        const same = JSON.stringify(mprops) === JSON.stringify(entry.properties ?? {});
+        mirror = same ? { entry, textures: [] } : await api.resolveBlock(entry.name, mprops);
       }
+      stroke = { entry, textures, mirror };
+    },
+    strokePaint: (cell) => {
+      const doc = activeDocument(documentsStore.getState());
+      if (!doc?.structure) return;
+      const s = get();
+      const d = editData(doc.structure);
+      let result: OpResult | null;
+      let extra: string[] = [];
+
+      if (s.tool === 'void') {
+        result = setVoidCell(d, cell, s.voidKind);
+      } else if (!stroke) {
+        return; // brush block still resolving
+      } else if (s.paintMode === 'recolor') {
+        result = recolorCell(d, cell, stroke.entry);
+        extra = stroke.textures;
+      } else {
+        // Brush: add the block (+ its mirror under live symmetry) in one cell edit.
+        const placements = [{ cell, entry: stroke.entry }];
+        if (stroke.mirror && s.symmetry !== 'none') {
+          const mc = mirrorCell(cell, s.symmetry, doc.structure.size);
+          if (cellKey(mc) !== cellKey(cell)) placements.push({ cell: mc, entry: stroke.mirror.entry });
+        }
+        result = placeCells(d, placements);
+        extra = stroke.mirror ? [...stroke.textures, ...stroke.mirror.textures] : stroke.textures;
+      }
+      if (!result) return;
+      applyResult(result, extra, !strokeSnapped);
+      strokeSnapped = true;
+    },
+    strokeEnd: () => {
+      stroke = null;
+      strokeSnapped = false;
+    },
+    fillAt: async (cell) => {
+      const doc = activeDocument(documentsStore.getState());
+      if (!doc?.structure) return;
+      const { entry, textures } = await api.resolveBlock(get().paintBlock);
       const cur = activeDocument(documentsStore.getState());
       if (!cur?.structure) return;
-      if (!mirror) {
-        commit(placeBlock(editData(cur.structure), cell, entry), textures);
-        return;
-      }
-      // Place both blocks in one edit (one undo step).
-      let palette = cur.structure.palette;
-      const a = internEntry(palette, entry);
-      palette = a.palette;
-      const b = internEntry(palette, mirror.entry);
-      palette = b.palette;
-      const targets = new Set([cellKey(cell), cellKey(mirror.cell)]);
-      const kept = cur.structure.blocks.filter((bl) => !targets.has(cellKey(bl.pos)));
-      commit(
-        {
-          blocks: [...kept, { state: a.index, pos: cell }, { state: b.index, pos: mirror.cell }],
-          palette,
-          selection: [cellKey(cell), cellKey(mirror.cell)],
-        },
-        [...textures, ...mirror.textures],
-      );
+      const result = floodFill(editData(cur.structure), cell, entry);
+      if (result) commit(result, textures);
     },
     remove: () => {
       const doc = activeDocument(documentsStore.getState());

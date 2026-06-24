@@ -453,12 +453,15 @@ src/
                           for a shallow single-volume build the section already reveals), floor-regions.ts
                           (FloorRegionsOverlay — the floor-plan
                           bands), highlight.ts (FocusHighlight — the inspector focus box),
-                          selection-overlay.ts + symmetry-overlay.ts (SelectionOverlay = the block editor's
-                          outlined+filled selection boxes; SymmetryOverlay = the live mirror plane) — both
-                          extend scene-overlay.ts (SceneOverlay, the shared scene/group/clear lifecycle) and
-                          read overlay-colors.ts (ACCENT/FOCUS, mirroring the CSS tokens). The Viewer also
-                          exposes `pickBlock(x,y)` (raycast → block cell, via stepping along the ray) +
-                          `setSelection`/`setSymmetryPlane` for the editor.
+                          selection-overlay.ts + symmetry-overlay.ts + void-overlay.ts + hover-overlay.ts
+                          (SelectionOverlay = the block editor's outlined+filled selection boxes;
+                          SymmetryOverlay = the live mirror plane; VoidOverlay = occluded wireframe markers
+                          over the solid-adjacent air/structure_void cells; HoverOverlay = the single
+                          paint/place preview cube) — all extend scene-overlay.ts (SceneOverlay, the shared
+                          scene/group/clear lifecycle) and read overlay-colors.ts (ACCENT/FOCUS/AIR_MARK
+                          [blue]/VOID_MARK [red], mirroring Minecraft's show-invisible-blocks colors). The Viewer also exposes `pickBlock(x,y)`
+                          (raycast → block cell, via stepping along the ray) + `pickPlacement(x,y)` (empty
+                          cell in front) + `setSelection`/`setSymmetryPlane`/`setVoids`/`setHover`/`setPaintNav`.
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain
@@ -1021,25 +1024,71 @@ corrupted on transform, capped/corrupting undo).
 
 - **Pure ops** (`renderer/editor/ops.ts`, unit-tested) rewrite `{size, palette, blocks}`:
   select (single / box / toggle), move, mirror/rotate (`planTransform`), extrude (spacing 1 = raise
-  walls / stack; spacing > 1 = a repeating array), build stairs (facing-correct), place, replace, delete. Move/extrude/place preserve orientation FOR FREE
+  walls / stack; spacing > 1 = a repeating array), build stairs (facing-correct), replace, delete, plus
+  the PAINT primitives — `placeCells` (the shared intern-and-overwrite for N cells, the base
+  `placeBlock`/the symmetry-mirrored brush both route through), `recolorCell` (repaint an existing block
+  in place), `floodFill` (the bucket — 6-connected same-entry region), `setVoidCell` (paint air /
+  structure_void / clear, GUARDED so it never overwrites a solid), `airEntry` (a local air-flagged
+  PaletteEntry, no IPC since air never renders), and `voidMarkers` (the solid-adjacent air/void cells for
+  the overlay). Move/extrude/paint preserve orientation FOR FREE
   (they only copy a block's `state`); **mirror/rotate** rewrite the directional blockstate (facing/axis/
   shape/hinge/rotation) via the shared `structure/orientation.ts` `transformProps`, pivoting about the
   selection's OWN centre — the transform WorldEdit never fully fixed. The **store** (`state/editor.ts`)
   holds mode/tool/selection/anchor/params + an undo/redo SNAPSHOT stack, patches the active doc's
-  `StructureData`, and the viewer re-shows on change (EditorLayer). Move/extrude use precise ±1 axis
-  buttons + arrow keys (no fiddly gizmo, by design); mirror/rotate are buttons too.
+  `StructureData`, and the viewer re-shows on change (EditorLayer). A paint/void DRAG coalesces into ONE
+  undo step via a STROKE (`strokeBegin`/`strokePaint`/`strokeEnd`): the brush block is resolved once at
+  begin so each dragged cell is a synchronous edit, and only the first cell snapshots (`commit` =
+  `applyResult(…, snap)` — the split that makes stroke-coalescing one code path). Move/extrude use
+  precise ±1 axis buttons + arrow keys (no fiddly gizmo, by design); mirror/rotate are buttons too.
+- **Paint tool** (`paint`, replaced the old single-click Place — a drag subsumes it) has three modes (a
+  Segmented): **brush** (click/drag over surfaces to add), **recolor** (drag across existing blocks to
+  repaint in place), **fill** (one-click flood-fill). A **hover preview** ghost (`HoverOverlay`, tinted
+  per intent) shows the target cell BEFORE you commit — the #1 voxel-editor complaint. Brush + Delete
+  honour live symmetry; the eyedropper samples into `paintBlock`.
+- **Air / structure void** (`void` tool + the header "Show voids" toggle): the editor can SHOW the
+  otherwise-invisible empty cells. Air + structure_void survive load (`load-structure` keeps every block)
+  and save faithfully, but render as holes. Minecraft semantics matter here: on paste `minecraft:air`
+  CLEARS the cell, while `minecraft:structure_void` (and a cell simply OMITTED from `blocks`) LEAVE the
+  world untouched — void ≡ omitted, which is why the Void tool is just **air | void** (no "clear": an
+  omitted cell already preserves terrain exactly like structure_void). Colors MATCH Minecraft's "show
+  invisible blocks": **air = BLUE** (`AIR_MARK`), **void = RED** (`VOID_MARK`). `voidMarkers` (ops.ts)
+  drives the overlay with three rules: (1) explicit `structure_void` → always shown (red, rare/intentional);
+  (2) **OMITTED cells** (a cell not in `blocks`) in a DENSE capture (`blocks/box > 0.5` — the build lists
+  its air so omission is an intentional carve-out, NOT the empty space around a sparse build) → shown as
+  void (red), boundary-only, ALWAYS — THIS is the common "my `.nbt` has a structure_void region but no void
+  block": a structure block drops the region from the list, so it survives only as omission; (3) explicit
+  `minecraft:air` → bulk (a captured `.nbt` stores it for the whole volume — the fog problem), shown only
+  when sparse (≤ `AIR_OVERLAY_CAP` = 256) or `revealAir` (the Void tool is active), boundary-only (blue).
+  `VoidOverlay` draws small wireframe markers with depthTest ON, so they're OCCLUDED by the build like real
+  blocks. `setVoidCell` is GUARDED to touch only empty cells (a stroke runs harmlessly over
+  solids), so void editing can't gut real geometry. A **cursor readout** (`describeCell` → the store's
+  `hoverInfo`, shown in the panel for Paint/Void) names whatever's under the pointer — `air` / `structure
+  void` / `empty` / a block id — via `viewer.identifyCell` (raycasts the solid mesh AND the void markers,
+  nearest wins), so cells are always tellable apart even when the overlay is sparse. (A `.nbt` that looks
+  like it has structure_void but shows nothing usually stores `minecraft:air` or omits the cells — both
+  invisible; the readout / absence-of-cyan is the tell.) The **Inspector (Info panel) + Statusbar list
+  air-like entries too** now (`groupBlocks` + `paletteCount`/`typeCount` no longer filter `entry.air`),
+  so a `.nbt`'s `structure_void`/`air` show up in the palette with their counts — the file's palette is
+  reported faithfully. (`blockCount`/"Blocks" stays SOLID-only — air isn't a placed block.)
 - **Picking:** the geometry is merged per-material (no per-block meshes), so the Viewer raycasts and
   steps a hair ALONG THE RAY past the hit point — robust where the face normal isn't (a wrong-way normal
-  would pick the wrong side). `pickBlock` steps INTO the surface (`+dir·ε`) for the solid cell; `pickPlacement`
-  steps BACK (`−dir·ε`) for the empty cell in front (the Place tool). A click that didn't move >4px is a
-  pick; a drag still orbits. `SelectionOverlay` draws the cobalt selection boxes.
-- **Live symmetry** (`symmetry` off/x/z in the store, a Segmented shown under the rail ONLY for the Place +
-  Delete tools, since it only affects those — no phantom control elsewhere): Place + Delete
+  would pick the wrong side). `pickBlock` steps INTO the surface (`+dir·ε`) for the solid cell;
+  `pickPlacement` steps BACK (`−dir·ε`) for the empty cell in front (Paint's brush + the Void tool target
+  it — NOT the void overlay, so a fog of air markers can't hijack a placement). A click that didn't move
+  >4px is a pick; a NON-paint drag still orbits. For Paint/Void tools `viewer.setPaintNav(true)` hands the
+  LEFT button to painting and orbit to the RIGHT button (the MagicaVoxel convention), so a stroke never
+  fights the camera; a drag with pointer-capture paints continuously, and EditorLayer COALESCES the
+  per-cell structure patch into at most one mesh rebuild per frame (a fast drag would otherwise rebuild
+  the merged geometry dozens of times a second). `SelectionOverlay` draws the cobalt selection boxes;
+  both new overlays extend the shared `SceneOverlay` like it.
+- **Live symmetry** (`symmetry` off/x/z in the store, a Segmented shown under the rail ONLY for the Paint +
+  Delete tools, since it only affects those — no phantom control elsewhere): Paint (brush) + Delete
   are mirrored across the structure's centre on that axis, with the placed block's directional blockstate
   flipped (`mirrorCell` + `transformProps`). While symmetry is on, the viewer draws a translucent cobalt
   **mirror plane** through the structure centre (`SymmetryOverlay`, mirrored from the store by `EditorLayer`)
-  so you SEE where placements land. **Replace v2:** a 3D swatch (`BlockPreview`) of the target block
-  + an **eyedropper** (`eyedropper` flag → next click `sample`s the block under the cursor into `replaceBlock`).
+  so you SEE where placements land. **Replace + Paint** each carry a 3D swatch (`BlockPreview`) of the
+  target block + an **eyedropper** (`eyedropper` flag → next click `sample`s the block under the cursor
+  into the active tool's block field).
 - **Rendering a NEW block** (Replace / Stairs) needs resolved models → IPC `structure:resolve-block`
   (`resolveBlockEntry` in block-catalog.ts) returns {entry, textures}; the store interns it + merges
   textures, then re-shows.
@@ -1213,9 +1262,22 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`, darwin-only). The
   full bleed is REQUIRED on macOS 26 (Tahoe): the OS composites every app icon onto a standardized rounded
   tile and masks it to the squircle, so an icon with transparent padding leaves the system tile showing as
-  a WHITE BORDER around the artwork — a full-bleed square masked by the OS avoids it. Regenerate from the
-  full-bleed master (rebuild the iconset → `iconutil -c icns`); re-derive the full-bleed master from
-  `icon-master.png` (cover-scale the squircle, fill corners navy).
+  a WHITE BORDER around the artwork — a full-bleed square masked by the OS avoids it. The cube SUBJECT is
+  also zoomed to ~70% of the canvas (was ~50%, which read tiny on Tahoe's tile) — re-zoom by center-cropping
+  the full-bleed master ~76% and rescaling. Regenerate from the full-bleed master (rebuild the iconset →
+  `iconutil -c icns` + downscale to `icon.png`); re-derive the full-bleed master from `icon-master.png`
+  (cover-scale the squircle, fill corners navy). NOTE: the dev dock (`npm start`, `app.dock.setIcon`) takes
+  a raster PNG and macOS still tiles it — only the cube-zoom helps there; the `.icon` format below does NOT.
+- **macOS 26 Liquid Glass icon (packaged only):** the proper Tahoe icon is a compiled `Assets.car` +
+  `CFBundleIconName`, NOT the `.icns`. Forge has no built-in support, so `forge.config.ts`
+  `installLiquidGlassIcon` (a `packageAfterCopy` hook) drops `build/Assets.car` into the .app's
+  `Contents/Resources/` and sets `CFBundleIconName: AppIcon` before signing — but ONLY if `build/Assets.car`
+  exists, so it's a no-op until you author one. Authoring needs a Mac with **Xcode 26+** (for `actool`) +
+  **Icon Composer**: design `build/AppIcon.icon` (import `icon-master-fullbleed.png` as the artwork), then
+  `xcrun actool build/AppIcon.icon --compile build --app-icon AppIcon --platform macosx
+  --minimum-deployment-target 26.0 --output-partial-info-plist /tmp/ai.plist` → `build/Assets.car`. The
+  `.icns` stays as the pre-Tahoe fallback (both coexist). This can't be produced/verified without Xcode 26,
+  so the hook ships dormant.
 - **Boot splash:** static markup + inline `<style>` in `index.html` inside `#app`; React's
   `createRoot(...).render()` replaces it on mount, so the window never shows empty. Its background
   is hardcoded to the same values as `--bg` (light/dark via `prefers-color-scheme`) — keep them in

@@ -1,19 +1,26 @@
 import { describe, it, expect } from 'vitest';
 import type { PaletteEntry, StructureBlock } from '@/shared/types';
 import {
+  airEntry,
+  describeCell,
+  voidMarkers,
   buildStairs,
   cellKey,
   cuboidCells,
   deleteSelection,
   extrudeSelection,
+  floodFill,
   internEntry,
   mirrorCell,
   moveSelection,
   occupancy,
   placeBlock,
+  placeCells,
   planTransform,
+  recolorCell,
   replaceSelection,
   selectBox,
+  setVoidCell,
   type EditData,
 } from '../ops';
 
@@ -143,6 +150,160 @@ describe('placeBlock', () => {
     const r = placeBlock(data(), [2, 0, 0], entry('minecraft:glass'));
     expect(r.blocks.find((b) => cellKey(b.pos) === '2,0,0')?.state).toBe(r.palette.findIndex((p) => p.name === 'minecraft:glass'));
     expect(r.selection).toEqual(['2,0,0']);
+  });
+});
+
+describe('placeCells', () => {
+  it('places several blocks in one edit, interning each entry once', () => {
+    const r = placeCells(data(), [
+      { cell: [2, 0, 0], entry: entry('minecraft:glass') },
+      { cell: [2, 1, 0], entry: entry('minecraft:glass') },
+    ]);
+    const glass = r.palette.findIndex((p) => p.name === 'minecraft:glass');
+    expect(r.palette.filter((p) => p.name === 'minecraft:glass')).toHaveLength(1); // deduped
+    expect(r.blocks.filter((b) => b.state === glass)).toHaveLength(2);
+    expect(r.selection.sort()).toEqual(['2,0,0', '2,1,0']);
+  });
+});
+
+describe('recolorCell', () => {
+  it('repaints the existing block in place', () => {
+    const r = recolorCell(data(), [0, 0, 0], entry('minecraft:oak_planks'));
+    const planks = r!.palette.findIndex((p) => p.name === 'minecraft:oak_planks');
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '0,0,0')?.state).toBe(planks);
+  });
+  it('is a no-op on an empty cell (nothing to recolor)', () => {
+    expect(recolorCell(data(), [2, 2, 2], entry('minecraft:oak_planks'))).toBeNull();
+  });
+});
+
+describe('setVoidCell', () => {
+  it('marks an empty cell as air without touching solids', () => {
+    const r = setVoidCell(data(), [2, 0, 0], 'air');
+    const air = r!.palette.findIndex((p) => p.name === 'minecraft:air');
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '2,0,0')?.state).toBe(air);
+  });
+  it('marks structure void with the right block', () => {
+    const r = setVoidCell(data(), [2, 0, 0], 'void');
+    expect(r!.palette.some((p) => p.name === 'minecraft:structure_void')).toBe(true);
+  });
+  it('refuses to overwrite a solid block', () => {
+    expect(setVoidCell(data(), [0, 0, 0], 'air')).toBeNull();
+  });
+  it('switches an existing air marker to structure void', () => {
+    const d = data();
+    d.blocks.push(block(1, [2, 0, 0])); // an air marker at index 1
+    const r = setVoidCell(d, [2, 0, 0], 'void');
+    const st = r!.blocks.find((b) => cellKey(b.pos) === '2,0,0')!.state;
+    expect(r!.palette[st].name).toBe('minecraft:structure_void');
+  });
+});
+
+describe('floodFill', () => {
+  it('fills the connected region of the same block', () => {
+    const d: EditData = {
+      size: [3, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:dirt')],
+      blocks: [block(0, [0, 0, 0]), block(0, [1, 0, 0]), block(1, [2, 0, 0])],
+    };
+    const r = floodFill(d, [0, 0, 0], entry('minecraft:glass'));
+    const glass = r!.palette.findIndex((p) => p.name === 'minecraft:glass');
+    expect(r!.blocks.filter((b) => b.state === glass).map((b) => cellKey(b.pos)).sort()).toEqual(['0,0,0', '1,0,0']);
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '2,0,0')?.state).toBe(1); // dirt untouched
+  });
+  it('is a no-op on an empty start cell', () => {
+    expect(floodFill(data(), [2, 2, 2], entry('minecraft:glass'))).toBeNull();
+  });
+});
+
+describe('voidMarkers', () => {
+  it('keeps only air/void cells adjacent to a solid (the editable boundary, not the fog)', () => {
+    const d: EditData = {
+      size: [4, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true), entry('minecraft:structure_void', true)],
+      blocks: [
+        block(0, [0, 0, 0]), // solid
+        block(1, [1, 0, 0]), // air touching the solid → shown
+        block(1, [3, 0, 0]), // air far from any solid → hidden (would be fog)
+        block(2, [0, 0, 1]), // structure_void? actually out of the line; touches the solid at 0,0,0
+      ],
+    };
+    const m = voidMarkers(d);
+    const byKey = new Map(m.map((v) => [v.key, v.kind]));
+    expect(byKey.get('1,0,0')).toBe('air');
+    expect(byKey.has('3,0,0')).toBe(false); // isolated air dropped
+    expect(byKey.get('0,0,1')).toBe('void'); // structure_void next to the solid
+  });
+  it('always shows structure_void, even far from any solid (it is intentional)', () => {
+    const d: EditData = {
+      size: [6, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:structure_void', true)],
+      blocks: [block(0, [0, 0, 0]), block(1, [5, 0, 0])], // void isolated at the far end
+    };
+    expect(voidMarkers(d).map((v) => v.key)).toContain('5,0,0');
+  });
+  it('shows OMITTED cells of a dense capture as void (terrain-preserving carve-outs)', () => {
+    const d: EditData = {
+      size: [1, 1, 3],
+      palette: [entry('minecraft:stone')],
+      blocks: [block(0, [0, 0, 0]), block(0, [0, 0, 1])], // [0,0,2] omitted, dense (2/3 > 0.5)
+    };
+    expect(voidMarkers(d)).toEqual([{ key: '0,0,2', kind: 'void' }]);
+  });
+  it('does NOT treat omitted cells of a SPARSE build as void (just empty space)', () => {
+    const d: EditData = {
+      size: [1, 1, 5],
+      palette: [entry('minecraft:stone')],
+      blocks: [block(0, [0, 0, 0])], // 1/5 < 0.5 → sparse, omitted is just empty
+    };
+    expect(voidMarkers(d)).toEqual([]);
+  });
+  it('reveals bulk air when editing (revealAir), still boundary-only', () => {
+    const blocks: StructureBlock[] = [block(0, [0, 0, 0])];
+    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // 300 air, only [1,0,0] touches the solid
+    const d: EditData = {
+      size: [2, 1, 301],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
+      blocks,
+    };
+    expect(voidMarkers(d).length).toBe(0); // capped off by default
+    const revealed = voidMarkers(d, true);
+    expect(revealed.map((v) => v.key)).toEqual(['1,0,0']); // shown, but only the boundary cell
+  });
+  it('drops bulk air (a captured .nbt) but keeps structure_void', () => {
+    const blocks: StructureBlock[] = [block(0, [0, 0, 0])]; // one solid
+    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // 300 air cells — bulk
+    blocks.push(block(2, [1, 0, 0])); // a structure_void next to the solid
+    const d: EditData = {
+      size: [2, 1, 301],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true), entry('minecraft:structure_void', true)],
+      blocks,
+    };
+    const kinds = voidMarkers(d).map((v) => v.kind);
+    expect(kinds).not.toContain('air'); // bulk air suppressed (no fog)
+    expect(kinds).toContain('void'); // structure_void still shown
+  });
+});
+
+describe('describeCell', () => {
+  it('names a solid block, and tells air / void / empty apart', () => {
+    const d: EditData = {
+      size: [4, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true), entry('minecraft:structure_void', true)],
+      blocks: [block(0, [0, 0, 0]), block(1, [1, 0, 0]), block(2, [2, 0, 0])],
+    };
+    expect(describeCell(d, [0, 0, 0])).toEqual({ kind: 'block', name: 'minecraft:stone' });
+    expect(describeCell(d, [1, 0, 0])).toEqual({ kind: 'air' });
+    expect(describeCell(d, [2, 0, 0])).toEqual({ kind: 'void' });
+    expect(describeCell(d, [3, 0, 0])).toEqual({ kind: 'empty' });
+  });
+});
+
+describe('airEntry', () => {
+  it('builds an air-flagged palette entry with no models', () => {
+    const e = airEntry('minecraft:structure_void');
+    expect(e.air).toBe(true);
+    expect(e.models).toEqual([]);
   });
 });
 

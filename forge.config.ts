@@ -10,6 +10,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 // macOS code signing, gated on env vars. Two tiers:
 //   1. No Apple Developer cert (default): AD-HOC sign (identity '-'). This produces
@@ -72,6 +73,37 @@ const RUNTIME_PACKAGES = [
   'zod',
 ];
 
+/** Install the macOS 26 (Tahoe) "Liquid Glass" app icon into the freshly-copied .app, IF one
+ *  has been compiled. macOS draws the legacy `.icns` (set via packagerConfig.icon) on a
+ *  standardized tile and insets it; a proper Liquid Glass icon is a compiled `Assets.car` +
+ *  `CFBundleIconName` in Info.plist. Forge/@electron/packager has no built-in support, so we
+ *  drop it in here — BEFORE signing, so it's signed with the bundle.
+ *
+ *  This is a NO-OP unless `build/Assets.car` exists, so current builds are unaffected. To
+ *  produce it (needs a Mac with Xcode 26+):
+ *    1. Author `build/AppIcon.icon` in Icon Composer (import build/icon-master-fullbleed.png
+ *       as the artwork — a single flat layer is fine; add glass layers for the full effect).
+ *    2. Compile it:  xcrun actool build/AppIcon.icon --compile build \
+ *                      --app-icon AppIcon --output-partial-info-plist /tmp/ai.plist \
+ *                      --platform macosx --minimum-deployment-target 26.0
+ *       (produces build/Assets.car). The `.icns` stays as the pre-Tahoe fallback.
+ *  `buildPath` is the copied `…/<App>.app/Contents/Resources/app`, so Contents is two up. */
+function installLiquidGlassIcon(buildPath: string, platform: string): void {
+  if (platform !== 'darwin') return;
+  const assetsCar = path.join(process.cwd(), 'build', 'Assets.car');
+  if (!fs.existsSync(assetsCar)) return; // no Liquid Glass icon authored yet
+  const contents = path.resolve(buildPath, '..', '..');
+  const infoPlist = path.join(contents, 'Info.plist');
+  if (!fs.existsSync(infoPlist)) return; // not a .app layout — bail safely
+  fs.copyFileSync(assetsCar, path.join(contents, 'Resources', 'Assets.car'));
+  // Point Info.plist at the icon in Assets.car (kept alongside CFBundleIconFile = the .icns).
+  try {
+    execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Add :CFBundleIconName string AppIcon', infoPlist]);
+  } catch {
+    execFileSync('/usr/libexec/PlistBuddy', ['-c', 'Set :CFBundleIconName AppIcon', infoPlist]);
+  }
+}
+
 /** A package's runtime dependency names (deps + optionalDeps) from its manifest. */
 function dependencyNames(pkgDir: string): string[] {
   try {
@@ -111,6 +143,11 @@ const config: ForgeConfig = {
     // packages land in the asar and the `asar.unpack` glob extracts their binaries.
     packageAfterPrune: async (_config, buildPath) => {
       copyDependencyClosure(RUNTIME_PACKAGES, process.cwd(), buildPath);
+    },
+    // Install the macOS 26 Liquid Glass icon if one has been compiled (no-op otherwise).
+    // Runs after copy, before signing, so the Assets.car is signed with the bundle.
+    packageAfterCopy: async (_config, buildPath, _electronVersion, platform) => {
+      installLiquidGlassIcon(buildPath, platform);
     },
   },
   packagerConfig: {

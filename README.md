@@ -69,10 +69,12 @@ refines through an emit → render → review loop — previewed live in the vie
   is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
 - In-app **block editor** — edit a structure directly in the 3D viewer: click to select (Shift-click
   for a box), move and extrude the selection (raise a footprint into walls), **mirror and rotate** it,
-  build facing-correct stairs, place, replace and delete blocks, with real undo/redo and arrow-key
-  nudging. Orientation stays correct on every transform — mirror a wing and its stairs/logs/doors flip
-  the right way (the bug WorldEdit never fully fixed) — and **Save version** writes the edit as a new
-  `.nbt` version, so a mistake is never fatal
+  build facing-correct stairs, **paint** blocks (click-and-drag a brush, recolor existing blocks, or
+  flood-fill a region), replace and delete, with real undo/redo and arrow-key nudging. A hover preview
+  shows where each block lands before you commit, and **air / structure void** cells can be shown and
+  edited safely (painting them never overwrites a solid block). Orientation stays correct on every
+  transform — mirror a wing and its stairs/logs/doors flip the right way (the bug WorldEdit never fully
+  fixed) — and **Save version** writes the edit as a new `.nbt` version, so a mistake is never fatal
 - **Schematic interop** — open **WorldEdit `.schem`** (Sponge) and **Litematica `.litematic`** schematics
   directly: they decode, render, and edit exactly like a native `.nbt`, and **Export As…** writes any of
   the three formats (block entities like chest contents and sign text are preserved through the conversion)
@@ -184,10 +186,20 @@ directly in the 3D view:
   walls or stacks a column; spacing > 1 makes a repeating array.
 - **Stairs** — pick a start block, a direction and a length to lay an ascending stair run with every
   stair facing the right way.
-- **Place / Replace / Delete** — click a face to add a block, swap the selected blocks for another
-  (pick from the catalog, with a 3D swatch, or **eyedrop** a block from the build), or carve them away.
+- **Paint** — the fast way to place blocks. **Brush** clicks or drags over surfaces to add blocks (a
+  drag paints a continuous stroke); **Recolor** drags across existing blocks to repaint them in place;
+  **Fill** flood-fills a block's whole connected region. Pick the block from the catalog (with a 3D
+  swatch) or **eyedrop** one from the build, and a hover ghost previews the target cell. In paint mode
+  the left button paints and the right button orbits, so a stroke never fights the camera.
+- **Replace / Delete** — swap the selected blocks for another, or carve them away.
+- **Air / void** — toggle **Show voids** to surface the otherwise-invisible markers, colored like
+  Minecraft's "show invisible blocks": **air is blue** (clears the cell when pasted), **void is red**
+  (leaves the terrain untouched, for non-cuboid footprints). "Void" covers both `minecraft:structure_void`
+  and cells simply omitted from the structure — so a region you carved out as structure void in-world shows
+  up even though Minecraft saved it as omitted blocks. Then use the **Air / void** tool to paint air or
+  void; it only ever touches empty cells, so your solid blocks are never overwritten.
 - **Live symmetry** — turn on an X or Z mirror and a translucent plane in the viewer shows where it is;
-  your placements + deletions are mirrored across the build's centre as you work, with correct blockstates.
+  your paint + delete edits are mirrored across the build's centre as you work, with correct blockstates.
 
 Edits keep block orientation correct, support **undo/redo** (no small cap), and **Save version** writes
 the result as a new `.nbt` version in the same version chain as AI builds — so an edit is never fatal.

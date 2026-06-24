@@ -12,6 +12,8 @@ import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
 import { SelectionOverlay } from './selection-overlay';
 import { SymmetryOverlay } from './symmetry-overlay';
+import { HoverOverlay } from './hover-overlay';
+import { VoidOverlay, type VoidCell } from './void-overlay';
 import { TextureLoader } from './texture-loader';
 
 export type { FloorRegion } from './floor-regions';
@@ -39,6 +41,12 @@ export class Viewer {
   private selectionOverlay = new SelectionOverlay(this.scene);
 
   private symmetryOverlay = new SymmetryOverlay(this.scene);
+
+  /** Ghost markers over explicit air / structure-void cells ("show voids"). */
+  private voidOverlay = new VoidOverlay(this.scene);
+
+  /** A single preview cube at the cell the next paint/place would land on. */
+  private hoverOverlay = new HoverOverlay(this.scene);
 
   private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
@@ -222,9 +230,32 @@ export class Viewer {
     return this.rayCell(clientX, clientY, 0.05);
   }
 
-  /** The empty cell adjacent to the clicked face (Place — drop a block against a surface). */
+  /** The empty cell adjacent to the clicked face — Paint's brush and the Void tool drop into
+   *  this cell (against a surface), the same robust ray-step Place used. */
   pickPlacement(clientX: number, clientY: number): [number, number, number] | null {
     return this.rayCell(clientX, clientY, -0.05);
+  }
+
+  /** The cell directly under the cursor — whatever is nearest there: a solid block OR a void
+   *  marker (so the cursor readout can name air/structure_void cells too). Null on a miss.
+   *  Unlike `pickBlock`/`pickPlacement` this returns the cell you're POINTING AT, not the one
+   *  an edit would target. */
+  identifyCell(clientX: number, clientY: number): [number, number, number] | null {
+    if (!this.current) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.nav.camera);
+    const solid = this.raycaster.intersectObject(this.current, true)[0] ?? null;
+    const voids = this.voidOverlay.object;
+    const ghost = voids ? this.raycaster.intersectObject(voids, true)[0] ?? null : null;
+    const hit = ghost && (!solid || ghost.distance <= solid.distance) ? ghost : solid;
+    if (!hit) return null;
+    // Step a hair INTO the hit so flooring lands in its own cell (works for the inset marker too).
+    const p = hit.point.clone().addScaledVector(this.raycaster.ray.direction, 0.05);
+    return [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
   }
 
   /** Highlight the given cells ("x,y,z") as the editor selection. */
@@ -237,11 +268,30 @@ export class Viewer {
     this.symmetryOverlay.set(axis, size);
   }
 
+  /** Show ghost markers over the given explicit air / structure-void cells (empty = hidden). */
+  setVoids(cells: VoidCell[]): void {
+    this.voidOverlay.set(cells);
+  }
+
+  /** Preview the cell the next paint/place would affect, in `color` (null = hide). */
+  setHover(cell: [number, number, number] | null, color?: number): void {
+    this.hoverOverlay.set(cell, color);
+  }
+
+  /** Hand the LEFT mouse button to painting (orbit moves to the RIGHT button) while a Paint/
+   *  Void tool is active, so a drag paints instead of rotating — the camera-vs-paint split
+   *  voxel editors are faulted for blurring. Restores the orbit defaults when off. */
+  setPaintNav(on: boolean): void {
+    this.nav.setPaintNav(on);
+  }
+
   clear() {
     this.lastPieces = null;
     this.highlight.clear();
     this.selectionOverlay.clear();
     this.symmetryOverlay.clear();
+    this.voidOverlay.clear();
+    this.hoverOverlay.clear();
     // Drop the live band meshes but keep the desired regions so the next build
     // re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();

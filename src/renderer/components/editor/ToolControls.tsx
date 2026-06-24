@@ -4,8 +4,9 @@
 import { useMemo } from 'react';
 import { Pipette, Trash2 } from 'lucide-react';
 import { useEditor } from '../../hooks/useStores';
-import { editorStore, type Tool } from '../../state/editor';
+import { editorStore, type PaintMode, type Tool, type VoidKind } from '../../state/editor';
 import type { Axis, Cell, Horizontal } from '../../editor/ops';
+import { Segmented } from '../ui/Segmented';
 import { Select } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
 import { BlockPreview } from '../ui/BlockPreview';
@@ -15,6 +16,8 @@ import { useBlockIds } from './useBlockIds';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
 const DIRS: Horizontal[] = ['north', 'south', 'east', 'west'];
+const PAINT_MODES: PaintMode[] = ['brush', 'recolor', 'fill'];
+const VOID_KINDS: VoidKind[] = ['air', 'void'];
 const axisDelta = (axis: Axis, dir: 1 | -1): Cell => [axis === 'x' ? dir : 0, axis === 'y' ? dir : 0, axis === 'z' ? dir : 0];
 
 export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
@@ -27,7 +30,9 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
   const stairsDir = useEditor((s) => s.stairsDir);
   const stairsSteps = useEditor((s) => s.stairsSteps);
   const replaceBlock = useEditor((s) => s.replaceBlock);
-  const placeBlock = useEditor((s) => s.placeBlock);
+  const paintBlock = useEditor((s) => s.paintBlock);
+  const paintMode = useEditor((s) => s.paintMode);
+  const voidKind = useEditor((s) => s.voidKind);
   const eyedropper = useEditor((s) => s.eyedropper);
   const blockIds = useBlockIds();
   const stairIds = useMemo(() => blockIds.filter((id) => id.endsWith('_stairs')), [blockIds]);
@@ -84,16 +89,44 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
         </>
       );
 
-    case 'place':
+    case 'paint':
       return (
         <>
-          <p className="editor-hint">{t('editor.placeHint')}</p>
+          <Segmented
+            value={paintMode}
+            ariaLabel={t('editor.paintMode')}
+            onChange={(v) => ed().setPaintMode(v as PaintMode)}
+            options={PAINT_MODES.map((m) => ({ value: m, label: t(`editor.paint.${m}` as MessageKey) }))}
+          />
+          <p className="editor-hint">{t(`editor.paintHint.${paintMode}` as MessageKey)}</p>
           <div className="editor-blockrow">
             <div className="editor-swatch">
-              <BlockPreview blockId={placeBlock} />
+              <BlockPreview blockId={paintBlock} />
             </div>
-            <BlockField label={t('editor.placeBlockLabel')} value={placeBlock} onChange={(v) => ed().setPlaceBlock(v)} options={blockIds} listId="editor-place-blocks" />
+            <BlockField label={t('editor.paintBlockLabel')} value={paintBlock} onChange={(v) => ed().setPaintBlock(v)} options={blockIds} listId="editor-paint-blocks" />
           </div>
+          <button
+            className={`btn sm ghost editor-eyedrop${eyedropper ? ' active' : ''}`}
+            onClick={() => ed().setEyedropper(!eyedropper)}
+            title={t('editor.eyedropperHint')}
+          >
+            <Pipette size={14} strokeWidth={1.9} aria-hidden />
+            {eyedropper ? t('editor.eyedropperOn') : t('editor.eyedropper')}
+          </button>
+        </>
+      );
+
+    case 'void':
+      return (
+        <>
+          <Segmented
+            value={voidKind}
+            ariaLabel={t('editor.voidKind')}
+            onChange={(v) => ed().setVoidKind(v as VoidKind)}
+            options={VOID_KINDS.map((k) => ({ value: k, label: t(`editor.void.${k}` as MessageKey) }))}
+          />
+          <p className="editor-hint">{t(`editor.voidHint.${voidKind}` as MessageKey)}</p>
+          <p className="editor-hint editor-note">{t('editor.voidSafe')}</p>
         </>
       );
 

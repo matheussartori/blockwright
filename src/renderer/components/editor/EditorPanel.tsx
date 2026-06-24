@@ -3,10 +3,10 @@
 // readout + Save/Undo/Redo. The orchestrator — it owns the layout + the selection readout;
 // the tools live in ToolRail/ToolControls, the ops in the store (state/editor.ts).
 import { useMemo } from 'react';
-import { Boxes, Pencil, Redo2, Save, Undo2, X } from 'lucide-react';
+import { Boxes, Eye, EyeOff, Pencil, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useActiveDoc, useEditor, useT } from '../../hooks/useStores';
 import { editorStore, type Symmetry } from '../../state/editor';
-import { cellKey, parseCell } from '../../editor/ops';
+import { cellKey, parseCell, type CellContent } from '../../editor/ops';
 import { Segmented } from '../ui/Segmented';
 import { ToolRail } from './ToolRail';
 import { ToolControls } from './ToolControls';
@@ -21,7 +21,17 @@ export function EditorPanel() {
   const canUndo = useEditor((s) => s.past.length > 0);
   const canRedo = useEditor((s) => s.future.length > 0);
   const symmetry = useEditor((s) => s.symmetry);
+  const showVoids = useEditor((s) => s.showVoids);
+  const hoverInfo = useEditor((s) => s.hoverInfo);
   const structure = useActiveDoc()?.structure ?? null;
+
+  // What the cursor is over (the readout), localized — a real block keeps its id.
+  const cellLabel = (c: CellContent): string => {
+    if (c.kind === 'block') return c.name.replace(/^minecraft:/, '');
+    if (c.kind === 'air') return t('editor.cell.air');
+    if (c.kind === 'void') return t('editor.cell.void');
+    return t('editor.cell.empty');
+  };
   const ed = editorStore.getState;
 
   // The footprint of the selection (W×H×D) for the readout.
@@ -69,16 +79,27 @@ export function EditorPanel() {
           <Boxes size={15} strokeWidth={1.9} aria-hidden />
           {t('editor.title')}
         </span>
-        <button className="editor-icon" onClick={() => ed().setActive(false)} title={t('editor.exit')} aria-label={t('editor.exit')}>
-          <X size={15} strokeWidth={2} aria-hidden />
-        </button>
+        <span className="editor-head-actions">
+          <button
+            className={`editor-icon${showVoids ? ' active' : ''}`}
+            onClick={() => ed().setShowVoids(!showVoids)}
+            title={t('editor.showVoids')}
+            aria-label={t('editor.showVoids')}
+            aria-pressed={showVoids}
+          >
+            {showVoids ? <Eye size={15} strokeWidth={1.9} aria-hidden /> : <EyeOff size={15} strokeWidth={1.9} aria-hidden />}
+          </button>
+          <button className="editor-icon" onClick={() => ed().setActive(false)} title={t('editor.exit')} aria-label={t('editor.exit')}>
+            <X size={15} strokeWidth={2} aria-hidden />
+          </button>
+        </span>
       </header>
 
       <ToolRail tool={tool} onTool={(id) => ed().setTool(id)} t={t} />
 
-      {/* Symmetry mirrors Place + Delete across the build's centre, so it only shows for
+      {/* Symmetry mirrors Paint + Delete across the build's centre, so it only shows for
           those tools — no phantom control under tools it doesn't affect. */}
-      {(tool === 'place' || tool === 'delete') && (
+      {(tool === 'paint' || tool === 'delete') && (
         <div className="editor-sym">
           <span className="editor-sym-label">{t('editor.symmetry')}</span>
           <Segmented
@@ -97,6 +118,13 @@ export function EditorPanel() {
       <div className="editor-context">
         <ToolControls tool={tool} t={t} />
       </div>
+
+      {(tool === 'paint' || tool === 'void') && hoverInfo && (
+        <div className="editor-hoverinfo">
+          <span className="editor-hoverpos">{hoverInfo.key}</span>
+          <span className="editor-hoverwhat">{cellLabel(hoverInfo.content)}</span>
+        </div>
+      )}
 
       <div className="editor-selinfo">
         {hasSel ? (
