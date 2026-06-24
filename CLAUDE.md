@@ -405,11 +405,18 @@ src/
                           and the opt-in `searchable` prop adds a sticky search box; the filter preserves
                           order so group headers HOLD while filtering (e.g. searching "classic" still shows
                           it under "House" then "Tower"); the OPAQUE
-                          `--elevated` token backs the menu, never the translucent `--panel`), Logo
+                          `--elevated` token backs the menu, never the translucent `--panel`), Tooltip
+                          (the hover/focus bubble — the richer replacement for a native `title=`: a bold
+                          `label` + an optional one-line `description` of what a control does, portal-rendered
+                          in `position:fixed` so the WebGL canvas can't clip it, with a directional caret and
+                          flip-when-no-room placement; shows after a hover delay but instantly on keyboard
+                          focus, keeps the trigger's `aria-label`, respects reduced motion — wrap one trigger
+                          element, no extra DOM box), Logo
                           (themed <picture>), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
                           Build dialogs/controls from these so fonts/spacing/styles stay consistent. Prefer
-                          `Select` over a native `<select>` or a fresh single-select chip group.
+                          `Select` over a native `<select>` or a fresh single-select chip group, and `Tooltip`
+                          over a bare `title=` when an icon-only control needs an explanation.
     generation/           Pure (no-React, no-IO) helpers behind the Generate composer, extracted from
                           NewStructurePanel/state so they're unit-testable: brief.ts (BuildDetails →
                           the model's "[Build details]" brief + BuildSelection + the BuildBrief chat

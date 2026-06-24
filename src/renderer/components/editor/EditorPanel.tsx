@@ -8,6 +8,7 @@ import { useActiveDoc, useEditor, useT } from '../../hooks/useStores';
 import { editorStore, type Symmetry } from '../../state/editor';
 import { cellKey, parseCell, type CellContent } from '../../editor/ops';
 import { Segmented } from '../ui/Segmented';
+import { Tooltip } from '../ui/Tooltip';
 import { ToolRail } from './ToolRail';
 import { ToolControls } from './ToolControls';
 
@@ -80,18 +81,23 @@ export function EditorPanel() {
           {t('editor.title')}
         </span>
         <span className="editor-head-actions">
-          <button
-            className={`editor-icon${showVoids ? ' active' : ''}`}
-            onClick={() => ed().setShowVoids(!showVoids)}
-            title={t('editor.showVoids')}
-            aria-label={t('editor.showVoids')}
-            aria-pressed={showVoids}
-          >
-            {showVoids ? <Eye size={15} strokeWidth={1.9} aria-hidden /> : <EyeOff size={15} strokeWidth={1.9} aria-hidden />}
-          </button>
-          <button className="editor-icon" onClick={() => ed().setActive(false)} title={t('editor.exit')} aria-label={t('editor.exit')}>
-            <X size={15} strokeWidth={2} aria-hidden />
-          </button>
+          {/* The Void tool forces the overlay on, so the eye is locked (disabled) while it's
+              active — it always shows there. */}
+          <Tooltip placement="right" label={t('editor.showVoids')} description={t('editor.showVoidsDesc')}>
+            <button
+              className={`editor-icon${showVoids ? ' active' : ''}`}
+              onClick={() => ed().setShowVoids(!showVoids)}
+              disabled={tool === 'void'}
+              aria-pressed={showVoids}
+            >
+              {showVoids ? <Eye size={15} strokeWidth={1.9} aria-hidden /> : <EyeOff size={15} strokeWidth={1.9} aria-hidden />}
+            </button>
+          </Tooltip>
+          <Tooltip placement="right" label={t('editor.exit')} description={t('editor.exitDesc')}>
+            <button className="editor-icon" onClick={() => ed().setActive(false)}>
+              <X size={15} strokeWidth={2} aria-hidden />
+            </button>
+          </Tooltip>
         </span>
       </header>
 
@@ -142,12 +148,16 @@ export function EditorPanel() {
       </div>
 
       <footer className="editor-foot">
-        <button className="editor-icon" onClick={() => ed().undo()} disabled={!canUndo} title={t('editor.undo')} aria-label={t('editor.undo')}>
-          <Undo2 size={15} strokeWidth={1.9} aria-hidden />
-        </button>
-        <button className="editor-icon" onClick={() => ed().redo()} disabled={!canRedo} title={t('editor.redo')} aria-label={t('editor.redo')}>
-          <Redo2 size={15} strokeWidth={1.9} aria-hidden />
-        </button>
+        <Tooltip placement="right" label={t('editor.undo')} description={t('editor.undoDesc')}>
+          <button className="editor-icon" onClick={() => ed().undo()} disabled={!canUndo}>
+            <Undo2 size={15} strokeWidth={1.9} aria-hidden />
+          </button>
+        </Tooltip>
+        <Tooltip placement="right" label={t('editor.redo')} description={t('editor.redoDesc')}>
+          <button className="editor-icon" onClick={() => ed().redo()} disabled={!canRedo}>
+            <Redo2 size={15} strokeWidth={1.9} aria-hidden />
+          </button>
+        </Tooltip>
         <button className="btn primary sm editor-save" disabled={!dirty || saving} onClick={() => void ed().save()}>
           <Save size={14} strokeWidth={1.9} aria-hidden />
           {saving ? t('editor.saving') : t('editor.save')}

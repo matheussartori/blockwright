@@ -4069,6 +4069,102 @@ body.row-resizing {
   to { opacity: 1; transform: none; }
 }
 
+/* ── Tooltip ─────────────────────────────────────────────────────────────────
+   The reusable hover/focus bubble (components/ui/Tooltip.tsx): a two-tier
+   label + description on the opaque elevated surface, with a caret anchoring it
+   to its trigger. Positioned by JS (left/top = the anchor point); a per-side
+   transform pulls the bubble onto the correct edge of that point. */
+.bw-tooltip {
+  position: fixed;
+  z-index: 1400;
+  max-width: 248px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--elevated);
+  border: 1px solid var(--border-strong, var(--border));
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  animation: bw-tooltip-in 0.11s ease-out both;
+}
+.bw-tooltip-label {
+  display: block;
+  font-size: 11.75px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.005em;
+}
+.bw-tooltip-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+/* The caret: a diamond tucked half under the bubble edge, bordered only on the
+   two outward-facing sides so it reads as a seamless arrowhead. */
+.bw-tooltip-caret {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--elevated);
+  border: 1px solid var(--border-strong, var(--border));
+}
+/* Anchor the bubble to the correct side of the JS-supplied point, and seat its caret. */
+.bw-tooltip.side-top {
+  transform: translate(-50%, calc(-100% - 5px));
+  transform-origin: bottom center;
+}
+.bw-tooltip.side-top .bw-tooltip-caret {
+  left: 50%;
+  bottom: -5px;
+  margin-left: -4px;
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+.bw-tooltip.side-bottom {
+  transform: translate(-50%, 5px);
+  transform-origin: top center;
+}
+.bw-tooltip.side-bottom .bw-tooltip-caret {
+  left: 50%;
+  top: -5px;
+  margin-left: -4px;
+  border-width: 1px 0 0 1px;
+  transform: rotate(45deg);
+}
+.bw-tooltip.side-right {
+  transform: translate(5px, -50%);
+  transform-origin: left center;
+}
+.bw-tooltip.side-right .bw-tooltip-caret {
+  top: 50%;
+  left: -5px;
+  margin-top: -4px;
+  border-width: 0 0 1px 1px;
+  transform: rotate(45deg);
+}
+.bw-tooltip.side-left {
+  transform: translate(calc(-100% - 5px), -50%);
+  transform-origin: right center;
+}
+.bw-tooltip.side-left .bw-tooltip-caret {
+  top: 50%;
+  right: -5px;
+  margin-top: -4px;
+  border-width: 1px 1px 0 0;
+  transform: rotate(45deg);
+}
+@keyframes bw-tooltip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bw-tooltip { animation: none; }
+}
+
 /* ── Stepper ─────────────────────────────────────────────────────────────────
    The composer's numeric control: a −/+ button flanking a click-to-type value.
    Big, comfortable hit targets (the native spinner arrows were unusable). */

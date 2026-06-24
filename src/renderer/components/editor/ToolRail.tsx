@@ -1,7 +1,9 @@
 // The editor's tool rail: one icon button per tool, the active one filled with the accent.
+// Each button carries a Tooltip naming the tool + a one-line note on what it does.
 import { ArrowUpFromLine, Brush, FlipHorizontal2, Move, MousePointer2, Replace, SquareDashed, Trash2, TrendingUp } from 'lucide-react';
 import type { Tool } from '../../state/editor';
 import type { MessageKey, TFunction } from '@/shared/i18n';
+import { Tooltip } from '../ui/Tooltip';
 
 const TOOLS: { id: Tool; Icon: typeof Move }[] = [
   { id: 'select', Icon: MousePointer2 },
@@ -19,15 +21,20 @@ export function ToolRail({ tool, onTool, t }: { tool: Tool; onTool: (tool: Tool)
   return (
     <div className="editor-tools">
       {TOOLS.map(({ id, Icon }) => (
-        <button
+        <Tooltip
           key={id}
-          className={`editor-tool${tool === id ? ' active' : ''}`}
-          onClick={() => onTool(id)}
-          title={t(`editor.tool.${id}` as MessageKey)}
-          aria-pressed={tool === id}
+          placement="right"
+          label={t(`editor.tool.${id}` as MessageKey)}
+          description={t(`editor.toolDesc.${id}` as MessageKey)}
         >
-          <Icon size={17} strokeWidth={1.8} aria-hidden />
-        </button>
+          <button
+            className={`editor-tool${tool === id ? ' active' : ''}`}
+            onClick={() => onTool(id)}
+            aria-pressed={tool === id}
+          >
+            <Icon size={17} strokeWidth={1.8} aria-hidden />
+          </button>
+        </Tooltip>
       ))}
     </div>
   );

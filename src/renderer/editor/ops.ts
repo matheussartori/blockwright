@@ -227,8 +227,8 @@ const AIR_OVERLAY_CAP = 256;
  *    an omitted cell is an intentional carve-out, not the empty space around a sparse build): shown
  *    as `void`, boundary-only (their visible face), ALWAYS — this is the user's "void region".
  *  - `minecraft:air` (explicit): bulk (a captured `.nbt` stores it for the whole volume), the fog
- *    risk — shown only when sparse (≤ {@link AIR_OVERLAY_CAP}) or `revealAir` (the Void tool is
- *    active), and then boundary-only. */
+ *    risk — shown only when sparse (≤ {@link AIR_OVERLAY_CAP}) or `revealAir` (the "show air / void"
+ *    overlay is explicitly on), and then boundary-only. */
 export function voidMarkers(d: EditData, revealAir = false): VoidMarker[] {
   const solid = occupancy(d); // non-air cells
   const hasSolidNeighbor = (p: readonly number[]): boolean =>

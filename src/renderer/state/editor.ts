@@ -150,6 +150,9 @@ export const editorStore = createStore<EditorState>((set, get) => {
   // stroke's FIRST committed cell snapshots for undo.
   let stroke: { entry: PaletteEntry; textures: string[]; mirror: { entry: PaletteEntry; textures: string[] } | null } | null = null;
   let strokeSnapped = false;
+  // The "show voids" state saved when entering the Void tool (which forces the overlay on),
+  // so leaving the tool restores whatever the user had before. null = not currently in the Void tool.
+  let voidPrevShowVoids: boolean | null = null;
 
   /** Patch the active doc with an op result (merging any new textures + recomputing the
    *  block count) and update the selection. Snapshots for undo first unless `snap` is false
@@ -218,9 +221,21 @@ export const editorStore = createStore<EditorState>((set, get) => {
       }
       set(active ? { active } : { active, selection: [], anchor: null, eyedropper: false, hoverInfo: null });
     },
-    // Picking the Void tool reveals the markers so you can see what you're editing (the
-    // global toggle still lets you hide them again).
-    setTool: (tool) => set(tool === 'void' ? { tool, showVoids: true } : { tool }),
+    // The Void tool always reveals the air/void markers (the eye is disabled meanwhile). We
+    // remember the overlay state on entry and restore it on exit, so toggling the tool doesn't
+    // silently flip a preference the user set: hidden → forced on → hidden again; shown → stays shown.
+    setTool: (tool) => {
+      const cur = get().tool;
+      if (tool === 'void' && cur !== 'void') {
+        voidPrevShowVoids = get().showVoids;
+        set({ tool, showVoids: true });
+      } else if (tool !== 'void' && cur === 'void') {
+        set({ tool, showVoids: voidPrevShowVoids ?? get().showVoids });
+        voidPrevShowVoids = null;
+      } else {
+        set({ tool });
+      }
+    },
     clearSelection: () => set({ selection: [], anchor: null }),
 
     pick: (cell, mode) => {

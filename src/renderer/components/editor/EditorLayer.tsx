@@ -204,13 +204,14 @@ export function EditorLayer() {
       const struct = activeDocument(documentsStore.getState())?.structure;
       viewer.setSymmetryPlane(sym === 'none' || !struct ? null : sym, struct?.size ?? [0, 0, 0]);
     };
-    // Mirror the explicit air/void boundary cells into the viewer when "show voids" is on. The
-    // Void tool reveals ALL boundary air (you're deliberately editing it); other tools cap bulk
-    // air so it can't fog the build.
+    // Mirror the explicit air/void boundary cells into the viewer when "show voids" is on.
+    // The eye explicitly promises "air / void", so turning it on reveals ALL boundary air too
+    // (not just void) — regardless of the active tool. With it off, no overlay; with it on and
+    // a bulk-air capture, the user opted into seeing it (toggle it back off to drop the fog).
     const applyVoids = () => {
       const s = editorStore.getState();
       const struct = activeDocument(documentsStore.getState())?.structure ?? null;
-      viewer.setVoids(s.showVoids && struct ? voidMarkers(struct, s.tool === 'void') : []);
+      viewer.setVoids(s.showVoids && struct ? voidMarkers(struct, s.showVoids) : []);
     };
     // Hand the LEFT button to painting while a Paint/Void tool is active (orbit → RIGHT button).
     const applyPaintNav = () => {
@@ -228,7 +229,6 @@ export function EditorLayer() {
       if (s.showVoids !== prev.showVoids) applyVoids();
       if (s.tool !== prev.tool) {
         applyPaintNav();
-        applyVoids(); // entering/leaving Void changes whether bulk air is revealed
         viewer.setHover(null); // a tool switch invalidates the old preview + readout
         clearHover();
       }
