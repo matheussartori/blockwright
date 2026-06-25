@@ -164,6 +164,21 @@ describe('placeCells', () => {
     expect(r.blocks.filter((b) => b.state === glass)).toHaveLength(2);
     expect(r.selection.sort()).toEqual(['2,0,0', '2,1,0']);
   });
+  it('drops placements outside the NBT volume (locked to size)', () => {
+    const r = placeCells(data(), [
+      { cell: [1, 0, 0], entry: entry('minecraft:glass') }, // in bounds
+      { cell: [3, 0, 0], entry: entry('minecraft:glass') }, // x == size[0] → out
+      { cell: [0, 0, -1], entry: entry('minecraft:glass') }, // z < 0 → out
+    ]);
+    const placed = r.blocks.filter((b) => r.palette[b.state].name === 'minecraft:glass');
+    expect(placed.map((b) => cellKey(b.pos))).toEqual(['1,0,0']);
+    expect(r.selection).toEqual(['1,0,0']);
+  });
+  it('is a no-op when every placement is out of bounds', () => {
+    const r = placeCells(data(), [{ cell: [3, 3, 3], entry: entry('minecraft:glass') }]);
+    expect(r.palette.some((p) => p.name === 'minecraft:glass')).toBe(false);
+    expect(r.selection).toEqual([]);
+  });
 });
 
 describe('recolorCell', () => {
@@ -189,6 +204,10 @@ describe('setVoidCell', () => {
   });
   it('refuses to overwrite a solid block', () => {
     expect(setVoidCell(data(), [0, 0, 0], 'air')).toBeNull();
+  });
+  it('refuses a cell outside the NBT volume (locked to size)', () => {
+    expect(setVoidCell(data(), [3, 0, 0], 'air')).toBeNull();
+    expect(setVoidCell(data(), [0, -1, 0], 'void')).toBeNull();
   });
   it('switches an existing air marker to structure void', () => {
     const d = data();

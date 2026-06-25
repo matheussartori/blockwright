@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import { useViewer } from '../../viewer/ViewerProvider';
 import { useEditor } from '../../hooks/useStores';
 import { editorStore, type EditorState, type PickMode } from '../../state/editor';
-import { cellKey, describeCell, voidMarkers } from '../../editor/ops';
+import { cellKey, describeCell, inBounds, voidMarkers } from '../../editor/ops';
 import { documentsStore, activeDocument } from '../../state/documents';
 import { ACCENT, FOCUS, AIR_MARK, VOID_MARK } from '../../viewer/overlay-colors';
 
@@ -37,11 +37,19 @@ export function EditorLayer() {
     const canvas = viewer.domElement;
 
     // The cell the active Paint/Void tool targets at a screen point: brush + void aim at the
-    // empty cell in front of a surface, recolor/fill at the solid block under the cursor.
-    const target = (s: EditorState, x: number, y: number): [number, number, number] | null =>
-      s.tool === 'void' || (s.tool === 'paint' && s.paintMode === 'brush')
-        ? viewer.pickPlacement(x, y)
-        : viewer.pickBlock(x, y);
+    // empty cell in front of a surface, recolor/fill at the solid block under the cursor. The
+    // brush/void cell can fall OUTSIDE the structure (clicking a side face aims into the empty
+    // space beside it) — editing is locked to the NBT's volume, so reject it here too, so no
+    // ghost preview promises a placement the file can't hold.
+    const target = (s: EditorState, x: number, y: number): [number, number, number] | null => {
+      const cell =
+        s.tool === 'void' || (s.tool === 'paint' && s.paintMode === 'brush')
+          ? viewer.pickPlacement(x, y)
+          : viewer.pickBlock(x, y);
+      if (!cell) return null;
+      const size = activeDocument(documentsStore.getState())?.structure?.size;
+      return size && !inBounds(cell, size) ? null : cell;
+    };
 
     // The hover-preview hue: what the next edit will do at the cursor.
     const hue = (s: EditorState): number => {

@@ -88,18 +88,20 @@ export class FloorRegionsOverlay {
     this.clearMeshes();
     if (this.regions.length === 0) return;
 
-    // Footprint from the current build, padded out a little; fall back to a
-    // comfortable pad centred on the origin for a fresh (empty) tab.
-    let minX = -1;
-    let maxX = 15;
-    let minZ = -1;
-    let maxZ = 15;
+    // Footprint = the build's exact occupied extent (its meshes span world cell..cell+1, so
+    // the Box3 already hugs the solid blocks). No padding: the band must end where the NBT's
+    // structure-block region ends — at the house wall — not a cell past it. Fall back to a
+    // 16×16 plot at the origin for a fresh (empty) tab.
+    let minX = 0;
+    let maxX = 16;
+    let minZ = 0;
+    let maxZ = 16;
     if (current) {
       const box = new THREE.Box3().setFromObject(current);
-      minX = box.min.x - 1;
-      maxX = box.max.x + 1;
-      minZ = box.min.z - 1;
-      maxZ = box.max.z + 1;
+      minX = box.min.x;
+      maxX = box.max.x;
+      minZ = box.min.z;
+      maxZ = box.max.z;
     }
     const w = Math.max(maxX - minX, 2);
     const d = Math.max(maxZ - minZ, 2);

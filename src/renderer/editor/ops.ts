@@ -36,6 +36,19 @@ export interface OpResult {
   selection: string[];
 }
 
+/** Whether a cell sits inside the structure's declared `[0,size)` volume — the fixed extent
+ *  the `.nbt` can actually hold. Editing is LOCKED to it: the brush/void tools target the empty
+ *  cell in FRONT of a surface (`pickPlacement`), so clicking a side face aims OUTSIDE the file's
+ *  bounds — there's no cell there to write, so the placement is dropped. (Resizing to grow the
+ *  volume is a separate, future op.) */
+export function inBounds(cell: readonly number[], size: readonly [number, number, number]): boolean {
+  return (
+    cell[0] >= 0 && cell[0] < size[0] &&
+    cell[1] >= 0 && cell[1] < size[1] &&
+    cell[2] >= 0 && cell[2] < size[2]
+  );
+}
+
 /** Every integer cell key in the inclusive box between `a` and `b`. */
 export function cuboidCells(a: Cell, b: Cell): string[] {
   const out: string[] = [];
@@ -271,7 +284,10 @@ export function airEntry(name: string): PaletteEntry {
  *  (two) both route through it, so the intern-and-overwrite logic lives in one place. */
 export function placeCells(d: EditData, placements: { cell: Cell; entry: PaletteEntry }[]): OpResult {
   let palette = d.palette;
-  const interned = placements.map((p) => {
+  // Locked to the NBT's volume: a placement outside `size` (clicking a side face aims into the
+  // empty space beside the structure) has no cell to write, so drop it.
+  const inBox = placements.filter((p) => inBounds(p.cell, d.size));
+  const interned = inBox.map((p) => {
     const r = internEntry(palette, p.entry);
     palette = r.palette;
     return { index: r.index, cell: p.cell };
@@ -304,6 +320,7 @@ export function recolorCell(d: EditData, cell: Cell, entry: PaletteEntry): OpRes
  *  terrain exactly like structure_void, so Void already IS that state — repaint with the other kind
  *  to switch, or paint a solid over it.) Returns null when a solid is in the way. */
 export function setVoidCell(d: EditData, cell: Cell, kind: 'air' | 'void'): OpResult | null {
+  if (!inBounds(cell, d.size)) return null; // outside the NBT volume — nothing to write
   const k = cellKey(cell);
   const existing = d.blocks.find((b) => cellKey(b.pos) === k);
   if (existing && !d.palette[existing.state]?.air) return null; // a real block — protect it
