@@ -47,62 +47,29 @@ refines through an emit → render → review loop — previewed live in the vie
 
 ## Features
 
-- Real-time 3D rendering of `.nbt` structures with [Three.js](https://threejs.org)
-- AI structure generation from a prompt or reference image, through an emit → render → review loop
-  that refines the build live — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT
-  Plus/Pro) subscription, no API credits; with simple cost presets (Saver / Balanced / Thorough)
-  to trade quality for spend, configured in Settings ▸ AI
-- Composable generation domain — pick a structure type (a **House** — classic / modern / farmhouse /
-  sakura / gothic — or a **Tower** — a battlemented stone keep or a derelict gothic spire; each compiles a
-  code-built shell with
-  seeded run-to-run variety that the AI furnishes and details, so the silhouette is guaranteed), a
-  decoration (including a universal dressed-stone **castle** look and a dark-stone gothic-ruin **cursed**
-  look), a roof, a basement, an in-roof
-  attic, the surroundings (a code-built yard
-  laid outside the building shell: a fenced **cottage garden** — stone-and-fence
-  perimeter with a varied outline, lamp posts, a double-door gate, dirt paths, flower beds, crop
-  plots and a well or fountain — a **pool terrace**, or a fenced **graveyard**) and per-floor interior rooms — a
-  general family (living room, kitchen, library, bedroom, shared bedrooms, storage) and a horror family
-  (ritual chamber, dungeon, morgue, séance parlour) — in the full-stage Build Planner (browse
-  every part with live 3D previews in the Module Gallery); the selection guides the build and loads
-  only the relevant knowledge, and registered structure × decoration modules also cross at compile
-  time behind the `template` op. Each room scales its furnishing to the floor via space-tiered
-  **furnishing presets** (snug / standard / grand) that the chosen decoration re-skins — so a big room
-  is furnished to its size instead of coming out empty (browse a room's presets in the Module Gallery)
-- In-app **block editor** — edit a structure directly in the 3D viewer: click to select (Shift-click
-  for a box), move and extrude the selection (raise a footprint into walls), **mirror and rotate** it,
-  build facing-correct stairs, **paint** blocks (click-and-drag a brush, recolor existing blocks, or
-  flood-fill a region), replace and delete, with real undo/redo and arrow-key nudging. A hover preview
-  shows where each block lands before you commit, and **air / structure void** cells can be shown and
-  edited safely (painting them never overwrites a solid block). Orientation stays correct on every
-  transform — mirror a wing and its stairs/logs/doors flip the right way (the bug WorldEdit never fully
-  fixed) — and **Save version** writes the edit as a new `.nbt` version, so a mistake is never fatal
-- **Schematic interop** — open **WorldEdit `.schem`** (Sponge) and **Litematica `.litematic`** schematics
-  directly: they decode, render, and edit exactly like a native `.nbt`, and **Export As…** writes any of
-  the three formats (block entities like chest contents and sign text are preserved through the conversion)
-  — so a schematic can be brought in, tweaked, and saved back out (or converted to a mod-ready `.nbt`)
-- Floor-plan editing — define named vertical levels, highlighted as bands in the viewer, that ride
+- **Real-time 3D rendering** of `.nbt` structures with [Three.js](https://threejs.org), using the
+  real block models and textures from your own Minecraft content pack
+- **AI structure generation** from a prompt or reference image, refined live through an
+  emit → render → review loop — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT Plus/Pro)
+  subscription, no API credits, with cost presets (Saver / Balanced / Thorough) to trade quality for spend
+- **Composable build planner** — steer a generation by picking a structure type (a **House** or a
+  **Tower**, each with a code-built shell the AI furnishes), a decoration, roof, basement, attic,
+  surrounding yard and per-floor interior rooms, with live 3D previews of every part in the Module Gallery
+- **In-app block editor** — select, move, mirror/rotate, extrude, paint, replace and delete blocks
+  directly in the viewer, with live symmetry, undo/redo, and orientation that stays correct on every
+  transform; each save writes a new `.nbt` version so a mistake is never fatal
+- **Schematic interop** — open and export **WorldEdit `.schem`** and **Litematica `.litematic`**
+  schematics alongside native `.nbt`, preserving block entities (chest contents, sign text) on conversion
+- **Mod workspace support** — render modded structures with their own textures, and **export** a
+  structure into a workspace as a version-correct `.nbt` plus the worldgen JSON (jigsaw structure /
+  template pool / structure set / biome tag) that makes it spawn in-world
+- **Structure library** — every generated build is saved to its own folder (latest `.nbt`, kept
+  versions, and a generation log), revealed from the chat's build card
+- **Floor-plan editing** — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
-- A browsable structure library — each generated build is saved to its own folder (the latest clean
-  `.nbt`, every kept version, and a generation log), revealed from the chat's build card
-- Namespace-aware asset resolution from your own extracted Minecraft content pack (configurable;
-  not bundled)
-- Mod workspace support — render modded structures with their own textures and models, with the
-  workspace's target Minecraft version auto-detected, and **export** a structure into a workspace as a
-  version-correct `.nbt` plus the worldgen JSON (jigsaw structure / template pool / structure set /
-  biome tag) that makes it spawn in-world — reading the mod's own biomes and validating it before writing
-- Jigsaw assembly preview for worldgen template pools
-- Block Catalog browser with live 3D block previews
-- Block-entity rendering (chests, beds, banners, skulls, decorated pots) and animated fluids
-  (water / lava)
-- Deterministic color fallback for blocks with missing textures
-- Floating, dockable tool windows (Controls / Inspector / Jigsaw) and a light/dark themed UI
-- Recently opened files and workspaces, surfaced in the welcome screen and native menu
-- Update aware — Windows auto-updates itself; on macOS and Linux the app checks GitHub Releases and
-  surfaces a new version (a banner + a status card in Settings ▸ About, or Help ▸ Check for Updates…)
-  with a one-click link to the download
-- Headless self-screenshot for visual testing (no screen-recording permission needed)
-- Full TypeScript source across all three Electron contexts
+- Jigsaw assembly preview, a Block Catalog browser with live 3D previews, block-entity rendering
+  (chests, beds, banners, skulls, decorated pots) and animated fluids
+- Floating, dockable tool windows and a light/dark themed UI
 
 ## Usage
 
