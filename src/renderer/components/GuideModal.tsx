@@ -216,7 +216,7 @@ function FlowDiagram({ t }: { t: TFunction }) {
       {nodes.map((n, i) => (
         <g key={n.label}>
           <rect x={n.x} y={16} width={72} height={40} rx={9} className={`gd-node${i === 2 ? ' accent' : ''}`} />
-          <text x={n.x + 36} y={40} className="gd-node-label">{n.label}</text>
+          <text x={n.x + 36} y={36} className="gd-node-label">{n.label}</text>
         </g>
       ))}
     </svg>
@@ -227,15 +227,13 @@ function FlowDiagram({ t }: { t: TFunction }) {
 function ViewerDiagram({ t }: { t: TFunction }) {
   return (
     <svg className="guide-diagram" viewBox="0 0 360 130" role="img" aria-label={t('guide.viewer.title')}>
-      {/* ground + an isometric house block */}
-      <ellipse cx={180} cy={104} rx={92} ry={16} className="gd-ground" />
-      <polygon points="150,52 210,52 210,96 150,96" className="gd-wall" />
-      <polygon points="210,52 244,40 244,84 210,96" className="gd-wall dim" />
-      <polygon points="150,52 180,30 240,30 210,52" className="gd-wall" />
-      <polygon points="210,52 240,30 274,18 244,40" className="gd-roof" />
-      <polygon points="180,30 240,30 274,18 214,18" className="gd-roof dim" />
+      {/* ground + an isometric cube (a Minecraft block) */}
+      <ellipse cx={180} cy={106} rx={84} ry={15} className="gd-ground" />
+      <polygon points="180,34 238,56 180,78 122,56" className="gd-roof" />
+      <polygon points="122,56 180,78 180,116 122,94" className="gd-wall" />
+      <polygon points="180,78 238,56 238,94 180,116" className="gd-wall dim" />
       {/* orbit arrow ring */}
-      <path d="M96,96 A96,30 0 0 0 264,96" className="gd-orbit" markerEnd="url(#gd-ah2)" />
+      <path d="M100,100 A82,24 0 0 0 260,100" className="gd-orbit" markerEnd="url(#gd-ah2)" />
       <defs>
         <marker id="gd-ah2" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
           <path d="M0,0 L7,4 L0,8 Z" className="gd-arrow-head" />
@@ -252,10 +250,10 @@ function CompositionDiagram({ t }: { t: TFunction }) {
   return (
     <svg className="guide-diagram" viewBox="0 0 360 110" role="img" aria-label={t('guide.details.title')}>
       <rect x={8} y={26} width={92} height={34} rx={8} className="gd-node" />
-      <text x={54} y={47} className="gd-node-label">{t('guide.comp.structure')}</text>
-      <text x={114} y={47} className="gd-plus">×</text>
+      <text x={54} y={43} className="gd-node-label">{t('guide.comp.structure')}</text>
+      <text x={114} y={43} className="gd-plus">×</text>
       <rect x={130} y={26} width={92} height={34} rx={8} className="gd-node" />
-      <text x={176} y={47} className="gd-node-label">{t('guide.comp.decoration')}</text>
+      <text x={176} y={43} className="gd-node-label">{t('guide.comp.decoration')}</text>
       <line x1={222} y1={43} x2={258} y2={43} className="gd-arrow" markerEnd="url(#gd-ah3)" />
       <defs>
         <marker id="gd-ah3" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
@@ -263,12 +261,12 @@ function CompositionDiagram({ t }: { t: TFunction }) {
         </marker>
       </defs>
       <rect x={262} y={20} width={90} height={46} rx={9} className="gd-node accent" />
-      <text x={307} y={41} className="gd-node-label">{t('guide.comp.build')}</text>
+      <text x={307} y={43} className="gd-node-label">{t('guide.comp.build')}</text>
       {/* part chips feeding the build */}
       {[t('guide.comp.roof'), t('guide.comp.basement'), t('guide.comp.rooms')].map((label, i) => (
         <g key={label}>
           <rect x={130 + i * 78} y={80} width={70} height={22} rx={11} className="gd-chip" />
-          <text x={165 + i * 78} y={95} className="gd-chip-label">{label}</text>
+          <text x={165 + i * 78} y={91} className="gd-chip-label">{label}</text>
         </g>
       ))}
     </svg>
