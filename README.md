@@ -73,8 +73,9 @@ refines through an emit → render → review loop — previewed live in the vie
 
 ## Usage
 
-> **Downloads** — packaged installers (macOS `.dmg`/`.zip`, Windows `.exe`, Linux `.deb`/`.rpm`)
-> are attached to each [GitHub Release](https://github.com/matheussartori/blockwright/releases).
+> **Downloads** — packaged installers (macOS `.dmg`/`.zip`, Windows `.exe`, Linux
+> `.deb`/`.rpm`/`.flatpak`) are attached to each
+> [GitHub Release](https://github.com/matheussartori/blockwright/releases).
 > Builds are **ad-hoc signed, not notarized** (no paid Apple Developer cert yet), so the first
 > launch shows an OS warning:
 >
@@ -90,6 +91,19 @@ refines through an emit → render → review loop — previewed live in the vie
 >   launches the app right away. It lands in `%LocalAppData%\blockwright`, adds Start
 >   Menu + Desktop shortcuts and an Add/Remove Programs entry, and auto-updates itself
 >   from new releases — so "it just opened without installing" means it *did* install.
+> - **Linux** — install the `.deb`/`.rpm` with your package manager, or use the
+>   **`.flatpak`** bundle (works on any distro). The bundle needs the Flathub remote
+>   added once so its shared runtime resolves automatically:
+>   ```bash
+>   # one-time: add the Flathub remote (skip if you already have it)
+>   flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+>   # install the downloaded bundle — pulls the org.freedesktop.Platform runtime from Flathub
+>   flatpak install --user io.github.matheussartori.Blockwright_*.flatpak
+>   # run it
+>   flatpak run io.github.matheussartori.Blockwright
+>   ```
+>   > If you hit `requires the runtime org.freedesktop.Platform/<arch>/<ver> which was not
+>   > found`, the Flathub remote isn't configured — run the `remote-add` line above and retry.
 >
 > You can also run from source — see [Development](#development).
 
@@ -253,6 +267,13 @@ notes if you package locally:
     `APPLE_PASSWORD`, `APPLE_TEAM_ID` to also notarize) to ship a clean, no-warning install.
 - **Windows** uses a branded Squirrel installer (`Blockwright-Setup.exe`) that installs per-user and
   auto-updates. It is **not** code-signed, so SmartScreen still shows an _unknown publisher_ warning.
+- **Linux Flatpak** (the `.flatpak` maker) only runs on Linux and needs `flatpak` + `flatpak-builder`
+  (and `elfutils`) on the build host, plus the `org.freedesktop.Sdk`/`Platform` and
+  `org.electronjs.Electron2.BaseApp` **24.08** runtimes installed (`flatpak install flathub
+  org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08`). The runtime/base version is
+  pinned in `forge.config.ts` — the installer's default (`19.08`) is long gone from Flathub and is why
+  an unpinned bundle fails to install. To bump it, change `runtimeVersion`/`baseVersion` together
+  (they must match). `.deb`/`.rpm` need no extra tooling.
 
 ### Updates
 

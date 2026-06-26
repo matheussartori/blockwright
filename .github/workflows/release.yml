@@ -30,6 +30,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Flatpak maker needs flatpak + flatpak-builder on the host, plus the
+      # pinned freedesktop/Electron runtimes (forge.config.ts: 24.08) so the build
+      # can reference them. Linux-only; the .deb/.rpm makers need no extra tooling.
+      - name: Install Flatpak build tooling (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder elfutils ostree
+          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --noninteractive flathub \
+            org.freedesktop.Platform//24.08 \
+            org.freedesktop.Sdk//24.08 \
+            org.electronjs.Electron2.BaseApp//24.08
+
       # Build the makers for this OS and upload them to the (draft) GitHub Release.
       # The publisher dedups by tag, so all three OS jobs attach to one release.
       - name: Publish

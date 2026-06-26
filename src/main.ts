@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { installMainLogger } from '@/main/logger';
+import { configureGpuFallback } from '@/main/gpu';
 import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-protocol';
 import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
@@ -22,6 +23,10 @@ installMainLogger();
 if (started) {
   app.quit();
 }
+
+// Software-GL fallback for GPU-less hosts (VMs / some flatpak setups) — must run before
+// the app is ready so the Chromium GL switches take effect. Avoids the all-white window.
+configureGpuFallback();
 
 // Privileged scheme must be declared before the app is ready.
 registerTextureScheme();

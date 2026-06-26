@@ -4,11 +4,13 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { MakerFlatpak } from '@electron-forge/maker-flatpak';
 import { PublisherGithub } from '@electron-forge/publisher-github';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -136,6 +138,53 @@ function copyDependencyClosure(packages: string[], fromRoot: string, appRoot: st
   }
 }
 
+// Flathub's repo description — where the freedesktop Platform + Electron BaseApp
+// runtimes live. Embedded into the .flatpak so installs can resolve them.
+const FLATHUB_REPO = 'https://flathub.org/repo/flathub.flatpakrepo';
+
+/** Whether a CLI is callable (used to make the runtime-repo step a no-op off Linux). */
+function hasBinary(bin: string): boolean {
+  try {
+    execFileSync(bin, ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Re-bundle a `.flatpak` with Flathub embedded as its `runtime-repo`.
+ *
+ *  THE "easy install" FIX. A single-file bundle ships the app but NOT its runtime;
+ *  `flatpak install app.flatpak` must fetch org.freedesktop.Platform//24.08 from a
+ *  remote. Without a hint the user gets "...Platform/<arch>/24.08 which was not found"
+ *  unless they've already added Flathub AND installed the runtime in the right scope.
+ *  `flatpak build-bundle --runtime-repo=<flathub>` stamps the bundle with where its
+ *  deps live, so `flatpak install app.flatpak` offers to add Flathub and pulls the
+ *  runtime automatically — one command, no prep.
+ *
+ *  The Forge maker (electron-installer-flatpak) exposes no way to pass this through to
+ *  build-bundle, so we re-roll the finished artifact: import it into a throwaway OSTree
+ *  repo, then re-export WITH the flag. Filename is `<id>_<branch>_<arch>.flatpak`. */
+function embedRuntimeRepo(artifact: string): void {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'bw-flatpak-repo-'));
+  try {
+    const base = path.basename(artifact, '.flatpak');
+    const parts = base.split('_');
+    const arch = parts.pop() as string;
+    const branch = parts.pop() as string;
+    const id = parts.join('_'); // ids can't contain '_', branch/arch can't either
+    execFileSync('ostree', [`--repo=${repo}`, 'init', '--mode=archive-z2'], { stdio: 'inherit' });
+    execFileSync('flatpak', ['build-import-bundle', repo, artifact], { stdio: 'inherit' });
+    execFileSync(
+      'flatpak',
+      ['build-bundle', `--runtime-repo=${FLATHUB_REPO}`, '--arch', arch, repo, artifact, id, branch],
+      { stdio: 'inherit' },
+    );
+  } finally {
+    fs.rmSync(repo, { recursive: true, force: true });
+  }
+}
+
 const config: ForgeConfig = {
   hooks: {
     // Re-instate the externalized runtime SDKs that prune removed (see the note above
@@ -148,6 +197,25 @@ const config: ForgeConfig = {
     // Runs after copy, before signing, so the Assets.car is signed with the bundle.
     packageAfterCopy: async (_config, buildPath, _electronVersion, platform) => {
       installLiquidGlassIcon(buildPath, platform);
+    },
+    // Stamp every produced .flatpak with Flathub as its runtime-repo so the runtime
+    // auto-resolves on `flatpak install` (see embedRuntimeRepo). No-op when the
+    // flatpak/ostree CLIs aren't present (e.g. a non-Linux make), so it never breaks
+    // the other makers' output.
+    postMake: async (_config, makeResults) => {
+      if (hasBinary('flatpak') && hasBinary('ostree')) {
+        for (const result of makeResults) {
+          for (const artifact of result.artifacts) {
+            if (!artifact.endsWith('.flatpak')) continue;
+            try {
+              embedRuntimeRepo(artifact);
+            } catch (err) {
+              console.warn(`[flatpak] could not embed runtime-repo into ${artifact}:`, err);
+            }
+          }
+        }
+      }
+      return makeResults;
     },
   },
   packagerConfig: {
@@ -204,6 +272,64 @@ const config: ForgeConfig = {
     new MakerDMG({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
+    // Linux Flatpak. CRITICAL: pin a CURRENT runtime/base version. For a modern
+    // Electron the underlying @malept/electron-installer-flatpak takes its
+    // "needs the zypak sandbox wrapper" path, which hardcodes the ancient
+    // runtimeVersion '19.08' (installer.js) — that freedesktop runtime no longer
+    // exists on Flathub, so `flatpak install app.flatpak` fails with
+    //   "requires the runtime org.freedesktop.Platform/<arch>/19.08 which was not found".
+    // Pinning 24.08 (a current, broadly-mirrored freedesktop runtime that supports
+    // x86_64 AND aarch64) fixes that — with the Flathub remote added, the runtime
+    // auto-installs alongside the bundle. base-version MUST match the runtime version
+    // (org.electronjs.Electron2.BaseApp ships a matching 24.08 branch).
+    new MakerFlatpak({
+      options: {
+        // Collision-free reverse-DNS app id for a GitHub-hosted app (was the
+        // generated, ambiguous `com.github.blockwright`). Names the desktop file +
+        // installed icon, and is the id users `flatpak run`.
+        id: 'io.github.matheussartori.Blockwright',
+        productName: 'Blockwright',
+        genericName: 'Minecraft Structure Viewer',
+        description: 'View, browse, and AI-generate Minecraft .nbt structures in 3D.',
+        categories: ['Graphics', 'Utility'],
+        // Pin a current runtime so the bundle's dependencies actually resolve.
+        runtime: 'org.freedesktop.Platform',
+        runtimeVersion: '24.08',
+        base: 'org.electronjs.Electron2.BaseApp',
+        baseVersion: '24.08',
+        // The 1024² app icon (logo-dark); the maker installs it under the id above.
+        icon: './build/icon.png',
+        // No extra files to copy into the bundle beyond what @electron/packager
+        // produces (the type requires this field; [] is the default).
+        files: [],
+        // Skip building the zypak sandbox wrapper FROM SOURCE. By default the
+        // installer injects a `zypak` git module compiled with clang++ during
+        // flatpak-builder — but the freedesktop SDK sandbox has no clang, so it
+        // dies with "make: clang++: No such file or directory" (Error 127).
+        // org.electronjs.Electron2.BaseApp//24.08 ALREADY ships zypak-wrapper in
+        // /app/bin, and the installer's generated `electron-wrapper` just calls it,
+        // so the source build is redundant. Empty modules = use the BaseApp's zypak.
+        modules: [],
+        finishArgs: [
+          // Display (Wayland with an X11 fallback) + GPU for the WebGL/Three.js viewer
+          '--socket=wayland',
+          '--socket=fallback-x11',
+          '--share=ipc',
+          '--device=dri',
+          // Audio
+          '--socket=pulseaudio',
+          // AI generation + the GitHub-release update check
+          '--share=network',
+          // Open .nbt/.schem/.litematic files, content packs and mod workspaces from
+          // anywhere the user picks (Electron's own dialogs, not portals, read the file)
+          '--filesystem=host',
+          // Chromium keeps its singleton socket in TMPDIR
+          '--env=TMPDIR=/var/tmp',
+          // Native desktop notifications via libnotify
+          '--talk-name=org.freedesktop.Notifications',
+        ],
+      },
+    }),
   ],
   publishers: [
     // Publish makers to GitHub Releases (the free, server-less update source that
