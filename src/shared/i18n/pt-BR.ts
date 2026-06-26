@@ -13,8 +13,12 @@ export const ptBR: Messages = {
   'menu.noRecentFiles': 'Nenhum arquivo recente',
   'menu.clearRecent': 'Limpar recentes',
   'menu.exportFile': 'Exportar como…',
+  'menu.exportForEditing': 'Exportar para edição…',
   'menu.exportToWorld': 'Exportar para o mundo…',
   'menu.exportToWorkspace': 'Exportar para o workspace do mod…',
+  'menu.openAssembly': 'Abrir montagem jigsaw…',
+  'menu.reimportWorld': 'Reimportar do mundo…',
+  'menu.exportScaffold': 'Exportar com structure blocks…',
   'menu.renameProject': 'Renomear projeto…',
   'menu.closeFile': 'Fechar arquivo',
   'menu.openWorkspace': 'Abrir workspace de mod…',
@@ -87,6 +91,16 @@ export const ptBR: Messages = {
   'dialog.worldDetail':
     'Os arquivos estão em {folder}. No seu mundo, rode /reload (ou reabra o mundo) e então:\n\n{command}\n\nEla aparece na sua posição. Os blocos jigsaw viram os blocos reais conforme a estrutura gera.',
   'dialog.worldNotDatapack': 'Essa pasta não é um save de mundo do Minecraft (sem level.dat). Escolha a pasta do save em si, ex.: .minecraft/saves/<mundo>.',
+  'dialog.editExportTitle': 'Exportar para edição',
+  'dialog.editExportDoneTitle': 'Exportado para edição',
+  'dialog.editExportDoneMessage': 'Salvo {file}.',
+  'dialog.editExportDoneDetail':
+    'Abra no Litematica ou WorldEdit, cole no seu mundo e edite à vontade (sem limite de tamanho). Salve de volta como .litematic/.schem, depois reabra aqui (Arquivo ▸ Abrir) e reexporte para o seu mod.',
+  'dialog.editExportReveal': 'Mostrar na pasta',
+  'dialog.scaffoldTitle': 'Andaime de edição instalado',
+  'dialog.scaffoldMessage': 'Instalado um datapack de edição com {count} peça(s).',
+  'dialog.scaffoldDetail':
+    'O datapack está em {folder}. No seu mundo (1.21+), rode /reload e então:\n\n{command}\n\nCada peça aparece na sua própria caixa delimitada. Edite os blocos dentro de uma caixa, abra o structure block dela e clique em SAVE. Quando todas as peças estiverem salvas, use Arquivo ▸ Reimportar do mundo aqui para costurar tudo de volta.',
 
   // Shared.
   'common.clear': 'Limpar',
@@ -100,6 +114,12 @@ export const ptBR: Messages = {
   'rename.placeholder': 'Nome do projeto',
   'rename.save': 'Renomear',
   'rename.done': 'Renomeado para “{name}”',
+
+  // Remontar uma montagem jigsaw dividida.
+  'reassemble.pickTitle': 'Abrir pasta da montagem jigsaw',
+  'reassemble.pickWorldTitle': 'Escolha a pasta do save do mundo',
+  'reassemble.no_manifest': 'Nenhum manifesto de remontagem do Blockwright (blockwright.split.json) foi encontrado ali.',
+  'reassemble.no_pieces': 'Nenhum arquivo de peça foi encontrado para remontar.',
 
   // Tab bar.
   'tab.home': 'Início',

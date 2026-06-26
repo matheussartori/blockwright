@@ -12,10 +12,20 @@ import type { DocumentFlow } from './useDocumentFlow';
 /** The document handlers the IPC listeners dispatch to. */
 type IpcHandlers = Pick<
   DocumentFlow,
-  'openFile' | 'close' | 'newDoc' | 'exportActive' | 'exportToWorldActive' | 'exportToWorkspaceActive' | 'onWorkspaceChanged'
+  | 'openFile'
+  | 'openAssembly'
+  | 'reimportWorld'
+  | 'close'
+  | 'newDoc'
+  | 'exportActive'
+  | 'exportForEditingActive'
+  | 'exportToWorldActive'
+  | 'exportScaffoldActive'
+  | 'exportToWorkspaceActive'
+  | 'onWorkspaceChanged'
 >;
 
-export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
+export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc, exportActive, exportForEditingActive, exportToWorldActive, exportScaffoldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
   // One-time IPC wiring + initial loads.
   useEffect(() => {
     const st = store.getState();
@@ -28,9 +38,13 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorld
     });
     api.onNewStructure(() => newDoc());
     api.onExportFile(() => void exportActive());
+    api.onExportForEditing(() => void exportForEditingActive());
     api.onExportToWorld(() => void exportToWorldActive());
+    api.onExportScaffold(() => void exportScaffoldActive());
     api.onExportToWorkspace(() => exportToWorkspaceActive());
     api.onRenameProject(() => st.setRenameOpen(true));
+    api.onOpenAssembly(() => void openAssembly());
+    api.onReimportWorld(() => void reimportWorld());
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
     api.onOpenGuide(() => st.setGuideOpen(true));
@@ -58,7 +72,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorld
       const pending = await api.getPendingUpdate();
       if (pending) st.setUpdate(pending);
     })();
-  }, [openFile, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
+  }, [openFile, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportForEditingActive, exportToWorldActive, exportScaffoldActive, exportToWorkspaceActive]);
 
   // Mirror file-open + window state to main (drives Close File and the View menu).
   // Only re-sends when the *reported* shape changes.

@@ -71,6 +71,19 @@ export const IPC_CHANNELS = {
    *  inside it (kept `versions/` + generation.log ride along). Payload: currentFile +
    *  newName + sessionId → RenameProjectResult. */
   projectRename: 'project:rename',
+  /** Pick a split jigsaw-assembly folder and reassemble it into one `.nbt` (the inverse of
+   *  the split export) → ReassembleResult (a temp file the renderer opens). */
+  assemblyReassemble: 'assembly:reassemble',
+  /** Export the build for editing in Litematica/WorldEdit: a single `.litematic`/`.schem`, never
+   *  split (payload: srcPath + suggestedName) → ExportResult. */
+  exportForEditing: 'file:export-editing',
+  /** Install an in-world EDITING scaffold into a Minecraft save: clean ≤-limit pieces + a
+   *  `.mcfunction` of SAVE-mode structure blocks (payload: srcPath + suggestedName + nbtLimit)
+   *  → ExportResult. */
+  exportScaffold: 'file:export-scaffold',
+  /** Pick a Minecraft SAVE folder and reassemble the pieces the player re-SAVEd with the
+   *  editing scaffold → ReassembleResult (a temp file the renderer opens). */
+  worldReimport: 'world:reimport',
   /** Copy the current build's `.nbt` to a user-chosen location via a Save dialog
    *  (payload: srcPath + suggestedName) → ExportResult. */
   exportFile: 'file:export',
@@ -174,6 +187,14 @@ export const IPC_EVENTS = {
   exportToWorkspace: 'export-to-workspace',
   /** Ask the renderer to open the Rename Project dialog (File ▸ Rename Project…). */
   renameProject: 'rename-project',
+  /** Ask the renderer to run the Open Jigsaw Assembly flow (File ▸ Open Jigsaw Assembly…). */
+  openAssembly: 'open-assembly',
+  /** Ask the renderer to export the build for Litematica/WorldEdit editing (File ▸ Export for Editing…). */
+  exportForEditing: 'export-for-editing',
+  /** Ask the renderer to export the in-world editing scaffold (File ▸ Export with Structure Blocks…). */
+  exportScaffold: 'export-scaffold',
+  /** Ask the renderer to run the Reimport from World flow (File ▸ Reimport from World…). */
+  reimportWorld: 'reimport-world',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
   /** Ask the renderer to load a just-generated `.nbt` into the viewer and return

@@ -11,8 +11,12 @@ export const en = {
   'menu.noRecentFiles': 'No Recent Files',
   'menu.clearRecent': 'Clear Recently Opened',
   'menu.exportFile': 'Export As…',
+  'menu.exportForEditing': 'Export for Editing…',
   'menu.exportToWorld': 'Export to World…',
   'menu.exportToWorkspace': 'Export to Mod Workspace…',
+  'menu.openAssembly': 'Open Jigsaw Assembly…',
+  'menu.reimportWorld': 'Reimport from World…',
+  'menu.exportScaffold': 'Export with Structure Blocks…',
   'menu.renameProject': 'Rename Project…',
   'menu.closeFile': 'Close File',
   'menu.openWorkspace': 'Open Mod Workspace…',
@@ -85,6 +89,16 @@ export const en = {
   'dialog.worldDetail':
     'The files are in {folder}. In your world, run /reload (or reopen the world), then:\n\n{command}\n\nIt spawns at your position. The jigsaw blocks turn into the real blocks as it generates.',
   'dialog.worldNotDatapack': 'That folder isn’t a Minecraft world save (no level.dat). Pick the save folder itself, e.g. .minecraft/saves/<world>.',
+  'dialog.editExportTitle': 'Export for Editing',
+  'dialog.editExportDoneTitle': 'Exported for editing',
+  'dialog.editExportDoneMessage': 'Saved {file}.',
+  'dialog.editExportDoneDetail':
+    'Open it in Litematica or WorldEdit, paste it into your world and edit freely (no size limit). Re-save it as .litematic/.schem, then open it back here (File ▸ Open) and re-export to your mod.',
+  'dialog.editExportReveal': 'Reveal in folder',
+  'dialog.scaffoldTitle': 'Editing scaffold installed',
+  'dialog.scaffoldMessage': 'Installed an editing datapack with {count} piece(s).',
+  'dialog.scaffoldDetail':
+    'The datapack is in {folder}. In your world (1.21+), run /reload, then run:\n\n{command}\n\nEach piece appears in its own outlined box. Edit the blocks inside a box, open its structure block and click SAVE. When every piece is saved, use File ▸ Reimport from World here to stitch them back together.',
 
   // Shared.
   'common.clear': 'Clear',
@@ -98,6 +112,12 @@ export const en = {
   'rename.placeholder': 'Project name',
   'rename.save': 'Rename',
   'rename.done': 'Renamed to “{name}”',
+
+  // Reassemble a split jigsaw assembly.
+  'reassemble.pickTitle': 'Open Jigsaw Assembly Folder',
+  'reassemble.pickWorldTitle': 'Pick your world save folder',
+  'reassemble.no_manifest': 'No Blockwright reassembly manifest (blockwright.split.json) was found there.',
+  'reassemble.no_pieces': 'No piece files were found to reassemble.',
 
   // Tab bar.
   'tab.home': 'Home',

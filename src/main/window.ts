@@ -77,6 +77,26 @@ export function notifyRenameProject(): void {
   mainWindow?.webContents.send(IPC_EVENTS.renameProject);
 }
 
+/** Ask the renderer to run the Open Jigsaw Assembly flow (File ▸ Open Jigsaw Assembly…). */
+export function notifyOpenAssembly(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openAssembly);
+}
+
+/** Ask the renderer to export for Litematica/WorldEdit editing (File ▸ Export for Editing…). */
+export function notifyExportForEditing(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.exportForEditing);
+}
+
+/** Ask the renderer to export the in-world editing scaffold (File ▸ Export with Structure Blocks…). */
+export function notifyExportScaffold(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.exportScaffold);
+}
+
+/** Ask the renderer to run the Reimport from World flow (File ▸ Reimport from World…). */
+export function notifyReimportWorld(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.reimportWorld);
+}
+
 /** Push the current recents list to the renderer (keeps the welcome view in sync). */
 export function notifyRecents(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());

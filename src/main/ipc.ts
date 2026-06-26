@@ -38,7 +38,8 @@ import {
 } from './workspace';
 import { planExport, runExport } from './export';
 import { notifyRecentWorkspaces, openFileDialog } from './window';
-import { exportStructure, exportToWorld } from './export/local-export';
+import { exportEditScaffold, exportForEditing, exportStructure, exportToWorld } from './export/local-export';
+import { reassembleAssemblyDialog, reimportWorldDialog } from './export/reassemble';
 import { renameProject } from './ai/rename-project';
 import { relinkSessionLibrary } from './ai/session';
 import { getLogBacklog } from './logger';
@@ -304,6 +305,18 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.exportWorld, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
     exportToWorld(srcPath, suggestedName, nbtLimit),
   );
+
+  ipcMain.handle(IPC_CHANNELS.assemblyReassemble, async () => reassembleAssemblyDialog());
+
+  ipcMain.handle(IPC_CHANNELS.exportForEditing, async (_e, srcPath: string, suggestedName: string) =>
+    exportForEditing(srcPath, suggestedName),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.exportScaffold, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
+    exportEditScaffold(srcPath, suggestedName, nbtLimit),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.worldReimport, async () => reimportWorldDialog());
 
   ipcMain.handle(IPC_CHANNELS.windowsReport, async (_e, state: WindowsReport) =>
     setWindowsState(state),

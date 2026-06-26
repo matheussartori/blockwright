@@ -11,6 +11,13 @@ export type ExportResult =
   | { ok: true; path: string; splitPieces?: number }
   | { ok: false; canceled?: boolean; error?: string };
 
+/** Result of reassembling a split jigsaw assembly back into one structure. On success
+ *  `path` is a freshly written `.nbt` the renderer opens as a new document; `missing` is
+ *  the number of piece files that couldn't be found (the result has holes if > 0). */
+export type ReassembleResult =
+  | { ok: true; path: string; name: string; missing: number }
+  | { ok: false; canceled?: boolean; error?: string };
+
 /** Result of renaming a generated project (its library folder + latest `.nbt`).
  *  On success `dir`/`file` are the new folder + `<name>.nbt` paths and `name` the
  *  sanitized project name; on failure `error` explains why (empty name, a clash, or

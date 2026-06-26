@@ -258,6 +258,63 @@ export function childSeamCell(dir: Direction, csize: Vec3, a: number, b: number)
 // --- Canonical names (file + connector) --------------------------------------
 
 export const pieceName = (slot: SplitSlot): string => `p_${slot.i}_${slot.j}_${slot.k}`;
+
+// --- Reassembly manifest -----------------------------------------------------
+// A split is the FORWARD half (structure → pieces); reassembly is the inverse
+// (pieces → structure, see main/structure/io/merge-structure.ts). The pieces are a
+// deterministic function of `size` + `limit`, so a tiny manifest written beside an
+// assembly is all reassembly needs to recompute the slot grid and place each piece.
+// It rides with the export paths that are reassembly targets (Export As, Export to
+// World, the structure-block scaffold) — not the mod-workspace tree, which the user
+// reassembles from their library original instead.
+
+/** The manifest filename dropped at the root of a reassemblable assembly. */
+export const SPLIT_MANIFEST_FILE = 'blockwright.split.json';
+
+/** Records what a split produced, so Blockwright can stitch the pieces back together. */
+export interface SplitManifest {
+  /** Marker + schema version so a stray JSON isn't mistaken for one. */
+  blockwright: 'split';
+  v: 1;
+  namespace: string;
+  /** Resource base name — the pieces live under `<base>/` as `<pieceName>.nbt`. */
+  base: string;
+  size: Vec3;
+  limit: number;
+  dataVersion: number;
+}
+
+/** Build the manifest object for a split export. */
+export function splitManifest(p: {
+  namespace: string;
+  base: string;
+  size: Vec3;
+  limit: number;
+  dataVersion: number;
+}): SplitManifest {
+  return { blockwright: 'split', v: 1, namespace: p.namespace, base: p.base, size: p.size, limit: p.limit, dataVersion: p.dataVersion };
+}
+
+/** Validate + narrow an unknown JSON into a SplitManifest, or null if it isn't one. */
+export function parseSplitManifest(json: unknown): SplitManifest | null {
+  if (!json || typeof json !== 'object') return null;
+  const m = json as Record<string, unknown>;
+  if (m.blockwright !== 'split' || m.v !== 1) return null;
+  const size = m.size;
+  if (!Array.isArray(size) || size.length !== 3 || !size.every((n) => typeof n === 'number')) return null;
+  if (typeof m.base !== 'string' || typeof m.namespace !== 'string') return null;
+  if (typeof m.limit !== 'number' || typeof m.dataVersion !== 'number') return null;
+  return {
+    blockwright: 'split',
+    v: 1,
+    namespace: m.namespace,
+    base: m.base,
+    size: size as Vec3,
+    limit: m.limit,
+    dataVersion: m.dataVersion,
+  };
+}
+
 export const startPoolLeaf = 'start';
 export const edgePoolLeaf = (edgeId: string): string => `e_${edgeId}`;
 export const outConnectorName = (edgeId: string): string => `out_${edgeId}`;

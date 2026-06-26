@@ -17,6 +17,10 @@ import {
   notifyExportFile,
   notifyExportToWorld,
   notifyExportToWorkspace,
+  notifyExportForEditing,
+  notifyExportScaffold,
+  notifyOpenAssembly,
+  notifyReimportWorld,
   notifyRenameProject,
   notifyOpenCatalog,
   notifyOpenGuide,
@@ -293,6 +297,8 @@ export function buildAppMenu(): void {
           },
         },
         { label: mt('menu.openRecent'), submenu: openRecent },
+        { label: mt('menu.openAssembly'), click: () => notifyOpenAssembly() },
+        { label: mt('menu.reimportWorld'), click: () => notifyReimportWorld() },
         { type: 'separator' },
         {
           label: mt('menu.renameProject'),
@@ -306,9 +312,19 @@ export function buildAppMenu(): void {
           click: () => notifyExportFile(),
         },
         {
+          label: mt('menu.exportForEditing'),
+          enabled: fileOpen,
+          click: () => notifyExportForEditing(),
+        },
+        {
           label: mt('menu.exportToWorld'),
           enabled: fileOpen,
           click: () => notifyExportToWorld(),
+        },
+        {
+          label: mt('menu.exportScaffold'),
+          enabled: fileOpen,
+          click: () => notifyExportScaffold(),
         },
         {
           label: mt('menu.exportToWorkspace'),

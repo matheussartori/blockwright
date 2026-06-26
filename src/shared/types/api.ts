@@ -16,7 +16,7 @@ import type {
   BuildSelection,
   FloorDef,
 } from './generation';
-import type { BlockDictionary, BlockNote, ExportResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
+import type { BlockDictionary, BlockNote, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
 import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
@@ -147,6 +147,18 @@ export interface BlockwrightApi {
   /** Rename a generated project (its library folder + latest `<name>.nbt`). `sessionId`
    *  re-points a live generation session's mirror to the renamed folder. */
   renameProject: (currentFile: string, newName: string, sessionId?: string) => Promise<RenameProjectResult>;
+  /** Pick a split jigsaw-assembly folder and reassemble it into one `.nbt` (inverse of the
+   *  split export); resolves to the written temp file the renderer then opens. */
+  reassembleAssembly: () => Promise<ReassembleResult>;
+  /** Export the build for editing in Litematica/WorldEdit — a single `.litematic`/`.schem`, never
+   *  split (those mods load any size). The recommended edit-and-bring-back round-trip. */
+  exportForEditing: (srcPath: string, suggestedName: string) => Promise<ExportResult>;
+  /** Install an in-world editing scaffold (clean pieces + a SAVE-structure-block `.mcfunction`)
+   *  into a user-chosen Minecraft save, so an oversized build can be edited in vanilla. */
+  exportScaffold: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
+  /** Pick a Minecraft save and reassemble the pieces the player re-SAVEd with the editing
+   *  scaffold; resolves to the written temp file the renderer then opens. */
+  reimportWorld: () => Promise<ReassembleResult>;
   /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
    *  `suggestedName` seeds the dialog's filename. `nbtLimit` is the resolved size limit —
    *  a `.nbt` export over it is cut into a jigsaw assembly folder instead. Returns where it
@@ -220,6 +232,16 @@ export interface BlockwrightApi {
   onExportToWorkspace: (cb: () => void) => void;
   /** Notified when File ▸ Rename Project… is chosen; the handler opens the rename dialog. */
   onRenameProject: (cb: () => void) => void;
+  /** Notified when File ▸ Open Jigsaw Assembly… is chosen; the handler runs the reassembly. */
+  onOpenAssembly: (cb: () => void) => void;
+  /** Notified when File ▸ Export for Editing… is chosen; the handler picks the build and calls
+   *  `exportForEditing`. */
+  onExportForEditing: (cb: () => void) => void;
+  /** Notified when File ▸ Export with Structure Blocks… is chosen; the handler picks the build
+   *  and calls `exportScaffold`. */
+  onExportScaffold: (cb: () => void) => void;
+  /** Notified when File ▸ Reimport from World… is chosen; the handler runs the reassembly. */
+  onReimportWorld: (cb: () => void) => void;
   /** The main-process log backlog buffered before the renderer mounted, so the
    *  Console dock starts with the full session history. */
   getLogBacklog: () => Promise<LogEntry[]>;
