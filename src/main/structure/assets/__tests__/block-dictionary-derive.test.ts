@@ -26,6 +26,12 @@ describe('guessRole', () => {
   it('returns null when nothing matches', () => {
     expect(guessRole('mysterious_widget')).toBeNull();
   });
+  it('does NOT map a connecting *_wall block to the wall material (it is a thin post, not a cube)', () => {
+    // The role palette is now load-bearing, so a `*_wall` mapped to the solid wall role would
+    // build see-through exteriors — the full-cube brick must claim `wall` instead.
+    expect(guessRole('ashen_brick_wall')).toBeNull();
+    expect(guessRole('ashen_bricks')).toBe('wall');
+  });
 });
 
 describe('propsFromState', () => {
@@ -77,12 +83,24 @@ describe('buildRolePalette', () => {
 describe('formatModBlockSection', () => {
   const entry = (id: string, extra: Partial<GuideEntry> = {}): GuideEntry => ({ id, props: {}, ...extra });
 
-  it('renders the primary role→block palette when one is supplied', () => {
-    const out = formatModBlockSection('mymod', 'prefer', [entry('mymod:a', { role: 'wall' })], { wall: 'mymod:a', roof: 'mymod:b' });
-    expect(out).toContain('PRIMARY PALETTE');
-    expect(out).toContain('- wall: `mymod:a`');
-    expect(out).toContain('- roof: `mymod:b`');
-    expect(out).toContain('starting shell is ALREADY built'); // the prefer-only note
+  it('renders the primary role→block palette for prefer, with the "already built" note only when seeded', () => {
+    const roles = { wall: 'mymod:a', roof: 'mymod:b' };
+    const seeded = formatModBlockSection('mymod', 'prefer', [entry('mymod:a', { role: 'wall' })], roles, true);
+    expect(seeded).toContain('PRIMARY PALETTE');
+    expect(seeded).toContain('- wall: `mymod:a`');
+    expect(seeded).toContain('- roof: `mymod:b`');
+    expect(seeded).toContain('starting shell is ALREADY built'); // a shell WAS seeded this run
+
+    // Free-form / edit (no shell seeded): the palette shows, but it must NOT claim a shell exists.
+    const unseeded = formatModBlockSection('mymod', 'prefer', [entry('mymod:a', { role: 'wall' })], roles, false);
+    expect(unseeded).toContain('PRIMARY PALETTE');
+    expect(unseeded).not.toContain('ALREADY built');
+  });
+
+  it('omits the imperative primary palette under mix (it would contradict the alongside-vanilla steer)', () => {
+    const out = formatModBlockSection('mymod', 'mix', [entry('mymod:a', { role: 'wall' })], { wall: 'mymod:a' }, true);
+    expect(out).not.toContain('PRIMARY PALETTE');
+    expect(out).toContain('available ALONGSIDE vanilla');
   });
 
   it('returns empty when scope is off', () => {

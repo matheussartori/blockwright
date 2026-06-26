@@ -8,7 +8,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { RenderRequest } from '@/shared/types';
 import { api } from '../api';
 import { documentsStore, docBySession } from '../state/documents';
-import { recordVersion } from '../state/generation';
+import { recordVersion } from '../state/versions';
 import type { Viewer } from '../viewer/viewer';
 import { captureAll } from './capture';
 

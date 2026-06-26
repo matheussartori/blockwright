@@ -108,6 +108,11 @@ export function listVersions(sessionId: string): VersionInfo[] {
  *  against deleting the Current version, so this never removes the live edit base.
  *  Returns true if any scratch file was removed. */
 export function deleteVersion(sessionId: string, version: number): boolean {
+  // Defensive (the delete IPC is a public surface): never remove the live HEAD version — it
+  // backs the next run's seed + patch base (`buildSeed` reads `v{session.version}.json`). The
+  // renderer also hides delete on the latest + Current, but don't rely on it here.
+  const session = sessions.get(sessionId);
+  if (session && version >= session.version) return false;
   const dir = sessionDir(sessionId);
   let removed = false;
   for (const ext of ['nbt', 'json']) {

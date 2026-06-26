@@ -22,7 +22,6 @@ const ROLE_HINTS: [RegExp, string][] = [
   [/_glass$/, 'glass'],
   [/_door$/, 'door'],
   [/_fence$/, 'fence'],
-  [/_wall$/, 'wall'],
   [/(lantern|_lamp|torch|candle|glowstone|sea_light|shroomlight)/, 'light'],
   [/(leaves|sapling|_flower|fern|vine|moss|blossom|petal)/, 'plant'],
   [/(_planks|_log|_wood|_stem)$/, 'wall'],
@@ -32,6 +31,12 @@ const ROLE_HINTS: [RegExp, string][] = [
 
 /** A heuristic semantic role for a block id, or null when nothing matches. */
 export function guessRole(block: string): string | null {
+  // A connecting-WALL block (`*_wall`) is a thin decorative POST, not a full cube — exclude it
+  // from the material rules below so its `brick`/`cobble`/`stone` substring can't claim the
+  // solid `wall` role (which is placed as a `walls` op → see-through exteriors). No role fits a
+  // wall post, so it gets none (the user can annotate one). This guard is now LOAD-BEARING:
+  // `guessRole` feeds the shell's role→block overrides, not just the catalog's suggestion.
+  if (/_wall$/.test(block)) return null;
   for (const [re, role] of ROLE_HINTS) if (re.test(block)) return role;
   return null;
 }
@@ -125,6 +130,7 @@ export function formatModBlockSection(
   scope: ModBlockScope,
   entries: GuideEntry[],
   rolePalette: Record<string, string> = {},
+  seeded = false,
 ): string {
   if (scope === 'off' || !entries.length) return '';
   const annotated = (e: GuideEntry) => (e.description || e.role ? 1 : 0);
@@ -141,14 +147,15 @@ export function formatModBlockSection(
     return `- \`${e.id}\`${role}${desc}${props}`;
   });
 
-  // The recommended role→block PALETTE: the concrete material to use for each part. For a
-  // PREFER seeded build the code-built shell is ALREADY compiled in these blocks, so this
-  // tells the model what they are and to keep using them for everything it adds. The single
-  // biggest lever for the model actually using mod blocks (a flat list of ids it ignores).
-  const roleKeys = Object.keys(rolePalette).sort();
+  // The recommended role→block PALETTE: the concrete material to use for each part — the single
+  // biggest lever for the model actually using mod blocks (a flat id list it ignores). Only for
+  // `prefer` (the imperative "use these as the default for everything" contradicts the `mix`
+  // steer). The "ALREADY built" clause is gated on a shell actually having been SEEDED this run
+  // (not on scope) — it's a lie on a free-form / edit build, where no shell was compiled.
+  const roleKeys = scope === 'prefer' ? Object.keys(rolePalette).sort() : [];
   const palette = roleKeys.length
     ? `\n\nPRIMARY PALETTE — use these as the default material for each part` +
-      `${scope === 'prefer' ? ' (the starting shell is ALREADY built in them)' : ''}:\n` +
+      `${seeded ? ' (the starting shell is ALREADY built in them)' : ''}:\n` +
       roleKeys.map((r) => `- ${r}: \`${rolePalette[r]}\``).join('\n') +
       `\nKeep using this palette for new geometry (interior, furniture, detailing) so the whole ` +
       `build reads in the mod's materials; only drop to a vanilla block for a part the palette ` +

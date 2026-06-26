@@ -7,7 +7,7 @@
 // a tab in the docked sidebar, or inside a FloatingWindow when torn off.
 import { Star, Trash2 } from 'lucide-react';
 import { useActiveDoc, useLocale, useT } from '../hooks/useStores';
-import { viewVersion, setCurrentVersion, deleteVersionEntry } from '../state/generation';
+import { viewVersion, setCurrentVersion, deleteVersionEntry } from '../state/versions';
 
 export function VersionsContent() {
   const t = useT();
@@ -89,7 +89,9 @@ export function VersionsContent() {
                         <Star size={13} strokeWidth={1.9} aria-hidden />
                       </button>
                     )}
-                    {!isCurrent && (
+                    {/* The latest/HEAD and the Current version are the seed + edit base, so they
+                        can't be deleted (set another version Current first to free this one). */}
+                    {!isCurrent && !isLatest && (
                       <button
                         type="button"
                         className="version-act version-del"

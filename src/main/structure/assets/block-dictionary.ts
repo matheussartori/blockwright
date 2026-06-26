@@ -48,6 +48,10 @@ const ROLE_SET = new Set<string>(ROLES);
 // Cached per workspace root (the file is re-read only when the workspace changes); the
 // catalog/JSON caches are cleared on a workspace switch alongside this one.
 let cache: { root: string; file: DictionaryFile } | null = null;
+// The built editor rows (catalog × notes × props), memoized per workspace root: `buildEntries`
+// is recomputed twice per generation (the guide + the shell role-overrides) plus on every
+// catalog fetch. Invalidated wherever the notes file is written or the workspace switches.
+let entriesCache: { root: string; entries: BlockDictEntry[] } | null = null;
 
 function dictionaryDir(ws: Workspace): string {
   return path.join(ws.root, 'blockwright');
@@ -86,6 +90,7 @@ function writeFile(ws: Workspace, file: DictionaryFile): void {
     notes: [...file.notes].sort((a, b) => a.id.localeCompare(b.id)),
   };
   cache = { root: ws.root, file: sorted };
+  entriesCache = null; // a note/scope edit changes the built rows — rebuild on next read
   try {
     fs.mkdirSync(dictionaryDir(ws), { recursive: true });
     fs.writeFileSync(dictionaryPath(ws), JSON.stringify(sorted, null, 2));
@@ -98,6 +103,7 @@ function writeFile(ws: Workspace, file: DictionaryFile): void {
  *  `applyWorkspace`, alongside the JSON/model cache clears). */
 export function clearDictionaryCache(): void {
   cache = null;
+  entriesCache = null;
 }
 
 /** A note is "empty" once the user clears every field — we drop it from the sparse file
@@ -118,8 +124,9 @@ function blockProps(id: string): Record<string, string[]> {
  *  its saved note, auto suggestions, and blockstate props. Vanilla blocks are excluded —
  *  the model already knows them. */
 function buildEntries(ws: Workspace): BlockDictEntry[] {
+  if (entriesCache && entriesCache.root === ws.root) return entriesCache.entries;
   const notesById = new Map(readFile(ws).notes.map((n) => [n.id, n]));
-  return listCatalog()
+  const entries = listCatalog()
     .filter((b) => b.namespace === ws.namespace && b.namespace !== 'minecraft')
     .map((b) => ({
       id: b.id,
@@ -130,6 +137,8 @@ function buildEntries(ws: Workspace): BlockDictEntry[] {
       suggestedRole: guessRole(b.block),
       props: blockProps(b.id),
     }));
+  entriesCache = { root: ws.root, entries };
+  return entries;
 }
 
 /** The active workspace's dictionary (namespace + scope + one row per mod block), or null
@@ -173,7 +182,13 @@ export function setScope(scope: ModBlockScope): BlockDictionary | null {
  *  description when authored, steered by the workspace scope. Returns '' when there is no
  *  mod workspace, the scope is off, or nothing usable is annotated — so a vanilla run pays
  *  nothing. Reads the live workspace + scope from disk; called once per generation. */
-export function modBlockGuide(): string {
+/**
+ * The system-prompt section teaching the model the active mod's blocks.
+ * @param seeded - Whether THIS run seeded a code-built shell (compiled in these mod blocks),
+ *   so the guide can truthfully say "the shell is already built in them" only when it is —
+ *   a free-form / edit build seeds no shell.
+ */
+export function modBlockGuide(seeded = false): string {
   const ws = getActiveWorkspace();
   if (!ws || ws.namespace === 'minecraft') return '';
   const file = readFile(ws);
@@ -187,7 +202,7 @@ export function modBlockGuide(): string {
   // (see modRoleOverrides), so the guide tells the model exactly which mod block plays
   // each role and to keep using it for everything it adds.
   const roles = buildRolePalette(roleCandidates(usable), scope === 'mix');
-  return formatModBlockSection(ws.namespace, scope, entries, roles);
+  return formatModBlockSection(ws.namespace, scope, entries, roles, seeded);
 }
 
 /** The mod blocks as role candidates (annotated role + heuristic guess), stably ordered

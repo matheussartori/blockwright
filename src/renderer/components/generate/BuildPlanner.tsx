@@ -87,7 +87,9 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
 
   const changeModScope = useCallback((scope: ModBlockScope) => {
     setModScope(scope); // optimistic
-    void api.setDictionaryScope(scope);
+    void api.setDictionaryScope(scope).then((d) => {
+      if (d) setModScope(d.scope); // reconcile with the persisted value
+    });
   }, []);
 
   useEffect(() => {

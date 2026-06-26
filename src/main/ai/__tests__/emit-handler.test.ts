@@ -135,6 +135,8 @@ describe('createEmitHandler — the COLLAPSE GATE (a full emit must carry the wh
     expect(ok.isError).toBeFalsy();
     expect(session.version).toBe(1);
     expect(session.lastSolids).toBeGreaterThan(50);
+    const v1 = path.join(session.dir, 'v1.nbt');
+    expect(fs.existsSync(v1)).toBe(true); // the good build landed
 
     const res = await handler({ mode: 'full', summary: '', structure: deltaOnly() });
     expect(res.isError).toBe(true);
@@ -142,7 +144,12 @@ describe('createEmitHandler — the COLLAPSE GATE (a full emit must carry the wh
     expect(res.content.some((b) => b.type === 'text' && /mode "patch"/.test(b.text))).toBe(true);
     expect(session.version).toBe(1); // the gutted emit never became a version
     expect(state.emitted.value?.version).toBe(1); // the kept result is still v1
-    expect(fs.existsSync(path.join(session.dir, 'v2.nbt'))).toBe(false); // scratch stays clean
+    // C2: every emit shares v{runVersion}.nbt, so the rejected emit must NOT clobber the good
+    // build — it compiles to a temp work file that's unlinked, leaving v1 (the delivered
+    // result's path) intact, with no stray temp left behind.
+    expect(fs.existsSync(v1)).toBe(true);
+    expect(state.emitted.value?.path).toBe(v1);
+    expect(fs.existsSync(path.join(session.dir, 'v1.work.nbt'))).toBe(false);
   });
 
   it('lets the same delta through as a PATCH (it layers onto this run’s working version)', async () => {

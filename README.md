@@ -195,6 +195,15 @@ one-line note on what it does. Edits keep block orientation correct, support **u
 and **Save version** writes the result as a new `.nbt` version in the same version chain as AI builds — so
 an edit is never fatal.
 
+### Versions
+
+Every build a tab produces — each AI run and each manual save — lands in its **Versions** panel, with its
+creation date. A whole generation run refines a build in place and commits a **single** version (not one
+per pass); a new prompt adds the next. Click a version to preview it, **Set as Current** to make it the
+base your next export, manual save and AI edit build from (promoting an older one branches a new build off
+it), or **delete** an old one (with a confirmation — the Current and latest versions are kept as the live
+base). Block editing is locked while the AI is building.
+
 ## Mod Workspaces
 
 Modded structures reference blocks and textures that don't exist in the vanilla content pack.
@@ -208,6 +217,16 @@ A **mod workspace** points Blockwright at a mod project folder so those assets r
 - Opening a loose `.nbt` that lives inside a mod prompts you to activate that mod's workspace.
 
 Opened workspaces are remembered under **File ▸ Open Recent Workspace**.
+
+### Building with the mod's own blocks
+
+AI generation can build with a mod's blocks, not just vanilla. In the **Block Catalog** you describe the
+blocks worth building with (a one-time annotation, optionally tagging a block's role — wall, roof, floor —
+that travels with the mod). The **Build Planner** then shows a **Mod blocks** control that sets how
+generation uses them: **Off** (vanilla only), **Mix** (offer them alongside vanilla), or **Prefer** (build
+the structure's main materials — walls, floors, roof, trim — from the mod's blocks, dropping to vanilla
+only for what the mod lacks, like windows). Under **Prefer** the code-built shell itself is compiled in the
+mod's blocks, with their custom blockstate properties, so the whole exterior comes out modded.
 
 ### Exporting into a workspace
 

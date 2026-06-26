@@ -12,6 +12,7 @@ import type { SaveVersionRequest, SaveVersionResult } from '@/shared/types';
 import type { AuthoringBlock, AuthoringEntity } from '../structure/authoring/types';
 import { encodeStructure } from '../structure/authoring/nbt-encode';
 import { readAuthoring } from '../structure/authoring/nbt-decode';
+import { isAir } from '../structure/authoring/palette';
 import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
 import { getSession } from './session';
 import { mirrorToLibrary } from './output-dir';
@@ -60,5 +61,9 @@ export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVe
 
   session.library = await mirrorToLibrary(session.library, req.slug ?? 'edited-build', nbtPath, version);
   session.version = version;
+  // Keep the collapse-gate baseline in step with the saved build (a manual edit / reimport
+  // can shrink it) — solid = non-air cells — so the next AI full emit isn't gated against a
+  // stale larger count and falsely rejected.
+  session.lastSolids = blocks.filter((b) => !isAir(req.palette[b.state]?.name ?? '')).length;
   return { ok: true, version, path: nbtPath, libraryPath: session.library?.latest ?? null };
 }

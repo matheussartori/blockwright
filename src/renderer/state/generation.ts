@@ -8,33 +8,15 @@
 // an Untitled build) via the main-process store, so reopening a file restores
 // its conversation and the SDK session can resume.
 import { api } from '../api';
-import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage, BuildSelection, BuildBrief, VersionInfo } from '@/shared/types';
+import { documentsStore, docBySession } from './documents';
+import type { GenerateImage, BuildSelection, BuildBrief } from '@/shared/types';
 import { basename, dirname } from '../ui/path';
 import { buildFloorPlan, normalizeFloor } from '../generation/floors';
+import { loadDoc } from './doc-loader';
+import { chatKey, persistDoc } from './persist';
+import { recordVersion, currentBasePath } from './versions';
 
 export { buildFloorPlan, normalizeFloor };
-
-/** Load a generated/opened `.nbt` into a document — and the on-screen viewer if
- *  it's the active tab. Provided by App, which owns the viewers.
- *  `working` (default true) updates the doc's working path (the edit base for the
- *  next AI turn); pass false to *preview* a version in the viewer without changing
- *  what the next edit builds on. */
-export type DocLoader = (
-  docId: string,
-  path: string,
-  opts?: { preserveCamera?: boolean; recent?: boolean; working?: boolean },
-) => Promise<void>;
-
-let docLoader: DocLoader | null = null;
-export function setDocLoader(fn: DocLoader): void {
-  docLoader = fn;
-}
-
-/** Persistent chat key: the file path for a saved `.nbt`, else the session id. */
-function chatKey(doc: Document): string {
-  return doc.filePath ?? doc.sessionId;
-}
 
 /** AI-generated versions live on disk at `<generatedRoot>/<sessionId>/vN.nbt`, so
  *  the parent directory name IS the session id. If the user reopens such a temp
@@ -48,119 +30,6 @@ function recoverGeneratedSession(filePath: string): string | null {
   const root = basename(dirname(sessionDir));
   if (root !== 'generated' && root !== '.generated') return null;
   return basename(sessionDir) || null;
-}
-
-/** Persist a document's current chat + session info so it survives restarts. */
-export function persistDoc(docId: string): void {
-  const doc = documentsStore.getState().documents.find((d) => d.id === docId);
-  if (!doc) return;
-  void api.chatHistorySave(chatKey(doc), {
-    sessionId: doc.sessionId,
-    sdkSessionId: doc.sdkSessionId,
-    version: doc.version,
-    messages: doc.chat,
-    baselinePath: doc.baselinePath,
-    floors: doc.floors,
-    generated: doc.generated,
-  });
-}
-
-/** Record a compiled version on the document (deduped by number) and mark it as
- *  the one being shown — so the viewer always follows the latest build as it's
- *  emitted. Called for every version the generator renders (live + final). */
-export function recordVersion(docId: string, version: number, path: string): void {
-  const docs = documentsStore.getState();
-  const doc = docs.documents.find((d) => d.id === docId);
-  if (!doc) return;
-  const entries = [...doc.versions.filter((v) => v.version !== version), { version, path }];
-  // For a file-backed doc (an EDIT of an existing .nbt, not a from-scratch
-  // creation) keep the original as a baseline "v0" the user can flip back to.
-  // That baseline is the untouched on-disk file by default, or — after "Clear
-  // versions" flattened the build — the iterated build it pinned (baselinePath).
-  // Untitled (created) docs have no original, so they get none — and a `generated`
-  // doc's `filePath` IS its own latest build (the adopted library file), not an
-  // original, so it gets none either.
-  const baseline = doc.generated ? doc.baselinePath : (doc.baselinePath ?? doc.filePath);
-  if (baseline && !entries.some((v) => v.version === 0)) {
-    entries.push({ version: 0, path: baseline });
-  }
-  const versions = entries.sort((a, b) => a.version - b.version);
-  docs.patchDoc(docId, { versions, viewingVersion: version });
-}
-
-/** The version entry the next export, manual save and AI edit builds on: the promoted
- *  "Current" version, else the latest. Null when the doc has no compiled versions yet
- *  (a fresh file/Untitled build → callers fall back to the working `path`). */
-export function currentBaseEntry(doc: Document): VersionInfo | null {
-  const target = doc.currentVersion ?? doc.version;
-  return doc.versions.find((v) => v.version === target) ?? null;
-}
-
-/** Promote a version to "Current" — the base every export/save/AI edit builds on — and
- *  preview it in the viewer so the on-screen build matches the promoted base. */
-export async function setCurrentVersion(docId: string, version: number): Promise<void> {
-  const docs = documentsStore.getState();
-  const doc = docs.documents.find((d) => d.id === docId);
-  if (!doc) return;
-  docs.patchDoc(docId, { currentVersion: version });
-  await viewVersion(docId, version);
-  persistDoc(docId);
-}
-
-/** Preview a version in the viewer for visualization only — loads `vN.nbt` into
- *  the active viewer (and the doc's structure, so the inspector matches) WITHOUT
- *  touching the working path, so the next AI edit still builds on the latest. */
-export async function viewVersion(docId: string, version: number): Promise<void> {
-  const doc = documentsStore.getState().documents.find((d) => d.id === docId);
-  if (!doc) return;
-  const entry = doc.versions.find((v) => v.version === version);
-  if (!entry) return;
-  documentsStore.getState().patchDoc(docId, { viewingVersion: version });
-  await docLoader?.(docId, entry.path, { preserveCamera: true, recent: false, working: false });
-}
-
-/** Delete a compiled version from the document + disk. Refuses the Current version
- *  (it's the live edit base) and the synthetic v0 baseline. If the deleted version was
- *  on screen, falls back to previewing the Current base. */
-export async function deleteVersionEntry(docId: string, version: number): Promise<void> {
-  const docs = documentsStore.getState();
-  const doc = docs.documents.find((d) => d.id === docId);
-  if (!doc || doc.busy) return;
-  const current = doc.currentVersion ?? doc.version;
-  if (version === current || version === 0) return;
-  await api.aiDeleteVersion(doc.sessionId, version);
-  const versions = doc.versions.filter((v) => v.version !== version);
-  const wasViewing = doc.viewingVersion === version;
-  docs.patchDoc(docId, { versions, ...(wasViewing ? { viewingVersion: null } : {}) });
-  if (wasViewing) {
-    // Snap the viewer back to the Current base so it doesn't keep showing a gone build.
-    const base = versions.find((v) => v.version === current);
-    if (base) await viewVersion(docId, base.version);
-  }
-  persistDoc(docId);
-}
-
-/** Commit a manually-edited build (from the block editor) as a new version: record it,
- *  adopt the saved library file if this was an Untitled doc, then load it as the working
- *  latest — the same finish an AI-emitted version goes through. */
-export async function commitManualVersion(
-  docId: string,
-  version: number,
-  scratchPath: string,
-  libraryPath: string | null,
-): Promise<void> {
-  const docs = documentsStore.getState();
-  const doc = docs.documents.find((d) => d.id === docId);
-  if (!doc) return;
-  recordVersion(docId, version, scratchPath);
-  // A new commit becomes the base: drop any "Current" pin so it follows the latest.
-  docs.patchDoc(docId, { version, viewingVersion: null, currentVersion: null });
-  if (!doc.filePath && libraryPath) {
-    docs.patchDoc(docId, { filePath: libraryPath, title: basename(libraryPath), generated: true });
-    api.addRecent(libraryPath);
-  }
-  await docLoader?.(docId, scratchPath, { preserveCamera: true, recent: false });
-  persistDoc(docId);
 }
 
 let progressBound = false;
@@ -297,7 +166,7 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
   // version, else the latest) so a first "change X" edits that build; main detects a
   // promoted-older base as a rebase and branches from it. Falls back to the working
   // path for a fresh file/Untitled build with no compiled versions yet.
-  const basePath = currentBaseEntry(doc)?.path ?? doc.path ?? undefined;
+  const basePath = currentBasePath(doc) ?? undefined;
   try {
     // The user's Floor plan rides along structured (not just as prompt text): main
     // uses it to locate the ground-floor level for the air-fill, overriding the
@@ -344,7 +213,7 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
         // It's a real saved project now — surface it in Open Recent / the welcome list.
         api.addRecent(result.libraryPath);
       }
-      await docLoader?.(docId, result.path, { preserveCamera: result.version > 1, recent: false });
+      await loadDoc(docId, result.path, { preserveCamera: result.version > 1, recent: false });
     } else if (result.canceled) {
       docs.appendChat(docId, { role: 'assistant', text: 'Canceled.', meta: stats(result) });
     } else {

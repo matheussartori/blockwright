@@ -107,6 +107,10 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   let seed: string;
   if (rebasing && basePath) {
     session.sdkSessionId = null;
+    // Reset the collapse-gate baseline: it still holds the LATEST (larger) build's solid
+    // count, so without this a smaller promoted base is falsely rejected as a "gutted" emit
+    // and the run can end with no committed version. It self-corrects after the first emit.
+    session.lastSolids = undefined;
     seed = await seedFromFile(basePath);
   } else {
     seed = await buildSeed(resumable, session, basePath);
@@ -237,8 +241,9 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       credential: cred,
       // The base instructions + knowledge base, then (when a mod workspace is open and its
       // scope isn't off) the mod's annotated blocks — so the model can build with non-vanilla
-      // blocks it has never seen. Empty for a vanilla run, so it costs nothing.
-      systemPrompt: systemPrompt(prompt, selection) + modBlockGuide(),
+      // blocks it has never seen. `seeded` lets the guide say "the shell is already in mod
+      // blocks" only when a shell was actually compiled this run. Empty for a vanilla run.
+      systemPrompt: systemPrompt(prompt, selection) + modBlockGuide(!!lockCells?.length),
       userText: effectivePrompt,
       images: images ?? [],
       thinkingBudget,

@@ -282,9 +282,13 @@ function makeModuleComposer(
     const subBox = box(from, to);
     const subParams = resolveParams(module.params ?? {}, { ...rawParams, ...extra });
     applyDecorationDecay(subParams, deco, extra, rawParams);
+    // A basement/surroundings module owns its OWN materials (a crypt stays self-contained
+    // stone, a yard stays a lawn — independent of the host decoration), so the host's
+    // `modBlocks` override must NOT bleed into it; strip it from their palette. A roof/attic
+    // reuses the host palette (it's part of the host's exterior story), so it keeps mod blocks.
     const palette = category === 'roof' || category === 'attic'
       ? hostPalette
-      : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra }, intern, true);
+      : makePalette(module.defaults ?? {}, deco, { ...rawParams, ...extra, modBlocks: undefined }, intern, true);
     // A surroundings module re-derives the house/yard split from the box, so it needs the
     // same per-axis yard scale the host inset with (passed in `extra` by the host).
     const surroundSizing = sanitizeSurroundSizing(extra.surroundSizing ?? rawParams.surroundSizing);

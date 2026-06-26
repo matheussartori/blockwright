@@ -527,7 +527,6 @@ export const ptBR: Messages = {
   'versions.source': 'origem',
   'versions.viewing': '● visualizando',
   'versions.current': 'atual',
-  'versions.setCurrent': 'Definir como Atual',
   'versions.setCurrentHint': 'Tornar {label} a base para exportações, salvamentos e edições da IA',
   'versions.created': 'Criada {date}',
   'versions.modified': 'Modificada {date}',

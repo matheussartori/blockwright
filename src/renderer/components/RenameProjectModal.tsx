@@ -9,7 +9,7 @@ import { api } from '../api';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { documentsStore, activeDocument } from '../state/documents';
-import { persistDoc } from '../state/generation';
+import { persistDoc } from '../state/persist';
 import { basename } from '../ui/path';
 import { Modal } from './ui/Modal';
 

@@ -13,7 +13,9 @@ import { settingsStore } from '../state/settings';
 import { plannerStore } from '../state/planner';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
-import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration, currentBaseEntry, commitManualVersion } from '../state/generation';
+import { bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
+import { setDocLoader } from '../state/doc-loader';
+import { currentBasePath, commitManualVersion } from '../state/versions';
 import type { Viewer } from '../viewer/viewer';
 
 export interface LoadOpts {
@@ -168,7 +170,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const exportActive = useCallback(async () => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const src = currentBaseEntry(doc)?.path ?? doc.path;
+    const src = currentBasePath(doc);
     if (!src) return; // nothing loaded to export
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
@@ -188,7 +190,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const exportToWorldActive = useCallback(async () => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const src = currentBaseEntry(doc)?.path ?? doc.path;
+    const src = currentBasePath(doc);
     if (!src) return;
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
@@ -213,8 +215,11 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
       return;
     }
     const missingNote = result.missing > 0 ? ` (${result.missing} piece(s) missing)` : '';
+    // Commit into the active GENERATED project — the round-trip's home (you exported it from
+    // there). We only graft onto a `generated` tab so the in-world edits can't silently attach
+    // to an unrelated opened file; anything else opens as a fresh document.
     const doc = activeDocument(documentsStore.getState());
-    if (doc) {
+    if (doc?.generated) {
       try {
         const structure = await api.loadStructure(result.path);
         const res = await api.saveVersion({
@@ -227,12 +232,15 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
         });
         if (res.ok && res.version != null && res.path) {
           await commitManualVersion(doc.id, res.version, res.path, res.libraryPath ?? null);
-          store.getState().setNotice({ text: `Reimported as v${res.version}${missingNote}`, warn: result.missing > 0 });
-          return;
+          store.getState().setNotice({ text: `Reimported into ${doc.title} as v${res.version}${missingNote}`, warn: result.missing > 0 });
+        } else {
+          // Surface the failure rather than silently opening a stray copy and claiming success.
+          store.getState().setNotice({ text: `Reimport failed: ${res.error ?? 'could not commit the version'}`, warn: true });
         }
-      } catch {
-        /* fall through to opening it as a standalone file */
+      } catch (err) {
+        store.getState().setNotice({ text: `Reimport failed: ${err instanceof Error ? err.message : String(err)}`, warn: true });
       }
+      return;
     }
     await openFile(result.path);
     store.getState().setNotice({ text: `Reimported the edited structure${missingNote}`, warn: result.missing > 0 });
@@ -244,7 +252,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const exportToWorkspaceActive = useCallback(() => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const src = currentBaseEntry(doc)?.path ?? doc.path;
+    const src = currentBasePath(doc);
     if (!src) return;
     const stem = doc.filePath ? basename(doc.filePath).replace(/\.nbt$/i, '') : doc.title || 'structure';
     store.getState().setExportTarget({ path: src, name: sanitizeResourceName(stem) });

@@ -154,10 +154,14 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       return text(rejection.feedback, true);
     }
 
-    // The version is FIXED for the whole run — every emit overwrites it, so the run
-    // yields one version, not one-per-design-pass.
+    // The version is FIXED for the whole run — every accepted emit overwrites it, so the
+    // run yields one version, not one-per-design-pass. The emit compiles to a TEMP work
+    // file first and is only promoted to `v{version}.nbt` once it clears the collapse gate
+    // (below): otherwise a later gutted emit would overwrite — then unlink — the last GOOD
+    // build at the shared version number, leaving the delivered result's path dangling.
     const version = runVersion;
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
+    const workPath = path.join(session.dir, `v${version}.work.nbt`);
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     // The AUTHORITATIVE storeys of the code-built structure (its shell is locked, so these
     // hold) — computed BEFORE the compile so the stairwell pass gets the real storey planes
@@ -192,7 +196,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       // Thread the selected structure type so the compile runs that structure's
       // declared finalize passes (e.g. the house's single-chimney + stair-inset fixes).
       // `log` streams each pass's play-by-play into the Console dock (fix-tagged).
-      report = await writeStructureFile(authoring, nbtPath, {
+      report = await writeStructureFile(authoring, workPath, {
         structureType: selection?.structureType,
         // The Floor plan drives grade + the stairwell pass's storey planes: the user's UI
         // plan when set, else the code structure's authoritative storeys.
@@ -220,7 +224,7 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
     // build. Deliberate demolition still has a path: a `patch` with air fills.
     const baseline = session.lastSolids ?? lockCells?.length ?? 0;
     if (args.mode !== 'patch' && baseline >= 50 && blockCount < baseline / 2) {
-      await fsp.unlink(nbtPath).catch(() => {}); // drop the gutted compile from the scratch dir
+      await fsp.unlink(workPath).catch(() => {}); // drop the gutted compile; the good v{version}.nbt is untouched
       state.captureError = `Emit dropped most of the build (${blockCount} solid blocks vs ${baseline} before)`;
       run.ai(
         `Rejected the emit: it contains only ${blockCount} solid blocks where the build had ` +
@@ -236,6 +240,9 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       );
     }
 
+    // Accepted — promote the temp compile to the run's version file (replacing the prior
+    // accepted emit's build) and persist its authoring JSON as the patch base for the next pass.
+    await fsp.rename(workPath, nbtPath);
     await fsp.writeFile(path.join(session.dir, `v${version}.json`), JSON.stringify(authoring, null, 2));
     session.version = version;
     session.lastSolids = blockCount;

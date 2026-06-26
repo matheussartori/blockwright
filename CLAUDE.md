@@ -465,6 +465,14 @@ src/
                           windows.ts (floating-window layout + the Console dock visibility/height,
                           persisted), logs.ts (the Console dock store: patches the renderer console,
                           pulls main's backlog + tails its live lines, capped + deduped), theme.ts,
+                          documents.ts (the tabbed Documents store: one Document per open `.nbt`/build
+                          with its own structure/chat/AI session + the version chain + the `currentVersion`
+                          pointer — see "Versions" below), generation.ts (the per-tab AI run loop +
+                          hydration), versions.ts (the VERSION CHAIN ops: recordVersion/viewVersion/
+                          setCurrentVersion/deleteVersionEntry/commitManualVersion + `currentBasePath`,
+                          split out of generation.ts so the panel/exporters/editor share one source),
+                          persist.ts (chat/session persistence) + doc-loader.ts (the `loadDoc` bridge App
+                          registers — both extracted so versions.ts and generation.ts don't cycle),
                           editor.ts (the block editor: mode/tool/selection/anchor/tool-params + an
                           undo/redo snapshot stack; ops patch the active doc's StructureData; save
                           re-encodes via IPC → a new version)
@@ -599,6 +607,23 @@ Each workspace also carries a **target Minecraft version** (`mc-version-detect.t
 `fabric.mod.json` / `mods.toml` / `gradle.properties` / `pack.mcmeta`; if none is found the renderer
 asks via `version-select.ts` and `setWorkspaceVersion` persists it). Loose vanilla files assume the
 bundled pack's version.
+
+**Generating with the mod's own blocks** (`structure/assets/block-dictionary.ts` + `-derive.ts`): the
+model has never seen a mod's blocks, so the user annotates the ones worth building with in the **Block
+Catalog** (description + optional semantic `role`), persisted in a VISIBLE `blockwright/dictionary.json`
+at the workspace root (travels with the mod). A workspace-level **scope** (off/mix/prefer, set in the
+Catalog OR the Build Planner's "Mod blocks" control) drives generation TWO ways: (1) `modBlockGuide()` is
+appended to the system prompt with the block list + a recommended role→block PRIMARY PALETTE (prefer only;
+the "shell is already in these" note gated on a shell actually being seeded this run); (2) `modRoleOverrides()`
+builds a role→mod-block map (`buildRolePalette`: a user-annotated role wins, then for `prefer` a heuristic
+`guessRole` fills the rest) injected into the seeded shell's `template` op as `params.modBlocks` — which
+`compose.ts makePalette` consults FIRST (above per-op/decoration/defaults, as its OWN object so it can't
+collide with the `roof` MODULE enum), so the LOCKED code-built shell compiles in the mod's materials with
+their custom blockstate props. Scoped to the host: a self-contained basement/surroundings module is NOT
+re-skinned (its `modBlocks` is stripped in `makeModuleComposer`). Roles the mod lacks (windows/glass) fall
+back to vanilla. `guessRole` excludes `*_wall` (a thin POST, never the solid wall material). Empty/no-op
+for a vanilla run. The built editor rows are memoized per workspace (`entriesCache`, cleared on note/scope
+edit + workspace switch).
 
 ### Jigsaw assembly
 
@@ -1171,6 +1196,30 @@ corrupted on transform, capped/corrupting undo).
   AI version. Plus full undo/redo. Edit mode auto-exits on tab change (App effect on `activeDoc.id`).
 - **Add a tool:** a pure op in `ops.ts` (+ test) + a store action + a `ToolControls` branch + a
   `ToolRail` entry + its `editor.*` i18n labels.
+
+### Versions
+
+Each open tab keeps a **version chain** — the compiled `vN.nbt` builds the AI loop + the block editor
+produce — surfaced in the **Versions panel** (`windows/VersionsWindow.tsx`) with created/modified dates.
+The chain ops live in `renderer/state/versions.ts` (NOT generation.ts — extracted so the panel, the
+exporters and the editor share one source, via `persist.ts` + `doc-loader.ts` to avoid an import cycle).
+
+- **ONE version per AI run.** A run refines a build in place: `generate.ts` allocates one `runVersion =
+  session.version + 1` up front, and every design-pass emit OVERWRITES it — the renderer's `recordVersion`
+  dedupes by number, so a run yields a SINGLE version, not one-per-pass. Each emit compiles to a TEMP
+  `v{n}.work.nbt` and is promoted to `v{n}.nbt` only after it clears the collapse gate, so a rejected later
+  emit can't clobber the last accepted build at the shared number. A new prompt = a new run = the next number.
+- **The "Current" version** (`Document.currentVersion`, null = follow latest) is the base every export,
+  manual save and AI edit builds on — resolved once via `currentBasePath(doc)`. "Set as Current" promotes a
+  version (and previews it); any new commit resets it to follow the latest. Promoting an OLDER version and
+  generating REBASES: `generate.ts` (`sessionVersionOf`) detects the older base, clears `sdkSessionId` (a
+  fresh conversation), seeds from that file, and resets `session.lastSolids` so the gate doesn't falsely
+  reject a smaller base.
+- **Delete** (`deleteVersionEntry` → IPC `aiDeleteVersion` → `session.ts deleteVersion`) removes a version's
+  scratch + library files, with a confirm. The Current AND the latest/HEAD are protected on BOTH sides (the
+  panel hides the button; main refuses `version >= session.version`) — the head backs the next run's seed.
+- **Reimport from World** commits the stitched `.nbt` as a new version of the active GENERATED project (the
+  round-trip's home), not a throwaway tab. **Block editing is locked while a run is in flight** (`doc.busy`).
 
 ### Schematic interop
 

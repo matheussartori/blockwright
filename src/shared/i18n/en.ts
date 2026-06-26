@@ -525,7 +525,6 @@ export const en = {
   'versions.source': 'source',
   'versions.viewing': '● viewing',
   'versions.current': 'current',
-  'versions.setCurrent': 'Set as Current',
   'versions.setCurrentHint': 'Make {label} the base for exports, saves and AI edits',
   'versions.created': 'Created {date}',
   'versions.modified': 'Modified {date}',
