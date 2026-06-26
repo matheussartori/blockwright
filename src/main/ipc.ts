@@ -37,7 +37,7 @@ import {
   setWorkspaceVersion,
 } from './workspace';
 import { planExport, runExport } from './export';
-import { exportStructure, notifyRecentWorkspaces, openFileDialog } from './window';
+import { exportStructure, exportToWorld, notifyRecentWorkspaces, openFileDialog } from './window';
 import { getLogBacklog } from './logger';
 import { checkForUpdatesManually, checkForUpdatesQuiet, getPendingUpdate } from './update-check';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
@@ -286,8 +286,12 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
 
-  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string) =>
-    exportStructure(srcPath, suggestedName),
+  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
+    exportStructure(srcPath, suggestedName, nbtLimit),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.exportWorld, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
+    exportToWorld(srcPath, suggestedName, nbtLimit),
   );
 
   ipcMain.handle(IPC_CHANNELS.windowsReport, async (_e, state: WindowsReport) =>

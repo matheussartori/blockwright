@@ -5,16 +5,19 @@ interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   ariaLabel?: string;
+  /** Lock the switch (shown dimmed, clicks ignored) — e.g. worldgen forced on for a split. */
+  disabled?: boolean;
 }
 
-export function Switch({ checked, onChange, ariaLabel }: SwitchProps) {
+export function Switch({ checked, onChange, ariaLabel, disabled = false }: SwitchProps) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
-      className={`ui-switch no-drag${checked ? ' on' : ''}`}
+      disabled={disabled}
+      className={`ui-switch no-drag${checked ? ' on' : ''}${disabled ? ' disabled' : ''}`}
       onClick={() => onChange(!checked)}
     >
       <span className="ui-switch-knob" />

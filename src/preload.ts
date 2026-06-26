@@ -150,8 +150,10 @@ const api: BlockwrightApi = {
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
-  exportStructure: (srcPath: string, suggestedName: string): Promise<ExportResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName),
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit),
+  exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportWorld, srcPath, suggestedName, nbtLimit),
   reportWindows: (state: WindowsReport) => {
     ipcRenderer.invoke(IPC_CHANNELS.windowsReport, state);
   },
@@ -185,6 +187,9 @@ const api: BlockwrightApi = {
   },
   onNewStructure: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.newStructure, () => cb());
+  },
+  onExportToWorld: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.exportToWorld, () => cb());
   },
   onExportFile: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportFile, () => cb());

@@ -6,11 +6,19 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import { useSettings, useT } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
+import { Select, type SelectOption } from '../ui/Select';
+import type { NbtSizePref } from '@/shared/domain/split';
 
 export function ViewerTab() {
   const t = useT();
   const settings = useSettings((s) => s);
   const set = settingsStore.getState().set;
+
+  const nbtLimitOptions: SelectOption[] = [
+    { value: 'auto', label: t('viewer.nbtLimitAuto'), description: t('viewer.nbtLimitAutoDesc') },
+    { value: '48', label: t('viewer.nbtLimit48'), description: t('viewer.nbtLimit48Desc') },
+    { value: '32', label: t('viewer.nbtLimit32'), description: t('viewer.nbtLimit32Desc') },
+  ];
 
   const [contentDir, setContentDir] = useState<string | null>(null);
   useEffect(() => {
@@ -61,6 +69,14 @@ export function ViewerTab() {
           />
         </label>
         <p className="setting-note">{t('viewer.blockTexturesNote')}</p>
+      </section>
+      <section className="settings-group">
+        <div className="settings-group-name">{t('viewer.structures')}</div>
+        <label className="setting-row">
+          <span className="setting-label">{t('viewer.nbtLimit')}</span>
+          <Select value={settings.nbtSizeLimit} options={nbtLimitOptions} onChange={(v) => set('nbtSizeLimit', v as NbtSizePref)} />
+        </label>
+        <p className="setting-note">{t('viewer.nbtLimitNote')}</p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.flyMode')}</div>

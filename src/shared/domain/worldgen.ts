@@ -6,6 +6,15 @@
 // non-fs validation) that main and the renderer must agree on, so the preview the user
 // sees and the files main writes can't drift.
 import { minorOf } from '../mc-version';
+import {
+  edgePoolLeaf,
+  MAX_JIGSAW_DEPTH,
+  MAX_RECONSTRUCT_SPAN,
+  MAX_SPLIT_PIECES,
+  pieceName,
+  startPoolLeaf,
+  type SplitPlan,
+} from './split';
 
 /** How a structure conforms to the ground it spawns on. Vanilla's terms; default
  *  `beard_thin` blends a foundation in like villages do. */
@@ -118,7 +127,7 @@ export function structureFolder(version: string | null | undefined): 'structure'
   return major * 100 + min >= 121 ? 'structure' : 'structures';
 }
 
-export type FileKind = 'nbt' | 'structure' | 'template_pool' | 'structure_set' | 'biome_tag';
+export type FileKind = 'nbt' | 'structure' | 'template_pool' | 'structure_set' | 'biome_tag' | 'piece';
 
 /** One file the export will write, as a workspace-relative path. */
 export interface PlannedFileSpec {
@@ -128,13 +137,19 @@ export interface PlannedFileSpec {
 }
 
 /** The exact set of files an export writes for these options — pure, so the dialog's
- *  preview tree and main's writer are computed from the same function. */
+ *  preview tree and main's writer are computed from the same function. When `split` is an
+ *  oversized plan, the structure is cut into a jigsaw assembly instead (many piece `.nbt`s +
+ *  per-edge template pools); the worldgen JSON is mandatory there (the pieces can't reassemble
+ *  without it), so it's emitted regardless of `worldgen.generate`. */
 export function plannedFiles(
   namespace: string,
   name: string,
   version: string | null | undefined,
   worldgen: WorldgenOptions,
+  split?: SplitPlan,
 ): PlannedFileSpec[] {
+  if (split?.oversized) return splitFileSpecs(namespace, name, version, split).map((s) => ({ rel: s.rel, kind: s.kind }));
+
   const sf = structureFolder(version);
   const files: PlannedFileSpec[] = [{ rel: `data/${namespace}/${sf}/${name}.nbt`, kind: 'nbt' }];
   if (worldgen.generate) {
@@ -148,6 +163,45 @@ export function plannedFiles(
   return files;
 }
 
+/** A planned file of a SPLIT export, tagged with what it represents so main's writer can fill
+ *  the right content (a piece buffer, a pool pointing at a piece, the structure def, …) while
+ *  the preview and the writer share the exact same path list. */
+export interface SplitFileSpec extends PlannedFileSpec {
+  ref:
+    | { type: 'piece'; slot: number }
+    | { type: 'start_pool' }
+    | { type: 'edge_pool'; edgeId: string }
+    | { type: 'structure' }
+    | { type: 'structure_set' }
+    | { type: 'biome_tag' };
+}
+
+/** The ordered file list for a split (jigsaw) export: one `.nbt` per piece, a start pool +
+ *  one pool per tree edge, then the structure/structure_set/biome-tag JSON. Pure. */
+export function splitFileSpecs(
+  namespace: string,
+  base: string,
+  version: string | null | undefined,
+  plan: SplitPlan,
+): SplitFileSpec[] {
+  const sf = structureFolder(version);
+  const tp = `data/${namespace}/worldgen/template_pool/${base}`;
+  const out: SplitFileSpec[] = [];
+  for (const slot of plan.slots) {
+    out.push({ rel: `data/${namespace}/${sf}/${base}/${pieceName(slot)}.nbt`, kind: 'piece', ref: { type: 'piece', slot: slot.index } });
+  }
+  out.push({ rel: `${tp}/${startPoolLeaf}.json`, kind: 'template_pool', ref: { type: 'start_pool' } });
+  for (const edge of plan.edges) {
+    out.push({ rel: `${tp}/${edgePoolLeaf(edge.edgeId)}.json`, kind: 'template_pool', ref: { type: 'edge_pool', edgeId: edge.edgeId } });
+  }
+  out.push(
+    { rel: `data/${namespace}/worldgen/structure/${base}.json`, kind: 'structure', ref: { type: 'structure' } },
+    { rel: `data/${namespace}/worldgen/structure_set/${base}.json`, kind: 'structure_set', ref: { type: 'structure_set' } },
+    { rel: `data/${namespace}/tags/worldgen/biome/has_structure/${base}.json`, kind: 'biome_tag', ref: { type: 'biome_tag' } },
+  );
+  return out;
+}
+
 /** A reason the export can't proceed (`error`) or something to double-check (`warning`).
  *  Carries a stable `code` the renderer localizes — never a baked English string. */
 export type IssueCode =
@@ -158,7 +212,12 @@ export type IssueCode =
   | 'overwrite'
   | 'legacy_folder'
   | 'no_workspace'
-  | 'source_missing';
+  | 'source_missing'
+  | 'split_active'
+  | 'split_too_many'
+  | 'split_too_deep'
+  | 'split_span'
+  | 'split_block_entity';
 
 export interface ValidationIssue {
   level: 'error' | 'warning';
@@ -175,6 +234,22 @@ export function splitIssues(issues: ValidationIssue[]): { errors: ValidationIssu
     errors: issues.filter((i) => i.level === 'error'),
     warnings: issues.filter((i) => i.level === 'warning' && i.code !== 'overwrite'),
   };
+}
+
+/** Checks specific to a SPLIT (jigsaw) export. `split_active` is an informational note that
+ *  the structure exceeds the size limit and is being cut up; the rest are hard limits of the
+ *  jigsaw mechanism (piece count / recursion depth / reconstructable span). Pure — the
+ *  per-cell block-entity-loss warning can only be known once main reads the blocks. */
+export function validateSplit(plan: SplitPlan): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!plan.oversized) return issues;
+  issues.push({ level: 'warning', code: 'split_active', detail: String(plan.pieceCount) });
+  if (plan.pieceCount > MAX_SPLIT_PIECES) issues.push({ level: 'error', code: 'split_too_many', detail: String(plan.pieceCount) });
+  if (plan.depth + 1 > MAX_JIGSAW_DEPTH) issues.push({ level: 'error', code: 'split_too_deep', detail: String(plan.depth + 1) });
+  if (Math.max(plan.size[0], plan.size[2]) > MAX_RECONSTRUCT_SPAN) {
+    issues.push({ level: 'warning', code: 'split_span', detail: String(Math.max(plan.size[0], plan.size[2])) });
+  }
+  return issues;
 }
 
 /** The non-fs checks (name + worldgen numbers + biomes). Overwrite / missing-source /

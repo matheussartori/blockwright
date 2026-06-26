@@ -67,6 +67,9 @@ export const IPC_CHANNELS = {
   /** Copy the current build's `.nbt` to a user-chosen location via a Save dialog
    *  (payload: srcPath + suggestedName) → ExportResult. */
   exportFile: 'file:export',
+  /** Install the current build into a user-chosen Minecraft world save as a ready-to-run
+   *  datapack (payload: srcPath + suggestedName + nbtLimit) → ExportResult. */
+  exportWorld: 'file:export-world',
   /** Renderer reports its floating-window state so the View menu checkmarks stay in sync. */
   windowsReport: 'windows:report',
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
@@ -156,6 +159,9 @@ export const IPC_EVENTS = {
   /** Ask the renderer to export the current build (File ▸ Export File). The
    *  renderer picks the source path + suggested name and calls IPC_CHANNELS.exportFile. */
   exportFile: 'export-file',
+  /** Ask the renderer to export the current build into a world save (File ▸ Export to World).
+   *  The renderer picks source + name + limit and calls IPC_CHANNELS.exportWorld. */
+  exportToWorld: 'export-to-world',
   /** Ask the renderer to open the "Export to mod" dialog for the active document
    *  (File ▸ Export to Workspace). */
   exportToWorkspace: 'export-to-workspace',

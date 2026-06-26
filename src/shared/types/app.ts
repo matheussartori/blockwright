@@ -4,9 +4,11 @@
 import type { FurnishingPreset } from '../domain/furnishing';
 
 /** Result of exporting (copying) the current build's `.nbt` to a user-chosen
- *  location via the native Save dialog. */
+ *  location via the native Save dialog. `splitPieces` is set when the structure
+ *  exceeded the size limit and was cut into a jigsaw assembly folder instead of a
+ *  single file (`path` is that folder). */
 export type ExportResult =
-  | { ok: true; path: string }
+  | { ok: true; path: string; splitPieces?: number }
   | { ok: false; canceled?: boolean; error?: string };
 
 /** The standardized panels/windows the View menu can show/hide. `console` is the

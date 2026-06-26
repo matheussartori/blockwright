@@ -42,11 +42,14 @@ interface ExportConfigProps {
   defaultName: string;
   /** The structure's [w, h, d], to proportion the terrain preview. */
   structureSize: [number, number, number];
+  /** Force the worldgen files on (a split assembly can't reassemble without its pools), so
+   *  the toggle is locked and the worldgen options always show. */
+  forceWorldgen?: boolean;
   onChange: (draft: ExportDraft) => void;
   t: TFunction;
 }
 
-export function ExportConfig({ workspaceName, namespace, defaultName, structureSize, onChange, t }: ExportConfigProps) {
+export function ExportConfig({ workspaceName, namespace, defaultName, structureSize, forceWorldgen = false, onChange, t }: ExportConfigProps) {
   const [name, setName] = useState(defaultName);
   const [generate, setGenerate] = useState(DEFAULT_WORLDGEN.generate);
   const [terrain, setTerrain] = useState<TerrainAdaptation>(DEFAULT_WORLDGEN.terrainAdaptation);
@@ -73,16 +76,18 @@ export function ExportConfig({ workspaceName, namespace, defaultName, structureS
     };
   }, []);
 
+  // A split (oversized) export MUST emit its worldgen plumbing, so the toggle is locked on.
+  const effectiveGenerate = generate || forceWorldgen;
   const resourceName = useMemo(() => sanitizeResourceName(name), [name]);
   const worldgen: WorldgenOptions = useMemo(
     () => ({
-      generate,
+      generate: effectiveGenerate,
       terrainAdaptation: terrain,
       biomes: biomeSource === 'mod' ? picked : (BIOME_PRESETS.find((p) => p.id === preset)?.biomes ?? []),
       spacing,
       separation,
     }),
-    [generate, terrain, biomeSource, picked, preset, spacing, separation],
+    [effectiveGenerate, terrain, biomeSource, picked, preset, spacing, separation],
   );
 
   useEffect(() => onChange({ name, resourceName, worldgen }), [name, resourceName, worldgen, onChange]);
@@ -133,12 +138,14 @@ export function ExportConfig({ workspaceName, namespace, defaultName, structureS
       <div className="export-field export-switch-row">
         <span className="export-switch-text">
           <span className="export-label">{t('export.worldgenToggle')}</span>
-          <span className="export-hint">{generate ? t('export.worldgenOn') : t('export.worldgenOff')}</span>
+          <span className="export-hint">
+            {forceWorldgen ? t('export.worldgenForced') : effectiveGenerate ? t('export.worldgenOn') : t('export.worldgenOff')}
+          </span>
         </span>
-        <Switch checked={generate} onChange={setGenerate} ariaLabel={t('export.worldgenToggle')} />
+        <Switch checked={effectiveGenerate} onChange={setGenerate} disabled={forceWorldgen} ariaLabel={t('export.worldgenToggle')} />
       </div>
 
-      {generate && (
+      {effectiveGenerate && (
         <div className="export-worldgen">
           <label className="export-field">
             <span className="export-label">{t('export.terrainLabel')}</span>

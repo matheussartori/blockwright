@@ -4,15 +4,16 @@
 // and switches between the three states (no workspace / the config+preview form / success).
 // The config column (ExportConfig) reports a draft; main computes the file list + problems
 // (planWorkspaceExport) so the preview and the writes can't drift.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { api } from '../../api';
-import { useActiveDoc, useApp, useT } from '../../hooks/useStores';
+import { useActiveDoc, useApp, useSettings, useT } from '../../hooks/useStores';
 import { store } from '../../state/store';
 import { ExportConfig, type ExportDraft } from './ExportConfig';
 import { ExportPreview } from './ExportPreview';
 import { ExportEmpty, ExportSuccess } from './ExportStates';
 import { splitIssues } from '@/shared/domain/worldgen';
+import { effectiveNbtLimit, splitPlan } from '@/shared/domain/split';
 import type { WorkspaceExportPlan, WorkspaceExportResult } from '@/shared/types';
 
 export function ExportModal() {
@@ -23,8 +24,14 @@ export function ExportModal() {
   // The structure being exported is the active doc (export is triggered from it) — used to
   // proportion the terrain preview and to warn if it carries jigsaw connectors.
   const structure = useActiveDoc()?.structure ?? null;
-  const structureSize = structure?.size ?? [9, 7, 9];
+  const structureSize = (structure?.size ?? [9, 7, 9]) as [number, number, number];
   const hasJigsaws = (structure?.jigsaws.length ?? 0) > 0;
+
+  // The structure can only load as one `.nbt` up to the size limit; beyond it, export cuts it
+  // into a jigsaw assembly. Resolve the user's limit setting for this workspace's MC version.
+  const nbtPref = useSettings((s) => s.nbtSizeLimit);
+  const nbtLimit = effectiveNbtLimit(nbtPref, workspace?.minecraftVersion ?? null);
+  const split = useMemo(() => splitPlan(structureSize, nbtLimit), [structureSize, nbtLimit]);
 
   const [draft, setDraft] = useState<ExportDraft | null>(null);
   const [plan, setPlan] = useState<WorkspaceExportPlan | null>(null);
@@ -42,14 +49,14 @@ export function ExportModal() {
     if (!open || !target || !workspace || !draft) return;
     let stale = false;
     void api
-      .planWorkspaceExport({ sourcePath: target.path, name: draft.resourceName, worldgen: draft.worldgen })
+      .planWorkspaceExport({ sourcePath: target.path, name: draft.resourceName, worldgen: draft.worldgen, size: structureSize, nbtLimit })
       .then((p) => {
         if (!stale) setPlan(p);
       });
     return () => {
       stale = true;
     };
-  }, [open, target, workspace, draft]);
+  }, [open, target, workspace, draft, structureSize, nbtLimit]);
 
   const close = () => store.getState().setExportTarget(null);
   const { errors } = splitIssues(plan?.issues ?? []);
@@ -58,7 +65,7 @@ export function ExportModal() {
   const doExport = async () => {
     if (!target || !draft || !canExport) return;
     setBusy(true);
-    const res = await api.exportToWorkspace({ sourcePath: target.path, name: draft.resourceName, worldgen: draft.worldgen });
+    const res = await api.exportToWorkspace({ sourcePath: target.path, name: draft.resourceName, worldgen: draft.worldgen, size: structureSize, nbtLimit });
     setBusy(false);
     setResult(res);
     // The new file should show on the welcome screen's workspace list immediately.
@@ -101,6 +108,7 @@ export function ExportModal() {
             namespace={workspace.namespace}
             defaultName={target?.name ?? ''}
             structureSize={structureSize}
+            forceWorldgen={split.oversized}
             onChange={setDraft}
             t={t}
           />
@@ -108,7 +116,8 @@ export function ExportModal() {
             plan={plan}
             namespace={workspace.namespace}
             result={result}
-            jigsawWarning={hasJigsaws && (draft?.worldgen.generate ?? false)}
+            jigsawWarning={hasJigsaws && !split.oversized && (draft?.worldgen.generate ?? false)}
+            splitPieces={split.oversized ? split.pieceCount : 0}
             t={t}
           />
         </div>

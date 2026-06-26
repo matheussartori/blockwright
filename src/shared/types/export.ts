@@ -10,6 +10,10 @@ export interface WorkspaceExportRequest {
   /** The resource name without the namespace, already sanitized by the dialog. */
   name: string;
   worldgen: WorldgenOptions;
+  /** The structure's [w, h, d] — used to decide if it exceeds the size limit (→ jigsaw split). */
+  size: [number, number, number];
+  /** The effective per-axis cell limit (the user's setting resolved for the workspace version). */
+  nbtLimit: number;
 }
 
 /** A planned file plus whether it already exists on disk (→ an overwrite warning). */

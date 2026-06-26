@@ -22,6 +22,7 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',
   'gen.autoSuffix', 'gen.heightTotalMode', 'viewer.contentPack',
   'editor.axisX', 'editor.axisY', 'editor.axisZ',
+  'viewer.nbtLimit48', // "48³ (1.16+)" — a numeric label, identical in both languages
 ]);
 
 describe('i18n chrome coverage', () => {

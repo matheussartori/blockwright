@@ -6,6 +6,7 @@ import { useCallback, useEffect, type MutableRefObject } from 'react';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
 import { sanitizeResourceName } from '@/shared/domain/worldgen';
+import { effectiveNbtLimit } from '@/shared/domain/split';
 import { basename } from '../ui/path';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
@@ -30,6 +31,7 @@ export interface DocumentFlow {
   close: () => void;
   closeDocById: (id: string) => void;
   exportActive: () => Promise<void>;
+  exportToWorldActive: () => Promise<void>;
   exportToWorkspaceActive: () => void;
   acceptSuggest: () => Promise<void>;
   onWorkspaceChanged: (ws: Workspace | null) => Promise<void>;
@@ -154,9 +156,29 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     const src = preview?.path ?? doc.path;
     if (!src) return; // nothing loaded to export
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
-    const result = await api.exportStructure(src, suggested);
+    const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
+    const result = await api.exportStructure(src, suggested, nbtLimit);
     if (result.ok) {
-      store.getState().setNotice({ text: `Exported to ${basename(result.path)}`, warn: false });
+      const text = result.splitPieces ? `Split into ${result.splitPieces} jigsaw pieces` : `Exported to ${basename(result.path)}`;
+      store.getState().setNotice({ text, warn: false });
+    } else if (!result.canceled) {
+      store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
+    }
+  }, []);
+
+  // Install the active tab's current build straight into a Minecraft world save (main picks
+  // the save folder and writes a ready-to-run datapack). Same source selection as exportActive.
+  const exportToWorldActive = useCallback(async () => {
+    const doc = activeDocument(documentsStore.getState());
+    if (!doc) return;
+    const preview = doc.viewingVersion != null ? doc.versions.find((v) => v.version === doc.viewingVersion) : null;
+    const src = preview?.path ?? doc.path;
+    if (!src) return;
+    const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
+    const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
+    const result = await api.exportToWorld(src, suggested, nbtLimit);
+    if (result.ok) {
+      store.getState().setNotice({ text: 'Installed into your world', warn: false });
     } else if (!result.canceled) {
       store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
     }
@@ -229,5 +251,5 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     bindGenerationProgress();
   }, [load]);
 
-  return { load, openFile, open, newDoc, close, closeDocById, exportActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
+  return { load, openFile, open, newDoc, close, closeDocById, exportActive, exportToWorldActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
 }

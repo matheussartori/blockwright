@@ -4,6 +4,7 @@
 // these are durable, renderer-local knobs. Uses Zustand's vanilla store to
 // match the rest of the renderer.
 import { createStore } from 'zustand/vanilla';
+import { DEFAULT_NBT_SIZE_PREF, type NbtSizePref } from '@/shared/domain/split';
 
 /** Color theme: follow the OS, or force light/dark. */
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -26,6 +27,10 @@ export interface Settings {
   /** Show each block's actual texture (not a flat color swatch) as its icon in
    *  the Info block list. On by default — textures are easier to recognize. */
   blockTextureIcons: boolean;
+  /** The Structure Block size limit a `.nbt` must fit, or it won't load in-game.
+   *  Above it, export cuts the structure into a jigsaw assembly. `auto` derives the
+   *  limit from the workspace's Minecraft version (≥1.16 → 48, older → 32). */
+  nbtSizeLimit: NbtSizePref;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -36,6 +41,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   showJigsaw: false,
   hideShell: false,
   blockTextureIcons: true,
+  nbtSizeLimit: DEFAULT_NBT_SIZE_PREF,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -74,6 +80,7 @@ function snapshot(s: SettingsState): Settings {
     showJigsaw: s.showJigsaw,
     hideShell: s.hideShell,
     blockTextureIcons: s.blockTextureIcons,
+    nbtSizeLimit: s.nbtSizeLimit,
   };
 }
 

@@ -15,6 +15,7 @@ import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './worksp
 import {
   notifyClose,
   notifyExportFile,
+  notifyExportToWorld,
   notifyExportToWorkspace,
   notifyOpenCatalog,
   notifyOpenGuide,
@@ -285,6 +286,11 @@ export function buildAppMenu(): void {
           accelerator: 'CmdOrCtrl+Shift+S',
           enabled: fileOpen,
           click: () => notifyExportFile(),
+        },
+        {
+          label: mt('menu.exportToWorld'),
+          enabled: fileOpen,
+          click: () => notifyExportToWorld(),
         },
         {
           label: mt('menu.exportToWorkspace'),

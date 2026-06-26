@@ -142,9 +142,13 @@ export interface BlockwrightApi {
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
   /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
-   *  `suggestedName` seeds the dialog's filename. Returns where it landed, or a
-   *  canceled/error result. */
-  exportStructure: (srcPath: string, suggestedName: string) => Promise<ExportResult>;
+   *  `suggestedName` seeds the dialog's filename. `nbtLimit` is the resolved size limit —
+   *  a `.nbt` export over it is cut into a jigsaw assembly folder instead. Returns where it
+   *  landed, or a canceled/error result. */
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
+  /** Install the build into a user-chosen Minecraft world save as a ready-to-run datapack
+   *  (oversized → jigsaw assembly, else a single placeable structure). */
+  exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
   reportWindows: (state: WindowsReport) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */
@@ -202,6 +206,9 @@ export interface BlockwrightApi {
   /** Notified when File ▸ Export File is chosen; the handler picks the build to
    *  save and calls `exportStructure`. */
   onExportFile: (cb: () => void) => void;
+  /** Notified when File ▸ Export to World is chosen; the handler picks the build and
+   *  calls `exportToWorld`. */
+  onExportToWorld: (cb: () => void) => void;
   /** Notified when File ▸ Export to Mod Workspace is chosen; the handler opens the
    *  export dialog for the active document. */
   onExportToWorkspace: (cb: () => void) => void;

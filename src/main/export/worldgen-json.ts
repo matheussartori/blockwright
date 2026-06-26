@@ -17,10 +17,19 @@ export function saltFor(id: string): number {
   return (Math.abs(h | 0) % 2147483646) + 1;
 }
 
+/** Extra knobs a multi-piece (split) assembly needs: a deeper recursion `size` so every
+ *  piece expands, and a wider `max_distance_from_center` so far pieces aren't culled. */
+export interface StructureJsonOpts {
+  /** Jigsaw recursion depth (default 1 = a single self-contained piece). */
+  size?: number;
+  /** Max block distance a piece may sit from the start piece (default 80, vanilla max ~128). */
+  maxDistance?: number;
+}
+
 /** `worldgen/structure/<name>.json` — the jigsaw structure definition. `spawn_overrides`
  *  is a REQUIRED field in 1.21's structure codec (`.fieldOf`, not optional), so it must be
  *  present even when empty, or the datapack fails to load. */
-export function structureJson(namespace: string, name: string, w: WorldgenOptions): unknown {
+export function structureJson(namespace: string, name: string, w: WorldgenOptions, opts: StructureJsonOpts = {}): unknown {
   return {
     type: 'minecraft:jigsaw',
     biomes: `#${namespace}:has_structure/${name}`,
@@ -28,31 +37,39 @@ export function structureJson(namespace: string, name: string, w: WorldgenOption
     spawn_overrides: {},
     terrain_adaptation: w.terrainAdaptation,
     start_pool: `${namespace}:${name}/start`,
-    size: 1,
+    size: opts.size ?? 1,
     start_height: { absolute: 0 },
     project_start_to_heightmap: 'WORLD_SURFACE_WG',
-    max_distance_from_center: 80,
+    max_distance_from_center: opts.maxDistance ?? 80,
     use_expansion_hack: false,
   };
 }
 
-/** `worldgen/template_pool/<name>/start.json` — the single-element start pool. */
-export function templatePoolJson(namespace: string, name: string): unknown {
+/** A single-element, rigid template pool pointing at one structure `location` — the building
+ *  block of a split assembly (the start pool points at the root piece; each edge pool points
+ *  at one child piece). `fallback` is empty since these pools are deterministic. */
+export function singleElementPoolJson(poolId: string, location: string): unknown {
   return {
-    name: `${namespace}:${name}/start`,
+    name: poolId,
     fallback: 'minecraft:empty',
     elements: [
       {
         weight: 1,
         element: {
           element_type: 'minecraft:single_pool_element',
-          location: `${namespace}:${name}`,
+          location,
           processors: 'minecraft:empty',
           projection: 'rigid',
         },
       },
     ],
   };
+}
+
+/** `worldgen/template_pool/<name>/start.json` — the single-element start pool (single-piece
+ *  export: the one structure IS the whole build). */
+export function templatePoolJson(namespace: string, name: string): unknown {
+  return singleElementPoolJson(`${namespace}:${name}/start`, `${namespace}:${name}`);
 }
 
 /** `worldgen/structure_set/<name>.json` — where/how often it spawns. */
