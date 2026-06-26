@@ -33,6 +33,12 @@ export const DEFAULT_BASEMENT_H = BASEMENT_OVERHEAD;
 export const MAX_BASEMENT_LEVELS = 4;
 /** In-roof attic headroom a storeyed box reserves (see {@link heightOverhead}). */
 export const ATTIC_OVERHEAD = 2;
+/** The non-storey reserve a TOWER needs above its top floor: a tower OWNS its crown in
+ *  code (a deck + crenellated parapet + spire tips — see the tower types' `crownReserve`),
+ *  which is a few cells, NOT a pitched-house roof (~half the footprint span). Reserving the
+ *  house pitch for a wide tower inflated the box ~10 cells and ballooned the storeys (the
+ *  "cavernous floors / door looks like it's in the basement" defect). */
+export const CROWN_RESERVE = 3;
 
 /** Inputs for {@link planStoreys}. */
 export interface StoreySpec {
@@ -182,6 +188,11 @@ export interface OverheadSpec {
   /** The roof pick ('flat' needs only a deck + parapet; anything else reserves a
    *  pitch). Omit → assume pitched (the conservative legacy default). */
   roof?: string;
+  /** The structure OWNS its crown in code (a tower keep/spire): reserve only
+   *  {@link CROWN_RESERVE} above the top floor instead of a pitched-house roof,
+   *  whatever the `roof` pick. The tower types have no roof slot, so this is the
+   *  honest reserve for them. */
+  crownRoof?: boolean;
   /** Whether a below-grade basement level is reserved. */
   basement?: boolean;
   /** Whether an in-roof attic adds headroom. */
@@ -196,6 +207,9 @@ export interface OverheadSpec {
  *  @returns The overhead in cells; `sum(floorHeights) + overhead` = the total box H. */
 export function heightOverhead(spec: OverheadSpec): number {
   const basement = spec.basement ? BASEMENT_OVERHEAD : 0;
+  // A tower owns its crown (a few cells) — never the half-footprint house pitch, and an
+  // attic can't sit in a crown, so a tower's whole above-floor reserve is just the crown.
+  if (spec.crownRoof) return basement + CROWN_RESERVE;
   const attic = spec.attic ? ATTIC_OVERHEAD : 0;
   const roof = spec.roof === 'flat' ? 2 : Math.floor(Math.min(spec.w, spec.d) / 2) + 1;
   return basement + roof + attic;

@@ -94,4 +94,15 @@ describe('heightOverhead: roof-aware', () => {
     expect(heightOverhead({ w: 37, d: 33 })).toBe(17); // unstated → conservative pitch
     expect(heightOverhead({ w: 11, d: 11, roof: 'hip', basement: true, attic: true })).toBe(13);
   });
+
+  it('a TOWER owns its crown — only CROWN_RESERVE above the floors, never a house pitch', () => {
+    // A 25-wide tower must NOT pay the 13-cell pitch (which inflated the box ~10 cells and
+    // ballooned the storeys into cavernous floors the AI then split into mezzanines).
+    expect(heightOverhead({ w: 25, d: 25, crownRoof: true })).toBe(3);
+    expect(heightOverhead({ w: 25, d: 25 })).toBe(13); // the same box as a house DOES pitch
+    // The crown reserve is fixed regardless of footprint, and an attic can't sit in a crown.
+    expect(heightOverhead({ w: 37, d: 33, crownRoof: true, attic: true })).toBe(3);
+    // A crypt below still adds its band under the crown.
+    expect(heightOverhead({ w: 25, d: 25, crownRoof: true, basement: true })).toBe(8);
+  });
 });

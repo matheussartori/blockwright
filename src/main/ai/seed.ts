@@ -42,9 +42,13 @@ export function shellPreamble(json: string): string {
     'volume it already has (porches/verandas on their posts, balconies and upper galleries, exposed ' +
     'framing, projecting entry porticos, dormers, railings, the stone plinth, the stairs). Do NOT ' +
     'flatten it back into a plain box, do NOT re-roof it, and do NOT re-clad or strip those volumes — ' +
-    'they ARE the requested style. Your job is to: furnish the interior room-by-room, connect the rooms ' +
-    'to any porch/gallery doors, add finishing exterior detail (greenery/hedges/planters/flower boxes, ' +
-    'outdoor steps, porch furniture, lighting), fix anything unsound, and otherwise REFINE — not ' +
+    'they ARE the requested style. KEEP the storey COUNT the shell defines: its floor slabs are the ONLY ' +
+    'floors — do NOT add intermediate floors, mezzanines, lofts or extra horizontal decks between the ' +
+    "shell's existing slab levels. If a storey is tall, leave it as ONE open volume with a high ceiling " +
+    '(galleries, tall windows, hanging fixtures) — never carve a tall storey into two cramped half-height ' +
+    'levels, and never add a floor the shell did not place. Your job is to: furnish the interior room-by-room, ' +
+    'connect the rooms to any porch/gallery doors, add finishing exterior detail (greenery/hedges/planters/' +
+    'flower boxes, outdoor steps, porch furniture, lighting), fix anything unsound, and otherwise REFINE — not ' +
     'replace — this shell. CRITICAL: a mode "full" emit REPLACES the entire structure — anything you do ' +
     'not re-emit is DELETED, so "keeping" the shell means RE-EMITTING EVERY BLOCK OF IT. Never emit only ' +
     'your additions as a full structure (a furniture-only emit erases the walls, floors and roof and is ' +

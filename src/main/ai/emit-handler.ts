@@ -267,23 +267,36 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
     // > geometric detection (the fallback in buildMetadata). Opening a file from outside the
     // library left a temp sidecar; the build now has its own folder, so promote here by
     // writing beside it and removing the temp copy.
-    if (session.library.latest) {
+    {
       const counts = new Map<string, number>();
       for (const b of solidBlocks) {
         const nm = report.palette[b.state]?.Name ?? '';
         if (nm) counts.set(nm, (counts.get(nm) ?? 0) + 1);
       }
       const authoritative = authoritativeFloors;
-      const meta = buildMetadata({
-        name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
-        source: session.library.latest,
+      const planFloors = floors?.length ? floors : authoritative.length ? authoritative : undefined;
+      // Write the sidecar BESIDE THE SCRATCH version too (not just the library copy): the
+      // viewer loads the scratch `vN.nbt` for a fresh build, and `loadStructure` prefers a
+      // sidecar beside the file — so the floor bands show the AUTHORITATIVE storeys (the 5 the
+      // shell laid), not the storeys geometric detection guesses from the AI's furniture (which
+      // counts a furnished tall floor's mid-height clutter as extra "mini" floors).
+      const scratchMeta = buildMetadata({
+        name: path.basename(nbtPath).replace(/\.nbt$/i, ''),
+        source: nbtPath,
         size,
         solids: solidBlocks.map((b) => b.pos),
         paletteCounts: counts,
-        floors: floors?.length ? floors : authoritative.length ? authoritative : undefined,
+        floors: planFloors,
       });
-      await writeMetadataJson(librarySidecarPath(session.library.latest), meta);
-      if (basePath) await removeTempMetadata(basePath);
+      await writeMetadataJson(librarySidecarPath(nbtPath), scratchMeta);
+      if (session.library.latest) {
+        await writeMetadataJson(librarySidecarPath(session.library.latest), {
+          ...scratchMeta,
+          name: path.basename(session.library.latest).replace(/\.nbt$/i, ''),
+          source: session.library.latest,
+        });
+        if (basePath) await removeTempMetadata(basePath);
+      }
     }
     state.emitted.value = {
       ok: true,

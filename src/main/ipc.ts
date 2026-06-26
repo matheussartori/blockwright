@@ -7,7 +7,7 @@ import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
 import { loadStructure } from './structure/io/load-structure';
-import { isInsideLibrary, librarySidecarPath, metadataFromStructure, readMetadata, writeLoadMetadata } from './structure/metadata';
+import { librarySidecarPath, metadataFromStructure, readMetadata, writeLoadMetadata } from './structure/metadata';
 import { contentPackVersion, getActiveWorkspace, resolveTextureFile } from './structure/assets/content-pack';
 import { getContentDir, setContentDir } from './structure/assets/content-dir';
 import { clearJsonCache } from './structure/assets/content-pack';
@@ -62,11 +62,15 @@ export function registerIpc(): void {
 
   ipcMain.handle(IPC_CHANNELS.loadStructure, async (_e, filePath: string) => {
     const data = await loadStructure(filePath);
-    // A build inside the library has an AUTHORITATIVE sidecar written at generation time
-    // (the code-built structure's exact storeys); prefer it over re-detecting, so a
-    // flat-roofed villa's floors are labelled exactly instead of guessed.
-    if (isInsideLibrary(filePath)) {
-      const existing = await readMetadata(librarySidecarPath(filePath));
+    // An AUTHORITATIVE sidecar written at generation time (the code-built structure's exact
+    // storeys) sits beside the build — both the library copy AND the scratch `vN.nbt` the
+    // viewer loads for a fresh build. Prefer it over re-detecting, so the floor bands show the
+    // real storeys (the 5 the shell laid) instead of guessing from the AI's interior furniture
+    // (which reads a tall furnished floor's clutter as extra "mini" floors). Only a sidecar we
+    // wrote ever sits beside a file, so an arbitrary opened `.nbt` still falls to detection.
+    const sidecar = librarySidecarPath(filePath);
+    if (fs.existsSync(sidecar)) {
+      const existing = await readMetadata(sidecar);
       if (existing?.floors?.length) return { ...data, floors: existing.floors };
     }
     // Otherwise recognise the storeys + write the `.bw.json` sidecar (temp for a file

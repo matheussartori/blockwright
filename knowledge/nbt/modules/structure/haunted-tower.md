@@ -29,7 +29,12 @@ terrace. (Basement, Surroundings and Room modules DO link to the tower.)
 - **Corner buttress piers** rising past the crown to lit **spire finials**, a **central
   spire**, and a spiky **crenellated parapet** over a walkable roof deck.
 - **Floor slabs** for every storey, a connected **stair core** (or a wall ladder), a **roof
-  hatch** onto the crown, and a hanging **soul lantern under every ceiling**.
+  hatch** onto the crown, and a hanging **soul lantern under every ceiling**. Vertical
+  circulation is ALREADY COMPLETE — every floor is linked and the crown is reachable. Do NOT
+  add your OWN stairs or ladders, and **never build an exterior staircase up the outside of the
+  shaft** (the entrance is the gothic doorway at the base). Extra/outside stairs are the exact
+  "escada no exterior" defect to avoid; if a floor feels unreachable, it isn't — the core
+  already serves it.
 - The **soul-lit lancet windows**, the projecting **lantern-arm cages** on the upper tiers,
   the **carved skull face** (on a wide tower), and the **gothic doorway + inverted cross**.
 - When picked: the **basement** (the chosen module's stone undercroft, barred — never glass —
@@ -46,6 +51,13 @@ holes in the shaft — the carved massing IS the tower.
    hall / shrine at the base, a study or ritual chamber above, an observatory or roost at the
    top). Partition only a genuinely large floor; otherwise dress the single room. Light every
    level with soul fire; decoration goes in AIR cells — never overwrite the shell.
+   **Respect the storey count — never add mezzanines.** The shell's floor slabs are the ONLY
+   floors. A storey here is TALL on purpose (a cathedral-height tower volume); leave it as one
+   open space with a high ceiling — hanging chandeliers/lanterns, tall lancet windows, a
+   gallery of banners — and partition it only with WALLS within the same level. Do NOT insert
+   an intermediate floor/deck/loft to "use up" the height: a half-height sub-level with a
+   cramped ceiling is the exact defect to avoid, and it breaks the stair core that climbs
+   slab-to-slab.
 2. **Lean into the haunted mood**: cobwebs in the corners, candles and skulls on shelves,
    tattered banners, soul campfires/braziers, chains, a central altar or tomb, bookshelves and
    brewing stands for a sorcerer's spire. Keep the palette dark and cold-lit.

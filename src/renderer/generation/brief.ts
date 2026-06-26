@@ -185,29 +185,44 @@ export function derivedSize(
 
 /** The resolved structure params with the basement/attic/roof SLOTS folded in (they're
  *  their own selects now, not house params, but still drive the derived height — the roof
- *  pick decides whether the box pays a pitch reserve or just a flat deck). */
+ *  pick decides whether the box pays a pitch reserve or just a flat deck). A tower OWNS its
+ *  crown in code (no roof/attic slot), so `crownRoof` rides along to swap the half-footprint
+ *  house pitch for the tower's small crown reserve. */
 function paramsWithSlots(d: BuildDetails, struct: GenerationModule | undefined): Record<string, string | number> {
   const out = resolveDetailParams(d, struct);
-  return { ...out, basement: d.basement || 'none', attic: d.attic || 'none', roof: d.roof || out.roof || '' };
+  return {
+    ...out,
+    basement: d.basement || 'none',
+    attic: d.attic || 'none',
+    roof: d.roof || out.roof || '',
+    crownRoof: ownsCrown(struct) ? 1 : 0,
+  };
+}
+
+/** Whether the structure owns its crown in code (a tower keep/spire) — so its above-floor
+ *  reserve is the small crown, not a pitched-house roof. Keyed off the `tower` family. */
+function ownsCrown(struct: GenerationModule | undefined): boolean {
+  return struct?.group === 'tower';
 }
 
 /** The shared roof-aware {@link heightOverhead}, fed from the slot-folded params — the
  *  SAME function the structure types' total budget agrees with, so a flat-roofed build
- *  no longer pays a phantom pitch reserve. */
+ *  no longer pays a phantom pitch reserve (and a tower pays only its crown). */
 function overhead(params: Record<string, string | number>, w: number, d: number): number {
   return heightOverhead({
     w,
     d,
     roof: typeof params.roof === 'string' ? params.roof : undefined,
+    crownRoof: !!params.crownRoof,
     basement: !!params.basement && params.basement !== 'none',
     attic: !!params.attic && params.attic !== 'none',
   });
 }
 
 /** Just the roof reserve of the overhead (no basement/attic) — what an attic band's
- *  default swallows. */
+ *  default swallows. A tower's is its crown. */
 function roofReserve(params: Record<string, string | number>, w: number, d: number): number {
-  return heightOverhead({ w, d, roof: typeof params.roof === 'string' ? params.roof : undefined });
+  return heightOverhead({ w, d, roof: typeof params.roof === 'string' ? params.roof : undefined, crownRoof: !!params.crownRoof });
 }
 
 /** The non-storey vertical BANDS of the box: the picked basement at the bottom (the
@@ -548,7 +563,12 @@ export function buildBrief(d: BuildDetails, catalog: GenerationCatalog | null): 
     });
     heightLine =
       `- Storey heights (slab-to-slab, bottom-up, y relative to the ground floor): ${lines.join(', ')}. ` +
-      `Each storey's floor slab MUST sit at its stated level — respect these heights exactly.\n`;
+      `Each storey's floor slab MUST sit at its stated level — respect these heights exactly.\n` +
+      `- These are the ONLY floors. There are exactly ${d.floorHeights.length} above-ground ` +
+      `storey${d.floorHeights.length === 1 ? '' : 's'} — do NOT add any intermediate floors, ` +
+      `mezzanines, lofts, or extra horizontal decks between the stated slab levels. A TALL storey ` +
+      `is one open volume with a high ceiling (galleries, chandeliers, tall windows) — never split ` +
+      `it into two cramped half-height levels.\n`;
     // The basement/attic bands the user sized in the same panel (the attic band is the
     // TOPMOST level — it owns the whole attic + roof zone, nothing sits above it).
     const bands = previewOverheads(d, s);
