@@ -17,6 +17,7 @@ import {
   notifyExportFile,
   notifyExportToWorld,
   notifyExportToWorkspace,
+  notifyRenameProject,
   notifyOpenCatalog,
   notifyOpenGuide,
   notifyOpenModules,
@@ -36,6 +37,10 @@ const isMac = process.platform === 'darwin';
 // renderer over IPC) — drives the enabled state of the Close File menu item.
 let fileOpen = false;
 
+// Whether the active doc is a renamable generated project (its own library folder).
+// Mirrored from the renderer; drives the File ▸ Rename Project… enabled state.
+let projectOpen = false;
+
 // Floating-window state mirrored from the renderer (it owns the persisted
 // layout). Drives the View menu's per-window checkmarks/enabled state. Defaults
 // to "shown but unavailable" until the renderer reports and a file is open.
@@ -52,6 +57,13 @@ let windowsState: WindowsReport = {
 export function setFileOpen(open: boolean): void {
   if (open === fileOpen) return;
   fileOpen = open;
+  buildAppMenu();
+}
+
+/** Update the renamable-project flag and rebuild the menu if it changed. */
+export function setProjectOpen(open: boolean): void {
+  if (open === projectOpen) return;
+  projectOpen = open;
   buildAppMenu();
 }
 
@@ -281,6 +293,12 @@ export function buildAppMenu(): void {
           },
         },
         { label: mt('menu.openRecent'), submenu: openRecent },
+        { type: 'separator' },
+        {
+          label: mt('menu.renameProject'),
+          enabled: projectOpen,
+          click: () => notifyRenameProject(),
+        },
         {
           label: mt('menu.exportFile'),
           accelerator: 'CmdOrCtrl+Shift+S',

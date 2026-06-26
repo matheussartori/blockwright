@@ -3430,6 +3430,29 @@ body.row-resizing {
   justify-content: center;
 }
 
+/* --- Rename Project dialog ------------------------------------------------ */
+.rename-modal {
+  width: min(420px, 100%);
+}
+.rename-hint {
+  margin: 0 0 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.rename-input {
+  width: 100%;
+}
+.rename-error {
+  margin: 10px 0 0;
+  color: var(--danger, #e5534b);
+  line-height: 1.4;
+}
+.rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* --- AI "New Structure" panel -------------------------------------------- */
 
 /* The chat body. Fills whichever chrome hosts it (the right dock or a floating

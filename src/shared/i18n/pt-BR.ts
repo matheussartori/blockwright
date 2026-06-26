@@ -15,6 +15,7 @@ export const ptBR: Messages = {
   'menu.exportFile': 'Exportar como…',
   'menu.exportToWorld': 'Exportar para o mundo…',
   'menu.exportToWorkspace': 'Exportar para o workspace do mod…',
+  'menu.renameProject': 'Renomear projeto…',
   'menu.closeFile': 'Fechar arquivo',
   'menu.openWorkspace': 'Abrir workspace de mod…',
   'menu.openRecentWorkspace': 'Abrir workspace recente',
@@ -91,6 +92,14 @@ export const ptBR: Messages = {
   'common.clear': 'Limpar',
   'common.dismiss': 'Dispensar',
   'common.close': 'Fechar',
+  'common.cancel': 'Cancelar',
+
+  // Diálogo Renomear projeto.
+  'rename.title': 'Renomear projeto',
+  'rename.hint': 'Renomeia a pasta do projeto e seu arquivo de estrutura — útil antes de exportar, pra não sair com um nome gerado.',
+  'rename.placeholder': 'Nome do projeto',
+  'rename.save': 'Renomear',
+  'rename.done': 'Renomeado para “{name}”',
 
   // Tab bar.
   'tab.home': 'Início',

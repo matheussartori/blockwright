@@ -64,6 +64,13 @@ export const IPC_CHANNELS = {
   jigsawCandidates: 'jigsaw:candidates',
   /** Renderer tells main whether a structure is currently open (drives Close File). */
   setFileOpen: 'file:set-open',
+  /** Renderer tells main whether the active doc is a renamable generated project
+   *  (drives the File ▸ Rename Project… enabled state). */
+  setProjectOpen: 'file:set-project-open',
+  /** Rename a generated project: rename its library FOLDER and the latest `<name>.nbt`
+   *  inside it (kept `versions/` + generation.log ride along). Payload: currentFile +
+   *  newName + sessionId → RenameProjectResult. */
+  projectRename: 'project:rename',
   /** Copy the current build's `.nbt` to a user-chosen location via a Save dialog
    *  (payload: srcPath + suggestedName) → ExportResult. */
   exportFile: 'file:export',
@@ -165,6 +172,8 @@ export const IPC_EVENTS = {
   /** Ask the renderer to open the "Export to mod" dialog for the active document
    *  (File ▸ Export to Workspace). */
   exportToWorkspace: 'export-to-workspace',
+  /** Ask the renderer to open the Rename Project dialog (File ▸ Rename Project…). */
+  renameProject: 'rename-project',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
   /** Ask the renderer to load a just-generated `.nbt` into the viewer and return

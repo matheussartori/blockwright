@@ -26,6 +26,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { CatalogModal } from './components/CatalogModal';
 import { ModulesModal } from './components/ModulesModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
+import { RenameProjectModal } from './components/RenameProjectModal';
 import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
 import { BuildPlanner, NewBuildPanel } from './components/generate/BuildPlanner';
@@ -128,6 +129,7 @@ function Shell() {
       <CatalogModal />
       <ModulesModal />
       <VersionSelectModal />
+      <RenameProjectModal />
       <GuideModal />
       <ExportModal />
       <ImagePreview />

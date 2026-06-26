@@ -64,6 +64,15 @@ export function resetSession(sessionId: string): void {
   sessions.delete(sessionId);
 }
 
+/** Re-point a LIVE session's library mirror after the user renamed the project, so
+ *  any further version this session mirrors lands in the renamed folder instead of
+ *  reserving a fresh one. No-op if the session isn't in memory (a reopened project
+ *  with no in-flight generation needs no relink — its files are already moved). */
+export function relinkSessionLibrary(sessionId: string, mirror: LibraryMirror): void {
+  const session = sessions.get(sessionId);
+  if (session) session.library = mirror;
+}
+
 /** List the compiled `vN.nbt` versions on disk for a session, ascending. */
 export function listVersions(sessionId: string): VersionInfo[] {
   let names: string[];

@@ -11,6 +11,14 @@ export type ExportResult =
   | { ok: true; path: string; splitPieces?: number }
   | { ok: false; canceled?: boolean; error?: string };
 
+/** Result of renaming a generated project (its library folder + latest `.nbt`).
+ *  On success `dir`/`file` are the new folder + `<name>.nbt` paths and `name` the
+ *  sanitized project name; on failure `error` explains why (empty name, a clash, or
+ *  a folder that isn't a Blockwright project). */
+export type RenameProjectResult =
+  | { ok: true; dir: string; file: string; name: string }
+  | { ok: false; error: string };
+
 /** The standardized panels/windows the View menu can show/hide. `console` is the
  *  bottom log dock (see `LogEntry`); like `controls` it tracks visibility only. */
 export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions' | 'console';

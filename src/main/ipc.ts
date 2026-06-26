@@ -39,9 +39,11 @@ import {
 import { planExport, runExport } from './export';
 import { notifyRecentWorkspaces, openFileDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
+import { renameProject } from './ai/rename-project';
+import { relinkSessionLibrary } from './ai/session';
 import { getLogBacklog } from './logger';
 import { checkForUpdatesManually, checkForUpdatesQuiet, getPendingUpdate } from './update-check';
-import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';
+import { buildAppMenu, refreshMenu, setFileOpen, setProjectOpen, setWindowsState } from './app-menu';
 
 /** Pending preview-render requests, keyed by requestId, resolved when the
  *  renderer replies on aiRenderResult (see the aiGenerate handler). */
@@ -286,6 +288,14 @@ export function registerIpc(): void {
   );
 
   ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
+  ipcMain.handle(IPC_CHANNELS.setProjectOpen, async (_e, open: boolean) => setProjectOpen(open));
+
+  ipcMain.handle(IPC_CHANNELS.projectRename, async (_e, currentFile: string, newName: string, sessionId?: string) => {
+    const result = renameProject(currentFile, newName);
+    // Keep a live generation session mirroring into the renamed folder.
+    if (result.ok && sessionId) relinkSessionLibrary(sessionId, { dir: result.dir, latest: result.file });
+    return result;
+  });
 
   ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
     exportStructure(srcPath, suggestedName, nbtLimit),

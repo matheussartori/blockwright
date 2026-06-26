@@ -13,6 +13,7 @@ export const en = {
   'menu.exportFile': 'Export As…',
   'menu.exportToWorld': 'Export to World…',
   'menu.exportToWorkspace': 'Export to Mod Workspace…',
+  'menu.renameProject': 'Rename Project…',
   'menu.closeFile': 'Close File',
   'menu.openWorkspace': 'Open Mod Workspace…',
   'menu.openRecentWorkspace': 'Open Recent Workspace',
@@ -89,6 +90,14 @@ export const en = {
   'common.clear': 'Clear',
   'common.dismiss': 'Dismiss',
   'common.close': 'Close',
+  'common.cancel': 'Cancel',
+
+  // Rename Project dialog.
+  'rename.title': 'Rename Project',
+  'rename.hint': 'Renames the project folder and its structure file — handy before exporting, so it doesn’t carry a generated name.',
+  'rename.placeholder': 'Project name',
+  'rename.save': 'Rename',
+  'rename.done': 'Renamed to “{name}”',
 
   // Tab bar.
   'tab.home': 'Home',

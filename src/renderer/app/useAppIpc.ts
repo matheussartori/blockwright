@@ -30,6 +30,7 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorld
     api.onExportFile(() => void exportActive());
     api.onExportToWorld(() => void exportToWorldActive());
     api.onExportToWorkspace(() => exportToWorkspaceActive());
+    api.onRenameProject(() => st.setRenameOpen(true));
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
     api.onOpenGuide(() => st.setGuideOpen(true));
@@ -69,6 +70,8 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorld
       const open = doc?.structure != null;
       const hasJigsaw = open && doc!.structure!.jigsaws.length > 0;
       const hasVersions = (doc?.versions.length ?? 0) > 0;
+      // A generated project (its own library folder) is renamable.
+      const renamable = doc?.generated === true && doc.filePath != null;
       const report: WindowsReport = {
         controls: { visible: w.controls.visible, available: open },
         inspector: { visible: w.inspector.visible, available: open },
@@ -78,10 +81,11 @@ export function useAppIpc({ openFile, close, newDoc, exportActive, exportToWorld
         // The Console dock is always available (logs exist regardless of state).
         console: { visible: w.console.visible, available: true },
       };
-      const key = JSON.stringify({ open, report });
+      const key = JSON.stringify({ open, renamable, report });
       if (key === lastKey.current) return;
       lastKey.current = key;
       api.setFileOpen(open);
+      api.setProjectOpen(renamable);
       api.reportWindows(report);
     };
     send();

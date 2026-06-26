@@ -52,6 +52,8 @@ export interface AppState {
   modulesOpen: boolean;
   /** Whether the in-app user Guide modal is open. */
   guideOpen: boolean;
+  /** Whether the Rename Project modal is open (File ▸ Rename Project…). */
+  renameOpen: boolean;
   /** Workspace name awaiting a manual version pick (shows the modal), or null. */
   versionPromptName: string | null;
   /** A chat image being shown full-size in the lightbox overlay, or null. */
@@ -74,6 +76,7 @@ export interface AppState {
   setCatalogOpen: (open: boolean) => void;
   setModulesOpen: (open: boolean) => void;
   setGuideOpen: (open: boolean) => void;
+  setRenameOpen: (open: boolean) => void;
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
   setExportTarget: (target: { path: string; name: string } | null) => void;
@@ -98,6 +101,7 @@ export const store = createStore<AppState>((set) => ({
   catalogOpen: false,
   modulesOpen: false,
   guideOpen: false,
+  renameOpen: false,
   versionPromptName: null,
   imagePreview: null,
   exportTarget: null,
@@ -116,6 +120,7 @@ export const store = createStore<AppState>((set) => ({
   setCatalogOpen: (catalogOpen) => set({ catalogOpen }),
   setModulesOpen: (modulesOpen) => set({ modulesOpen }),
   setGuideOpen: (guideOpen) => set({ guideOpen }),
+  setRenameOpen: (renameOpen) => set({ renameOpen }),
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),
   setExportTarget: (exportTarget) => set({ exportTarget }),

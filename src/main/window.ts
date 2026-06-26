@@ -72,6 +72,11 @@ export function notifyExportToWorkspace(): void {
   mainWindow?.webContents.send(IPC_EVENTS.exportToWorkspace);
 }
 
+/** Ask the renderer to open the Rename Project dialog (File ▸ Rename Project…). */
+export function notifyRenameProject(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.renameProject);
+}
+
 /** Push the current recents list to the renderer (keeps the welcome view in sync). */
 export function notifyRecents(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());

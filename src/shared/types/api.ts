@@ -16,7 +16,7 @@ import type {
   BuildSelection,
   FloorDef,
 } from './generation';
-import type { BlockDictionary, BlockNote, ExportResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
+import type { BlockDictionary, BlockNote, ExportResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
 import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
@@ -141,6 +141,12 @@ export interface BlockwrightApi {
   sendRenderResult: (result: RenderResult) => void;
   /** Report whether a structure is currently open, so main can enable/disable Close File. */
   setFileOpen: (open: boolean) => void;
+  /** Report whether the active doc is a renamable generated project, so main can
+   *  enable/disable File ▸ Rename Project…. */
+  setProjectOpen: (open: boolean) => void;
+  /** Rename a generated project (its library folder + latest `<name>.nbt`). `sessionId`
+   *  re-points a live generation session's mirror to the renamed folder. */
+  renameProject: (currentFile: string, newName: string, sessionId?: string) => Promise<RenameProjectResult>;
   /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
    *  `suggestedName` seeds the dialog's filename. `nbtLimit` is the resolved size limit —
    *  a `.nbt` export over it is cut into a jigsaw assembly folder instead. Returns where it
@@ -212,6 +218,8 @@ export interface BlockwrightApi {
   /** Notified when File ▸ Export to Mod Workspace is chosen; the handler opens the
    *  export dialog for the active document. */
   onExportToWorkspace: (cb: () => void) => void;
+  /** Notified when File ▸ Rename Project… is chosen; the handler opens the rename dialog. */
+  onRenameProject: (cb: () => void) => void;
   /** The main-process log backlog buffered before the renderer mounted, so the
    *  Console dock starts with the full session history. */
   getLogBacklog: () => Promise<LogEntry[]>;

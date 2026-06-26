@@ -11,6 +11,7 @@ import type {
   ModBlockScope,
   ChatRecord,
   ExportResult,
+  RenameProjectResult,
   WorkspaceExportRequest,
   WorkspaceExportPlan,
   WorkspaceExportResult,
@@ -150,6 +151,11 @@ const api: BlockwrightApi = {
   setFileOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
   },
+  setProjectOpen: (open: boolean) => {
+    ipcRenderer.invoke(IPC_CHANNELS.setProjectOpen, open);
+  },
+  renameProject: (currentFile: string, newName: string, sessionId?: string): Promise<RenameProjectResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.projectRename, currentFile, newName, sessionId),
   exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit),
   exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
@@ -196,6 +202,9 @@ const api: BlockwrightApi = {
   },
   onExportToWorkspace: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportToWorkspace, () => cb());
+  },
+  onRenameProject: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.renameProject, () => cb());
   },
   getLogBacklog: () => ipcRenderer.invoke(IPC_CHANNELS.logBacklog),
   onLogEntry: (cb: (entry: LogEntry) => void) => {
