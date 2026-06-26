@@ -168,11 +168,16 @@ function hasBinary(bin: string): boolean {
 function embedRuntimeRepo(artifact: string): void {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'bw-flatpak-repo-'));
   try {
+    // Filename is `<id>_<branch>_<arch>.flatpak`, but the arch CAN contain an underscore
+    // (`x86_64`), so splitting the whole basename on '_' mis-parses it (arch→`64`,
+    // branch→`x86`). The arch is also the name of the artifact's parent directory
+    // (out/make/flatpak/<arch>/), so take it from there, then peel branch off the rest.
+    const arch = path.basename(path.dirname(artifact));
     const base = path.basename(artifact, '.flatpak');
-    const parts = base.split('_');
-    const arch = parts.pop() as string;
-    const branch = parts.pop() as string;
-    const id = parts.join('_'); // ids can't contain '_', branch/arch can't either
+    const stem = base.endsWith(`_${arch}`) ? base.slice(0, -(arch.length + 1)) : base;
+    const sep = stem.lastIndexOf('_');
+    const id = stem.slice(0, sep); // ids use '.'/'-', so the last '_' splits id from branch
+    const branch = stem.slice(sep + 1);
     execFileSync('ostree', [`--repo=${repo}`, 'init', '--mode=archive-z2'], { stdio: 'inherit' });
     execFileSync('flatpak', ['build-import-bundle', repo, artifact], { stdio: 'inherit' });
     execFileSync(
