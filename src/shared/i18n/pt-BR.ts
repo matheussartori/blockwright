@@ -301,6 +301,7 @@ export const ptBR: Messages = {
   'gen.statFloors': 'Andares',
   'gen.statFloorsTitle': 'Número de andares acima do solo',
   'gen.cardFloorHeightTitle': 'Altura do andar (blocos)',
+  'gen.cardModBlocks': 'Blocos do mod',
   'gen.revealBuild': 'Mostrar',
   'gen.revealBuildTitle': 'Mostrar a pasta da construção no gerenciador de arquivos',
   'gen.autoFixes': 'correções automáticas',

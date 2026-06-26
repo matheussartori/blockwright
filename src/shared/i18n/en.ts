@@ -299,6 +299,7 @@ export const en = {
   'gen.statFloors': 'Floors',
   'gen.statFloorsTitle': 'Number of above-ground storeys',
   'gen.cardFloorHeightTitle': 'Storey height (blocks)',
+  'gen.cardModBlocks': 'Mod blocks',
   'gen.revealBuild': 'Reveal',
   'gen.revealBuildTitle': 'Show the build folder in your file manager',
   'gen.autoFixes': 'auto-fixes',

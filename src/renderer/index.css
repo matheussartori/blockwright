@@ -4767,64 +4767,83 @@ body.row-resizing {
   color: var(--text-muted);
 }
 
-/* The presentable build-details card shown in a user chat message. */
+/* The presentable build-details "manifest" card shown in a chat message. It sits INSIDE
+   the message bubble — the user bubble is solid --accent with white text — so the card
+   establishes its OWN opaque surface (--elevated is opaque in both themes; --panel was
+   translucent and let the blue bubble bleed through, washing the text out in light mode)
+   and an explicit text color, so it reads on its own regardless of the bubble. */
 .gen-build-card {
-  margin-top: 6px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  margin-top: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
-  padding: 9px 11px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--elevated));
+  color: var(--text);
+  padding: 11px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .gen-build-card-head {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
 }
 .gen-build-card-icon {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .gen-build-card-titles {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 .gen-build-card-group {
   font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  color: var(--accent);
   line-height: 1;
 }
 .gen-build-card-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.01em;
   line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .gen-build-card-version {
   margin-left: auto;
+  align-self: flex-start;
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-radius: 999px;
-  padding: 1px 7px;
+  padding: 2px 8px;
 }
+/* The quoted request on a result card — set off with a left rule, not a heavy box. */
 .gen-build-card-prompt {
   font-size: 12px;
-  color: var(--text);
-  line-height: 1.4;
+  color: var(--text-2);
+  line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 32%, var(--border));
 }
 .gen-build-card-actions {
   display: flex;
@@ -4837,73 +4856,118 @@ body.row-resizing {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 8px;
   font-size: 11px;
-  color: var(--text-muted);
+  color: var(--text-2);
   cursor: default;
 }
 .gen-build-fixes > svg {
   flex: none;
   color: var(--ok);
 }
-.gen-build-card-chips {
+
+/* Stats strip — the quantitative facts (size / floors / blocks), big mono numerals over a
+   small uppercase label, each in its own tile. */
+.gen-build-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
 }
-.gen-build-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--bg, var(--panel));
+.gen-build-stat {
+  flex: 1 1 0;
+  min-width: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  background: var(--panel-strong);
   border: 1px solid var(--border);
+  border-radius: 8px;
 }
-.gen-build-chip-label {
-  color: var(--text-muted);
+.gen-build-stat-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.gen-build-stat-label {
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* Spec grid — every module pick as a label→value row (decoration/roof/basement/attic/
+   surroundings/mod blocks). A definition list, laid out as a 2-column grid. */
+.gen-build-specs {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.gen-build-spec-key {
+  align-self: center;
+  margin: 0;
+  color: var(--text-muted);
   font-size: 9.5px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.gen-build-chip-value {
+.gen-build-spec-val {
+  margin: 0;
   color: var(--text);
   font-weight: 600;
 }
+
+/* Per-floor plan — a light table: name · height pill · rooms, divided by hairlines. */
 .gen-build-floors {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 .gen-build-floor {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 9px;
   font-size: 12px;
+  padding: 4px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.gen-build-floor:first-child {
+  border-top: none;
+  padding-top: 0;
 }
 .gen-build-floor-name {
-  flex: 0 0 58px;
+  flex: 0 0 52px;
   color: var(--text-muted);
-  font-weight: 600;
-  font-size: 11px;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .gen-build-floor-height {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-radius: 999px;
-  padding: 0 6px;
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 .gen-build-floor-rooms {
-  color: var(--text);
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-2);
+}
+.gen-build-floor-rooms.empty {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* Floor-plan editor above the textarea (mirrors .gen-details — same height cap

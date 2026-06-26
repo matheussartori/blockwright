@@ -1,6 +1,7 @@
 // AI structure-generation contracts: the prompt inputs, the per-turn result, the
 // persisted chat transcript, and the live progress / self-review render round-trip.
 import type { ModuleSlotKey } from '../domain/module-slots';
+import type { ModBlockScope } from './app';
 
 /** A reference image attached to a generation prompt. `data` is base64 with no
  *  `data:` URL prefix; `mediaType` is one Claude accepts (png/jpeg/gif/webp). */
@@ -85,6 +86,10 @@ export type BuildBrief = Partial<Record<ModuleSlotKey, string>> & {
   /** Placement repairs the compile pipeline applied (assistant result card) — surfaced so
    *  the auto-fixes aren't silent. */
   fixes?: string[];
+  /** The active mod workspace's block-usage preference (off/mix/prefer) when generating
+   *  with a mod loaded — an INFORMED input to the build, so the card shows it. Stored as
+   *  the scope id (not a label) so the card re-localizes it; absent for a vanilla run. */
+  modBlocks?: ModBlockScope;
 };
 
 /** Result of an AI generation/edit turn: the written `.nbt` (a temp version) and

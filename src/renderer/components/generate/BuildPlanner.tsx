@@ -171,6 +171,15 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
     const aiPrompt = note ? note + brief : brief ? `Generate a structure with these details:${brief}` : note;
     const selection = buildSelection(d, catalog);
     const summary = buildSummary(d, catalog);
+    // Surface the mod-block preference on the build card when a mod workspace is active — the
+    // scope (vanilla-only / mix / prefer) is an INFORMED input to the build, so the card shows
+    // it alongside the other picks. Read the workspace + persisted scope FRESH (this callback
+    // only re-memoizes on `catalog`), and stash the id so the card re-localizes it.
+    if (summary) {
+      const ws = store.getState().workspace;
+      const modNs = ws && ws.namespace !== 'minecraft' ? ws.namespace : null;
+      if (modNs) summary.modBlocks = (await api.getDictionary())?.scope ?? 'mix';
+    }
     ps.closePlanner();
     ps.reset();
     // Reveal the Generate chat so the build's transcript + live progress are visible.
