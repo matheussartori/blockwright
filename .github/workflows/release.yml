@@ -38,8 +38,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder elfutils ostree
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install -y --noninteractive flathub \
+          # Use the per-user installation: a system remote-add/install goes through
+          # polkit, which has no agent in non-interactive CI and fails with
+          # "ConfigureRemote not allowed for user". flatpak-builder searches the
+          # user install too, so the pinned runtimes still resolve.
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install -y --user --noninteractive flathub \
             org.freedesktop.Platform//24.08 \
             org.freedesktop.Sdk//24.08 \
             org.electronjs.Electron2.BaseApp//24.08
