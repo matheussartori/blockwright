@@ -5,8 +5,9 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { parseSplitManifest, SPLIT_MANIFEST_FILE, type SplitManifest } from '@/shared/domain/split';
+import { parseSplitManifest, splitPlan, SPLIT_MANIFEST_FILE, type SplitManifest } from '@/shared/domain/split';
 import { encodeMergedNbt, reassemble } from './merge-structure';
+import { readRaw } from './convert';
 import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
 export type ReassembleError = 'no_manifest' | 'no_pieces';
@@ -105,6 +106,15 @@ export async function reassembleFolderToBuffer(dir: string): Promise<Reassembled
 export async function reassembleWorldToBuffer(saveDir: string): Promise<ReassembledBuffer | { ok: false; error: ReassembleError }> {
   const manifest = await findManifest(saveDir);
   if (!manifest) return { ok: false, error: 'no_manifest' };
-  const piecesDir = path.join(saveDir, 'generated', manifest.namespace, 'structures', manifest.base);
-  return mergeWithManifest(manifest, await indexNbt(piecesDir));
+  const structures = path.join(saveDir, 'generated', manifest.namespace, 'structures');
+  // A within-limit build was exported as a single `.nbt` (Export to World, pure path); the player
+  // re-SAVEd it to <structures>/<base>.nbt — open that file straight, no stitching needed.
+  if (!splitPlan(manifest.size, manifest.limit).oversized) {
+    const single = path.join(structures, `${manifest.base}.nbt`);
+    if (!fs.existsSync(single)) return { ok: false, error: 'no_pieces' };
+    const raw = await readRaw(single);
+    return { ok: true, buffer: encodeMergedNbt(raw, manifest.dataVersion ?? DEFAULT_DATA_VERSION), name: manifest.base, missing: 0 };
+  }
+  // Oversized: the player re-SAVEd each piece to <structures>/<base>/<piece>.nbt — stitch them.
+  return mergeWithManifest(manifest, await indexNbt(path.join(structures, manifest.base)));
 }

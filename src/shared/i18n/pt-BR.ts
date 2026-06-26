@@ -13,12 +13,10 @@ export const ptBR: Messages = {
   'menu.noRecentFiles': 'Nenhum arquivo recente',
   'menu.clearRecent': 'Limpar recentes',
   'menu.exportFile': 'Exportar como…',
-  'menu.exportForEditing': 'Exportar para edição…',
   'menu.exportToWorld': 'Exportar para o mundo…',
   'menu.exportToWorkspace': 'Exportar para o workspace do mod…',
   'menu.openAssembly': 'Abrir montagem jigsaw…',
   'menu.reimportWorld': 'Reimportar do mundo…',
-  'menu.exportScaffold': 'Exportar com structure blocks…',
   'menu.renameProject': 'Renomear projeto…',
   'menu.closeFile': 'Fechar arquivo',
   'menu.openWorkspace': 'Abrir workspace de mod…',
@@ -86,21 +84,14 @@ export const ptBR: Messages = {
   'dialog.splitCopy': 'Copiar comando',
   'dialog.worldPickTitle': 'Escolha a pasta do save do seu mundo',
   'dialog.worldTitle': 'Adicionado ao seu mundo',
-  'dialog.worldMessageSplit': 'Instalei um datapack com {count} peças de jigsaw.',
-  'dialog.worldMessageSingle': 'Instalei a estrutura como um datapack.',
-  'dialog.worldDetail':
-    'Os arquivos estão em {folder}. No seu mundo, rode /reload (ou reabra o mundo) e então:\n\n{command}\n\nEla aparece na sua posição. Os blocos jigsaw viram os blocos reais conforme a estrutura gera.',
+  'dialog.worldMessageSingle': 'Salvei a estrutura no seu mundo.',
+  'dialog.worldStructureDetail':
+    'A estrutura está em {folder}. No seu mundo (1.21+), coloque um Structure Block, mude para o modo LOAD e digite o nome:\n\n{name}\n\nCarregue, edite à vontade, depois mude o mesmo bloco para SAVE e clique em SAVE. Quando terminar, use Arquivo ▸ Reimportar do mundo aqui para trazer de volta.',
   'dialog.worldNotDatapack': 'Essa pasta não é um save de mundo do Minecraft (sem level.dat). Escolha a pasta do save em si, ex.: .minecraft/saves/<mundo>.',
-  'dialog.editExportTitle': 'Exportar para edição',
-  'dialog.editExportDoneTitle': 'Exportado para edição',
-  'dialog.editExportDoneMessage': 'Salvo {file}.',
-  'dialog.editExportDoneDetail':
-    'Abra no Litematica ou WorldEdit, cole no seu mundo e edite à vontade (sem limite de tamanho). Salve de volta como .litematic/.schem, depois reabra aqui (Arquivo ▸ Abrir) e reexporte para o seu mod.',
-  'dialog.editExportReveal': 'Mostrar na pasta',
   'dialog.scaffoldTitle': 'Andaime de edição instalado',
   'dialog.scaffoldMessage': 'Instalado um datapack de edição com {count} peça(s).',
   'dialog.scaffoldDetail':
-    'O datapack está em {folder}. No seu mundo (1.21+), rode /reload e então:\n\n{command}\n\nCada peça aparece na sua própria caixa delimitada. Edite os blocos dentro de uma caixa, abra o structure block dela e clique em SAVE. Quando todas as peças estiverem salvas, use Arquivo ▸ Reimportar do mundo aqui para costurar tudo de volta.',
+    'O datapack está em {folder}. No seu mundo (1.21+), rode /reload e então:\n\n{command}\n\nAs peças se montam na build inteira, cada uma dentro da sua caixa delimitada, com um structure block SAVE uma célula abaixo do canto dela. Edite a build à vontade, depois abra o structure block de cada peça e clique em SAVE. Quando todas as peças estiverem salvas, use Arquivo ▸ Reimportar do mundo aqui para costurar tudo de volta.',
 
   // Shared.
   'common.clear': 'Limpar',

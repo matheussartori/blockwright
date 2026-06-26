@@ -1,28 +1,35 @@
 // The vanilla structure-block EDITING scaffold (Phase 3a). An oversized build can't load in
 // one Structure Block (48³ cap), so to edit it in-world WITHOUT a mod we lay each ≤-limit
-// piece out separately, each with its own SAVE-mode structure block. The player loads, edits,
-// and re-SAVEs each piece; Blockwright then stitches the edited pieces back by the manifest
-// grid (no in-world alignment needed — each piece is edited in isolation).
+// piece at its TRUE position, so the pieces tile into the original silhouette and the player
+// edits the whole build at once. Each piece still gets its own SAVE-mode structure block (sat
+// one cell below the piece, posY:1 — within the ±48 relative-position limit since a piece is
+// ≤48). The player edits the assembled build and re-SAVEs each piece; Blockwright then stitches
+// the edited pieces back by the manifest grid (reassembly keys on the saved file NAME, not on
+// where the player edited — so the layout is purely for the player's benefit).
+//
+// Vertical splits (ny>1) can't share one solid stack AND keep every piece's structure block
+// reachable (an interior upper block would land inside the build), so each vertical layer is
+// floated one empty row above the previous; that row holds the layer's structure blocks. A
+// build with no vertical split (the common case) has a single layer, so it assembles whole.
 //
 // Pure text generation (no IO): given the split plan it produces the `.mcfunction` the player
 // runs at their position. Targets the 1.21 command syntax.
 import type { SplitPlan, SplitSlot, Vec3 } from './split';
 import { pieceName } from './split';
 
-/** Gap (in blocks) between adjacent piece editing areas so their bounding boxes never touch. */
-const PAD = 2;
+/** Empty rows inserted below each vertical layer to hold that layer's SAVE structure blocks. */
+const LAYER_GAP = 1;
 
-/** Place each piece's editing area on a flat grid at the run position, so a build with many
- *  pieces stays compact rather than one long row. Returns each piece's anchor (the SAVE
- *  block cell); the piece geometry sits one block above it (`posY:1`). Positions are arbitrary
- *  — reassembly uses the manifest grid, not where the player edits each piece. */
+/** Lay each piece at its real position so the assembly reads as the whole build. Returns each
+ *  piece's anchor (the SAVE block cell); the piece geometry sits one block above it (`posY:1`),
+ *  i.e. at its original min corner shifted up by one gap row per vertical layer below it. */
 export function scaffoldLayout(plan: SplitPlan): { slot: SplitSlot; name: string; anchor: Vec3 }[] {
-  const step = plan.limit + PAD;
-  const cols = Math.max(1, Math.ceil(Math.sqrt(plan.slots.length)));
-  return plan.slots.map((slot, t) => ({
+  return plan.slots.map((slot) => ({
     slot,
     name: pieceName(slot),
-    anchor: [(t % cols) * step, 0, Math.floor(t / cols) * step],
+    // x/z stay at the true min; y lifts the layer (slot.j) up by one extra gap row so the
+    // row directly below it (anchor.y) is free for this piece's structure block.
+    anchor: [slot.min[0], slot.min[1] + (slot.j + 1) * LAYER_GAP - 1, slot.min[2]],
   }));
 }
 

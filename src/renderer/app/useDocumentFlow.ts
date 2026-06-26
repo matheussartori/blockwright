@@ -33,9 +33,7 @@ export interface DocumentFlow {
   close: () => void;
   closeDocById: (id: string) => void;
   exportActive: () => Promise<void>;
-  exportForEditingActive: () => Promise<void>;
   exportToWorldActive: () => Promise<void>;
-  exportScaffoldActive: () => Promise<void>;
   exportToWorkspaceActive: () => void;
   acceptSuggest: () => Promise<void>;
   onWorkspaceChanged: (ws: Workspace | null) => Promise<void>;
@@ -188,25 +186,10 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     }
   }, []);
 
-  // Export the active build for editing in Litematica/WorldEdit (a single .litematic/.schem, never
-  // split). main shows a Save dialog defaulting to .litematic. Same source selection as exportActive.
-  const exportForEditingActive = useCallback(async () => {
-    const doc = activeDocument(documentsStore.getState());
-    if (!doc) return;
-    const preview = doc.viewingVersion != null ? doc.versions.find((v) => v.version === doc.viewingVersion) : null;
-    const src = preview?.path ?? doc.path;
-    if (!src) return;
-    const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
-    const result = await api.exportForEditing(src, suggested);
-    if (result.ok) {
-      store.getState().setNotice({ text: `Exported ${basename(result.path)} for editing`, warn: false });
-    } else if (!result.canceled) {
-      store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
-    }
-  }, []);
-
-  // Install the active tab's current build straight into a Minecraft world save (main picks
-  // the save folder and writes a ready-to-run datapack). Same source selection as exportActive.
+  // Install the active tab's current build into a Minecraft world save for editing + round-trip
+  // (main picks the save folder; within the size limit → a raw .nbt loadable with one structure
+  // block, else an editing datapack of pieces with SAVE-mode structure blocks). After editing
+  // in-world the user runs Reimport from World. Same source selection as exportActive.
   const exportToWorldActive = useCallback(async () => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
@@ -218,25 +201,6 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     const result = await api.exportToWorld(src, suggested, nbtLimit);
     if (result.ok) {
       store.getState().setNotice({ text: 'Installed into your world', warn: false });
-    } else if (!result.canceled) {
-      store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
-    }
-  }, []);
-
-  // Install the in-world EDITING scaffold for the active build into a Minecraft save (main picks
-  // the save folder + writes the pieces + the SAVE-structure-block .mcfunction). Same source
-  // selection as exportToWorldActive. After editing in-world the user runs Reimport from World.
-  const exportScaffoldActive = useCallback(async () => {
-    const doc = activeDocument(documentsStore.getState());
-    if (!doc) return;
-    const preview = doc.viewingVersion != null ? doc.versions.find((v) => v.version === doc.viewingVersion) : null;
-    const src = preview?.path ?? doc.path;
-    if (!src) return;
-    const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
-    const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
-    const result = await api.exportScaffold(src, suggested, nbtLimit);
-    if (result.ok) {
-      store.getState().setNotice({ text: 'Installed editing scaffold into your world', warn: false });
     } else if (!result.canceled) {
       store.getState().setNotice({ text: `Export failed: ${result.error ?? 'unknown error'}`, warn: true });
     }
@@ -326,5 +290,5 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     bindGenerationProgress();
   }, [load]);
 
-  return { load, openFile, open, openAssembly, reimportWorld, newDoc, close, closeDocById, exportActive, exportForEditingActive, exportToWorldActive, exportScaffoldActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
+  return { load, openFile, open, openAssembly, reimportWorld, newDoc, close, closeDocById, exportActive, exportToWorldActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
 }

@@ -17,8 +17,6 @@ import {
   notifyExportFile,
   notifyExportToWorld,
   notifyExportToWorkspace,
-  notifyExportForEditing,
-  notifyExportScaffold,
   notifyOpenAssembly,
   notifyReimportWorld,
   notifyRenameProject,
@@ -312,19 +310,9 @@ export function buildAppMenu(): void {
           click: () => notifyExportFile(),
         },
         {
-          label: mt('menu.exportForEditing'),
-          enabled: fileOpen,
-          click: () => notifyExportForEditing(),
-        },
-        {
           label: mt('menu.exportToWorld'),
           enabled: fileOpen,
           click: () => notifyExportToWorld(),
-        },
-        {
-          label: mt('menu.exportScaffold'),
-          enabled: fileOpen,
-          click: () => notifyExportScaffold(),
         },
         {
           label: mt('menu.exportToWorkspace'),

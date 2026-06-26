@@ -5,24 +5,33 @@ import { scaffoldFunction, scaffoldLayout } from '../scaffold';
 const LIMIT = 48;
 
 describe('scaffoldLayout', () => {
-  it('gives every piece a non-overlapping anchor on a compact grid', () => {
-    const plan = splitPlan([120, 40, 120] as Vec3, LIMIT); // 3×1×3 = 9 pieces
+  it('anchors each piece at its true x/z so they tile into the whole build', () => {
+    const plan = splitPlan([120, 40, 120] as Vec3, LIMIT); // 3×1×3 = 9 pieces, no vertical split
     const layout = scaffoldLayout(plan);
     expect(layout).toHaveLength(plan.slots.length);
 
-    // No two editing boxes share an X/Z column closer than the limit (boxes can't touch).
-    const step = LIMIT + 2;
-    const anchors = layout.map((l) => l.anchor);
-    for (let a = 0; a < anchors.length; a++)
-      for (let b = a + 1; b < anchors.length; b++) {
-        const sameCell = anchors[a][0] === anchors[b][0] && anchors[a][2] === anchors[b][2];
-        expect(sameCell).toBe(false);
-      }
-    // Anchors are multiples of the grid step.
-    for (const [x, , z] of anchors) {
-      expect(x % step).toBe(0);
-      expect(z % step).toBe(0);
+    for (const { slot, anchor } of layout) {
+      // x/z follow the slot's real min; with no vertical split the SAVE block sits at y=0
+      // (the build geometry lands at anchor.y + 1 = 1).
+      expect(anchor[0]).toBe(slot.min[0]);
+      expect(anchor[2]).toBe(slot.min[2]);
+      expect(anchor[1]).toBe(0);
     }
+    // Pieces tile: every X/Z corner pair is distinct (no two pieces share a footprint corner).
+    const corners = layout.map((l) => `${l.anchor[0]},${l.anchor[2]}`);
+    expect(new Set(corners).size).toBe(corners.length);
+  });
+
+  it('floats each vertical layer one row up so its SAVE blocks sit in the gap below', () => {
+    const plan = splitPlan([8, 96, 8] as Vec3, LIMIT); // 1×2×1 = 2 stacked pieces (y split 48|48)
+    const layout = scaffoldLayout(plan);
+    const lower = layout.find((l) => l.slot.j === 0)!;
+    const upper = layout.find((l) => l.slot.j === 1)!;
+    // Lower piece geometry lands at y=1 (its SAVE block at y=0); the upper layer gains an extra
+    // empty row, so its SAVE block (anchor.y) clears the top of the lower piece.
+    expect(lower.anchor[1]).toBe(0);
+    expect(upper.anchor[1]).toBe(upper.slot.min[1] + 1);
+    expect(upper.anchor[1]).toBeGreaterThan(lower.anchor[1] + lower.slot.size[1]);
   });
 });
 

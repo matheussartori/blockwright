@@ -18,14 +18,12 @@ type IpcHandlers = Pick<
   | 'close'
   | 'newDoc'
   | 'exportActive'
-  | 'exportForEditingActive'
   | 'exportToWorldActive'
-  | 'exportScaffoldActive'
   | 'exportToWorkspaceActive'
   | 'onWorkspaceChanged'
 >;
 
-export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc, exportActive, exportForEditingActive, exportToWorldActive, exportScaffoldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
+export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc, exportActive, exportToWorldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
   // One-time IPC wiring + initial loads.
   useEffect(() => {
     const st = store.getState();
@@ -38,9 +36,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
     });
     api.onNewStructure(() => newDoc());
     api.onExportFile(() => void exportActive());
-    api.onExportForEditing(() => void exportForEditingActive());
     api.onExportToWorld(() => void exportToWorldActive());
-    api.onExportScaffold(() => void exportScaffoldActive());
     api.onExportToWorkspace(() => exportToWorkspaceActive());
     api.onRenameProject(() => st.setRenameOpen(true));
     api.onOpenAssembly(() => void openAssembly());
@@ -72,7 +68,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
       const pending = await api.getPendingUpdate();
       if (pending) st.setUpdate(pending);
     })();
-  }, [openFile, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportForEditingActive, exportToWorldActive, exportScaffoldActive, exportToWorkspaceActive]);
+  }, [openFile, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
 
   // Mirror file-open + window state to main (drives Close File and the View menu).
   // Only re-sends when the *reported* shape changes.

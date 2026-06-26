@@ -158,10 +158,6 @@ const api: BlockwrightApi = {
   renameProject: (currentFile: string, newName: string, sessionId?: string): Promise<RenameProjectResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.projectRename, currentFile, newName, sessionId),
   reassembleAssembly: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.assemblyReassemble),
-  exportForEditing: (srcPath: string, suggestedName: string): Promise<ExportResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.exportForEditing, srcPath, suggestedName),
-  exportScaffold: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.exportScaffold, srcPath, suggestedName, nbtLimit),
   reimportWorld: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.worldReimport),
   exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit),
@@ -215,12 +211,6 @@ const api: BlockwrightApi = {
   },
   onOpenAssembly: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.openAssembly, () => cb());
-  },
-  onExportForEditing: (cb: () => void) => {
-    ipcRenderer.on(IPC_EVENTS.exportForEditing, () => cb());
-  },
-  onExportScaffold: (cb: () => void) => {
-    ipcRenderer.on(IPC_EVENTS.exportScaffold, () => cb());
   },
   onReimportWorld: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.reimportWorld, () => cb());

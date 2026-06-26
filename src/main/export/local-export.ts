@@ -1,15 +1,16 @@
-// Local (non-workspace) export of the current build: "Export As…" (a user-chosen file/format)
-// and "Export to World" (install a ready-to-run datapack into a Minecraft save). Both can hit
-// the size limit and fall back to a JIGSAW assembly; the writing/dialog plumbing lives here so
-// window.ts stays about the window. (Workspace export is its own module — ./index.ts.)
-import { clipboard, dialog, shell, type MessageBoxOptions, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
+// Local (non-workspace) export of the current build: "Export As…" (a user-chosen file/format,
+// which can fall back to a JIGSAW assembly) and "Export to World" (install the build into a
+// Minecraft save for editing + round-trip — a raw `.nbt` when it fits one Structure Block, else
+// an in-world editing scaffold). The writing/dialog plumbing lives here so window.ts stays about
+// the window. (Workspace export is its own module — ./index.ts.)
+import { clipboard, dialog, type MessageBoxOptions, type OpenDialogOptions, type SaveDialogOptions } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { ExportResult } from '@/shared/types';
 import type { MessageKey } from '@/shared/i18n';
 import { DEFAULT_WORLDGEN, sanitizeResourceName, validateSplit, type ValidationIssue } from '@/shared/domain/worldgen';
-import { outConnectorName, splitManifest, splitPlan, SPLIT_MANIFEST_FILE, type SplitPlan } from '@/shared/domain/split';
+import { LIMIT_MODERN, outConnectorName, splitManifest, splitPlan, SPLIT_MANIFEST_FILE, type SplitPlan } from '@/shared/domain/split';
 import { mt } from '../language';
 import { getMainWindow } from '../window';
 import { convertStructure, readRaw } from '../structure/io/convert';
@@ -140,85 +141,70 @@ async function showSplitNotice(folder: string, pieces: number, warnings: Validat
   });
 }
 
-/** Export the current build for EDITING in Litematica / WorldEdit (Phase 2): a single
- *  `.litematic` (default) or `.schem` — formats whose mods load ANY size, so an oversized
- *  build is never split. The recommended round-trip: paste it in-world with Litematica/WorldEdit,
- *  edit freely, re-save it, then open it back here and re-export to your mod. */
-export async function exportForEditing(srcPath: string, suggestedName: string): Promise<ExportResult> {
+/** Export the current build into a Minecraft WORLD for editing + round-trip. The user picks their
+ *  save folder; what's written depends on whether the build fits a single Structure Block (the
+ *  `nbtLimit` per axis):
+ *   • Within the limit → the raw `.nbt` is dropped at `<save>/generated/<ns>/structures/<ns>.nbt`,
+ *     loadable with ONE structure block (LOAD mode, name `<ns>:<ns>`); a re-SAVE overwrites it.
+ *   • Over the limit → an editing datapack: the build cut into ≤-limit pieces laid at their TRUE
+ *     positions, each with a SAVE-mode structure block (the in-world editing scaffold).
+ *  Either way a reassembly manifest is written, so File ▸ Reimport from World stitches the edited
+ *  result back. Works with vanilla — no mod required. */
+export async function exportToWorld(srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> {
   if (!fs.existsSync(srcPath)) return { ok: false, error: 'The structure file no longer exists on disk.' };
-  const stem = path.basename(suggestedName).replace(/\.nbt$/i, '');
-  const options: SaveDialogOptions = {
-    title: mt('dialog.editExportTitle'),
-    defaultPath: `${stem}.litematic`,
-    filters: [
-      { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
-      { name: mt('dialog.schemFilter'), extensions: ['schem'] },
-    ],
-  };
-  const win = getMainWindow();
-  const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
-  if (result.canceled || !result.filePath) return { ok: false, canceled: true };
+  const pick = await pickWorldSave();
+  if (!pick.ok) return pick.result;
 
+  const stem = sanitizeResourceName(path.basename(suggestedName).replace(/\.nbt$/i, ''));
   try {
-    // `.litematic`/`.schem` never split (their mods load arbitrary sizes) — one whole file.
-    await convertStructure(srcPath, result.filePath);
-    const { response } = await messageBox({
-      type: 'info',
-      title: mt('dialog.editExportDoneTitle'),
-      message: mt('dialog.editExportDoneMessage', { file: path.basename(result.filePath) }),
-      detail: mt('dialog.editExportDoneDetail'),
-      buttons: [mt('dialog.editExportReveal'), mt('dialog.splitOk')],
-      defaultId: 1,
-      cancelId: 1,
-    });
-    if (response === 0) shell.showItemInFolder(result.filePath);
-    return { ok: true, path: result.filePath };
+    const raw = await readRaw(srcPath);
+    const limit = nbtLimit > 0 ? nbtLimit : LIMIT_MODERN;
+    const split = splitPlan(raw.size, limit);
+    if (split.oversized) {
+      if (!(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
+      return await installEditScaffold(pick.saveRoot, stem, raw, split, limit);
+    }
+    return await installSingleStructure(pick.saveRoot, stem, srcPath, raw.size, limit);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
-/** Export the current build straight into a Minecraft WORLD: the user picks their save folder
- *  and Blockwright installs a ready-to-run datapack at `<save>/datapacks/<name>/` — the pieces +
- *  worldgen JSON in the right place — so they only have to /reload and run one command. An
- *  oversized build becomes a jigsaw assembly; a normal one is a single placeable structure. */
-export async function exportToWorld(srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> {
-  if (!fs.existsSync(srcPath)) return { ok: false, error: 'The structure file no longer exists on disk.' };
-  const pick = await pickWorldSave();
-  if (!pick.ok) return pick.result;
-  const saveRoot = pick.saveRoot;
+/** A within-limit build loads as ONE structure block: drop the raw `.nbt` where a structure
+ *  block reads/writes saved structures in single-player (`<save>/generated/<ns>/structures/<ns>.nbt`),
+ *  so the player LOADs it as `<ns>:<ns>`, edits, and re-SAVEs to the same file. The manifest sits
+ *  beside it so Reimport from World reads the re-SAVEd structure straight back. */
+async function installSingleStructure(saveRoot: string, stem: string, srcPath: string, size: RawStructure['size'], limit: number): Promise<ExportResult> {
+  const genDir = path.join(saveRoot, 'generated', stem);
+  const dest = path.join(genDir, 'structures', `${stem}.nbt`);
+  await fsp.mkdir(path.dirname(dest), { recursive: true });
+  await convertStructure(srcPath, dest);
+  await writeManifest(genDir, stem, size, limit);
+  await showWorldStructureNotice(dest, `${stem}:${stem}`);
+  return { ok: true, path: dest };
+}
 
-  const stem = sanitizeResourceName(path.basename(suggestedName).replace(/\.nbt$/i, ''));
-  const packDir = path.join(saveRoot, 'datapacks', stem);
-  try {
-    const raw = await readRaw(srcPath);
-    const split = splitPlan(raw.size, nbtLimit);
+/** Install the in-world EDITING scaffold for an oversized build: a datapack of clean ≤-limit
+ *  pieces + a `.mcfunction` that lays each piece at its TRUE position with its own SAVE-mode
+ *  structure block, so the pieces tile into the whole build. The player edits the assembled build
+ *  and clicks SAVE on each piece; a re-SAVE writes the edited region to
+ *  `<save>/generated/<ns>/structures/<base>/`, where File ▸ Reimport from World reads it. */
+async function installEditScaffold(saveRoot: string, stem: string, raw: RawStructure, split: SplitPlan, limit: number): Promise<ExportResult> {
+  const packDir = path.join(saveRoot, 'datapacks', `${stem}_edit`);
+  const pieces = sliceCleanPieces(raw, split, DEFAULT_DATA_VERSION);
+  const files: SplitFile[] = pieces.map((p) => ({ rel: path.join('data', stem, 'structure', stem, `${p.name}.nbt`), kind: 'piece', buffer: p.buffer }));
+  await fsp.mkdir(packDir, { recursive: true });
+  await writeSplitFiles(files, packDir);
 
-    let command: string;
-    let pieces = 0;
-    let warnings: ValidationIssue[] = [];
-    if (split.oversized) {
-      if (!(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
-      // Build everything in memory first (this is what can throw), so a failure never leaves a
-      // half-written datapack — and the pack.mcmeta is written LAST, after the data lands.
-      const assembly = buildJigsawAssembly(raw, stem, split);
-      await fsp.mkdir(packDir, { recursive: true });
-      await writeSplitFiles(assembly.files, packDir);
-      await writeManifest(packDir, stem, raw.size, nbtLimit);
-      ({ command, warnings } = assembly);
-      pieces = split.pieceCount;
-    } else {
-      const dest = path.join(packDir, 'data', stem, 'structure', `${stem}.nbt`);
-      await fsp.mkdir(path.dirname(dest), { recursive: true });
-      await convertStructure(srcPath, dest);
-      command = `/place template ${stem}:${stem} ~ ~ ~`;
-    }
-    await fsp.writeFile(path.join(packDir, 'pack.mcmeta'), JSON.stringify(datapackMeta(), null, 2) + '\n');
-    await showWorldExportNotice(packDir, command, pieces, warnings);
-    return { ok: true, path: packDir, splitPieces: pieces || undefined };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  const fnPath = path.join(packDir, 'data', stem, 'function', 'edit.mcfunction');
+  await fsp.mkdir(path.dirname(fnPath), { recursive: true });
+  await fsp.writeFile(fnPath, scaffoldFunction(stem, stem, split));
+
+  await writeManifest(packDir, stem, raw.size, limit);
+  await fsp.writeFile(path.join(packDir, 'pack.mcmeta'), JSON.stringify(datapackMeta(), null, 2) + '\n');
+
+  await showScaffoldNotice(packDir, `/function ${stem}:edit`, split.pieceCount);
+  return { ok: true, path: packDir, splitPieces: split.pieceCount };
 }
 
 /** A lenient datapack `pack.mcmeta`: a 1.21 `pack_format` plus a wide `supported_formats` range
@@ -227,55 +213,19 @@ function datapackMeta(): unknown {
   return { pack: { pack_format: 48, supported_formats: { min_inclusive: 4, max_inclusive: 99 }, description: 'Blockwright export' } };
 }
 
-/** Confirm the world install and TEACH the exact command to place it (with one-click copy). */
-async function showWorldExportNotice(folder: string, command: string, pieces: number, warnings: ValidationIssue[]): Promise<void> {
+/** Confirm a single-structure install + TEACH how to LOAD it with one structure block (Copy the
+ *  structure name). */
+async function showWorldStructureNotice(file: string, structureName: string): Promise<void> {
   const { response } = await messageBox({
     type: 'info',
     title: mt('dialog.worldTitle'),
-    message: pieces > 0 ? mt('dialog.worldMessageSplit', { count: pieces }) : mt('dialog.worldMessageSingle'),
-    detail: mt('dialog.worldDetail', { folder, command }) + warningSuffix(warnings),
+    message: mt('dialog.worldMessageSingle'),
+    detail: mt('dialog.worldStructureDetail', { folder: path.dirname(file), name: structureName }),
     buttons: [mt('dialog.splitCopy'), mt('dialog.splitOk')],
     defaultId: 1,
     cancelId: 1,
   });
-  if (response === 0) clipboard.writeText(command);
-}
-
-/** Install an in-world EDITING scaffold into a Minecraft save (Phase 3a): a datapack with the
- *  build cut into clean ≤-limit pieces + a `.mcfunction` that lays each piece out with its own
- *  SAVE-mode structure block. The player edits each piece and clicks SAVE; File ▸ Reimport from
- *  World then stitches the edited pieces back together. Works with vanilla — no mod required. */
-export async function exportEditScaffold(srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> {
-  if (!fs.existsSync(srcPath)) return { ok: false, error: 'The structure file no longer exists on disk.' };
-  const pick = await pickWorldSave();
-  if (!pick.ok) return pick.result;
-
-  const stem = sanitizeResourceName(path.basename(suggestedName).replace(/\.nbt$/i, ''));
-  const packDir = path.join(pick.saveRoot, 'datapacks', `${stem}_edit`);
-  try {
-    const raw = await readRaw(srcPath);
-    const split = splitPlan(raw.size, nbtLimit);
-    if (split.oversized && !(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
-
-    // Clean pieces live in the datapack (for `/place template`); a re-SAVE writes the edited
-    // region to `<save>/generated/<ns>/structures/<base>/`, where Reimport from World reads it.
-    const pieces = sliceCleanPieces(raw, split, DEFAULT_DATA_VERSION);
-    const files: SplitFile[] = pieces.map((p) => ({ rel: path.join('data', stem, 'structure', stem, `${p.name}.nbt`), kind: 'piece', buffer: p.buffer }));
-    await fsp.mkdir(packDir, { recursive: true });
-    await writeSplitFiles(files, packDir);
-
-    const fnPath = path.join(packDir, 'data', stem, 'function', 'edit.mcfunction');
-    await fsp.mkdir(path.dirname(fnPath), { recursive: true });
-    await fsp.writeFile(fnPath, scaffoldFunction(stem, stem, split));
-
-    await writeManifest(packDir, stem, raw.size, nbtLimit);
-    await fsp.writeFile(path.join(packDir, 'pack.mcmeta'), JSON.stringify(datapackMeta(), null, 2) + '\n');
-
-    await showScaffoldNotice(packDir, `/function ${stem}:edit`, split.pieceCount);
-    return { ok: true, path: packDir, splitPieces: split.pieceCount };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
+  if (response === 0) clipboard.writeText(structureName);
 }
 
 /** Confirm the scaffold install and TEACH the edit→save→reimport workflow (with a Copy of the

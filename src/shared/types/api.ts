@@ -150,22 +150,17 @@ export interface BlockwrightApi {
   /** Pick a split jigsaw-assembly folder and reassemble it into one `.nbt` (inverse of the
    *  split export); resolves to the written temp file the renderer then opens. */
   reassembleAssembly: () => Promise<ReassembleResult>;
-  /** Export the build for editing in Litematica/WorldEdit — a single `.litematic`/`.schem`, never
-   *  split (those mods load any size). The recommended edit-and-bring-back round-trip. */
-  exportForEditing: (srcPath: string, suggestedName: string) => Promise<ExportResult>;
-  /** Install an in-world editing scaffold (clean pieces + a SAVE-structure-block `.mcfunction`)
-   *  into a user-chosen Minecraft save, so an oversized build can be edited in vanilla. */
-  exportScaffold: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
-  /** Pick a Minecraft save and reassemble the pieces the player re-SAVEd with the editing
-   *  scaffold; resolves to the written temp file the renderer then opens. */
+  /** Pick a Minecraft save and reassemble the pieces the player re-SAVEd after Export to World;
+   *  resolves to the written temp file the renderer then opens. */
   reimportWorld: () => Promise<ReassembleResult>;
   /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
    *  `suggestedName` seeds the dialog's filename. `nbtLimit` is the resolved size limit —
    *  a `.nbt` export over it is cut into a jigsaw assembly folder instead. Returns where it
    *  landed, or a canceled/error result. */
   exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
-  /** Install the build into a user-chosen Minecraft world save as a ready-to-run datapack
-   *  (oversized → jigsaw assembly, else a single placeable structure). */
+  /** Install the build into a user-chosen Minecraft world save for editing + round-trip: within
+   *  the size limit → the raw `.nbt` loadable with one structure block; oversized → an editing
+   *  datapack of ≤-limit pieces with SAVE-mode structure blocks. Reimport from World brings it back. */
   exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
   reportWindows: (state: WindowsReport) => void;
@@ -234,12 +229,6 @@ export interface BlockwrightApi {
   onRenameProject: (cb: () => void) => void;
   /** Notified when File ▸ Open Jigsaw Assembly… is chosen; the handler runs the reassembly. */
   onOpenAssembly: (cb: () => void) => void;
-  /** Notified when File ▸ Export for Editing… is chosen; the handler picks the build and calls
-   *  `exportForEditing`. */
-  onExportForEditing: (cb: () => void) => void;
-  /** Notified when File ▸ Export with Structure Blocks… is chosen; the handler picks the build
-   *  and calls `exportScaffold`. */
-  onExportScaffold: (cb: () => void) => void;
   /** Notified when File ▸ Reimport from World… is chosen; the handler runs the reassembly. */
   onReimportWorld: (cb: () => void) => void;
   /** The main-process log backlog buffered before the renderer mounted, so the
