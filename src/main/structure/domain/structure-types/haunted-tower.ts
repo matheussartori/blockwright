@@ -310,6 +310,14 @@ export const hauntedTower: StructureType = {
     const { slabYs, wallTop } = plan(b, params, floorHeights);
     return storeyEntries(slabYs, wallTop);
   },
+  // The ground-floor INTERIOR rect: one cell IN from the tier-0 shaft walls. The shaft sits at
+  // `insetAt(0)` (the flared-plinth `baseInset`) from the box, so the walkable air starts one
+  // further in — `box+1` is solid wall here, which is why the central descent ladder needs this
+  // (else it would be buried in the battered base). Reuses the same inset schedule as build().
+  interiorRect(box: Box, params): { x0: number; z0: number; x1: number; z1: number } {
+    const m = makeInset(box, params.floors as number)(0) + 1;
+    return { x0: box.x0 + m, z0: box.z0 + m, x1: box.x1 - m, z1: box.z1 - m };
+  },
 };
 
 /** Proud vertical buttress ribs on a tier's four faces: pilasters standing ONE cell off the

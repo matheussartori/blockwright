@@ -142,6 +142,14 @@ export interface StructureType extends ModuleMeta {
    *  math with `build()` — including the user's explicit per-floor heights, when given.
    *  Omit → the app falls back to `detectFloors`. */
   floors?(box: Box, params: ParamValues, floorHeights?: number[], surroundSizing?: SurroundSizing): FloorPlanEntry[];
+  /** The ground-floor INTERIOR footprint (the walkable rect, inside the wall ring) for a
+   *  box+params. The central basement path lands its DESCENT LADDER against this rect's back
+   *  wall, so the climb always surfaces in the type's USABLE area. A type whose ground wall
+   *  sits on the box edge (a 1-thick wall) needs nothing here; one whose shaft is INSET from
+   *  the box — the haunted tower's battered, flared plinth — MUST report the inner rect, or
+   *  the descent ladder lands inside the thick wall (the "escada dentro da parede" defect).
+   *  Omit → box inset by 1 (the 1-thick-wall default). */
+  interiorRect?(box: Box, params: ParamValues, floorHeights?: number[], surroundSizing?: SurroundSizing): { x0: number; z0: number; x1: number; z1: number };
   /** Code post-processing passes this type opts into (run at compile when this type is
    *  the selected structure). Omit → none. This is the modular "which fix applies to
    *  which structure" declaration — e.g. house = `['chimney']`. */

@@ -174,7 +174,8 @@ export function basementHeight(H: number): number {
  * @param baseY - The deepest basement floor Y (the box bottom).
  * @param levelHeights - Per-level slab-to-slab heights, top-down (index 0 = under ground).
  * @param groundY - The ground-floor slab Y the descent climbs out to (≥ the vault top).
- * @param houseB - The house box (the ladder lands in its back-left interior corner).
+ * @param interior - The host's ground-floor INTERIOR rect (walkable area); the ladder lands in
+ *   its back-left corner, so the climb surfaces in the usable room, never inside a thick wall.
  * @param palette - The HOST palette (supplies the ladder + the spine backing).
  * @returns The vault + descent ops.
  */
@@ -185,7 +186,7 @@ function composeBasementStack(
   baseY: number,
   levelHeights: number[],
   groundY: number,
-  houseB: ReturnType<typeof box>,
+  interior: { x0: number; z0: number; x1: number; z1: number },
   palette: RolePalette,
 ): { vault: AuthoringOp[]; descent: AuthoringOp[] } {
   const vault: AuthoringOp[] = [];
@@ -203,14 +204,18 @@ function composeBasementStack(
     if (bottom > baseY) levelFloors.push(bottom);
     top = bottom;
   }
-  // Descent ladder in the house's back-left interior corner, backed by a solid spine so it
-  // attaches through every level (the spine coincides with the rear wall when the basement
-  // matches the house). Rungs run the deepest floor → the ground slab; a step-off + 2-block
-  // headroom at the ground AND at every intermediate level, so each level is reachable. The
-  // descent is emitted by the caller AFTER the type's foundation slab so its shaft carve
-  // through the ground floor survives (else the foundation caps the climb).
+  // Descent ladder in the ground floor's back-left INTERIOR corner (the type's real usable
+  // area, NOT the raw box edge — a battered/inset shaft like the haunted tower's flared plinth
+  // sits one cell in, so box+1 is solid wall and a ladder placed there is BURIED, the "escada
+  // dentro da parede" defect). Backed by a solid spine so it attaches through every level (the
+  // spine coincides with the rear wall when the interior reaches the basement footprint). Rungs
+  // run the deepest floor → the ground slab; a step-off + 2-block headroom at the ground AND at
+  // every intermediate level, so each level is reachable. Clamped into the vault footprint so a
+  // smaller/offset basement never lands the column in a vault wall. The descent is emitted by
+  // the caller AFTER the type's foundation slab so its shaft carve through the floor survives.
   const descent: AuthoringOp[] = [];
-  const lx = houseB.x0 + 1, lz = houseB.z1 - 1;
+  const lx = Math.min(Math.max(interior.x0, foot.x0 + 1), foot.x1 - 1);
+  const lz = Math.min(Math.max(interior.z1, foot.z0 + 1), foot.z1 - 1);
   const ladder = palette.get('ladder', { facing: 'north' }); // back against the +z spine
   const spine = palette.get('foundation');
   const air = palette.air();
@@ -411,7 +416,14 @@ export function composeStructure(
       // `b.y0 + depth` (= groundY-1 when an extra ceiling layer is reserved). The descent
       // climbs to `groundY` (the house floor) and is laid LAST so its shaft carve survives
       // the type's foundation slab.
-      const { vault, descent } = composeBasementStack(composeModuleDelegate, basement, basementB, b.y0, levelHeights, groundY, houseB, palette);
+      // The type's ground-floor INTERIOR rect (walkable area) so the descent ladder surfaces in
+      // the usable room, not inside a thick/inset wall. A type reports its own (the haunted
+      // tower's inset shaft); else the generic 1-thick-wall default (box inset by 1). The build
+      // box at grade shares the house footprint's X/Z, so houseB is the right reference box.
+      const interior = type.interiorRect
+        ? type.interiorRect(houseB, values, floorHeights, surroundSizing)
+        : { x0: houseB.x0 + 1, z0: houseB.z0 + 1, x1: houseB.x1 - 1, z1: houseB.z1 - 1 };
+      const { vault, descent } = composeBasementStack(composeModuleDelegate, basement, basementB, b.y0, levelHeights, groundY, interior, palette);
       const ops: AuthoringOp[] = [
         ...vault,
         // The type builds its full massing onto the ground slab at `groundY` (its new floor).

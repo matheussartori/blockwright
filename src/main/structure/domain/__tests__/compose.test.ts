@@ -106,6 +106,51 @@ describe('compose: structure types × decorations', () => {
     expect(structureFloorPlan('castle', [9, 9, 9], {})).toEqual([]);
   });
 
+  it('haunted-tower basement descent ladder surfaces in the USABLE interior, not inside a wall', () => {
+    // The bug: the central descent ladder was placed at the raw `box+1` corner, which for the
+    // haunted tower (a flared plinth insets the shaft one cell) is SOLID WALL — so the ladder
+    // came out buried in the base, reachable only by breaking blocks ("escada dentro da parede").
+    const size: [number, number, number] = [15, 40, 15];
+    const corner: [number, number, number] = [14, 39, 14];
+    const params = { decoration: 'cursed', floors: 4, basement: 'cellar' };
+    const { blocks, palette } = resolveBlocks({
+      DataVersion: 3955, size, palette: [{ Name: 'minecraft:air' }],
+      ops: [{ op: 'template', name: 'haunted-tower', from, to: corner, params }],
+    });
+    const nameAt = new Map<string, string>();
+    for (const b of blocks) nameAt.set(`${b.pos[0]},${b.pos[1]},${b.pos[2]}`, palette[b.state]?.Name ?? '');
+    const isLadder = (n?: string): boolean => !!n && n.endsWith('ladder');
+
+    const grade = structureFloorPlan('haunted-tower', size, params).find((f) => f.role !== 'basement')!.from;
+    // The descent is the ladder column running BELOW grade.
+    const descent = blocks.filter((b) => isLadder(palette[b.state]?.Name) && b.pos[1] < grade);
+    expect(descent.length).toBeGreaterThan(0);
+    const lx = descent[0].pos[0], lz = descent[0].pos[2];
+    expect(descent.every((b) => b.pos[0] === lx && b.pos[2] === lz)).toBe(true); // one clean column
+    // Strictly INSIDE the tier-0 wall ring — never on the buried box+1 corner.
+    expect(lx).toBeGreaterThan(1);
+    expect(lz).toBeLessThan(size[2] - 2);
+
+    // It surfaces into a REAL room: open (non-solid) cells at the ground walk level, flooded
+    // from the ladder's step-off cell, reach a sizable area — not a 1-cell pocket in the wall.
+    const walkY = grade + 1;
+    const open = (x: number, z: number): boolean => {
+      if (x < 0 || z < 0 || x >= size[0] || z >= size[2]) return false;
+      const n = nameAt.get(`${x},${walkY},${z}`);
+      return !n || isLadder(n); // absent (air) or a passable ladder cell
+    };
+    const seen = new Set<string>();
+    const stack: [number, number][] = [[lx, lz - 1]]; // step off toward -z (the ladder faces north)
+    while (stack.length) {
+      const [x, z] = stack.pop() as [number, number];
+      const k = `${x},${z}`;
+      if (seen.has(k) || !open(x, z)) continue;
+      seen.add(k);
+      stack.push([x + 1, z], [x - 1, z], [x, z + 1], [x, z - 1]);
+    }
+    expect(seen.size).toBeGreaterThan(10); // a walkable room, not a buried niche
+  });
+
   it('accepts both `decoration` and the legacy `theme` param key', () => {
     const viaDecoration = composeStructure('classic', from, house, { decoration: 'cozy' }, stubIntern());
     const viaTheme = composeStructure('classic', from, house, { theme: 'cozy' }, stubIntern());
