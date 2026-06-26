@@ -4,6 +4,44 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-26
+
+### Added
+
+- Round-trip editing — take a structure out of Blockwright, edit it anywhere
+  (including with vanilla Structure Blocks), and bring it back:
+  - **Export for Editing…** writes the build out for external editing, cutting an
+    oversized structure into its jigsaw pieces.
+  - **Export with Structure Blocks…** installs an editing datapack into a save —
+    each piece appears in its own outlined box; edit it, save the structure block,
+    then stitch the pieces back together.
+  - **Open Jigsaw Assembly…** reopens a previously-split assembly folder back into
+    Blockwright.
+  - **Reimport from World…** stitches the edited pieces back into a single
+    structure, committed as a new version of the project.
+- Rename Project — rename a project's folder and its structure file (handy before
+  exporting, so a build doesn't carry its generated name).
+- Generate with the mod's own blocks — the workspace block dictionary now feeds
+  generation, mapping semantic roles to the mod's blocks (off / mix / prefer) so
+  a seeded shell can compile in the mod's materials.
+
+### Changed
+
+- Versions overhaul — one version per AI run, a "Current" base pointer that every
+  export, manual save and AI edit builds on, version deletion, and block editing
+  locked while a run is in flight.
+- Reworked the export options — consolidated the local-export, slice, merge and
+  reassemble internals behind the new round-trip flows.
+- Dependency upgrades.
+
+### Fixed
+
+- Flatpak build.
+- Underground access on towers — the descent ladder no longer ends up outside the
+  tower.
+- Haunted tower and graveyard generation.
+- Structure-block export.
+
 ## [1.3.0] - 2026-06-26
 
 ### Added
@@ -122,6 +160,7 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[1.4.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.0
 [1.3.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.3.0
 [1.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.2.0
 [1.1.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.1
