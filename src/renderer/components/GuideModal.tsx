@@ -8,14 +8,14 @@ import {
   Compass, Sparkles, Orbit, Blocks, MessagesSquare, FolderTree,
   MousePointer2, Move3D, Scan, Eye, Layers, PencilLine, SlidersHorizontal, History,
   Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload, FlipHorizontal2,
-  SquarePlus, Columns2,
+  SquarePlus, Columns2, FileDown, Globe, Package,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { Modal } from './ui/Modal';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
-type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'workspaces';
+type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'export' | 'workspaces';
 
 const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'overview', icon: Compass, label: 'guide.navOverview' },
@@ -24,6 +24,7 @@ const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'details', icon: Blocks, label: 'guide.navDetails' },
   { id: 'edit', icon: MessagesSquare, label: 'guide.navEdit' },
   { id: 'blocks', icon: Boxes, label: 'guide.navBlocks' },
+  { id: 'export', icon: Upload, label: 'guide.navExport' },
   { id: 'workspaces', icon: FolderTree, label: 'guide.navWorkspaces' },
 ];
 
@@ -66,6 +67,7 @@ export function GuideModal() {
         {section === 'details' && <Details t={t} />}
         {section === 'edit' && <Edit t={t} />}
         {section === 'blocks' && <BlockTools t={t} />}
+        {section === 'export' && <Export t={t} />}
         {section === 'workspaces' && <Workspaces t={t} />}
       </div>
     </Modal>
@@ -176,6 +178,20 @@ function BlockTools({ t }: { t: TFunction }) {
         <li><Columns2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.symmetryT')}</b> {t('guide.blocks.symmetry')}</span></li>
       </ul>
       <p className="guide-tip"><Save size={14} strokeWidth={1.9} aria-hidden />{t('guide.blocks.tip')}</p>
+    </Block>
+  );
+}
+
+function Export({ t }: { t: TFunction }) {
+  return (
+    <Block icon={<Upload size={18} strokeWidth={1.8} />} title={t('guide.export.title')}>
+      <p className="guide-lead">{t('guide.export.lead')}</p>
+      <ul className="guide-list">
+        <li><FileDown size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.export.fileT')}</b> {t('guide.export.file')}</span></li>
+        <li><Package size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.export.modT')}</b> {t('guide.export.mod')}</span></li>
+        <li><Globe size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.export.worldT')}</b> {t('guide.export.world')}</span></li>
+      </ul>
+      <p className="guide-tip"><Boxes size={14} strokeWidth={1.9} aria-hidden />{t('guide.export.tip')}</p>
     </Block>
   );
 }
