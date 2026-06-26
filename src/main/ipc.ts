@@ -20,6 +20,7 @@ import { previewModule } from './structure/catalog/module-preview';
 import { listModuleCatalog } from './structure/domain';
 import { localizeCatalog } from '@/shared/i18n/registry';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
+import { deleteVersion } from './ai/session';
 import { getConfig, setActiveProvider, setModel, setCredential, clearCredential, setGenerationSettings } from './ai/credentials';
 import { getOutputDir, setOutputDir } from './ai/output-dir';
 import type { AiProviderId, GenerationSettings } from '@/shared/ai';
@@ -238,6 +239,7 @@ export function registerIpc(): void {
     primeSession(sessionId, sdkSessionId, version),
   );
   ipcMain.handle(IPC_CHANNELS.aiListVersions, async (_e, sessionId: string) => listVersions(sessionId));
+  ipcMain.handle(IPC_CHANNELS.aiDeleteVersion, async (_e, sessionId: string, version: number) => deleteVersion(sessionId, version));
 
   ipcMain.handle(IPC_CHANNELS.aiGetOutputDir, async () => getOutputDir());
   ipcMain.handle(IPC_CHANNELS.aiChooseOutputDir, async () => {

@@ -49,6 +49,11 @@ export interface Document {
    *  working/latest structure. Set only while the user is previewing an earlier
    *  build (editing always continues from the latest). */
   viewingVersion: number | null;
+  /** The "Current" version — the base every export, manual save and AI edit builds
+   *  on (the user promotes one via "Set as Current" in the Versions panel). null
+   *  means "follow the latest", and any new commit resets it to null. Distinct from
+   *  `viewingVersion`, which is purely what's on screen. */
+  currentVersion: number | null;
   /** Overrides `filePath` as the "Original" baseline of the version chain. Set by
    *  "Clear versions", which flattens the build you've iterated to into a fresh
    *  starting point: the current `.nbt` (not the untouched on-disk file) becomes
@@ -106,6 +111,7 @@ function freshDoc(over: Partial<Document> = {}): Document {
     version: 0,
     versions: [],
     viewingVersion: null,
+    currentVersion: null,
     baselinePath: null,
     floors: [],
     hydrated: false,

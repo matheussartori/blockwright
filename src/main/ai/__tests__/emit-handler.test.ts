@@ -37,6 +37,8 @@ function makeHandler(
   const deps: EmitHandlerDeps = {
     session,
     prompt: 'a test build',
+    // One run commits one version; the orchestrator allocates it as session.version + 1.
+    runVersion: session.version + 1,
     critic: null,
     cred: { id: 'claude-subscription', model: 'test' } as unknown as ResolvedCredential,
     abort: new AbortController(),
@@ -143,7 +145,7 @@ describe('createEmitHandler — the COLLAPSE GATE (a full emit must carry the wh
     expect(fs.existsSync(path.join(session.dir, 'v2.nbt'))).toBe(false); // scratch stays clean
   });
 
-  it('lets the same delta through as a PATCH (it layers onto the previous version)', async () => {
+  it('lets the same delta through as a PATCH (it layers onto this run’s working version)', async () => {
     const state = freshState();
     const session = newSession('patch-ok');
     const handler = makeHandler(state, session);
@@ -151,7 +153,10 @@ describe('createEmitHandler — the COLLAPSE GATE (a full emit must carry the wh
     await handler({ mode: 'full', summary: '', structure: fullBuild() });
     const res = await handler({ mode: 'patch', summary: '', structure: deltaOnly() });
     expect(res.isError).toBeFalsy();
-    expect(session.version).toBe(2); // merged onto v1 → a real, complete v2
+    // One run = one version: both design passes write v1; the patch MERGES onto the full
+    // build (so the solid count stays high — it layered on, not replaced the shell).
+    expect(session.version).toBe(1);
+    expect(session.lastSolids).toBeGreaterThan(50);
   });
 
   it('gates the FIRST emit against a seeded shell via lockCells (and the lock restores it)', async () => {

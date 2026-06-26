@@ -519,13 +519,20 @@ export const ptBR: Messages = {
 
   // Versions panel.
   'versions.original': 'Original',
-  'versions.note': 'Visualize uma construção anterior. As edições sempre continuam a partir da versão mais recente.',
+  'versions.note': 'Clique numa versão para visualizá-la. “Definir como Atual” torna a versão a base para exportações, salvamentos e edições da IA.',
   'versions.showing': 'Exibindo no visualizador',
   'versions.viewOriginal': 'Ver o arquivo original (antes de qualquer edição)',
   'versions.view': 'Ver {label}',
   'versions.latest': 'mais recente',
   'versions.source': 'origem',
   'versions.viewing': '● visualizando',
+  'versions.current': 'atual',
+  'versions.setCurrent': 'Definir como Atual',
+  'versions.setCurrentHint': 'Tornar {label} a base para exportações, salvamentos e edições da IA',
+  'versions.created': 'Criada {date}',
+  'versions.modified': 'Modificada {date}',
+  'versions.delete': 'Excluir {label}',
+  'versions.deleteConfirm': 'Excluir {label}? Isso remove essa construção do disco permanentemente e não pode ser desfeito.',
 
   // Block Catalog.
   'catalog.title': 'Catálogo de blocos',
@@ -761,6 +768,7 @@ export const ptBR: Messages = {
   // Block editor (in-viewer editing tools).
   'editor.enter': 'Editar',
   'editor.enterHint': 'Editar blocos: selecionar, mover, extrudar, pintar, substituir, ar/vazio',
+  'editor.aiBusyHint': 'A edição de blocos fica bloqueada enquanto a IA está construindo — aguarde ela terminar',
   'editor.title': 'Editar',
   'editor.exit': 'Sair da edição',
   'editor.tool.select': 'Selecionar',

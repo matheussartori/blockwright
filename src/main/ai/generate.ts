@@ -12,8 +12,9 @@ import { systemPrompt } from './schema';
 import { modBlockGuide } from '../structure/assets/block-dictionary';
 import { phaseAt, PHASES } from './phases';
 import { maxRoundsFor } from './rounds';
+import path from 'node:path';
 import { beginRun, endRun, getSession } from './session';
-import { buildSeed } from './seed';
+import { buildSeed, seedFromFile } from './seed';
 import { buildShellSeed } from './shell-seed';
 import { activeCredential, aiAvailable, getGenerationSettings } from './credentials';
 import { getCritic, getDriver, RESUMABLE_PROVIDERS } from './providers';
@@ -96,8 +97,20 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // The LOCKED shell cells of a seeded archetype: re-asserted on every emit's compile
   // so the AI can't gut the code-built exterior (it reliably emits furniture-only
   // deltas otherwise). Empty for a free-form build (so `preserveShell` no-ops).
+  // A REBASE: the user promoted an OLDER version to "Current" and is generating from
+  // it (basePath points at a `v{k}.nbt` in our scratch dir with k < the latest). Branch
+  // a fresh conversation from that build — forget the server-side session so the model
+  // restarts from the promoted version, and seed from its file directly.
+  const baseVersion = sessionVersionOf(basePath, session.dir);
+  const rebasing = baseVersion != null && baseVersion < session.version;
   let lockCells: ShellLockCell[] | undefined;
-  let seed = await buildSeed(resumable, session, basePath);
+  let seed: string;
+  if (rebasing && basePath) {
+    session.sdkSessionId = null;
+    seed = await seedFromFile(basePath);
+  } else {
+    seed = await buildSeed(resumable, session, basePath);
+  }
   if (!seed && session.version === 0) {
     const shell = await buildShellSeed({
       structureType: selection?.structureType,
@@ -117,6 +130,12 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     lockCells = shell.lockCells;
   }
   const effectivePrompt = seed + prompt;
+
+  // ONE version per run: allocate the number now, before any emit, so every design
+  // pass overwrites the same `v{runVersion}.nbt` instead of stacking a near-identical
+  // version per pass. session.version is bumped to it on the first successful emit, so
+  // the next prompt (a new run) increments from here.
+  const runVersion = session.version + 1;
 
   run.ai(
     `Starting generation with the “${cred.id}” provider (${cred.model})` +
@@ -204,7 +223,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   const ac = beginRun(sessionId);
   const onEmit = createEmitHandler({
     session, prompt, selection, floors, images, capture, lockCells, critic, cred,
-    basePath, abort: ac, roundsBudget, startedAt, run, meter, state, emitProgress,
+    basePath, runVersion, abort: ac, roundsBudget, startedAt, run, meter, state, emitProgress,
   });
 
   // Snapshot the running token totals — attached to EVERY result branch (success,
@@ -256,6 +275,16 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
     return { ok: false, error: authHint(`Generation failed (${subtype}).`), ...tokens() };
   }
   return { ok: false, error: 'The model did not return a structure. Try rephrasing your request.', ...tokens() };
+}
+
+/** The version number if `p` is a `v{n}.nbt` inside this session's scratch dir, else
+ *  null — used to detect a rebase (a promoted older version as the edit base). */
+function sessionVersionOf(p: string | undefined, dir: string): number | null {
+  if (!p) return null;
+  const resolved = path.resolve(p);
+  if (!resolved.startsWith(path.resolve(dir) + path.sep)) return null;
+  const m = /^v(\d+)\.nbt$/i.exec(path.basename(resolved));
+  return m ? Number(m[1]) : null;
 }
 
 /** Append a hint about auth when the failure looks credential-related. */

@@ -9,7 +9,7 @@
 // its conversation and the SDK session can resume.
 import { api } from '../api';
 import { documentsStore, docBySession, type Document } from './documents';
-import type { GenerateImage, BuildSelection, BuildBrief } from '@/shared/types';
+import type { GenerateImage, BuildSelection, BuildBrief, VersionInfo } from '@/shared/types';
 import { basename, dirname } from '../ui/path';
 import { buildFloorPlan, normalizeFloor } from '../generation/floors';
 
@@ -88,6 +88,25 @@ export function recordVersion(docId: string, version: number, path: string): voi
   docs.patchDoc(docId, { versions, viewingVersion: version });
 }
 
+/** The version entry the next export, manual save and AI edit builds on: the promoted
+ *  "Current" version, else the latest. Null when the doc has no compiled versions yet
+ *  (a fresh file/Untitled build → callers fall back to the working `path`). */
+export function currentBaseEntry(doc: Document): VersionInfo | null {
+  const target = doc.currentVersion ?? doc.version;
+  return doc.versions.find((v) => v.version === target) ?? null;
+}
+
+/** Promote a version to "Current" — the base every export/save/AI edit builds on — and
+ *  preview it in the viewer so the on-screen build matches the promoted base. */
+export async function setCurrentVersion(docId: string, version: number): Promise<void> {
+  const docs = documentsStore.getState();
+  const doc = docs.documents.find((d) => d.id === docId);
+  if (!doc) return;
+  docs.patchDoc(docId, { currentVersion: version });
+  await viewVersion(docId, version);
+  persistDoc(docId);
+}
+
 /** Preview a version in the viewer for visualization only — loads `vN.nbt` into
  *  the active viewer (and the doc's structure, so the inspector matches) WITHOUT
  *  touching the working path, so the next AI edit still builds on the latest. */
@@ -98,6 +117,27 @@ export async function viewVersion(docId: string, version: number): Promise<void>
   if (!entry) return;
   documentsStore.getState().patchDoc(docId, { viewingVersion: version });
   await docLoader?.(docId, entry.path, { preserveCamera: true, recent: false, working: false });
+}
+
+/** Delete a compiled version from the document + disk. Refuses the Current version
+ *  (it's the live edit base) and the synthetic v0 baseline. If the deleted version was
+ *  on screen, falls back to previewing the Current base. */
+export async function deleteVersionEntry(docId: string, version: number): Promise<void> {
+  const docs = documentsStore.getState();
+  const doc = docs.documents.find((d) => d.id === docId);
+  if (!doc || doc.busy) return;
+  const current = doc.currentVersion ?? doc.version;
+  if (version === current || version === 0) return;
+  await api.aiDeleteVersion(doc.sessionId, version);
+  const versions = doc.versions.filter((v) => v.version !== version);
+  const wasViewing = doc.viewingVersion === version;
+  docs.patchDoc(docId, { versions, ...(wasViewing ? { viewingVersion: null } : {}) });
+  if (wasViewing) {
+    // Snap the viewer back to the Current base so it doesn't keep showing a gone build.
+    const base = versions.find((v) => v.version === current);
+    if (base) await viewVersion(docId, base.version);
+  }
+  persistDoc(docId);
 }
 
 /** Commit a manually-edited build (from the block editor) as a new version: record it,
@@ -113,7 +153,8 @@ export async function commitManualVersion(
   const doc = docs.documents.find((d) => d.id === docId);
   if (!doc) return;
   recordVersion(docId, version, scratchPath);
-  docs.patchDoc(docId, { version, viewingVersion: null });
+  // A new commit becomes the base: drop any "Current" pin so it follows the latest.
+  docs.patchDoc(docId, { version, viewingVersion: null, currentVersion: null });
   if (!doc.filePath && libraryPath) {
     docs.patchDoc(docId, { filePath: libraryPath, title: basename(libraryPath), generated: true });
     api.addRecent(libraryPath);
@@ -252,9 +293,11 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
     tokensOut: r.tokensOut,
   });
 
-  // Seed the model with the structure this tab already has open so a first
-  // "change X" edits it rather than building anew (main ignores its own outputs).
-  const basePath = doc.path ?? undefined;
+  // Seed the model with the CURRENT version this tab is based on (a promoted older
+  // version, else the latest) so a first "change X" edits that build; main detects a
+  // promoted-older base as a rebase and branches from it. Falls back to the working
+  // path for a fresh file/Untitled build with no compiled versions yet.
+  const basePath = currentBaseEntry(doc)?.path ?? doc.path ?? undefined;
   try {
     // The user's Floor plan rides along structured (not just as prompt text): main
     // uses it to locate the ground-floor level for the air-fill, overriding the
@@ -281,7 +324,8 @@ export async function runGeneration(docId: string, input: GenerationInput): Prom
         // The card carries version/size/blocks now; meta keeps just the run cost.
         meta: stats(result),
       });
-      docs.patchDoc(docId, { sdkSessionId: result.sdkSessionId, version: result.version });
+      // The fresh build is the new base — clear any "Current" pin so it follows latest.
+      docs.patchDoc(docId, { sdkSessionId: result.sdkSessionId, version: result.version, currentVersion: null });
       // Record the final version (live renders already recorded intermediate ones)
       // and always show the latest. First version frames the build; later versions
       // keep the camera so the user sees exactly what changed.

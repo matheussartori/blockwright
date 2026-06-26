@@ -57,8 +57,10 @@ export function shellPreamble(json: string): string {
   );
 }
 
-/** Read an existing `.nbt` and wrap it as an edit preamble, or '' if unreadable. */
-async function seedFromFile(basePath: string): Promise<string> {
+/** Read an existing `.nbt` and wrap it as an edit preamble, or '' if unreadable.
+ *  Exported so a REBASE (generating from a promoted older "Current" version) can seed
+ *  from that version's file directly, bypassing buildSeed's own-output guard. */
+export async function seedFromFile(basePath: string): Promise<string> {
   try {
     const authoring = await readAuthoring(basePath);
     return editPreamble(JSON.stringify(authoring));

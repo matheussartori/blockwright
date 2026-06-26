@@ -111,6 +111,8 @@ export const IPC_CHANNELS = {
   aiPrimeSession: 'ai:prime-session',
   /** List a session's compiled versions on disk (payload: sessionId) → VersionInfo[]. */
   aiListVersions: 'ai:list-versions',
+  /** Delete a session's compiled version files (payload: sessionId, version) → boolean. */
+  aiDeleteVersion: 'ai:delete-version',
   /** Get the folder where finished structures are saved (the browsable library) → string. */
   aiGetOutputDir: 'ai:get-output-dir',
   /** Open a native folder picker for the library folder; returns the chosen dir (persisted) or null. */

@@ -517,13 +517,20 @@ export const en = {
 
   // Versions panel.
   'versions.original': 'Original',
-  'versions.note': 'Preview an earlier build. Edits always continue from the latest version.',
+  'versions.note': 'Click a version to preview it. “Set as Current” makes a version the base for exports, saves and AI edits.',
   'versions.showing': 'Showing in the viewer',
   'versions.viewOriginal': 'View the original file (before any edits)',
   'versions.view': 'View {label}',
   'versions.latest': 'latest',
   'versions.source': 'source',
   'versions.viewing': '● viewing',
+  'versions.current': 'current',
+  'versions.setCurrent': 'Set as Current',
+  'versions.setCurrentHint': 'Make {label} the base for exports, saves and AI edits',
+  'versions.created': 'Created {date}',
+  'versions.modified': 'Modified {date}',
+  'versions.delete': 'Delete {label}',
+  'versions.deleteConfirm': 'Delete {label}? This permanently removes that build from disk and can’t be undone.',
 
   // Block Catalog.
   'catalog.title': 'Block Catalog',
@@ -759,6 +766,7 @@ export const en = {
   // Block editor (in-viewer editing tools).
   'editor.enter': 'Edit',
   'editor.enterHint': 'Edit blocks: select, move, extrude, paint, replace, air/void',
+  'editor.aiBusyHint': 'Block editing is locked while the AI is building — wait for it to finish',
   'editor.title': 'Edit',
   'editor.exit': 'Exit editing',
   'editor.tool.select': 'Select',

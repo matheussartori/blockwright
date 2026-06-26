@@ -10,7 +10,7 @@ import type { StructureData } from '@/shared/types';
 import { api } from '../api';
 import { store } from './store';
 import { documentsStore, activeDocument } from './documents';
-import { commitManualVersion } from './generation';
+import { commitManualVersion, currentBaseEntry } from './generation';
 import { transformProps } from '@/shared/structure/orientation';
 import {
   buildStairs,
@@ -435,7 +435,9 @@ export const editorStore = createStore<EditorState>((set, get) => {
       const slug = doc.title && doc.title !== 'Untitled' ? doc.title : undefined;
       const res = await api.saveVersion({
         sessionId: doc.sessionId,
-        sourcePath: doc.path,
+        // Inherit block-entity NBT / entities / DataVersion from the CURRENT base
+        // version (the promoted one, else the latest) — what the edit started from.
+        sourcePath: currentBaseEntry(doc)?.path ?? doc.path,
         size: doc.structure.size,
         palette: doc.structure.palette.map((p) => ({ name: p.name, properties: p.properties })),
         blocks: doc.structure.blocks.map((b) => ({ state: b.state, pos: b.pos })),

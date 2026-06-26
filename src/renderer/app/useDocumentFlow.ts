@@ -13,7 +13,7 @@ import { settingsStore } from '../state/settings';
 import { plannerStore } from '../state/planner';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
-import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
+import { setDocLoader, bindGenerationProgress, hydrateDoc, cancelGeneration, currentBaseEntry, commitManualVersion } from '../state/generation';
 import type { Viewer } from '../viewer/viewer';
 
 export interface LoadOpts {
@@ -162,18 +162,13 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     void hydrateDoc(id);
   }, []);
 
-  // Export the active tab's CURRENT build to a location the user picks. We export
-  // exactly what's on screen: a previewed earlier version if one is being viewed,
-  // otherwise the working build (`path`). The source is a real `.nbt` on disk, so
-  // main just copies it. Suggest the file's own name, or "<title>.nbt" for an
-  // untitled AI build.
+  // Export the active tab's CURRENT version (the promoted one, else the latest) to a
+  // location the user picks. The source is a real `.nbt` on disk, so main just copies
+  // it. Suggest the file's own name, or "<title>.nbt" for an untitled AI build.
   const exportActive = useCallback(async () => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const preview = doc.viewingVersion != null
-      ? doc.versions.find((v) => v.version === doc.viewingVersion)
-      : null;
-    const src = preview?.path ?? doc.path;
+    const src = currentBaseEntry(doc)?.path ?? doc.path;
     if (!src) return; // nothing loaded to export
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
@@ -193,8 +188,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const exportToWorldActive = useCallback(async () => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const preview = doc.viewingVersion != null ? doc.versions.find((v) => v.version === doc.viewingVersion) : null;
-    const src = preview?.path ?? doc.path;
+    const src = currentBaseEntry(doc)?.path ?? doc.path;
     if (!src) return;
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
@@ -206,21 +200,42 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     }
   }, []);
 
-  // Reassemble the pieces the player re-SAVEd in their world (the editing scaffold round-trip)
-  // back into one structure and open it. main picks the save folder, reads the edited pieces,
-  // and returns a temp `.nbt`. Mirrors openAssembly.
+  // Reassemble the pieces the player re-SAVEd in their world (the editing scaffold
+  // round-trip). main picks the save folder, reads the edited pieces, and returns a
+  // stitched temp `.nbt`. When a project tab is open we commit that structure as a NEW
+  // VERSION of it (so the in-world edits become v(N+1) of the same project, and the
+  // Versions panel / Current pointer pick it up) — re-encoded faithfully via the
+  // save-version path (no AI repair). With no tab open we just open it as a fresh doc.
   const reimportWorld = useCallback(async () => {
     const result = await api.reimportWorld();
-    if (result.ok) {
-      await openFile(result.path);
-      store.getState().setNotice(
-        result.missing > 0
-          ? { text: `Reimported with ${result.missing} piece(s) missing`, warn: true }
-          : { text: 'Reimported the edited structure', warn: false },
-      );
-    } else if (!result.canceled) {
-      store.getState().setNotice({ text: `Reimport failed: ${result.error ?? 'unknown error'}`, warn: true });
+    if (!result.ok) {
+      if (!result.canceled) store.getState().setNotice({ text: `Reimport failed: ${result.error ?? 'unknown error'}`, warn: true });
+      return;
     }
+    const missingNote = result.missing > 0 ? ` (${result.missing} piece(s) missing)` : '';
+    const doc = activeDocument(documentsStore.getState());
+    if (doc) {
+      try {
+        const structure = await api.loadStructure(result.path);
+        const res = await api.saveVersion({
+          sessionId: doc.sessionId,
+          sourcePath: result.path,
+          size: structure.size,
+          palette: structure.palette.map((p) => ({ name: p.name, properties: p.properties })),
+          blocks: structure.blocks.map((b) => ({ state: b.state, pos: b.pos })),
+          slug: doc.title && doc.title !== 'Untitled' ? doc.title : undefined,
+        });
+        if (res.ok && res.version != null && res.path) {
+          await commitManualVersion(doc.id, res.version, res.path, res.libraryPath ?? null);
+          store.getState().setNotice({ text: `Reimported as v${res.version}${missingNote}`, warn: result.missing > 0 });
+          return;
+        }
+      } catch {
+        /* fall through to opening it as a standalone file */
+      }
+    }
+    await openFile(result.path);
+    store.getState().setNotice({ text: `Reimported the edited structure${missingNote}`, warn: result.missing > 0 });
   }, [openFile]);
 
   // Open the "Export to mod" dialog for the active tab's current build. Same source
@@ -229,10 +244,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const exportToWorkspaceActive = useCallback(() => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
-    const preview = doc.viewingVersion != null
-      ? doc.versions.find((v) => v.version === doc.viewingVersion)
-      : null;
-    const src = preview?.path ?? doc.path;
+    const src = currentBaseEntry(doc)?.path ?? doc.path;
     if (!src) return;
     const stem = doc.filePath ? basename(doc.filePath).replace(/\.nbt$/i, '') : doc.title || 'structure';
     store.getState().setExportTarget({ path: src, name: sanitizeResourceName(stem) });

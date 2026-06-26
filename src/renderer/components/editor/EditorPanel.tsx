@@ -2,7 +2,7 @@
 // "Edit" button; on, it's the tool rail + the active tool's controls + the selection
 // readout + Save/Undo/Redo. The orchestrator — it owns the layout + the selection readout;
 // the tools live in ToolRail/ToolControls, the ops in the store (state/editor.ts).
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Boxes, Eye, EyeOff, Pencil, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useActiveDoc, useEditor, useT } from '../../hooks/useStores';
 import { editorStore, type Symmetry } from '../../state/editor';
@@ -24,7 +24,14 @@ export function EditorPanel() {
   const symmetry = useEditor((s) => s.symmetry);
   const showVoids = useEditor((s) => s.showVoids);
   const hoverInfo = useEditor((s) => s.hoverInfo);
-  const structure = useActiveDoc()?.structure ?? null;
+  const activeDoc = useActiveDoc();
+  const structure = activeDoc?.structure ?? null;
+  // Block-editing is locked while the AI is generating/editing this build (both mutate
+  // the doc's structure — concurrent edits would corrupt it). Force-exit if a run starts.
+  const busy = activeDoc?.busy ?? false;
+  useEffect(() => {
+    if (busy && active) editorStore.getState().setActive(false);
+  }, [busy, active]);
 
   // What the cursor is over (the readout), localized — a real block keeps its id.
   const cellLabel = (c: CellContent): string => {
@@ -64,7 +71,12 @@ export function EditorPanel() {
 
   if (!active) {
     return (
-      <button className="editor-fab no-drag" onClick={() => ed().setActive(true)} title={t('editor.enterHint')}>
+      <button
+        className="editor-fab no-drag"
+        onClick={() => ed().setActive(true)}
+        disabled={busy}
+        title={busy ? t('editor.aiBusyHint') : t('editor.enterHint')}
+      >
         <Pencil size={15} strokeWidth={1.9} aria-hidden />
         {t('editor.enter')}
       </button>

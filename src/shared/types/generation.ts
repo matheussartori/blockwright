@@ -125,6 +125,11 @@ export interface VersionInfo {
   version: number;
   /** Absolute path to the compiled `vN.nbt`, loadable in the viewer. */
   path: string;
+  /** When the version file was first created (epoch ms), from the filesystem —
+   *  surfaced in the Versions panel. Omitted for the synthetic v0 baseline. */
+  createdAt?: number;
+  /** When the version file was last modified (epoch ms), from the filesystem. */
+  modifiedAt?: number;
 }
 
 /** One message in a document's AI chat transcript (persisted + shown in the UI). */

@@ -121,6 +121,9 @@ export interface BlockwrightApi {
   /** List the compiled versions (`vN.nbt`) on disk for a generation session, so the
    *  Versions panel can offer earlier builds to view. Empty when none/unknown. */
   aiListVersions: (sessionId: string) => Promise<VersionInfo[]>;
+  /** Delete a compiled version's files for a session (scratch + library mirror). The
+   *  caller guards against deleting the Current version. Resolves true if removed. */
+  aiDeleteVersion: (sessionId: string, version: number) => Promise<boolean>;
   /** The folder where finished structures are auto-saved as clean `<slug>.nbt` files. */
   aiGetOutputDir: () => Promise<string>;
   /** Open a native folder picker for the library folder; resolves to the chosen (persisted) dir, or null if cancelled. */

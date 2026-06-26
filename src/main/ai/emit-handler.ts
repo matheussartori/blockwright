@@ -9,6 +9,7 @@
 // design-pass pointer, the captured result, the last error) — modelled explicitly as
 // {@link EmitRunState}, a single record both sides hold by reference. The orchestrator
 // reads it after the driver run to assemble the final result.
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { BuildSelection, FloorDef, GenerateImage, GeneratePhase, GenerateResult } from '@/shared/types';
@@ -85,6 +86,11 @@ export interface EmitHandlerDeps {
   cred: ResolvedCredential;
   /** The currently-open `.nbt` being edited (clears its temp sidecar on first emit). */
   basePath?: string;
+  /** The single version number this whole run commits to. Allocated ONCE per run
+   *  (in generate.ts) so every design-pass emit OVERWRITES the same `vN.nbt` — the
+   *  live preview still updates each emit, but the run produces exactly one version
+   *  (the renderer dedupes by number). A new prompt starts a new run → a new number. */
+  runVersion: number;
   abort: AbortController;
   /** The authoritative round budget (a fixed number), or null for the volume-scaled AUTO path. */
   roundsBudget: number | null;
@@ -111,7 +117,7 @@ function errMessage(err: unknown): string {
 export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Promise<EmitToolResult> {
   const {
     session, prompt, selection, floors, images, capture, lockCells, critic, cred,
-    basePath, abort, roundsBudget, startedAt, run, meter, state, emitProgress,
+    basePath, runVersion, abort, roundsBudget, startedAt, run, meter, state, emitProgress,
   } = deps;
 
   return async (args: EmitArgs): Promise<EmitToolResult> => {
@@ -123,14 +129,17 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
         `“${phaseAt(state.phaseIndex).label}” pass — validating and compiling it.`,
     );
 
-    // A patch reuses the previous version as its base and appends new geometry
-    // (palette entries are append-only; later ops overwrite earlier cells). Falls
-    // back to treating it as a full emit when there's no prior version.
+    // A patch reuses THIS RUN's working version as its base and appends new geometry
+    // (palette entries are append-only; later ops overwrite earlier cells). Since every
+    // emit of a run writes the SAME `v{runVersion}.json`, the patch base is that file —
+    // the previous design pass of this run. Falls back to treating it as a full emit
+    // when no prior emit has landed this run yet (e.g. the first pass arrives as patch).
     const input = args.structure;
     let authoring = input;
-    if (args.mode === 'patch' && session.version >= 1) {
+    const workingJson = path.join(session.dir, `v${runVersion}.json`);
+    if (args.mode === 'patch' && fs.existsSync(workingJson)) {
       try {
-        const prevJson = await fsp.readFile(path.join(session.dir, `v${session.version}.json`), 'utf8');
+        const prevJson = await fsp.readFile(workingJson, 'utf8');
         authoring = mergePatch(JSON.parse(prevJson) as AuthoringStructure, input);
       } catch (err) {
         state.captureError = `Could not load the previous version to patch: ${errMessage(err)}`;
@@ -145,7 +154,9 @@ export function createEmitHandler(deps: EmitHandlerDeps): (args: EmitArgs) => Pr
       return text(rejection.feedback, true);
     }
 
-    const version = session.version + 1;
+    // The version is FIXED for the whole run — every emit overwrites it, so the run
+    // yields one version, not one-per-design-pass.
+    const version = runVersion;
     const nbtPath = path.join(session.dir, `v${version}.nbt`);
     const size = (authoring.size ?? [0, 0, 0]) as [number, number, number];
     // The AUTHORITATIVE storeys of the code-built structure (its shell is locked, so these

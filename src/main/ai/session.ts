@@ -84,9 +84,49 @@ export function listVersions(sessionId: string): VersionInfo[] {
   const out: VersionInfo[] = [];
   for (const name of names) {
     const match = /^v(\d+)\.nbt$/.exec(name);
-    if (match) out.push({ version: Number(match[1]), path: path.join(sessionDir(sessionId), name) });
+    if (!match) continue;
+    const full = path.join(sessionDir(sessionId), name);
+    // Stat for the created/modified dates shown in the Versions panel (best-effort:
+    // a stat failure just omits them — birthtime is unreliable on some filesystems,
+    // so fall back to mtime when it reads 0).
+    let createdAt: number | undefined;
+    let modifiedAt: number | undefined;
+    try {
+      const st = fs.statSync(full);
+      modifiedAt = st.mtimeMs;
+      createdAt = st.birthtimeMs || st.mtimeMs;
+    } catch {
+      /* keep the entry without dates */
+    }
+    out.push({ version: Number(match[1]), path: full, createdAt, modifiedAt });
   }
   return out.sort((a, b) => a.version - b.version);
+}
+
+/** Delete a compiled version's files: the scratch `vN.nbt` + `vN.json`, plus the
+ *  library mirror copy when the session is live (best-effort). The renderer guards
+ *  against deleting the Current version, so this never removes the live edit base.
+ *  Returns true if any scratch file was removed. */
+export function deleteVersion(sessionId: string, version: number): boolean {
+  const dir = sessionDir(sessionId);
+  let removed = false;
+  for (const ext of ['nbt', 'json']) {
+    try {
+      fs.unlinkSync(path.join(dir, `v${version}.${ext}`));
+      removed = true;
+    } catch {
+      /* not present — nothing to remove */
+    }
+  }
+  const libDir = sessions.get(sessionId)?.library?.dir;
+  if (libDir) {
+    try {
+      fs.unlinkSync(path.join(libDir, 'versions', `v${version}.nbt`));
+    } catch {
+      /* library copy already gone */
+    }
+  }
+  return removed;
 }
 
 /** Restore a session's conversation id + version from persisted chat history so a
