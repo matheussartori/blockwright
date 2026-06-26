@@ -97,4 +97,11 @@ describe('splitPlan', () => {
       expect(d).toBe(1);
     }
   });
+
+  it('always gives the root an outbound edge (so the /place jigsaw target exists)', () => {
+    for (const size of [[49, 10, 10], [60, 50, 60], [200, 48, 48]] as Vec3[]) {
+      const plan = splitPlan(size, 48);
+      expect(plan.edges.some((e) => e.parent === plan.root)).toBe(true);
+    }
+  });
 });

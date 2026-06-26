@@ -26,6 +26,7 @@ import { readRaw } from '../structure/io/convert';
 import { splitToJigsaw } from '../structure/io/split-structure';
 import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
 import { jsonFor } from './worldgen-json';
+import { writeSplitFiles } from './write-split';
 
 /** Compute the dialog's live preview: the target workspace, the files that would be
  *  written (with overwrite flags), and the problems to surface. Never throws. */
@@ -99,13 +100,5 @@ async function writeSplit(
 ): Promise<string[]> {
   const raw = await readRaw(req.sourcePath);
   const { files } = splitToJigsaw(raw, split, { namespace, base: req.name, version, worldgen: req.worldgen, dataVersion: DEFAULT_DATA_VERSION });
-  const written: string[] = [];
-  for (const f of files) {
-    const abs = path.join(root, f.rel);
-    await fsp.mkdir(path.dirname(abs), { recursive: true });
-    if ('buffer' in f) await fsp.writeFile(abs, f.buffer);
-    else await fsp.writeFile(abs, JSON.stringify(f.json, null, 2) + '\n');
-    written.push(f.rel);
-  }
-  return written;
+  return writeSplitFiles(files, root);
 }

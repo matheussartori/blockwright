@@ -129,4 +129,16 @@ describe('split export file plan', () => {
     expect(issues.some((i) => i.code === 'split_active')).toBe(true);
     expect(issues.every((i) => i.level !== 'error')).toBe(true);
   });
+
+  it('validateSplit blocks splits past the jigsaw limits (too many pieces / too deep)', () => {
+    const tooMany = validateSplit(splitPlan([48 * 16, 48 * 16, 48], 48)); // 256 pieces
+    expect(tooMany.some((i) => i.code === 'split_too_many' && i.level === 'error')).toBe(true);
+
+    const tooDeep = validateSplit(splitPlan([48 * 42, 48, 48], 48)); // a 42-long chain → depth 22
+    expect(tooDeep.some((i) => i.code === 'split_too_deep' && i.level === 'error')).toBe(true);
+
+    // A wide-but-shallow structure only warns (far pieces may not all generate), never blocks.
+    const span = validateSplit(splitPlan([300, 48, 48], 48));
+    expect(span.some((i) => i.code === 'split_span' && i.level === 'warning')).toBe(true);
+  });
 });

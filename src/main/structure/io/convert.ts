@@ -37,6 +37,7 @@ export async function readRaw(filePath: string): Promise<RawStructure> {
     palette,
     blocks: (a.blocks ?? []).map((b) => ({ state: b.state, pos: b.pos as [number, number, number] })),
     blockEntities,
+    entities: (a.entities ?? []).map((e) => ({ pos: e.pos, blockPos: e.blockPos, nbt: e.nbt ?? {} })),
   };
 }
 
@@ -69,7 +70,7 @@ export async function convertStructure(srcPath: string, destPath: string): Promi
         const be = beByPos.get(b.pos.join(','));
         return be ? { state: b.state, pos: b.pos, nbt: { id: be.id, ...be.nbt } } : { state: b.state, pos: b.pos };
       }),
-      entities: [],
+      entities: (raw.entities ?? []).map((e) => ({ pos: e.pos, blockPos: e.blockPos, ...(Object.keys(e.nbt).length ? { nbt: e.nbt } : {}) })),
     }),
   );
 }

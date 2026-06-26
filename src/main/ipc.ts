@@ -37,7 +37,8 @@ import {
   setWorkspaceVersion,
 } from './workspace';
 import { planExport, runExport } from './export';
-import { exportStructure, exportToWorld, notifyRecentWorkspaces, openFileDialog } from './window';
+import { notifyRecentWorkspaces, openFileDialog } from './window';
+import { exportStructure, exportToWorld } from './export/local-export';
 import { getLogBacklog } from './logger';
 import { checkForUpdatesManually, checkForUpdatesQuiet, getPendingUpdate } from './update-check';
 import { buildAppMenu, refreshMenu, setFileOpen, setWindowsState } from './app-menu';

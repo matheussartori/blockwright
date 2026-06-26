@@ -44,17 +44,28 @@ src/
     workspace.ts          Mod-workspace detect/apply (+ detect-from-.nbt, activate a known one,
                           listWorkspaceStructures/listWorkspaceBiomes for the export dialog)
     texture-protocol.ts   Custom bw-texture:// privileged scheme serving namespaced PNGs
-    export/               "Export to mod": write a structure into the active workspace's data pack.
-                          worldgen-json.ts (pure builders: jigsaw structure def / template_pool /
-                          structure_set / has_structure biome tag — spawn_overrides is REQUIRED in the
-                          1.21 codec even when empty) + index.ts (planExport = live preview of the files
-                          + problems; runExport = write them). See "Export to mod workspace" below.
+    export/               Writing a structure out. worldgen-json.ts (pure builders: jigsaw structure def /
+                          template_pool / structure_set / has_structure biome tag — spawn_overrides is
+                          REQUIRED in the 1.21 codec even when empty; `singleElementPoolJson` + a
+                          parameterized `structureJson` size/max_distance back the SPLIT assembly) +
+                          index.ts (the WORKSPACE export — planExport = live preview of the files +
+                          problems; runExport = write them) + local-export.ts (the NON-workspace exports:
+                          `exportStructure` = "Export As…" a user-chosen file/format, `exportToWorld` =
+                          install a ready-to-run datapack into a MC save + teach the `/place` command) +
+                          write-split.ts (`writeSplitFiles` — the one mkdir+write loop every path shares).
+                          See "Export to mod workspace" + "Oversized structures → jigsaw split" below.
     structure/              Grouped by responsibility (one subdir per concern):
       io/
-        raw.ts              The format-NEUTRAL `RawStructure` shape ({size,palette,blocks,blockEntities?})
-                            + RawPaletteEntry/RawBlock/RawBlockEntity + `blockStateString` + `omitKeys`. Every
+        raw.ts              The format-NEUTRAL `RawStructure` shape ({size,palette,blocks,blockEntities?,entities?})
+                            + RawPaletteEntry/RawBlock/RawBlockEntity/RawEntity + `blockStateString` + `omitKeys`. Every
                             codec decodes to / encodes from this; kept in its own module so no codec owns the
                             shared contract (load-structure + schematic re-export for back-compat).
+        split-structure.ts  `splitToJigsaw` (main): cut an oversized `RawStructure` into a JIGSAW assembly that
+                            reassembles voxel-perfectly. A `JigsawSplitter` class (mirrors jigsaw-assembler's
+                            `Assembler`) slices pieces, picks seam cells off block entities, injects connectors
+                            whose `final_state` restores the seam, partitions block entities + entities per piece,
+                            and asserts the geometry round-trips through `solveAttachment`. See "Oversized
+                            structures → jigsaw split".
         nbt-tags.ts         Shared NBT tag builders (int/str/compound/compoundList/longArray/xyz/longFromMs…)
                             + `createPaletteInterner` — the helpers the `.schem`/`.litematic` encoders had
                             copy-pasted verbatim, now declared once.
@@ -1036,6 +1047,42 @@ files" switch is **OFF by default** (`DEFAULT_WORLDGEN.generate`), so a plain ex
 - **Add a worldgen file / preset:** extend `plannedFiles` + a builder in `worldgen-json.ts` (+ test),
   or add a preset to `worldgen.ts`. **Add an export option:** it rides through `WorldgenOptions`.
 
+### Oversized structures → jigsaw split
+
+A Minecraft Structure Block only loads up to the size limit per axis (48 since 1.16, 32 before); a
+bigger `.nbt` simply won't load. So when a structure exceeds the limit, EVERY export path cuts it into
+a **jigsaw assembly** — a grid of pieces (each ≤ limit) plus the worldgen JSON that reassembles them
+**voxel-perfectly** in-world. The size-limit preference lives in **Settings ▸ Viewer ▸ Structures**
+(`settings.nbtSizeLimit`: `auto`/`48`/`32`, default `auto` → derived from the workspace's MC version);
+the renderer resolves it via `effectiveNbtLimit` and threads the number into every export request.
+
+- **Why it's lossless:** vanilla replaces each jigsaw block with its OWN `final_state` after generation,
+  so each connector restores the original block at its cell. The only cost is the (≤2) seam cells per
+  tree edge, placed off block entities so no NBT is lost (`split_block_entity` warns when unavoidable).
+- **Pure planning vs. IO:** `shared/domain/split.ts` is the PURE layer — `splitPlan(size, limit)` decides
+  the balanced grid + a center-rooted BFS **spanning tree** (shallow, to respect the distance cap) +
+  the connector orientation/seam-cell math + canonical names. `main/structure/io/split-structure.ts`
+  (`splitToJigsaw`, the `JigsawSplitter` class) does the block-level work; `shared/domain/worldgen.ts`
+  (`splitFileSpecs`/`plannedFiles(…, split)`/`validateSplit`) owns the file list + limit checks. The
+  renderer preview (`splitFileSpecs`) and main's writer derive from the SAME functions, so they can't drift.
+- **Two in-game gotchas (test-enforced):** (1) `max_distance_from_center` ≤ **116**, not 128 — vanilla
+  adds +12 for non-`none` terrain adaptation and rejects the def if the sum > 128. (2) `/place jigsaw
+  <pool> <target> <depth>`'s `target` must be the NAME of a jigsaw on the ROOT piece (it anchors the
+  command placement) — we pass a real `out_<edgeId>` connector, NOT `minecraft:empty`. Natural worldgen
+  needs no such match. Limits: ≤ `MAX_SPLIT_PIECES` (200), depth ≤ `MAX_JIGSAW_DEPTH` (20); past them
+  `validateSplit` BLOCKS the export (the local paths abort with a dialog, the workspace path with an error).
+- **The three export paths converge here:** WORKSPACE (`export/index.ts` `runExport`, into the mod's data
+  pack — the dialog forces "generate worldgen" on for a split), **Export As** (`export/local-export.ts`
+  `exportStructure`, a sibling `<name>_jigsaw/` data tree), and **Export to World** (`exportToWorld`, a
+  drop-in datapack at `<save>/datapacks/<name>/` + a native dialog that teaches the `/place` command with
+  a Copy button). `.schem`/`.litematic` are NEVER split (their mods load arbitrary sizes). All three write
+  via `writeSplitFiles` and build the assembly in memory FIRST, so a failure leaves no half-written tree.
+- **Verification = a round-trip test** (`split-structure.test.ts`): decode the emitted pieces, rebuild
+  each at its slot origin (where the assembly places it, proven per edge), and assert every non-seam cell
+  + each seam's `final_state` matches the source — local proof of reassembly without launching Minecraft.
+- **Add an export path / worldgen field:** reuse `splitToJigsaw` + `writeSplitFiles`; new size checks go in
+  `validateSplit`, new piece/pool files in `splitFileSpecs` (+ a `JigsawSplitter.build` case).
+
 ### Block editor
 
 "Edit" (the FAB on the stage when a structure is open) opens an in-viewer block editor — the last-mile
@@ -1155,6 +1202,9 @@ writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re
   chest contents / sign text / structure-block data survive `.nbt`↔`.schem`↔`.litematic`. The arbitrary NBT
   fields serialise via `inferCompound` (exported from `nbt-encode.ts`). (Rendering doesn't need them — block
   entities draw from the block NAME — so the import/render path ignores them; they ride the convert path.)
+  **Entities** (armor stands, item frames, mobs) ride along the same way: `RawStructure.entities`
+  ({pos, blockPos, nbt}) is read by `readAuthoring`/`readRaw` and written back on a `.nbt` write, so a
+  format conversion — and the jigsaw split (which partitions them per piece) — no longer drops them.
 
 ### Updates
 

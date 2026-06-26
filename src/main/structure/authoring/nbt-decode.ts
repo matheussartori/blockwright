@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import * as nbt from 'prismarine-nbt';
 import { isAir } from './palette';
-import type { AuthoringBlock, AuthoringPaletteEntry, AuthoringStructure } from './types';
+import type { AuthoringBlock, AuthoringEntity, AuthoringPaletteEntry, AuthoringStructure } from './types';
 import { DEFAULT_DATA_VERSION } from '../mc-data-version';
 
 /** Read an existing `.nbt` into authoring JSON. Air cells are dropped (the
@@ -20,6 +20,7 @@ export async function readAuthoring(filePath: string): Promise<AuthoringStructur
     size?: number[];
     palette?: { Name: string; Properties?: Record<string, string | number> }[];
     blocks?: { state: number; pos: number[]; nbt?: Record<string, unknown> }[];
+    entities?: { pos?: number[]; blockPos?: number[]; nbt?: Record<string, unknown> }[];
   };
   const palette: AuthoringPaletteEntry[] = (root.palette ?? []).map((p) => {
     const out: AuthoringPaletteEntry = { Name: p.Name };
@@ -37,10 +38,20 @@ export async function readAuthoring(filePath: string): Promise<AuthoringStructur
       pos: b.pos as [number, number, number],
       ...(b.nbt && Object.keys(b.nbt).length > 0 ? { nbt: b.nbt } : {}),
     }));
+  // Entities (armor stands, item frames, mobs) carry a precise `pos` + the `blockPos` they
+  // sit in; kept so format conversions / the jigsaw split don't silently drop them.
+  const entities: AuthoringEntity[] = (root.entities ?? [])
+    .filter((e) => Array.isArray(e.pos) && Array.isArray(e.blockPos))
+    .map((e) => ({
+      pos: e.pos as [number, number, number],
+      blockPos: e.blockPos as [number, number, number],
+      ...(e.nbt && Object.keys(e.nbt).length > 0 ? { nbt: e.nbt } : {}),
+    }));
   return {
     DataVersion: root.DataVersion ?? DEFAULT_DATA_VERSION,
     size: (root.size ?? [0, 0, 0]) as [number, number, number],
     palette,
     blocks,
+    ...(entities.length > 0 ? { entities } : {}),
   };
 }

@@ -23,12 +23,22 @@ export interface RawBlockEntity {
   nbt: Record<string, unknown>;
 }
 
+/** A structure entity (armor stand, item frame, mob, …): a precise `pos` plus the `blockPos`
+ *  it sits in (used to partition entities by piece on a split) and its raw NBT. */
+export interface RawEntity {
+  pos: [number, number, number];
+  blockPos: [number, number, number];
+  nbt: Record<string, unknown>;
+}
+
 export interface RawStructure {
   size: [number, number, number];
   palette: RawPaletteEntry[];
   blocks: RawBlock[];
   /** Block-entity data preserved through conversions (absent = none carried). */
   blockEntities?: RawBlockEntity[];
+  /** Entities preserved through conversions (absent = none carried). */
+  entities?: RawEntity[];
 }
 
 /** Drop the given keys from a plain object (the BE id/position live separately). */

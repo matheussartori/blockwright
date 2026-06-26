@@ -63,6 +63,10 @@ refines through an emit → render → review loop — previewed live in the vie
 - **Mod workspace support** — render modded structures with their own textures, and **export** a
   structure into a workspace as a version-correct `.nbt` plus the worldgen JSON (jigsaw structure /
   template pool / structure set / biome tag) that makes it spawn in-world
+- **Oversized structures auto-split to jigsaw** — a build bigger than the Structure Block limit (48³,
+  or 32³ pre-1.16) is cut into a jigsaw assembly that reassembles voxel-perfectly in-world, so it loads
+  despite the limit. **Export to World** drops a ready-to-run datapack straight into a save and hands you
+  the `/place` command
 - **Structure library** — every generated build is saved to its own folder (latest `.nbt`, kept
   versions, and a generation log), revealed from the chat's build card
 - **Floor-plan editing** — define named vertical levels, highlighted as bands in the viewer, that ride
@@ -214,6 +218,18 @@ on **Generate worldgen files** to also write the four JSON files that make Minec
 **structure** definition, a **template pool**, a **structure set**, and a biome tag. Pick how it sits on
 the terrain, how often it spawns, and which biomes (the dialog reads your mod's own biomes), then see
 every file — and any problems (an empty biome list, `separation ≥ spacing`, overwrites) — before writing.
+
+If a structure is larger than the Structure Block size limit (48³, or 32³ before 1.16 — configurable in
+**Settings ▸ Viewer ▸ Structures**), it can't load as one file, so every export instead cuts it into a
+**jigsaw assembly**: a grid of pieces (each within the limit) plus the worldgen JSON that reassembles them
+voxel-perfectly in-world. The export dialog shows the piece count up front.
+
+### Exporting into a world
+
+**File ▸ Export to World…** installs the build straight into a Minecraft save as a ready-to-run datapack
+(`<save>/datapacks/<name>/`) and shows you the exact command to spawn it (`/place jigsaw …` for a split
+build, `/place template …` for a single one), with a one-click copy. Run `/reload` in the world and paste
+it — no manual file shuffling.
 
 ## Development
 
