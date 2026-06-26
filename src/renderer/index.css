@@ -689,12 +689,15 @@ body {
   max-height: calc(100% - 24px);
   font-size: 12px;
   color: var(--text);
-  background: var(--panel-strong);
+  /* Frosted but readable: mostly the opaque raised surface, kept slightly
+     translucent so the blurred backdrop still shows through. The thin
+     `--panel-strong` token alone left text unreadable over a busy build. */
+  background: color-mix(in srgb, var(--elevated) 88%, transparent);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
   overflow: hidden;
 }
 .bw-window-head {
