@@ -288,34 +288,78 @@ export const graveyard: SurroundingsModule = {
       }
     };
 
-    // --- Headstone rows flanking the approach (the spacious front grounds) -------------
-    // Bands either side of the central path, in front of the transept and behind it.
-    const rowZs: number[] = [];
-    for (let z = b.z0 + 3; z <= hz0 - 3; z += 3) if (z !== crossZ && Math.abs(z - crossZ) > 1) rowZs.push(z);
-    for (const gz of rowZs) {
-      for (let gx = b.x0 + 3; gx <= b.x1 - 3; gx += 2) {
-        if (Math.abs(gx - cx) <= 2) continue; // keep the path clear
-        if (rnd() < 0.7) addGrave(gx, gz);
+    /** A bare dead tree: a short leafless oak trunk with the odd clinging leaf — gnarled
+     *  cemetery growth that breaks up the lawn without the weeping tree's bulk. */
+    const addDeadTree = (tx: number, tz: number): void => {
+      if (!free(tx, tz) || outOfYard(tx, tz)) return;
+      const th = Math.min(2 + Math.floor(rnd() * 3), b.y1 - gy - 1);
+      if (th < 2) return;
+      mark(tx, tz);
+      ops.push({ op: 'fill', from: [tx, gy + 1, tz], to: [tx, clampY(gy + th), tz], state: trunk });
+      if (rnd() < 0.6) ops.push({ op: 'block', pos: [tx, clampY(gy + th + 1), tz], state: leaf });
+      if (rnd() < 0.4) ops.push({ op: 'block', pos: [tx, clampY(gy + th), tz], state: leaf });
+    };
+
+    /** A churchyard lamp post: a cobble-wall column carrying a soul lantern. */
+    const addLampPost = (px: number, pz: number): void => {
+      if (!free(px, pz) || outOfYard(px, pz)) return;
+      mark(px, pz);
+      ops.push({ op: 'fill', from: [px, gy + 1, pz], to: [px, clampY(gy + 2), pz], state: cap });
+      ops.push({ op: 'block', pos: [px, clampY(gy + 3), pz], state: lantern });
+    };
+
+    // --- Focal features spread across the WHOLE plot ----------------------------------
+    // Split the ring into quadrants + side flanks and seed a varied focal feature into
+    // each that fits — a weeping tree, a mausoleum, a ruined colonnade, a rubble pile, a
+    // dead-tree-and-lamp cluster — so the grounds read alive everywhere, not just front.
+    const cz = Math.floor((hz0 + hz1) / 2); // house mid-z, to split the side flanks
+    const regions: Rect[] = [
+      { x0: b.x0 + 2, x1: cx - 3, z0: b.z0 + 2, z1: hz0 - 2 }, // front-left
+      { x0: cx + 3, x1: b.x1 - 2, z0: b.z0 + 2, z1: hz0 - 2 }, // front-right
+      { x0: b.x0 + 2, x1: cx - 3, z0: hz1 + 2, z1: b.z1 - 2 }, // back-left
+      { x0: cx + 3, x1: b.x1 - 2, z0: hz1 + 2, z1: b.z1 - 2 }, // back-right
+      { x0: b.x0 + 2, x1: hx0 - 2, z0: hz0, z1: cz },          // left-front flank
+      { x0: b.x0 + 2, x1: hx0 - 2, z0: cz + 1, z1: hz1 },      // left-back flank
+      { x0: hx1 + 2, x1: b.x1 - 2, z0: hz0, z1: cz },          // right-front flank
+      { x0: hx1 + 2, x1: b.x1 - 2, z0: cz + 1, z1: hz1 },      // right-back flank
+    ].filter((r) => fitsRect(r, 3, 3));
+    let trees = 0;
+    const MAX_TREES = 2;
+    for (const r of regions) {
+      const pick = rnd();
+      if (pick < 0.26 && trees < MAX_TREES && fitsRect(r, 5, 5)) {
+        addTree(midX(r), midZ(r)); trees++;
+      } else if (pick < 0.46 && fitsRect(r, 4, 4) && !outOfYard(r.x0 + 1, r.z0 + 1)) {
+        addCrypt({ x0: r.x0 + 1, x1: r.x0 + 1, z0: r.z0 + 1, z1: r.z0 + 1 });
+      } else if (pick < 0.68 && fitsRect(r, 3, 4)) {
+        const axis = r.x1 - r.x0 >= r.z1 - r.z0 ? 'x' : 'z';
+        addColonnade(r, axis);
+      } else if (pick < 0.85) {
+        addRubble(midX(r), midZ(r));
+      } else {
+        addDeadTree(midX(r), midZ(r));
+        if (fitsRect(r, 3, 3)) addLampPost(midX(r) + 2 <= r.x1 ? midX(r) + 2 : midX(r), midZ(r));
       }
     }
 
-    // --- The weeping tree: in one front quadrant, off the central axis -----------------
-    const treeFront: Rect = { x0: b.x0 + 4, x1: cx - 4, z0: b.z0 + 4, z1: crossZ - 2 };
-    if (fitsRect(treeFront, 5, 5)) addTree(midX(treeFront), midZ(treeFront));
+    // --- Graves scattered through the ENTIRE cemetery (every strip, seeded) ------------
+    // No longer front-only rows: a loose grid over all four ring strips, seeded so the
+    // headstones speckle the whole plot. Density leans up near the approach (front).
+    for (const s of strips) {
+      for (let gx = s.x0 + 1; gx <= s.x1 - 1; gx += 2) {
+        if (Math.abs(gx - cx) <= 1) continue; // keep the central path clear
+        for (let gz = s.z0 + 1; gz <= s.z1 - 1; gz += 2) {
+          if (gz === crossZ || Math.abs(gz - crossZ) <= 1) continue; // clear the transept
+          const front = gz <= hz0; // the great approach is densest
+          if (rnd() < (front ? 0.5 : 0.34)) addGrave(gx, gz);
+        }
+      }
+    }
 
-    // --- A ruined colonnade down the opposite front flank ------------------------------
-    const colon: Rect = { x0: cx + 4, x1: b.x1 - 3, z0: b.z0 + 4, z1: crossZ - 1 };
-    if (fitsRect(colon, 3, 4)) addColonnade({ ...colon, x0: midX(colon) - 1, x1: midX(colon) + 1 }, 'z');
-
-    // --- A crypt + rubble in the rear/side grounds -------------------------------------
-    const rearL: Rect = { x0: b.x0 + 2, x1: cx - 3, z0: hz1 + 2, z1: b.z1 - 2 };
-    const rearR: Rect = { x0: cx + 3, x1: b.x1 - 2, z0: hz1 + 2, z1: b.z1 - 2 };
-    if (fitsRect(rearR, 4, 4) && !outOfYard(rearR.x0, rearR.z0)) addCrypt({ x0: rearR.x0 + 1, x1: rearR.x0 + 1, z0: rearR.z0 + 1, z1: rearR.z0 + 1 });
-    if (fitsRect(rearL, 3, 3)) addRubble(midX(rearL), midZ(rearL));
-    // a second colonnade fragment + rubble behind the transept, front
-    const colon2: Rect = { x0: b.x0 + 3, x1: cx - 4, z0: crossZ + 2, z1: hz0 - 3 };
-    if (fitsRect(colon2, 3, 3)) addColonnade(colon2, 'x');
-    if (fitsRect(rearL, 3, 3)) addRubble(midX(rearL) + 2 <= rearL.x1 ? midX(rearL) + 2 : midX(rearL), midZ(rearL));
+    // --- A few lamp posts dotting the grounds for the eerie blue light -----------------
+    for (const r of regions) {
+      if (rnd() < 0.35) addLampPost(midX(r), midZ(r));
+    }
 
     // --- Overgrowth scatter: ferns, poppies and the odd leaf clump reclaiming the lawn -
     for (const s of strips) {

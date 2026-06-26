@@ -68,6 +68,29 @@ export function isSolidSupport(name: string | undefined): boolean {
   return true;
 }
 
+// Interior / functional furniture — blocks that belong INSIDE a finished room, never
+// embedded in the exterior structural skin (a wall/floor/roof). The model likes to plug
+// a seeded shell wall with a wall of bookshelves (the "biblioteca na parede" defect);
+// `preserveShell` uses this to restore the shell block underneath such furniture, so a
+// locked exterior cell can be re-coloured but never swapped for an interior fixture.
+const INTERIOR_SUFFIX = ['_bed', '_shulker_box'];
+const INTERIOR_IDS = new Set([
+  'bookshelf', 'chiseled_bookshelf',
+  'chest', 'trapped_chest', 'ender_chest', 'barrel', 'shulker_box',
+  'furnace', 'blast_furnace', 'smoker',
+  'crafting_table', 'cartography_table', 'fletching_table', 'smithing_table',
+  'loom', 'stonecutter', 'grindstone', 'lectern', 'jukebox', 'note_block',
+  'brewing_stand', 'enchanting_table', 'beacon', 'conduit', 'composter',
+  'cauldron', 'water_cauldron', 'lava_cauldron', 'powder_snow_cauldron',
+  'anvil', 'chipped_anvil', 'damaged_anvil', 'bell',
+  'decorated_pot', 'beehive', 'bee_nest', 'cake',
+]);
+
+/** Whether a block is interior/functional furniture that must never occupy an exterior
+ *  shell cell (consulted by `preserveShell`). */
+export const isInteriorFurniture = (id: string): boolean =>
+  INTERIOR_IDS.has(id) || INTERIOR_SUFFIX.some((s) => id.endsWith(s));
+
 /** Wall-mounted fixtures, split by how we repair an unsupported one: a `torch` can
  *  be re-anchored to an adjacent solid wall (cheap, orientation-agnostic); `attach`
  *  blocks (sign/banner/ladder) can't be re-anchored without changing what they show,

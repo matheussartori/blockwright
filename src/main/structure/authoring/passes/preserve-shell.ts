@@ -11,10 +11,17 @@
 //   leave it. So the model may recolor, glaze and furnish freely, but cannot delete the
 //   floor, roof, walls or tower.
 //
+//   ONE exception to "leave any solid block": INTERIOR FURNITURE (a bookshelf, chest,
+//   furnace, …) is never legitimate exterior skin — the model plugs a seeded wall with a
+//   wall of bookshelves (the "biblioteca na parede" defect: structural walls swapped for
+//   interiors). Such a cell is RESTORED to its shell block, so the exterior stays the
+//   building material while real furniture lives in the interior cells (which aren't locked).
+//
 // Runs FIRST in the pipeline (before rebuildStairwells), so the floor/roof are whole
 // before circulation cuts its stair opening and the chimney pass clears its flue.
 import { posKey } from '../geometry';
-import { isAir, makeIntern } from '../palette';
+import { bareId, isAir, makeIntern } from '../palette';
+import { isInteriorFurniture } from './placement-rules';
 import type { Pass } from './types';
 
 export const preserveShell: Pass = (blocks, palette, ctx) => {
@@ -30,6 +37,8 @@ export const preserveShell: Pass = (blocks, palette, ctx) => {
 
   const out = blocks.slice();
   const intern = makeIntern(palette);
+  const isFurnitureIdx = (idx: number): boolean =>
+    isInteriorFurniture(bareId(palette[idx]?.Name ?? 'minecraft:air'));
   let restored = 0;
   for (const c of cells) {
     const [x, y, z] = c.pos;
@@ -37,7 +46,9 @@ export const preserveShell: Pass = (blocks, palette, ctx) => {
     if (isAir(c.entry.Name)) continue; // only solid shell geometry is protected
     const k = posKey(x, y, z);
     const idx = at.get(k);
-    if (idx !== undefined && !isAirIdx(out[idx].state)) continue; // model kept/redecorated it
+    // Keep the model's block only if it's a real solid that isn't interior furniture —
+    // a bookshelf/chest/furnace embedded in the exterior skin is restored to the shell.
+    if (idx !== undefined && !isAirIdx(out[idx].state) && !isFurnitureIdx(out[idx].state)) continue;
     const state = intern(c.entry);
     if (idx === undefined) {
       out.push({ state, pos: [x, y, z] });
@@ -49,7 +60,7 @@ export const preserveShell: Pass = (blocks, palette, ctx) => {
   }
 
   const fixes = restored
-    ? [`restored ${restored} deleted shell block(s) the build must keep (floor/roof/walls/tower)`]
+    ? [`restored ${restored} shell block(s) the build must keep (floor/roof/walls/tower) that were deleted or swapped for interior furniture`]
     : [];
   return { blocks: out, palette, fixes };
 };

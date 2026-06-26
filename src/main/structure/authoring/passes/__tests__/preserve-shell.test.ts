@@ -7,6 +7,7 @@ import type { AuthoringBlock, AuthoringPaletteEntry } from '../../types';
 const AIR: AuthoringPaletteEntry = { Name: 'minecraft:air' };
 const STONE: AuthoringPaletteEntry = { Name: 'minecraft:stone' };
 const PLANKS: AuthoringPaletteEntry = { Name: 'minecraft:oak_planks' };
+const BOOKSHELF: AuthoringPaletteEntry = { Name: 'minecraft:bookshelf' };
 
 /** A 2×1×2 stone floor at y=0 — the protected shell deck. */
 const floorCells: ShellLockCell[] = [
@@ -32,7 +33,7 @@ describe('preserveShell', () => {
       expect(b).toBeTruthy();
       expect(r.palette[b!.state].Name).toBe('minecraft:stone');
     }
-    expect(r.fixes?.[0]).toMatch(/restored 4 deleted shell/);
+    expect(r.fixes?.[0]).toMatch(/restored 4 shell block/);
   });
 
   it('keeps a cell the model redecorated (solid → different solid)', () => {
@@ -43,7 +44,18 @@ describe('preserveShell', () => {
     const redecorated = r.blocks.find((b) => b.pos[0] === 0 && b.pos[1] === 0 && b.pos[2] === 0);
     expect(r.palette[redecorated!.state].Name).toBe('minecraft:oak_planks'); // kept
     // The other three deleted cells are restored.
-    expect(r.fixes?.[0]).toMatch(/restored 3 deleted shell/);
+    expect(r.fixes?.[0]).toMatch(/restored 3 shell block/);
+  });
+
+  it('restores a shell cell the model plugged with interior furniture (bookshelf)', () => {
+    // The model walled a protected floor cell with a bookshelf — that is interior
+    // furniture, never legitimate exterior skin, so it is restored to the shell block.
+    const palette = [AIR, BOOKSHELF];
+    const blocks: AuthoringBlock[] = [{ state: 1, pos: [0, 0, 0] }];
+    const r = preserveShell(blocks, palette, ctx(floorCells));
+    const restored = r.blocks.find((b) => b.pos[0] === 0 && b.pos[1] === 0 && b.pos[2] === 0);
+    expect(r.palette[restored!.state].Name).toBe('minecraft:stone'); // shell restored
+    expect(r.fixes?.[0]).toMatch(/interior furniture/);
   });
 
   it('restores a cell the model explicitly aired out (a hole)', () => {

@@ -93,7 +93,7 @@ export const fixPlacement: Pass = (blocks, palette, ctx) => {
   let removedTorches = 0, removedCandles = 0, removedGround = 0, removedHeads = 0;
   let reanchoredTorches = 0, removedWall = 0;
   let clearedChestTops = 0, openedDoorways = 0, seatedSlabs = 0;
-  let removedOrphanDoors = 0, removedFloating = 0;
+  let removedOrphanDoors = 0, removedFloating = 0, removedCobwebs = 0;
 
   // Pre-compute the floating connecting blocks (railings/grilles with no solid
   // anchor) once, against the frozen geometry — a global, order-independent test.
@@ -134,6 +134,19 @@ export const fixPlacement: Pass = (blocks, palette, ctx) => {
     if (isDoorName(name)) {
       const mate = props.half === 'upper' ? at(x, y - 1, z) : at(x, y + 1, z);
       if (mate === undefined || !isDoorName(mate)) { removedOrphanDoors++; continue; }
+    }
+
+    // A cobweb floating in open air with no solid block on any of its 6 faces reads as a
+    // "teia voando" — strands hanging in the void. A real cobweb clings to a wall, ceiling
+    // or corner, so drop any with no solid neighbour to anchor it.
+    if (id === 'cobweb') {
+      const anchored =
+        isSolidSupport(at(x - 1, y, z)) || isSolidSupport(at(x + 1, y, z)) ||
+        isSolidSupport(at(x, y - 1, z)) || isSolidSupport(at(x, y + 1, z)) ||
+        isSolidSupport(at(x, y, z - 1)) || isSolidSupport(at(x, y, z + 1));
+      if (!anchored) { removedCobwebs++; continue; }
+      out.push(b);
+      continue;
     }
 
     if (isLantern(id)) {
@@ -301,6 +314,7 @@ export const fixPlacement: Pass = (blocks, palette, ctx) => {
   if (seatedSlabs) fixes.push(`seated ${plural(seatedSlabs, 'floating top-slab')} onto the block below (flipped to bottom)`);
   if (removedOrphanDoors) fixes.push(`removed ${plural(removedOrphanDoors, 'orphan door half')} with no matching half (a door floating in mid-air, or a single-leaf "half door" used as decoration)`);
   if (removedFloating) fixes.push(`removed ${plural(removedFloating, 'floating pane/bar/fence/wall')} with no solid support (e.g. a railing hovering over the roof)`);
+  if (removedCobwebs) fixes.push(`removed ${plural(removedCobwebs, 'floating cobweb')} with no solid block to cling to`);
 
   const kept = carve.size ? out.filter((b) => !carve.has(posKey(...b.pos))) : out;
   return { blocks: kept, palette: outPalette, fixes };
