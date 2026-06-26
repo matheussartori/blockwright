@@ -16,8 +16,9 @@ import { plannerStore } from '../../state/planner';
 import { documentsStore } from '../../state/documents';
 import { windowsStore } from '../../state/windows';
 import { runGeneration } from '../../state/generation';
-import { usePlanner, useT, useLocale, useActiveDoc } from '../../hooks/useStores';
+import { usePlanner, useT, useLocale, useActiveDoc, useApp } from '../../hooks/useStores';
 import { api } from '../../api';
+import { Segmented } from '../ui/Segmented';
 import {
   basementAreaOf,
   buildBrief,
@@ -47,7 +48,7 @@ import {
 import type { SurroundSizing } from '@/shared/domain/surroundings';
 import { DetailsSection } from './DetailsSection';
 import { ATTIC_COLOR, BASEMENT_COLOR, BuildScalePreview, PLAYER_H } from './BuildScalePreview';
-import type { GenerationCatalog } from '@/shared/types';
+import type { GenerationCatalog, ModBlockScope } from '@/shared/types';
 
 /** The shared planner UI, rendered inline (new build) or as an overlay (advanced edit). */
 function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => void }) {
@@ -59,10 +60,35 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
   const isEdit = !!activeDoc?.filePath; // an open .nbt → this build EDITS it
   const [catalog, setCatalog] = useState<GenerationCatalog | null>(null);
   const [available, setAvailable] = useState<boolean | null>(null);
+  // Mod-block generation scope, shown only when a mod workspace is open. WORKSPACE-level
+  // (persisted in the mod's dictionary.json), surfaced HERE so it's set where you generate
+  // — `prefer` makes the seeded shell + the build come out in the mod's own blocks.
+  const workspace = useApp((s) => s.workspace);
+  const modNamespace = workspace && workspace.namespace !== 'minecraft' ? workspace.namespace : null;
+  const [modScope, setModScope] = useState<ModBlockScope | null>(null);
 
   useEffect(() => {
     void api.generationCatalog().then(setCatalog);
   }, [locale]);
+
+  useEffect(() => {
+    if (!modNamespace) {
+      setModScope(null);
+      return;
+    }
+    let alive = true;
+    void api.getDictionary().then((d) => {
+      if (alive) setModScope(d?.scope ?? 'mix');
+    });
+    return () => {
+      alive = false;
+    };
+  }, [modNamespace, workspace?.root]);
+
+  const changeModScope = useCallback((scope: ModBlockScope) => {
+    setModScope(scope); // optimistic
+    void api.setDictionaryScope(scope);
+  }, []);
 
   useEffect(() => {
     void api.aiAvailable().then(setAvailable);
@@ -215,6 +241,30 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onAddRoom={onAddRoom}
             onRemoveRoom={onRemoveRoom}
           />
+          {modNamespace && modScope && (
+            <div className="planner-modblocks">
+              <span className="gen-chip-label">
+                {t('catalog.scopeTitle')} · <code>{modNamespace}</code>
+              </span>
+              <Segmented<ModBlockScope>
+                ariaLabel={t('catalog.scopeTitle')}
+                value={modScope}
+                onChange={changeModScope}
+                options={[
+                  { value: 'off', label: t('catalog.scopeOff') },
+                  { value: 'mix', label: t('catalog.scopeMix') },
+                  { value: 'prefer', label: t('catalog.scopePrefer') },
+                ]}
+              />
+              <span className="planner-modblocks-hint">
+                {modScope === 'off'
+                  ? t('catalog.scopeHintOff')
+                  : modScope === 'mix'
+                    ? t('catalog.scopeHintMix')
+                    : t('catalog.scopeHintPrefer')}
+              </span>
+            </div>
+          )}
           <div className="planner-notes">
             <span className="gen-chip-label">
               <PencilLine size={13} strokeWidth={1.8} aria-hidden />

@@ -151,6 +151,43 @@ describe('compose: structure types × decorations', () => {
     expect(seen.size).toBeGreaterThan(10); // a walkable room, not a buried niche
   });
 
+  it('modBlocks overrides a role’s material across the whole build (the mod-block prefer path)', () => {
+    // A recording intern captures every block name the build interns.
+    const record = () => {
+      const names = new Set<string>();
+      const seen = new Map<string, number>();
+      const intern: Intern = (name, props) => {
+        names.add(name);
+        const k = `${name}|${JSON.stringify(props ?? {})}`;
+        if (!seen.has(k)) seen.set(k, seen.size);
+        return seen.get(k)!;
+      };
+      return { intern, names };
+    };
+    const withMod = record();
+    composeStructure('classic', from, house, { seed: 1, modBlocks: { wall: 'mymod:ashen_bricks' } }, withMod.intern);
+    expect(withMod.names.has('mymod:ashen_bricks')).toBe(true); // the wall role resolved to the mod block
+
+    const without = record();
+    composeStructure('classic', from, house, { seed: 1 }, without.intern);
+    expect(without.names.has('mymod:ashen_bricks')).toBe(false); // not there without the override
+  });
+
+  it('modBlocks.roof sets the roof MATERIAL without disturbing the roof MODULE enum', () => {
+    const names = new Set<string>();
+    const intern: Intern = (name) => {
+      names.add(name);
+      return names.size;
+    };
+    const tall: [number, number, number] = [14, 16, 12];
+    // `roof: 'gable'` still selects the gable MODULE (no throw), while `modBlocks.roof`
+    // overrides only the stairs material — the two share the key 'roof' but never collide
+    // (the module value 'gable' has no ':', so it's not read as a material override).
+    const ops = composeStructure('classic', from, tall, { floors: 1, roof: 'gable', modBlocks: { roof: 'mymod:ashen_stairs' } }, intern);
+    expect(ops.filter((o) => o.op === 'roof')).toHaveLength(1);
+    expect(names.has('mymod:ashen_stairs')).toBe(true);
+  });
+
   it('accepts both `decoration` and the legacy `theme` param key', () => {
     const viaDecoration = composeStructure('classic', from, house, { decoration: 'cozy' }, stubIntern());
     const viaTheme = composeStructure('classic', from, house, { theme: 'cozy' }, stubIntern());

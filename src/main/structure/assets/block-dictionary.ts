@@ -19,6 +19,8 @@ import { ROLES } from '../domain/roles';
 import {
   type BlockstateJson,
   type GuideEntry,
+  type RoleCandidate,
+  buildRolePalette,
   formatModBlockSection,
   guessRole,
   humanize,
@@ -179,8 +181,39 @@ export function modBlockGuide(): string {
   if (scope === 'off') return '';
   // Non-ignored mod blocks → the model-facing entries (props + any authored role/desc);
   // the pure formatter sorts/caps/renders. '' when nothing is usable.
-  const entries: GuideEntry[] = buildEntries(ws)
-    .filter((e) => !e.note?.ignore)
-    .map((e) => ({ id: e.id, role: e.note?.role, description: e.note?.description, props: e.props }));
-  return formatModBlockSection(ws.namespace, scope, entries);
+  const usable = buildEntries(ws).filter((e) => !e.note?.ignore);
+  const entries: GuideEntry[] = usable.map((e) => ({ id: e.id, role: e.note?.role, description: e.note?.description, props: e.props }));
+  // The recommended role→block palette: the SAME map the seeded shell is compiled with
+  // (see modRoleOverrides), so the guide tells the model exactly which mod block plays
+  // each role and to keep using it for everything it adds.
+  const roles = buildRolePalette(roleCandidates(usable), scope === 'mix');
+  return formatModBlockSection(ws.namespace, scope, entries, roles);
+}
+
+/** The mod blocks as role candidates (annotated role + heuristic guess), stably ordered
+ *  so the role→block pick is deterministic — shared by the guide and the shell overrides. */
+function roleCandidates(entries: BlockDictEntry[]): RoleCandidate[] {
+  return [...entries]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((e) => ({ id: e.id, role: e.note?.role, guessed: e.suggestedRole ?? undefined }));
+}
+
+/** The role→mod-block override map that makes a FRESH build come out in the mod's blocks:
+ *  fed into the seeded shell's `template` op as `params.modBlocks`, so the code-built (and
+ *  then LOCKED) exterior compiles in mod materials with their custom blockstate props. `{}`
+ *  when there's no mod workspace, the scope is off, or nothing maps — so a vanilla run is
+ *  untouched. `mix` rides only the user-annotated roles in; `prefer` adds heuristic fills.
+ *  Reads the live workspace + scope from disk; called once per generation. */
+export function modRoleOverrides(): Record<string, string> {
+  try {
+    const ws = getActiveWorkspace();
+    if (!ws || ws.namespace === 'minecraft') return {};
+    const scope = readFile(ws).scope ?? DEFAULT_SCOPE;
+    if (scope === 'off') return {};
+    const usable = buildEntries(ws).filter((e) => !e.note?.ignore);
+    return buildRolePalette(roleCandidates(usable), scope === 'mix');
+  } catch {
+    // Best-effort: a catalog/asset hiccup just means a vanilla shell, never a failed build.
+    return {};
+  }
 }

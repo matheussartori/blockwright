@@ -84,11 +84,48 @@ export interface GuideEntry {
   props: Record<string, string[]>;
 }
 
+/** A mod block as a candidate for a semantic role: its id, the user-ANNOTATED role (if
+ *  any), and the heuristic role GUESS from its id. Feeds {@link buildRolePalette}. */
+export interface RoleCandidate {
+  id: string;
+  /** The user's explicit role annotation (authoritative). */
+  role?: string;
+  /** The heuristic role guessed from the id (a weaker, fallback signal). */
+  guessed?: string;
+}
+
+/**
+ * Build the role→mod-block override map that makes a build come out IN the mod's blocks:
+ * for each semantic role, the mod block to use as that role's material. A user-ANNOTATED
+ * role always wins; under `prefer` the heuristic guess then fills roles the user didn't
+ * annotate. Sparse by design — a role no mod block covers (e.g. `window`/`glass` a mod
+ * lacks) is omitted, so the build falls back to the vanilla decoration there.
+ *
+ * @param candidates - The non-ignored mod blocks, each with its annotated/guessed role.
+ *   Pass them in a STABLE order (sorted by id) so the pick is deterministic.
+ * @param annotatedOnly - true for `mix` scope (only user-annotated roles ride into the
+ *   shell); false for `prefer` (heuristic guesses fill the rest too).
+ * @returns role name → mod block id (the first candidate wins per role).
+ */
+export function buildRolePalette(candidates: RoleCandidate[], annotatedOnly = false): Record<string, string> {
+  const out: Record<string, string> = {};
+  // Annotated roles first — the user's curation is authoritative.
+  for (const c of candidates) if (c.role && !(c.role in out)) out[c.role] = c.id;
+  // Heuristic fill (prefer scope) — never overrides an annotated pick.
+  if (!annotatedOnly) for (const c of candidates) if (c.guessed && !(c.guessed in out)) out[c.guessed] = c.id;
+  return out;
+}
+
 /** The system-prompt "Mod blocks" section for a namespace: the non-ignored blocks (props +
  *  any authored role/description), steered by the scope. Returns '' when the scope is off or
  *  nothing is usable, so a vanilla run pays nothing. Annotated blocks sort first and the set
  *  is capped at {@link MAX_INJECTED}. Pure — the caller supplies the live entries. */
-export function formatModBlockSection(namespace: string, scope: ModBlockScope, entries: GuideEntry[]): string {
+export function formatModBlockSection(
+  namespace: string,
+  scope: ModBlockScope,
+  entries: GuideEntry[],
+  rolePalette: Record<string, string> = {},
+): string {
   if (scope === 'off' || !entries.length) return '';
   const annotated = (e: GuideEntry) => (e.description || e.role ? 1 : 0);
   const sorted = [...entries].sort((a, b) => annotated(b) - annotated(a) || a.id.localeCompare(b.id));
@@ -104,6 +141,20 @@ export function formatModBlockSection(namespace: string, scope: ModBlockScope, e
     return `- \`${e.id}\`${role}${desc}${props}`;
   });
 
+  // The recommended role→block PALETTE: the concrete material to use for each part. For a
+  // PREFER seeded build the code-built shell is ALREADY compiled in these blocks, so this
+  // tells the model what they are and to keep using them for everything it adds. The single
+  // biggest lever for the model actually using mod blocks (a flat list of ids it ignores).
+  const roleKeys = Object.keys(rolePalette).sort();
+  const palette = roleKeys.length
+    ? `\n\nPRIMARY PALETTE — use these as the default material for each part` +
+      `${scope === 'prefer' ? ' (the starting shell is ALREADY built in them)' : ''}:\n` +
+      roleKeys.map((r) => `- ${r}: \`${rolePalette[r]}\``).join('\n') +
+      `\nKeep using this palette for new geometry (interior, furniture, detailing) so the whole ` +
+      `build reads in the mod's materials; only drop to a vanilla block for a part the palette ` +
+      `above doesn't cover (e.g. windows/glass the mod lacks).`
+    : '';
+
   const steer =
     scope === 'prefer'
       ? `PREFER these mod blocks over vanilla equivalents for this build's main materials ` +
@@ -114,7 +165,7 @@ export function formatModBlockSection(namespace: string, scope: ModBlockScope, e
 
   return (
     `\n\n# Mod blocks — namespace \`${namespace}\`\n\n` +
-    `${steer}\n\n` +
+    `${steer}${palette}\n\n` +
     `RULES: for the \`${namespace}\` namespace use ONLY ids from this list (others don't exist and ` +
     `will be rejected); set each block's blockstate properties from its listed \`props\` (e.g. \`facing\`, ` +
     `\`axis\`, \`half\`) exactly as you would the vanilla equivalent; a block with a role behaves like that ` +

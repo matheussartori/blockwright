@@ -87,7 +87,15 @@ function makePalette(
   intern: Intern,
   preferDefaults = false,
 ): RolePalette {
+  // The mod-block override map (`params.modBlocks`, role→mod block id) wins over EVERYTHING
+  // — it's how a "prefer mod blocks" build comes out in the mod's materials. It rides as its
+  // own object (not role-keyed params) so it can't collide with the `roof` param (which is
+  // the roof-MODULE enum gable/hip/flat, not a material). Sparse: a role it omits falls
+  // through to the per-op override / decoration / defaults as usual.
+  const modBlocks = (raw.modBlocks ?? null) as Record<string, string> | null;
   const idOf = (role: Role): string => {
+    const mod = modBlocks?.[role];
+    if (typeof mod === 'string' && mod.includes(':')) return mod;
     const override = raw[role];
     if (typeof override === 'string' && override.includes(':')) return override;
     return preferDefaults

@@ -4617,6 +4617,21 @@ body.row-resizing {
   background: transparent;
   padding: 0;
 }
+.planner-modblocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.planner-modblocks code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+.planner-modblocks-hint {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
 .planner-notes {
   display: flex;
   flex-direction: column;

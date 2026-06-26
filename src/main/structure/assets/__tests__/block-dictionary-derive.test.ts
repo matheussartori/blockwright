@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_INJECTED,
+  buildRolePalette,
   formatModBlockSection,
   guessRole,
   humanize,
@@ -47,8 +48,42 @@ describe('propsFromState', () => {
   });
 });
 
+describe('buildRolePalette', () => {
+  it('maps annotated roles, first candidate per role winning', () => {
+    const map = buildRolePalette([
+      { id: 'm:a', role: 'wall' },
+      { id: 'm:b', role: 'wall' }, // loses — a came first
+      { id: 'm:c', role: 'floor' },
+    ]);
+    expect(map).toEqual({ wall: 'm:a', floor: 'm:c' });
+  });
+
+  it('prefer fills unannotated roles from the heuristic guess, never overriding an annotation', () => {
+    const map = buildRolePalette([
+      { id: 'm:planks', guessed: 'wall' },
+      { id: 'm:special', role: 'wall' }, // the annotation wins for wall…
+      { id: 'm:stairs', guessed: 'roof' }, // …and a guess fills roof
+    ]);
+    expect(map.wall).toBe('m:special');
+    expect(map.roof).toBe('m:stairs');
+  });
+
+  it('mix (annotatedOnly) ignores heuristic guesses entirely', () => {
+    const map = buildRolePalette([{ id: 'm:planks', guessed: 'wall' }, { id: 'm:x', role: 'floor' }], true);
+    expect(map).toEqual({ floor: 'm:x' });
+  });
+});
+
 describe('formatModBlockSection', () => {
   const entry = (id: string, extra: Partial<GuideEntry> = {}): GuideEntry => ({ id, props: {}, ...extra });
+
+  it('renders the primary role→block palette when one is supplied', () => {
+    const out = formatModBlockSection('mymod', 'prefer', [entry('mymod:a', { role: 'wall' })], { wall: 'mymod:a', roof: 'mymod:b' });
+    expect(out).toContain('PRIMARY PALETTE');
+    expect(out).toContain('- wall: `mymod:a`');
+    expect(out).toContain('- roof: `mymod:b`');
+    expect(out).toContain('starting shell is ALREADY built'); // the prefer-only note
+  });
 
   it('returns empty when scope is off', () => {
     expect(formatModBlockSection('mymod', 'off', [entry('mymod:a')])).toBe('');

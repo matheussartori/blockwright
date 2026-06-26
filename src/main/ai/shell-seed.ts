@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getStructureType, structureFloorPlan } from '../structure/domain';
+import { modRoleOverrides } from '../structure/assets/block-dictionary';
 import { readAuthoring, writeStructureFile } from '../structure/authoring';
 import { isAir } from '../structure/authoring/palette';
 import type { AuthoringStructure } from '../structure/authoring/types';
@@ -116,6 +117,14 @@ export async function buildShellSeed(opts: ShellSeedOptions, dir: string): Promi
   // The user's per-floor heights ride in as a raw array param; composeStructure sanitizes
   // them and the type's storey ladder lays its decks at exactly those heights.
   if (floorHeights?.length) params.floorHeights = floorHeights;
+  // MOD BLOCKS: when the active workspace's scope prefers/mixes its own blocks, the role→
+  // mod-block map rides in as `params.modBlocks` (its own object, so it never collides with
+  // the `roof` module param). `makePalette` consults it FIRST, so the code-built shell —
+  // which is then LOCKED — compiles in the mod's materials (with their custom blockstate
+  // props), instead of vanilla. Roles the mod doesn't cover (e.g. windows) stay vanilla.
+  // Empty for a vanilla run, so it's a no-op there.
+  const modBlocks = modRoleOverrides();
+  if (Object.keys(modBlocks).length) params.modBlocks = modBlocks;
   const authoring: AuthoringStructure = {
     DataVersion: DEFAULT_DATA_VERSION,
     size: [W, H, D],
