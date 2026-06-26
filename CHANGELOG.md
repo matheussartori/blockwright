@@ -4,6 +4,40 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-26
+
+### Added
+
+- Big structures that exceed the Structure Block size limit (48×48×48, or 32³
+  before 1.16) are now exported as a jigsaw assembly — cut into a grid of pieces
+  that reassemble voxel-perfectly in-world, so a structure that previously
+  wouldn't load now does. Every export path (mod workspace, Export As, Export to
+  World) handles it automatically.
+- Export to World — install the current build straight into a Minecraft save as
+  a ready-to-run datapack, with the exact `/place` command to spawn it (and a
+  one-click copy).
+- NBT size-limit setting (Settings ▸ Viewer ▸ Structures) — Auto (from the
+  workspace's Minecraft version), 48³ (1.16+) or 32³ (pre-1.16). Above the limit,
+  export switches to the jigsaw assembly.
+- Flatpak packaging for Linux.
+
+### Changed
+
+- Entities (armor stands, item frames, mobs) are now carried through format
+  conversions and the jigsaw split instead of being dropped.
+- Reworked the export internals (split engine, a shared file writer, and a
+  dedicated local-export module).
+- Dependency upgrades.
+
+### Fixed
+
+- Blank/white window on hosts without a usable GPU (VMs, headless, and some
+  Wayland/Flatpak setups) — the app now falls back to software rendering
+  (SwiftShader), and `BW_SOFTWARE_GL=1` forces it.
+- Block-editor edits now stay within the structure's declared size — no more
+  placing or extruding blocks out of bounds.
+- Text alignment in the in-app Guide.
+
 ## [1.2.0] - 2026-06-24
 
 ### Added
@@ -88,6 +122,7 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[1.3.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.3.0
 [1.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.2.0
 [1.1.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.1
 [1.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.1.0
