@@ -17,7 +17,7 @@ export const bedroom: AtticModule = {
     'cosy upstairs room — a bed under the slope, a rug and a side table — reached by a ladder ' +
     'from the top floor. Needs a pitched roof (it lives in the void underneath).',
   knowledge: 'nbt/modules/attic/bedroom.md',
-  appliesTo: ['classic'],
+  appliesTo: ['cottage'],
   incompatibleWith: ['flat'],
   // GENERIC: floor the void at its base (box.y0 = the wall top) in the finished floor
   // material + a standing lantern. The host carves the ladder step-off through this floor.

@@ -62,7 +62,7 @@ export const modern: SurroundingsModule = {
     'yards; it scales with the house, so a bigger villa gets a denser plot. The build box grows ' +
     'beyond the house shell to fit the ring.',
   knowledge: 'nbt/modules/surroundings/modern.md',
-  appliesTo: ['modern', 'tower'],
+  appliesTo: ['villa', 'tower'],
   // Previewed as the full modern villa + its grounds (the ring only reads in context).
   preview: { size: [27, 12, 29], params: { floors: 2 } },
   // A self-contained landscaping kit (wins over the decoration, like a basement's stone):

@@ -77,7 +77,7 @@ export interface BuildArgs {
    *  `insetHouseBox` so the house/yard split honours the user's chosen yard size, and into
    *  its `composeModule('surroundings', …)` delegation so the ring fills the same margins. */
   surroundSizing?: SurroundSizing;
-  /** The host structure-type id this module is being applied to (e.g. `'classic'`),
+  /** The host structure-type id this module is being applied to (e.g. `'cottage'`),
    *  when applicable. Lets a roof/basement module run GENERIC geometry for any host
    *  in `build()`, plus host-specific extras keyed by this id in `integrations`.
    *  Undefined for a structure type building itself, or a context-free preview. */
@@ -160,7 +160,7 @@ export interface StructureType extends ModuleMeta {
   /** The decoration id that IS this type's identity look (the modern villa's white-and-
    *  glass, the sakura's pink cherry) — auto-picked in the composer Details when this
    *  structure is chosen (the user can still change it). DECLARED HERE, on the module,
-   *  so the renderer never hardcodes a type→decoration map. Omit → no pairing (classic
+   *  so the renderer never hardcodes a type→decoration map. Omit → no pairing (a type with no `pairedDecoration`
    *  stays free on the default decoration). */
   pairedDecoration?: string;
   /** Marks an inherently articulated archetype (wings/towers/multi-volume massing) so
@@ -171,7 +171,7 @@ export interface StructureType extends ModuleMeta {
    *  (compiled via `build()` at the requested size + decoration) instead of being left
    *  fully free-form — the model keeps the exterior massing and only furnishes/details it.
    *  The model can't reliably invent a silhouette from prose (the modern villa: flat
-   *  roofs, stacked volumes, glass, pool), so EVERY house type opts in — the classic
+   *  roofs, stacked volumes, glass, pool), so EVERY house type opts in — the cottage
    *  included, whose variety comes from its own seeded shell (windows/corners/roof/
    *  chimney vary per seed), not from free-form. Free-form remains the path when no
    *  structure is selected at all (omit → no shell seed).

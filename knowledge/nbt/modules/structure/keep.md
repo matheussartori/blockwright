@@ -1,13 +1,13 @@
-# Structure module — Classic tower (keep)
+# Structure module — Keep
 
-> Loads when the user picks the **Classic** tower (the first member of the `tower`
+> Loads when the user picks the **Keep** (the first member of the `tower`
 > family). A FRESH build is SEEDED with a code-built shell (see the "STARTING SHELL"
 > preamble) — your job is to FINISH it, not reinvent it. The interior recipes live in
 > `06-decoration-and-interiors.md` / `11-furniture-and-interior-detailing.md` and the
 > furnishing-by-space rules in `14-furnishing-by-space.md`; this file is the
-> tower-specific playbook.
+> keep-specific playbook.
 
-## What a classic tower is
+## What a keep is
 
 A battlemented stone **keep**: a tall, square stone shaft of stacked narrow storeys,
 arrow-slit windows, a seated arched doorway on a stone plinth, a connected switchback

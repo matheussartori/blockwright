@@ -54,7 +54,7 @@ export interface ModuleMeta {
   /** Structure-type ids AND/OR group ids this module pairs with (e.g. a roof's
    *  `['house']` — the GROUP, so it's shared across every house-family member). A
    *  GROWING link: tag the whole family via its group, or narrow to specific structures
-   *  (e.g. `['classic']`, or `['classic', 'cabin']`). Drives the composer Details
+   *  (e.g. `['cottage']`, or `['cottage', 'villa']`). Drives the composer Details
    *  filtering + knowledge-guide gating (`moduleAppliesTo`, which resolves the host's
    *  group). Omit → applies to every structure (decorations, which cross with all types).
    *  The roof/basement/room contracts narrow this to REQUIRED, so those always declare

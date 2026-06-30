@@ -45,7 +45,7 @@ export const graveyard: SurroundingsModule = {
     '(around four times a normal yard) and front-heavy, so the manor reads as an estate. ' +
     'The build box grows well beyond the house shell to fit the cemetery.',
   knowledge: 'nbt/modules/surroundings/graveyard.md',
-  appliesTo: ['gothic', 'tower'],
+  appliesTo: ['manor', 'tower', 'church'],
   // Previewed as the gothic manor sunk into its cemetery (the ring only reads in context);
   // big enough that the inset still leaves a manor footprint inside the wide ring.
   preview: { size: [71, 16, 84], params: { decoration: 'gothic', floors: 2 } },

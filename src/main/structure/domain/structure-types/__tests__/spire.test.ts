@@ -1,4 +1,4 @@
-// The haunted-tower keep, QA'd against the defects the user hit on a TALL build (a 25×123×25
+// The spire keep, QA'd against the defects the user hit on a TALL build (a 25×123×25
 // spire is 5 storeys of ~22 blocks each — far too tall for a single 45° flight to fit a 25-wide
 // tower). Guards three fixes:
 //   1. Circulation: every storey is reachable on foot via the code-built switchback stair core,
@@ -16,15 +16,15 @@ function compileTower(size: [number, number, number], floors: number) {
   const corner: [number, number, number] = [size[0] - 1, size[1] - 1, size[2] - 1];
   // Thread the structure's authoritative floor plan, exactly as real generation does
   // (ai/emit-handler.ts), so every tapered upper storey is a recognised floor plane.
-  const planFloors = structureFloorPlan('haunted-tower', size, { floors, decoration: 'cursed' });
+  const planFloors = structureFloorPlan('spire', size, { floors, decoration: 'cursed' });
   return compileStructureReport(
     {
       DataVersion: 3955,
       size,
       palette: [{ Name: 'minecraft:air' }],
-      ops: [{ op: 'template', name: 'haunted-tower', from: [0, 0, 0], to: corner, params: { decoration: 'cursed', surroundings: 'none', floors } }],
+      ops: [{ op: 'template', name: 'spire', from: [0, 0, 0], to: corner, params: { decoration: 'cursed', surroundings: 'none', floors } }],
     },
-    { structureType: 'haunted-tower', floors: planFloors },
+    { structureType: 'spire', floors: planFloors },
   );
 }
 
@@ -68,10 +68,10 @@ function reachableFeet(blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[
   return seen;
 }
 
-describe('haunted-tower (tall build)', () => {
+describe('spire (tall build)', () => {
   const size: [number, number, number] = [25, 123, 25];
   const { report } = compileTower(size, 5);
-  const planes = structureFloorPlan('haunted-tower', size, { floors: 5, decoration: 'cursed' })
+  const planes = structureFloorPlan('spire', size, { floors: 5, decoration: 'cursed' })
     .map((f) => Math.min(f.from, f.to));
 
   it('connects every storey with a clean stair core and warns about none', () => {

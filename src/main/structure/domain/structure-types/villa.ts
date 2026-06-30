@@ -1,5 +1,5 @@
-// "modern" — a contemporary flat-roofed villa, the deliberate opposite of `house`. Where
-// the house is a single pitched-roof box, the modern type owns a MODERN MASSING: two
+// "villa" — a contemporary flat-roofed villa, the deliberate opposite of `cottage`. Where
+// the cottage is a single pitched-roof box, the villa type owns a MODERN MASSING: two
 // stacked, OFFSET cuboid volumes (the upper one set back to leave a roof terrace), FLAT
 // roofs with slim parapets, big GLASS curtain walls broken by dark accent mullions, and
 // glass terrace railings. It reads as white concrete + dark accent + glass — pair it with
@@ -96,9 +96,9 @@ function roofRail(ops: AuthoringOp[], x0: number, x1: number, z0: number, z1: nu
   ops.push({ op: 'line', from: [x1, y, z0], to: [x1, y, z1], state: rail });
 }
 
-export const modern: StructureType = {
-  id: 'modern',
-  label: 'Modern house',
+export const villa: StructureType = {
+  id: 'villa',
+  label: 'Modern villa',
   category: 'structure',
   group: 'house',
   description:
@@ -106,7 +106,7 @@ export const modern: StructureType = {
     'upper floor and roof terrace, floor-to-ceiling glass curtain walls broken by dark accent ' +
     'columns, and glass railings. The modern alternative to the pitched ' +
     'House — pair it with the Modern decoration for white-and-glass materials.',
-  knowledge: 'nbt/modules/structure/modern.md',
+  knowledge: 'nbt/modules/structure/villa.md',
   // Previewed (and seeded) under the modern decoration so the white/glass palette reads.
   preview: { size: [15, 13, 13], params: { decoration: 'modern' } },
   // NO chimney finalizer (modern houses have none); circulation is the always-on pass.

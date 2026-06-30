@@ -1,13 +1,13 @@
-# Structure module — Haunted tower (cursed spire)
+# Structure module — Spire
 
-> Loads when the user picks the **Haunted** tower (the second member of the `tower`
+> Loads when the user picks the **Spire** (the second member of the `tower`
 > family). A FRESH build is SEEDED with a code-built carved shell (see the "STARTING
 > SHELL" preamble) — your job is to FINISH it, not reinvent it. The interior recipes live
 > in `06-decoration-and-interiors.md` / `11-furniture-and-interior-detailing.md` and the
 > furnishing-by-space rules in `14-furnishing-by-space.md`; this file is the
-> haunted-tower-specific playbook.
+> spire-specific playbook.
 
-## What a haunted tower is
+## What a spire is
 
 A derelict gothic **spire** — the brooding monolith of the references. Its character is in
 the **carved silhouette**, not in sprawl: a battered, flared stone **plinth**; a vertically

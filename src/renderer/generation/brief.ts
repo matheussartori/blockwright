@@ -413,7 +413,7 @@ function seededRng(seed: number): () => number {
 /** Decorations whose mood is dark/occult — an unspecified floor of such a build should be
  *  programmed from the HORROR room family (ritual/dungeon/morgue/seance), not the everyday set. */
 const DARK_DECORATIONS = new Set(['haunted', 'cursed', 'gothic']);
-const DARK_STRUCTURES = new Set(['gothic', 'haunted-tower']);
+const DARK_STRUCTURES = new Set(['manor', 'spire']);
 
 /**
  * The per-floor rooms used to PROGRAM the build. When the user assigned rooms by hand they win

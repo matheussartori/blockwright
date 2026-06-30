@@ -55,7 +55,7 @@ export const garden: SurroundingsModule = {
     'every seed, so the plot is never a plain rectangle. The build box grows beyond ' +
     'the house shell to fit the yard.',
   knowledge: 'nbt/modules/surroundings/garden.md',
-  appliesTo: ['classic', 'farmhouse', 'sakura', 'gothic', 'tower'],
+  appliesTo: ['cottage', 'farmhouse', 'raised-cottage', 'manor', 'tower', 'church'],
   // Previewed as the classic house + its yard (the ring only reads in context).
   preview: { size: [27, 13, 27], params: { floors: 2 } },
   // A self-contained homestead kit (wins over the decoration, like a basement's stone):

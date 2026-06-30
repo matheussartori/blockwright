@@ -1,4 +1,4 @@
-// "classic" — the original house archetype (a member of the "house" group). A
+// "cottage" — the original house archetype (a member of the "house" group). A
 // storeyed home whose MASSING (the part the model is bad at) is owned
 // entirely by code: a real stack of levels (optional below-grade basement, N
 // above-ground storeys, an optional in-roof attic), a SINGLE pitched roof, a
@@ -49,9 +49,9 @@ function plan(b: Box, params: ParamValues, floorHeights?: number[], canPitch = t
   return { storeyCount, isFlat, slabYs: ladder.slabYs, wallTop };
 }
 
-export const classic: StructureType = {
-  id: 'classic',
-  label: 'Classic',
+export const cottage: StructureType = {
+  id: 'cottage',
+  label: 'Cottage',
   category: 'structure',
   group: 'house',
   description:
@@ -59,7 +59,7 @@ export const classic: StructureType = {
     'banded windows. Owns its full massing: an optional basement, 1–4 above-ground floors, ' +
     'an optional attic in the roof, a connected stair core, and an optional covered balcony. ' +
     'Decoration supplies the materials and (optionally) decay.',
-  knowledge: 'nbt/modules/structure/classic.md',
+  knowledge: 'nbt/modules/structure/cottage.md',
   preview: { size: [11, 13, 9], params: { floors: 2, attic: 'storage' } },
   // A single complete chimney — the house-only finalizer.
   finalize: ['chimney'],
@@ -74,11 +74,11 @@ export const classic: StructureType = {
     floors: { kind: 'int', default: 1, min: 1, max: 4, label: 'Floors' }, // above-ground storeys
     // The basement is the separate "Basement" module slot (category 'basement'), composed
     // CENTRALLY by composeStructure for EVERY type (it reserves the box bottom, lays the
-    // vault stack and ladders it to the ground) — so classic no longer owns burial here, and
+    // vault stack and ladders it to the ground) — so the cottage no longer owns burial here, and
     // a multi-level / enlarged basement works the same as for every other archetype.
     // Surfaced in Details as the separate "Attic" module select (category 'attic'), so it's
     // omitted from the house's own param controls — but kept here so the legacy
-    // `template name:'classic'` build path still resolves it. The value is the attic-module
+    // `template name:'cottage'` build path still resolves it. The value is the attic-module
     // id (storage/bedroom); the house delegates the loft geometry to that module.
     attic: {
       kind: 'enum', default: 'none', values: ['none', 'storage', 'bedroom'], label: 'Attic',
@@ -90,7 +90,7 @@ export const classic: StructureType = {
     },
     // Surfaced in Details as the separate "Roof" module select (category 'roof'), so
     // it's omitted from the house's own param controls — but kept here so the legacy
-    // `template name:'classic'` build path still resolves it.
+    // `template name:'cottage'` build path still resolves it.
     roof: {
       kind: 'enum', default: 'auto', values: ['auto', 'gable', 'hip', 'flat'], label: 'Roof',
       labels: { auto: 'Auto (varied)', gable: 'Gable', hip: 'Hip', flat: 'Flat' }, module: 'roof',

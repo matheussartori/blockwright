@@ -9,32 +9,37 @@ export const dataPtBR: Record<string, string> = {
   // --- structure families (groups) ------------------------------------------
   'group.house': 'Casa',
   'group.tower': 'Torre',
+  'group.church': 'Igreja',
   // --- room program families (groups) ---------------------------------------
   'group.general': 'Geral',
   'group.horror': 'Terror',
 
   // --- structure types ------------------------------------------------------
-  'mod.structure.classic.label': 'Clássica',
-  'mod.structure.classic.desc':
+  'mod.structure.cottage.label': 'Chalé',
+  'mod.structure.cottage.desc':
     'Uma casa de vários andares com telhado inclinado, pilares de canto emoldurados, uma porta central e janelas em faixa. Define toda a sua volumetria: porão opcional, 1–4 andares acima do solo, sótão opcional no telhado, um núcleo de escadas conectado e uma varanda coberta opcional. A decoração fornece os materiais e (opcionalmente) o desgaste.',
-  'mod.structure.modern.label': 'Casa moderna',
-  'mod.structure.modern.desc':
+  'mod.structure.villa.label': 'Villa moderna',
+  'mod.structure.villa.desc':
     'Uma vila contemporânea de telhado plano: volumes de concreto branco empilhados e deslocados, com andar superior recuado e terraço na cobertura, paredes-cortina de vidro do piso ao teto interrompidas por colunas escuras de destaque e guarda-corpos de vidro. A alternativa moderna à casa de telhado inclinado — combine com a decoração Moderna para materiais de branco e vidro.',
   'mod.structure.farmhouse.label': 'Fazenda',
   'mod.structure.farmhouse.desc':
     'Uma rústica casa de sítio: uma silhueta em L com telhado de duas águas cruzadas — nunca uma caixa — com uma varanda coberta e profunda sobre pilares de madeira e uma galeria superior na frente, um alpendre abrigado no canto, estrutura aparente de troncos escuros sobre uma base de pedra, um telhado escuro e íngreme de ardósia e uma chamine alta na empena. Espraiada, habitada, enraizada.',
-  'mod.structure.sakura.label': 'Casa Sakura',
-  'mod.structure.sakura.desc':
+  'mod.structure.raised-cottage.label': 'Chalé elevado',
+  'mod.structure.raised-cottage.desc':
     'Um chalé das cerejeiras erguido sobre um porão de tijolos de pedra visível: a entrada fica no andar principal elevado, alcançada por uma escada externa de pedra que sobe por baixo do andar superior em balanço. Revestimento de madeira de cerejeira em rosa suave, um telhado de duas águas rosa coroado por cascatas de flores, floreiras frondosas e uma sacada frontal superior. Romântica e primaveril.',
-  'mod.structure.gothic.label': 'Gótica',
-  'mod.structure.gothic.desc':
+  'mod.structure.manor.label': 'Solar',
+  'mod.structure.manor.desc':
     'Uma mansão gótica sombria: paredes enegrecidas de madeira e blackstone realçadas por cordões de pedra clara, um telhado íngreme de ardósia, uma torre central de fachada que se projeta à frente e se ergue acima da cumeeira até um remate pontiagudo, uma varanda frontal com balaustrada, uma mini torre de canto, uma ala-capela de vidro com altas janelas cinzas e heras pendendo dos beirais. Soturna, vertical e assimétrica — iluminada por almas e senhorial.',
-  'mod.structure.tower-classic.label': 'Clássica',
-  'mod.structure.tower-classic.desc':
+  'mod.structure.keep.label': 'Torre de menagem',
+  'mod.structure.keep.desc':
     'Uma torre de menagem de pedra com ameias: um alto eixo quadrado de andares estreitos empilhados com janelas em fresta, uma porta arqueada assente sobre um embasamento de pedra, um núcleo de escadas em ziguezague conectado e um parapeito ameado coroando um terraço de cobertura praticável. Define a sua própria coroa em código (sem opção de telhado); liga-se a todos os módulos de Porão, Arredores e Cômodo. A decoração fornece os materiais.',
-  'mod.structure.haunted-tower.label': 'Assombrada',
-  'mod.structure.haunted-tower.desc':
+  'mod.structure.spire.label': 'Agulha',
+  'mod.structure.spire.desc':
     'Um pináculo gótico em ruínas: um embasamento alargado, um eixo nervurado verticalmente que recua em degraus à medida que se ergue, braços de lanterna em gaiola pendurados por correntes, um rosto de caveira esculpido numa frente larga, uma porta gótica em ogiva sob uma cruz invertida luminosa, janelas em fresta iluminadas pela chama das almas, contrafortes de canto de altura plena rematados por pináculos acesos e uma coroa de ameias espinhada. O exterior esculpido cresce com a largura — uma torre larga fica densamente articulada, nunca uma caixa. Define a sua própria coroa em código (sem opção de telhado); liga-se a todos os módulos de Porão, Arredores e Cômodo. Melhor com a decoração Assombrada.',
+
+  'mod.structure.church.label': 'Igreja',
+  'mod.structure.church.desc':
+    'Um templo de nave longa coroado por um campanário frontal proeminente: um salão com contrafortes e altas janelas em arco sob um telhado íngreme de duas águas, com uma torre quadrada que se ergue acima da cumeeira até uma agulha escalonada rematada por uma cruz. Define o próprio telhado e a torre em código (sem opção de telhado). Combine com a decoração Capela para reboco branco sobre pedra, ou Castelo para uma catedral toda em pedra cinza.',
 
   // --- decorations ----------------------------------------------------------
   'mod.decoration.cozy.label': 'Aconchegante',
@@ -58,6 +63,9 @@ export const dataPtBR: Record<string, string> = {
   'mod.decoration.castle.label': 'Castelo',
   'mod.decoration.castle.desc':
     'Um visual de pedra lavrada e fortificada: tijolos de pedra cinza-claros sobre uma base de pedregulho, detalhes de pedra cinzelada, madeira escura de spruce e luz quente de lanternas. Alvenaria onde a Aconchegante é madeira. A pedra se desgasta para suas variantes com musgo e rachadas. O padrão da torre de menagem — combina com torres, muralhas e salões de pedra.',
+  'mod.decoration.chapel.label': 'Capela',
+  'mod.decoration.chapel.desc':
+    'Um visual sacro caiado de branco: paredes de reboco em quartzo liso e claro sobre cantos, molduras de janela e contrafortes de tijolos de pedra lavrada, coroadas por um telhado íngreme e escuro de telhas de deepslate com luz quente de lanterna. Reboco branco onde o Castelo é alvenaria nua — o padrão da igreja. Escolha Castelo para uma catedral toda em pedra cinza.',
   'mod.decoration.cursed.label': 'Amaldiçoada',
   'mod.decoration.cursed.desc':
     'A paleta da ruína gótica em pedra escura: um eixo de tijolos de blackstone realçado por cordões de pedra cinzelada e contrafortes de blackstone polido, fundações de pedregulho com musgo, vidro cinza encardido e a chama azul e fria das lanternas das almas. A contraparte em pedra da Assombrada — um monólito de blackstone em ruínas, não um chalé de madeira. A pedra se desgasta para suas variantes rachadas e com musgo, e ela se deteriora intensamente por padrão. Combine com a torre Assombrada; ideal para criptas, templos de culto e qualquer santuário de pedra amaldiçoado.',

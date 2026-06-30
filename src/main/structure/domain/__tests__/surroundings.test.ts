@@ -23,7 +23,7 @@ const m = surroundMargins('modern', SHELL[0], SHELL[2])!;
 const SIZE: [number, number, number] = [SHELL[0] + m.side * 2, SHELL[1], SHELL[2] + m.front + m.back];
 
 /** Expand a structure template at `size` to named blocks (+ compose warnings). */
-function expand(size: [number, number, number], params: Record<string, unknown>, name = 'modern') {
+function expand(size: [number, number, number], params: Record<string, unknown>, name = 'villa') {
   const authoring: AuthoringStructure = {
     DataVersion: 3955,
     size,
@@ -201,7 +201,7 @@ describe('garden surroundings geometry (template expansion)', () => {
   const GSHELL: [number, number, number] = [13, 13, 11];
   const g = surroundMargins('garden', GSHELL[0], GSHELL[2])!;
   const GSIZE: [number, number, number] = [GSHELL[0] + g.side * 2, GSHELL[1], GSHELL[2] + g.front + g.back];
-  const { at, warnings } = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 11 }, 'classic');
+  const { at, warnings } = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 11 }, 'cottage');
   const outer = box([0, 0, 0], [GSIZE[0] - 1, GSIZE[1] - 1, GSIZE[2] - 1]);
   const inner = insetHouseBox(outer, 'garden');
   const cx = Math.floor((GSIZE[0] - 1) / 2);
@@ -214,7 +214,7 @@ describe('garden surroundings geometry (template expansion)', () => {
   it('honours an explicit yard-size override end-to-end (bigger box, house still inset, no warnings)', () => {
     const sizing = { side: 12, front: 16, back: 12 };
     const big: [number, number, number] = [GSHELL[0] + sizing.side * 2, GSHELL[1], GSHELL[2] + sizing.front + sizing.back];
-    const r = expand(big, { surroundings: 'garden', surroundSizing: sizing, floors: 2, seed: 11 }, 'classic');
+    const r = expand(big, { surroundings: 'garden', surroundSizing: sizing, floors: 2, seed: 11 }, 'cottage');
     expect(r.warnings).toEqual([]);
     // The house is inset by the override margins, so the same shell sits inside the bigger box.
     const bigInner = insetHouseBox(box([0, 0, 0], [big[0] - 1, big[1] - 1, big[2] - 1]), 'garden', sizing);
@@ -245,7 +245,7 @@ describe('garden surroundings geometry (template expansion)', () => {
   });
 
   it('seeds vary the outline (two seeds disagree on some fence cells)', () => {
-    const other = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 12 }, 'classic');
+    const other = expand(GSIZE, { surroundings: 'garden', floors: 2, seed: 12 }, 'cottage');
     const fenceSet = (m: typeof at) => new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:oak_fence').map(([k]) => k));
     const a = fenceSet(at), b = fenceSet(other.at);
     expect([...a].some((k) => !b.has(k)) || [...b].some((k) => !a.has(k))).toBe(true);
@@ -291,7 +291,7 @@ describe('garden surroundings geometry (template expansion)', () => {
   });
 
   it('every garden host composes the yard with zero warnings', () => {
-    for (const host of ['farmhouse', 'sakura', 'gothic']) {
+    for (const host of ['farmhouse', 'raised-cottage', 'manor']) {
       const size: [number, number, number] = [15 + g.side * 2, 14, 13 + g.front + g.back];
       const r = expand(size, { surroundings: 'garden', floors: 2, seed: 5 }, host);
       expect(r.warnings, host).toEqual([]);
@@ -304,7 +304,7 @@ describe('graveyard surroundings geometry (template expansion)', () => {
   const YSHELL: [number, number, number] = [13, 15, 11];
   const y = surroundMargins('graveyard', YSHELL[0], YSHELL[2])!;
   const YSIZE: [number, number, number] = [YSHELL[0] + y.side * 2, YSHELL[1], YSHELL[2] + y.front + y.back];
-  const { at, warnings } = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 21 }, 'gothic');
+  const { at, warnings } = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 21 }, 'manor');
   const outer = box([0, 0, 0], [YSIZE[0] - 1, YSIZE[1] - 1, YSIZE[2] - 1]);
   const inner = insetHouseBox(outer, 'graveyard');
   const cx = Math.floor((YSIZE[0] - 1) / 2);
@@ -381,7 +381,7 @@ describe('graveyard surroundings geometry (template expansion)', () => {
   });
 
   it('seeds vary the layout (two seeds disagree on some grave/wall cells)', () => {
-    const other = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 22 }, 'gothic');
+    const other = expand(YSIZE, { surroundings: 'graveyard', floors: 2, seed: 22 }, 'manor');
     const set = (m: typeof at) =>
       new Set([...m.entries()].filter(([, c]) => c.name === 'minecraft:mossy_stone_bricks').map(([k]) => k));
     const a = set(at), b = set(other.at);
@@ -391,8 +391,8 @@ describe('graveyard surroundings geometry (template expansion)', () => {
 
 describe('the ring scales with the house (big-shell template expansion)', () => {
   it.each([
-    ['modern', 'modern', 25, 21],
-    ['garden', 'classic', 25, 21],
+    ['modern', 'villa', 25, 21],
+    ['garden', 'cottage', 25, 21],
   ] as const)('%s ring around a %s at 25×21 grows beyond the base and composes warning-free', (id, host, w, d) => {
     const gm = surroundMargins(id, w, d)!;
     expect(gm.side).toBeGreaterThan(SURROUND_SCALE[id].base.side);
@@ -416,11 +416,11 @@ describe('modern surroundings survives the compile pass pipeline', () => {
       DataVersion: 3955,
       size: SIZE,
       palette: [{ Name: 'minecraft:air' }],
-      ops: [{ op: 'template', name: 'modern', from: [0, 0, 0], to: [SIZE[0] - 1, SIZE[1] - 1, SIZE[2] - 1], params: { surroundings: 'modern', floors: 2, seed: 7 } }],
+      ops: [{ op: 'template', name: 'villa', from: [0, 0, 0], to: [SIZE[0] - 1, SIZE[1] - 1, SIZE[2] - 1], params: { surroundings: 'modern', floors: 2, seed: 7 } }],
     };
     const file = path.join(os.tmpdir(), `bw-surroundings-${Date.now()}.nbt`);
     try {
-      await writeStructureFile(authoring, file, { structureType: 'modern' });
+      await writeStructureFile(authoring, file, { structureType: 'villa' });
       const out = await readAuthoring(file);
       const names = new Map<number, string>();
       out.palette?.forEach((p, i) => names.set(i, p.Name));
@@ -440,11 +440,11 @@ describe('modern surroundings survives the compile pass pipeline', () => {
       DataVersion: 3955,
       size,
       palette: [{ Name: 'minecraft:air' }],
-      ops: [{ op: 'template', name: 'classic', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params: { surroundings: 'garden', floors: 2, seed: 11 } }],
+      ops: [{ op: 'template', name: 'cottage', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params: { surroundings: 'garden', floors: 2, seed: 11 } }],
     };
     const file = path.join(os.tmpdir(), `bw-garden-${Date.now()}.nbt`);
     try {
-      await writeStructureFile(authoring, file, { structureType: 'classic' });
+      await writeStructureFile(authoring, file, { structureType: 'cottage' });
       const out = await readAuthoring(file);
       const names = new Map<number, string>();
       out.palette?.forEach((p, i) => names.set(i, p.Name));

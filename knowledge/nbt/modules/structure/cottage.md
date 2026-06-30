@@ -1,12 +1,12 @@
-# Structure module — Classic house
+# Structure module — Cottage
 
-> Loads when the user picks the **Classic** house (a member of the `house` family). A
+> Loads when the user picks the **Cottage** (a member of the `house` family). A
 > FRESH build is SEEDED with a code-built shell (see the "STARTING SHELL" preamble) —
 > your job is to FINISH it, not reinvent it. Pairs by default with the **Cozy**
 > decoration. The interior recipes live in `06-decoration-and-interiors.md` /
-> `11-furniture-and-interior-detailing.md`; this file is the classic-specific playbook.
+> `11-furniture-and-interior-detailing.md`; this file is the cottage-specific playbook.
 
-## What a classic house is
+## What a cottage is
 
 A storeyed home with a single pitched roof, framed corner posts, banded symmetric
 windows, a centred front door on a stone plinth, and one complete chimney. Its character
@@ -30,7 +30,7 @@ in the shell you receive.
   glass — at any half-buried clerestory) and the **recessed covered balcony**.
 
 Do NOT re-roof it, strip the corner posts, delete the stair core, open extra holes in the
-shell, or add a second chimney — the massing IS the classic house.
+shell, or add a second chimney — the massing IS the cottage.
 
 ## How to FINISH it
 
@@ -47,7 +47,7 @@ shell, or add a second chimney — the massing IS the classic house.
    on a corner — so the house sits in a place rather than floating. (A picked Garden
    surroundings ring is part of the shell — only add small outdoor detail on it.)
 
-## Common classic-house mistakes
+## Common cottage mistakes
 
 - Re-emitting the exterior "improved" — a furniture-only patch is the right move for
   detail passes; the shell is restored if deleted, so fighting it just wastes rounds.

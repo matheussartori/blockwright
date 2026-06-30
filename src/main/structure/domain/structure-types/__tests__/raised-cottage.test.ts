@@ -13,7 +13,7 @@ function grid(size: [number, number, number], params: Record<string, unknown>) {
     DataVersion: 3955,
     size,
     palette: [{ Name: 'minecraft:air' }],
-    ops: [{ op: 'template', name: 'sakura', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params }],
+    ops: [{ op: 'template', name: 'raised-cottage', from: [0, 0, 0], to: [size[0] - 1, size[1] - 1, size[2] - 1], params }],
   };
   const resolved = resolveBlocks(authoring);
   const cells = new Map<string, string>();

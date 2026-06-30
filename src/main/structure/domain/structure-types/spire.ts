@@ -1,4 +1,4 @@
-// "haunted-tower" — the second member of the `tower` group: a derelict gothic SPIRE, the
+// "spire" — the second member of the `tower` group: a derelict gothic SPIRE, the
 // brooding monolith from the references. The fix for "the tower keeps coming out as a plain
 // dark cube": the silhouette that makes it read as haunted — a battered flared plinth, a
 // vertically RIBBED shaft (organ-pipe buttress pilasters) that STEPS inward in tiers as it
@@ -61,9 +61,9 @@ function makeInset(b: Box, floors: number) {
   return (f: number): number => Math.min(hardMax, baseInset + Math.round((taper - baseInset) * (f / span) ** 2));
 }
 
-export const hauntedTower: StructureType = {
-  id: 'haunted-tower',
-  label: 'Haunted',
+export const spire: StructureType = {
+  id: 'spire',
+  label: 'Spire',
   category: 'structure',
   group: 'tower',
   description:
@@ -74,7 +74,7 @@ export const hauntedTower: StructureType = {
     'crenellated crown. The carved exterior scales with width — a fat tower is densely ' +
     'articulated, never a box. Owns its crown in code (no Roof slot); links to every Basement, ' +
     'Surroundings and Room module. Best with the Haunted decoration.',
-  knowledge: 'nbt/modules/structure/haunted-tower.md',
+  knowledge: 'nbt/modules/structure/spire.md',
   preview: { size: [15, 38, 15], params: { decoration: 'cursed', floors: 5 } },
   // A tall spire reads with one cramped program per level, but a fat tower can take two.
   maxRoomsPerFloor: 2,

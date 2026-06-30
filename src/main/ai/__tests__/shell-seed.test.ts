@@ -13,7 +13,7 @@ describe('buildShellSeed', () => {
     const seeded = structureTypeIds().filter((id) => getStructureType(id)?.seedShell);
     // EVERY house type seeds now — the classic included (its variety is in the shell's
     // own seed, not in free-form).
-    expect(seeded).toEqual(expect.arrayContaining(['classic', 'modern', 'farmhouse', 'sakura', 'gothic']));
+    expect(seeded).toEqual(expect.arrayContaining(['cottage', 'villa', 'farmhouse', 'raised-cottage', 'manor', 'church']));
     for (const id of seeded) {
       const shell = await buildShellSeed(
         { structureType: id, size: [15, 14, 13] },

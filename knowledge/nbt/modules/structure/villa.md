@@ -1,10 +1,10 @@
-# Structure module — Modern house
+# Structure module — Modern villa
 
-> Loads when the user picks **Modern house**. A FRESH modern build is SEEDED with a
+> Loads when the user picks the **Modern villa**. A FRESH modern build is SEEDED with a
 > code-built exterior shell (see the "STARTING SHELL" preamble) — your job is to FINISH
 > it, not reinvent it. This guide is about the modern look so your additions match.
 
-## What a modern house is
+## What a modern villa is
 
 A sleek contemporary villa: **stacked, offset white-concrete/quartz volumes** with **FLAT
 roofs** and slim parapets, **floor-to-ceiling glass curtain walls** broken by dark accent

@@ -210,7 +210,7 @@ describe('cross-type INVARIANTS: every house × roof × basement ships a real, c
   it('a pick that genuinely cannot fit WARNS instead of vanishing (the old silent-skip defect)', () => {
     // A box too short to bury a crypt below the gothic manor → the central composer
     // refuses it loudly, with actionable text.
-    const { warnings } = expand('gothic', [15, 9, 13], { floors: 1, basement: 'crypt', seed: 1 });
+    const { warnings } = expand('manor', [15, 9, 13], { floors: 1, basement: 'crypt', seed: 1 });
     expect(warnings.join(' ')).toMatch(/basement|crypt/i);
   });
 });

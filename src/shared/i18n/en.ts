@@ -389,7 +389,7 @@ export const en = {
   'guide.generate.title': 'Generating a build',
   'guide.generate.lead': 'Click Generate on the home screen (or open a new tab) to start a build. The Details-first screen lets you shape it, then one click builds.',
   'guide.generate.s1t': 'Pick a structure.',
-  'guide.generate.s1': 'Choose a house type (Classic, Modern, Farmhouse, Sakura, Gothic). Its options cascade in below.',
+  'guide.generate.s1': 'Choose a structure (Cottage, Modern villa, Manor, Keep, Spire, Church…). Its options cascade in below.',
   'guide.generate.s2t': 'Configure (optional).',
   'guide.generate.s2': 'Set the decoration, roof, basement, attic, per-floor rooms and size — or skip them entirely.',
   'guide.generate.s3t': 'Describe (optional).',

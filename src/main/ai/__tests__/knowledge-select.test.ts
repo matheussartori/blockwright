@@ -3,7 +3,7 @@ import { coreGuideIncluded, includedModuleGuides, isComplexBuild, isConditionalC
 
 const COMPLEX = 'nbt/08-complex-structures.md';
 
-const HOUSE = 'nbt/modules/structure/classic.md';
+const HOUSE = 'nbt/modules/structure/cottage.md';
 const COZY = 'nbt/modules/decoration/cozy.md';
 
 describe('isModuleGuide', () => {
@@ -26,7 +26,7 @@ describe('includedModuleGuides — prompt keyword fallback (no selection)', () =
 
 describe('includedModuleGuides — explicit selection', () => {
   it('includes the selected structure + decoration guides', () => {
-    const set = includedModuleGuides('', { structureType: 'classic', decoration: 'cozy' });
+    const set = includedModuleGuides('', { structureType: 'cottage', decoration: 'cozy' });
     expect(set).toContain(HOUSE);
     expect(set).toContain(COZY);
   });
@@ -36,7 +36,7 @@ describe('includedModuleGuides — explicit selection', () => {
   });
 
   it('loads a selected roof/basement guide, and ONLY the selected one', () => {
-    const set = includedModuleGuides('', { structureType: 'classic', roof: 'gable', basement: 'cellar' });
+    const set = includedModuleGuides('', { structureType: 'cottage', roof: 'gable', basement: 'cellar' });
     expect(set).toContain('nbt/modules/roof/gable.md');
     expect(set).toContain('nbt/modules/basement/cellar.md');
     // The roof/basement the user did NOT pick must not ride along.
@@ -45,7 +45,7 @@ describe('includedModuleGuides — explicit selection', () => {
   });
 
   it('loads a guide for each selected interior room, and only those', () => {
-    const set = includedModuleGuides('', { structureType: 'classic', rooms: ['living', 'kitchen'] });
+    const set = includedModuleGuides('', { structureType: 'cottage', rooms: ['living', 'kitchen'] });
     expect(set).toContain('nbt/modules/room/living.md');
     expect(set).toContain('nbt/modules/room/kitchen.md');
     expect(set).not.toContain('nbt/modules/room/library.md');
@@ -73,13 +73,13 @@ describe('conditional core — complex-structures gate', () => {
   it('drops complex-structures for a clearly simple build', () => {
     expect(isComplexBuild('a small cozy hut', undefined)).toBe(false);
     expect(coreGuideIncluded(COMPLEX, 'a small cozy hut', undefined)).toBe(false);
-    expect(isComplexBuild('', { structureType: 'classic', decoration: 'cozy' })).toBe(false);
+    expect(isComplexBuild('', { structureType: 'cottage', decoration: 'cozy' })).toBe(false);
   });
 
   it('keeps complex-structures when the selection signals complexity', () => {
-    expect(isComplexBuild('', { structureType: 'classic', basement: 'cellar' })).toBe(true);
-    expect(isComplexBuild('', { structureType: 'classic', rooms: ['living', 'kitchen'] })).toBe(true);
-    expect(isComplexBuild('', { structureType: 'gothic' })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'cottage', basement: 'cellar' })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'cottage', rooms: ['living', 'kitchen'] })).toBe(true);
+    expect(isComplexBuild('', { structureType: 'manor' })).toBe(true);
     expect(coreGuideIncluded(COMPLEX, '', { basement: 'cellar' })).toBe(true);
   });
 

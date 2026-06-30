@@ -87,7 +87,7 @@ describe('preserveShell', () => {
       DataVersion: 3955,
       size: [W, H, D],
       palette: [{ Name: 'minecraft:air' }],
-      ops: [{ op: 'template', name: 'gothic', from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params: { decoration: 'gothic', floors: 2 } }],
+      ops: [{ op: 'template', name: 'manor', from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params: { decoration: 'gothic', floors: 2 } }],
     });
     const solid = (b: AuthoringBlock, pal: AuthoringPaletteEntry[]) => pal[b.state] && pal[b.state].Name !== 'minecraft:air';
     const lockCells: ShellLockCell[] = resolved.blocks

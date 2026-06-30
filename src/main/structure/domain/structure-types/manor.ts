@@ -1,4 +1,4 @@
-// "gothic" — a dark manor: blackened timber-and-blackstone walls picked out with pale
+// "manor" — a dark gothic manor: blackened timber-and-blackstone walls picked out with pale
 // stone belt courses (the "predominantly black with white details" look), a STEEP dark
 // slate roof, and the signature moves from the references — a CENTRAL FRONTISPIECE TOWER
 // projecting at the front-centre and rising past the ridge to a steep pyramidal cap +
@@ -6,11 +6,11 @@
 // turned BALUSTRADED VERANDA across the facade, a mini CORNER TOWER at the back rising to
 // a stepped cap, a GLASS CHAPEL wing down the left side (the wall of tall grey windows),
 // and IVY GARLANDS draping the eaves + tower shoulders. Brooding, vertical, asymmetric —
-// this is the fix for "the gothic keeps coming out as a plain dark box": the towered,
+// this is the fix for "the manor keeps coming out as a plain dark box": the towered,
 // porticoed massing the model can't reliably invent is owned by code and SEEDED
 // (`seedShell`), so a fresh build only finishes it.
 //
-// Massing in semantic roles (the decoration supplies blocks); ships its own gothic kit.
+// Massing in semantic roles (the decoration supplies blocks); ships its own gothic-manor kit.
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
@@ -32,9 +32,9 @@ function plan(b: Box, floors: number, isFlat: boolean, floorHeights?: number[]) 
   return { portD, hz0, roofRings, slabYs, wallTop };
 }
 
-export const gothic: StructureType = {
-  id: 'gothic',
-  label: 'Gothic',
+export const manor: StructureType = {
+  id: 'manor',
+  label: 'Manor',
   category: 'structure',
   group: 'house',
   description:
@@ -43,7 +43,7 @@ export const gothic: StructureType = {
     'and rising past the ridge to a pointed cap, a balustraded front veranda, a mini corner ' +
     'tower, a glass chapel wing of tall grey windows, and ivy garlands over the eaves. ' +
     'Brooding, vertical and asymmetric — soul-lit and manorly.',
-  knowledge: 'nbt/modules/structure/gothic.md',
+  knowledge: 'nbt/modules/structure/manor.md',
   preview: { size: [15, 16, 13], params: { decoration: 'gothic', floors: 2 } },
   finalize: ['chimney'],
   maxRoomsPerFloor: 3,

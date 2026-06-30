@@ -15,7 +15,7 @@ it('the gothic shell lock restores a gutted floor through the full compile pipel
     DataVersion: 3955,
     size: [W, H, D],
     palette: [{ Name: 'minecraft:air' }],
-    ops: [{ op: 'template', name: 'gothic', from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params: { decoration: 'gothic', floors: 2 } }],
+    ops: [{ op: 'template', name: 'manor', from: [0, 0, 0], to: [W - 1, H - 1, D - 1], params: { decoration: 'gothic', floors: 2 } }],
   });
   const lockCells: ShellLockCell[] = resolved.blocks
     .filter((b) => resolved.palette[b.state]?.Name !== 'minecraft:air')
@@ -28,11 +28,11 @@ it('the gothic shell lock restores a gutted floor through the full compile pipel
 
   // Without the lock the deleted floor stays gone …
   const noLockFile = path.join(tmpdir(), 'bw-gothic-nolock.nbt');
-  writeFileSync(noLockFile, compileStructure(gutted, { structureType: 'gothic' }));
+  writeFileSync(noLockFile, compileStructure(gutted, { structureType: 'manor' }));
   expect(groundSolid(await readAuthoring(noLockFile))).toBeLessThan(W * D * 0.2);
 
   // … with the lock it is rebuilt and survives the rest of the pipeline.
   const lockFile = path.join(tmpdir(), 'bw-gothic-lock.nbt');
-  await writeStructureFile(gutted, lockFile, { structureType: 'gothic', lockCells });
+  await writeStructureFile(gutted, lockFile, { structureType: 'manor', lockCells });
   expect(groundSolid(await readAuthoring(lockFile))).toBeGreaterThan(W * D * 0.5);
 });

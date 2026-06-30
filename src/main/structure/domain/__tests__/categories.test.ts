@@ -8,7 +8,7 @@ describe('category dispatch (registry-of-registries)', () => {
 
   it('resolves a module by (category, id) for every category', () => {
     const cases: [ModuleCategory, string][] = [
-      ['structure', 'classic'],
+      ['structure', 'cottage'],
       ['decoration', 'cozy'],
       ['roof', 'gable'],
       ['basement', 'cellar'],

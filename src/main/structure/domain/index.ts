@@ -69,7 +69,7 @@ export { paramFields } from './params';
 export type { ModuleCategory, ModuleMeta, ModuleSummary, ModuleParam, PreviewSpec } from './modules';
 
 /** The structure type a decoration preview is rendered on. */
-const PREVIEW_HOST_STRUCTURE = 'classic';
+const PREVIEW_HOST_STRUCTURE = 'cottage';
 
 /** The renderer-facing catalog: every module summary grouped by category, plus the
  *  structure GROUP definitions. The wire shape (one array per category) is owned by
@@ -99,7 +99,7 @@ export function listModuleCatalog(): ModuleCatalog {
  * geometry (the geometric `detectFloors` is the fallback for free-form builds). Threaded
  * into the generated build's metadata sidecar.
  *
- * @param id - The structure-type id (e.g. 'modern').
+ * @param id - The structure-type id (e.g. 'villa').
  * @param size - The build size [X, Y, Z].
  * @param rawParams - The build's loose params (floors, roof, a `floorHeights` array, …);
  *   defaults applied.

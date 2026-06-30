@@ -14,9 +14,9 @@ function compileTower(size: [number, number, number], floors: number, surroundin
       DataVersion: 3955,
       size,
       palette: [{ Name: 'minecraft:air' }],
-      ops: [{ op: 'template', name: 'tower-classic', from: [0, 0, 0], to: corner, params: { decoration: 'castle', surroundings, floors } }],
+      ops: [{ op: 'template', name: 'keep', from: [0, 0, 0], to: corner, params: { decoration: 'castle', surroundings, floors } }],
     },
-    { structureType: 'tower-classic' },
+    { structureType: 'keep' },
   );
   return report;
 }
@@ -54,7 +54,7 @@ function ladderColumns(blocks: AuthoringBlock[], palette: AuthoringPaletteEntry[
   return cols;
 }
 
-describe('tower-classic roof access', () => {
+describe('keep roof access', () => {
   for (const [label, size, floors, surroundings] of [
     ['a multi-storey keep', [11, 26, 11], 3, 'none'],
     ['a single-storey keep', [9, 14, 9], 1, 'none'],

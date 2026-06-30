@@ -391,7 +391,7 @@ export const ptBR: Messages = {
   'guide.generate.title': 'Gerando uma construção',
   'guide.generate.lead': 'Clique em Gerar na tela inicial (ou abra uma nova aba) para começar. A tela de Detalhes deixa você moldá-la e um clique constrói.',
   'guide.generate.s1t': 'Escolha uma estrutura.',
-  'guide.generate.s1': 'Escolha um tipo de casa (Clássica, Moderna, Fazenda, Sakura, Gótica). As opções dela aparecem abaixo.',
+  'guide.generate.s1': 'Escolha uma estrutura (Chalé, Villa moderna, Solar, Torre de menagem, Agulha, Igreja…). As opções dela aparecem abaixo.',
   'guide.generate.s2t': 'Configure (opcional).',
   'guide.generate.s2': 'Defina a decoração, telhado, porão, sótão, cômodos por andar e tamanho — ou pule tudo isso.',
   'guide.generate.s3t': 'Descreva (opcional).',

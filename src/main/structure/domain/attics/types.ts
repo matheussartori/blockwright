@@ -13,7 +13,7 @@ import type { GeometryModule } from '../geometry-module';
 export interface AtticModule extends GeometryModule {
   category: 'attic';
   /** The structure-type ids this attic pairs with — REQUIRED (narrows ModuleMeta's optional
-   *  `appliesTo`). Pitched-roof houses only; start with `['classic']`, add ids to reuse it. */
+   *  `appliesTo`). Pitched-roof houses only; start with `['cottage']`, add ids to reuse it. */
   appliesTo: string[];
   /** Module ids this attic cannot combine with — every attic conflicts with the `flat`
    *  roof (no roof void). Narrowed to required so an attic must always declare it. */

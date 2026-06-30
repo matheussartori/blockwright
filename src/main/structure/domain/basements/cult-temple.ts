@@ -25,7 +25,7 @@ export const cultTemple: BasementModule = {
     'cold blue glow of soul lanterns. Dress it with a soul campfire on the altar, candle ' +
     'rings, skulls, and cobwebs. Pairs best with the Haunted look.',
   knowledge: 'nbt/modules/basement/cult-temple.md',
-  appliesTo: ['house', 'tower'],
+  appliesTo: ['house', 'tower', 'church'],
   preview: { size: [11, 7, 11] },
   params: {
     decay: { kind: 'unit', default: 0.4 },

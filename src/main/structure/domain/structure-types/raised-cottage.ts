@@ -1,9 +1,9 @@
-// "sakura" — a cherry-blossom cottage: RAISED on a visible stone-brick basement (the base
+// "raised-cottage" — a cherry-blossom cottage: RAISED on a visible stone-brick basement (the base
 // reads as a storey from outside, like the references), with the main entrance up on that
 // raised floor reached by an exterior stone stair that climbs in under the overhanging
 // upper storey. Soft pink cherry cladding, a pink cherry-stair gable roof crowned with
 // blossom cascades, leafy window boxes, and an upper-front balcony. This is the fix for
-// "the sakura keeps coming out as a flat pink box" — the raised, blossom-crowned massing
+// "the raised cottage keeps coming out as a flat pink box" — the raised, blossom-crowned massing
 // the model can't reliably invent is owned by code and SEEDED (`seedShell`), so a fresh
 // build keeps this casco and only furnishes/refines it.
 //
@@ -29,9 +29,9 @@ function plan(b: Box, floors: number, isFlat: boolean, floorHeights?: number[]) 
   return { baseH, mainY, slabYs, wallTop };
 }
 
-export const sakura: StructureType = {
-  id: 'sakura',
-  label: 'Sakura house',
+export const raisedCottage: StructureType = {
+  id: 'raised-cottage',
+  label: 'Raised cottage',
   category: 'structure',
   group: 'house',
   description:
@@ -39,7 +39,7 @@ export const sakura: StructureType = {
     'on the raised main floor, reached by an exterior stone stair that climbs in under the ' +
     'overhanging upper storey. Soft pink cherry cladding, a pink gable roof crowned with ' +
     'blossom cascades, leafy window boxes and an upper-front balcony. Romantic and springtime.',
-  knowledge: 'nbt/modules/structure/sakura.md',
+  knowledge: 'nbt/modules/structure/raised-cottage.md',
   preview: { size: [13, 14, 11], params: { decoration: 'sakura', floors: 2 } },
   finalize: ['chimney'],
   maxRoomsPerFloor: 2,

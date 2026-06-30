@@ -1,4 +1,4 @@
-// "tower-classic" — the first member of the `tower` group: a battlemented stone KEEP. A
+// "keep" — the first member of the `tower` group: a battlemented stone KEEP. A
 // tall, square stone shaft with a stacked plan of narrow storeys, arrow-slit windows, a
 // seated arched doorway on a stone plinth, a connected switchback stair core linking every
 // level, and a CRENELLATED parapet (merlons + crenel gaps) crowning a walkable roof deck.
@@ -32,9 +32,9 @@ function plan(b: Box, params: ParamValues, floorHeights?: number[]) {
   return { storeyCount: floors, slabYs: ladder.slabYs, wallTop };
 }
 
-export const towerClassic: StructureType = {
-  id: 'tower-classic',
-  label: 'Classic',
+export const keep: StructureType = {
+  id: 'keep',
+  label: 'Keep',
   category: 'structure',
   group: 'tower',
   description:
@@ -42,7 +42,7 @@ export const towerClassic: StructureType = {
     'windows, a seated arched doorway on a stone plinth, a connected switchback stair core, and ' +
     'a crenellated parapet crowning a walkable roof deck. Owns its crown in code (no roof slot); ' +
     'links to every Basement, Surroundings and Room module. Decoration supplies the materials.',
-  knowledge: 'nbt/modules/structure/tower-classic.md',
+  knowledge: 'nbt/modules/structure/keep.md',
   preview: { size: [9, 22, 9], params: { floors: 3 } },
   // A tall, narrow keep — one interior program per cramped level reads best.
   maxRoomsPerFloor: 1,

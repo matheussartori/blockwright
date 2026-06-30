@@ -1,9 +1,9 @@
 // Structure GROUPS — a family that several structure types belong to (e.g. the
-// "House" group: classic, modern, farmhouse, sakura, gothic). A group is the SHARING unit for
+// "House" group: cottage, villa, farmhouse, raised-cottage, manor). A group is the SHARING unit for
 // modules: a roof/basement/room whose `appliesTo` names a group id pairs with EVERY
 // member of that group, instead of having to list each structure id. So a gable roof
 // tagged `appliesTo: ['house']` is offered on every house-family structure, while one
-// tagged `appliesTo: ['classic']` stays specific to that single type. The renderer
+// tagged `appliesTo: ['cottage']` stays specific to that single type. The renderer
 // reads a group both to header the gallery rail / Details select and (via the host's
 // group) to resolve `moduleAppliesTo`. Pure data — labels are registry data (like
 // module labels), so deliberately untranslated.
@@ -21,6 +21,7 @@ export interface StructureGroup {
 export const STRUCTURE_GROUPS: StructureGroup[] = [
   { id: 'house', label: 'House' },
   { id: 'tower', label: 'Tower' },
+  { id: 'church', label: 'Church' },
 ];
 
 /** ROOM groups — the family a room PROGRAM belongs to (the everyday `general` rooms vs.

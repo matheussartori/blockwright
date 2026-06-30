@@ -1,10 +1,10 @@
-# Structure module — Gothic
+# Structure module — Manor
 
-> Loads when the user picks **Gothic**. A FRESH build is SEEDED with a code-built shell
+> Loads when the user picks the **Manor**. A FRESH build is SEEDED with a code-built shell
 > (see the "STARTING SHELL" preamble) — your job is to FINISH it, not reinvent it. Pairs by
 > default with the **Gothic decoration** (black timber + blackstone, pale stone detailing).
 
-## What a gothic house is
+## What a manor is
 
 A **dark manor**: **predominantly black** (dark-oak boarding + blackstone) **picked out with
 pale stone detailing** (white belt courses, sills, jambs). A **steep dark slate roof**.

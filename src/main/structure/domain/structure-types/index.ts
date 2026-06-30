@@ -6,33 +6,51 @@
 import { toSummary, type ModuleSummary } from '../modules';
 import { paramFields } from '../params';
 import { createRegistry } from '../registry';
-import { classic } from './classic';
+import { church } from './church';
+import { cottage } from './cottage';
 import { farmhouse } from './farmhouse';
-import { gothic } from './gothic';
-import { hauntedTower } from './haunted-tower';
-import { modern } from './modern';
-import { sakura } from './sakura';
-import { towerClassic } from './tower-classic';
+import { keep } from './keep';
+import { manor } from './manor';
+import { raisedCottage } from './raised-cottage';
+import { spire } from './spire';
+import { villa } from './villa';
 import type { FinalizePass, StructureType } from './types';
 
 export type { StructureType, BuildArgs, RolePalette, Box, FinalizePass } from './types';
 
-export const registry = createRegistry<StructureType>([classic, modern, farmhouse, sakura, gothic, towerClassic, hauntedTower]);
+export const registry = createRegistry<StructureType>([cottage, villa, farmhouse, raisedCottage, manor, keep, spire, church]);
 
-/** Look up a structure type by id (undefined if unknown). */
+/** Legacy structure-type ids → their current id. The form-based rename (2026-06) replaced
+ *  the old theme-named ids; a project `.nbt`/chat persisted under an old id still resolves
+ *  through this map so saved builds keep working. (Decoration ids were NOT renamed.) */
+const LEGACY_ALIASES: Record<string, string> = {
+  classic: 'cottage',
+  modern: 'villa',
+  sakura: 'raised-cottage',
+  gothic: 'manor',
+  'tower-classic': 'keep',
+  'haunted-tower': 'spire',
+};
+
+/** Resolve a possibly-legacy id to the current registered id. */
+function resolveId(id: string): string {
+  return LEGACY_ALIASES[id] ?? id;
+}
+
+/** Look up a structure type by id (undefined if unknown). Resolves legacy aliases. */
 export function getStructureType(id: string): StructureType | undefined {
-  return registry.get(id);
+  return registry.get(resolveId(id));
 }
 
 /** The structure GROUP id a type belongs to (undefined for an unknown id) — the host
  *  link `moduleAppliesTo` resolves so a group-tagged module shares across the family. */
 export function structureGroupOf(id: string | undefined): string | undefined {
-  return id ? registry.get(id)?.group : undefined;
+  return id ? registry.get(resolveId(id))?.group : undefined;
 }
 
-/** Is `id` a registered structure type? (Aliases are resolved in compose, not here.) */
+/** Is `id` a registered structure type (or a legacy alias of one)? */
 export function isStructureType(id: string): boolean {
-  return registry.has(id);
+  return registry.has(resolveId(id));
 }
 
 /** Every registered structure-type id (for validation / UI / prompts). */
@@ -61,5 +79,5 @@ export function structureModules(): StructureType[] {
  *  id). Drives the compile pipeline's per-structure gating — the modular "which fix
  *  applies to which structure" lookup. */
 export function structureFinalizers(id: string | undefined): FinalizePass[] {
-  return (id ? registry.get(id)?.finalize : undefined) ?? [];
+  return (id ? registry.get(resolveId(id))?.finalize : undefined) ?? [];
 }

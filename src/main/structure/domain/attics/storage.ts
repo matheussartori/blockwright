@@ -17,7 +17,7 @@ export const storage: AtticModule = {
     'and odds-and-ends, reached by a ladder from the top floor. Plain and utilitarian — not a ' +
     'living space. Needs a pitched roof (it lives in the void underneath).',
   knowledge: 'nbt/modules/attic/storage.md',
-  appliesTo: ['classic'],
+  appliesTo: ['cottage'],
   incompatibleWith: ['flat'],
   // GENERIC: floor the void at its base (box.y0 = the wall top) in the rough plinth
   // material + a standing lantern. The host carves the ladder step-off through this floor.

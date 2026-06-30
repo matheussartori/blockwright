@@ -1,8 +1,8 @@
 // "gable" — a classic two-sided pitched roof with a triangular gable end at each end
 // of the ridge. It carries GENERIC geometry (`build()` — a single gable `roof` op over
-// the host's wall box, works on any structure) PLUS a CLASSIC-SPECIFIC integration
-// (`integrations.classic` — gable-end vents, which only make sense over the classic
-// house's attic). Run by `composeModule` — for the gallery preview AND the house's roof
+// the host's wall box, works on any structure) PLUS a COTTAGE-SPECIFIC integration
+// (`integrations.cottage` — gable-end vents, which only make sense over the cottage's
+// attic). Run by `composeModule` — for the gallery preview AND the house's roof
 // delegation.
 //
 // Shared with the whole `house` group via `appliesTo`; its host integration is keyed by
@@ -37,9 +37,9 @@ export const gable: RoofModule = {
     const ridge = gableRidge(params.ridge, box);
     return [{ op: 'roof', from: [x0, y0, z0], to: [x1, y1, z1], state: stair, style: 'gable', ridge, fill }];
   },
-  // CLASSIC-SPECIFIC: a small vent at each gable end's peak (the classic house has an attic to breathe).
+  // COTTAGE-SPECIFIC: a small vent at each gable end's peak (the cottage has an attic to breathe).
   integrations: {
-    classic({ box, params, palette }): AuthoringOp[] {
+    cottage({ box, params, palette }): AuthoringOp[] {
       const { x0, y0, z0, x1, y1, z1 } = box;
       const vent = palette.get('window');
       const ridge = gableRidge(params.ridge, box);

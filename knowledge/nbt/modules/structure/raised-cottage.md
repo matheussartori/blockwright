@@ -1,10 +1,10 @@
-# Structure module — Sakura house
+# Structure module — Raised cottage
 
-> Loads when the user picks **Sakura**. A FRESH build is SEEDED with a code-built shell
+> Loads when the user picks the **Raised cottage**. A FRESH build is SEEDED with a code-built shell
 > (see the "STARTING SHELL" preamble) — your job is to FINISH it, not reinvent it. Pairs by
 > default with the **Sakura decoration** (pink cherry cladding + a pink roof).
 
-## What a sakura house is
+## What a raised cottage is
 
 A **cherry-blossom cottage RAISED on a visible stone-brick basement** — the base reads as a
 storey from outside (low **barred** openings, a half-buried look), not a hidden cellar. The **main
@@ -26,7 +26,7 @@ Romantic, springtime, a house tucked in a grove of cherry trees.
 - The **upper-front balcony** rail, and a working **staircase** between the cherry floors.
 
 Do NOT bury the basement, flatten it to grade, move the door down to ground level, re-roof it
-a dark/red colour, or strip the blossoms/balcony — they ARE the sakura house.
+a dark/red colour, or strip the blossoms/balcony — they ARE the raised cottage.
 
 ## How to FINISH it
 

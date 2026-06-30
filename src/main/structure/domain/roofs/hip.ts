@@ -19,7 +19,7 @@ export const hip: RoofModule = {
     'gable, and wraps an overhanging eave evenly on every side.',
   knowledge: 'nbt/modules/roof/hip.md',
   // Classic/farmhouse/gothic + modern offer a hip alternative; sakura is gable-identity.
-  appliesTo: ['classic', 'farmhouse', 'gothic', 'modern'],
+  appliesTo: ['cottage', 'farmhouse', 'manor', 'villa'],
   preview: { size: [9, 9, 7] },
   defaults: { roof: 'minecraft:oak_stairs', wall: 'minecraft:oak_planks' },
   // GENERIC: one hip roof op over the wall box (slopes on all four sides).

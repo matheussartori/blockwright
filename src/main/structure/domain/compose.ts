@@ -142,7 +142,7 @@ function seedFor(params: Record<string, unknown>, b: ReturnType<typeof box>): nu
 /** The selected basement MODULE id from raw params (the Details "Basement" slot rides
  *  in as `params.basement` = a module id), or undefined when none/unknown — an unknown
  *  id is reported through `warn` instead of vanishing silently. A structure type that
- *  declares its OWN `basement` param (classic) handles burial itself, so the central
+ *  declares its OWN `basement` param (cottage) handles burial itself, so the central
  *  path is skipped for it (the caller checks `'basement' in type.params`). */
 export function selectedBasement(params: Record<string, unknown>, warn?: (message: string) => void): string | undefined {
   const id = params.basement;
@@ -334,7 +334,7 @@ function verifyModuleRespect(
  * Expand a `template` op into ordinary ops — the cross of a structure TYPE and a
  * DECORATION resolved against a role palette.
  *
- * @param name - The structure-type id (e.g. 'classic').
+ * @param name - The structure-type id (e.g. 'cottage').
  * @param from - One corner of the build box [x, y, z].
  * @param to - The opposite corner of the build box [x, y, z].
  * @param params - The op's loose params: a `decoration`/`theme` key, role-name block
