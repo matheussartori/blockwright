@@ -8,6 +8,7 @@
 // Claude Agent SDK (Pro/Max) and the Codex CLI (ChatGPT Plus/Pro). The user picks the
 // active provider + model in Settings (see credentials.ts).
 import type { GenerateResult, GenerateProgress, GenerateImage, BuildSelection, FloorDef } from '@/shared/types';
+import { THINKING_EFFORTS, type ThinkingEffort } from '@/shared/ai';
 import { systemPrompt } from './schema';
 import { modBlockGuide } from '../structure/assets/block-dictionary';
 import { phaseAt, PHASES } from './phases';
@@ -33,6 +34,13 @@ function envNum(name: string): number | null {
   if (raw === undefined || raw.trim() === '') return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+/** A `BW_AI_THINKING_EFFORT` override (off/low/medium/high/xhigh/max), or null when
+ *  unset/invalid so the user's Settings value wins. */
+function envEffort(name: string): ThinkingEffort | null {
+  const raw = process.env[name]?.trim().toLowerCase();
+  return raw && (THINKING_EFFORTS as readonly string[]).includes(raw) ? (raw as ThinkingEffort) : null;
 }
 
 export { aiAvailable };
@@ -82,7 +90,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
   // The user's cost/quality knobs (Settings ▸ AI), defaulting CHEAP; a BW_AI_* env
   // var still wins for power users.
   const gen = getGenerationSettings();
-  const thinkingBudget = envNum('BW_AI_THINKING_BUDGET') ?? gen.thinkingBudget;
+  const thinkingEffort = envEffort('BW_AI_THINKING_EFFORT') ?? gen.thinkingEffort;
   // A numeric budget (env or a positive `maxRounds` setting) is the authoritative cap;
   // `maxRounds:0` (Balanced) is the AUTO sentinel → null → volume-scaled (see below).
   const roundsBudget = envNum('BW_AI_MAX_ROUNDS') ?? (gen.maxRounds > 0 ? gen.maxRounds : null);
@@ -246,7 +254,7 @@ export async function generateStructure(opts: GenerateStructureOptions): Promise
       systemPrompt: systemPrompt(prompt, selection) + modBlockGuide(!!lockCells?.length),
       userText: effectivePrompt,
       images: images ?? [],
-      thinkingBudget,
+      thinkingEffort,
       abort: ac,
       resume: session.sdkSessionId,
       setSessionId: (id) => {

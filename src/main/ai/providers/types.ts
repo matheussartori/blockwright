@@ -7,6 +7,7 @@
 // screenshots) back so the model can review and refine. The driver ends when the
 // model stops, `onEmit` returns `stop`, or the run is aborted.
 import type { GenerateImage } from '@/shared/types';
+import type { ThinkingEffort } from '@/shared/ai';
 import type { ResolvedCredential } from '../credentials';
 import type { EmitArgs } from '../schema';
 
@@ -54,8 +55,9 @@ export interface DriverParams {
   userText: string;
   /** Reference images supplied by the user (base64, no data: prefix). */
   images: GenerateImage[];
-  /** Extended-thinking budget in tokens (0 disables). */
-  thinkingBudget: number;
+  /** Reasoning effort for extended thinking (`off` disables it). Claude maps this to
+   *  adaptive thinking + the Agent SDK `effort` knob; Codex ignores it. */
+  thinkingEffort: ThinkingEffort;
   /** Cancellation for the whole run. */
   abort: AbortController;
   /** Conversation id to resume (Claude SDK / Codex), or null to start fresh. */

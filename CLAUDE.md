@@ -927,12 +927,16 @@ active provider (subscription = optimistic); a real auth failure surfaces as a c
 send (see `authHint`). Old single-Claude credentials migrate to `claude-subscription` on first read.
 - **Generation cost/quality knobs** (`GenerationSettings` in `shared/ai.ts`, persisted in the prefs
   blob via `getGenerationSettings`/`setGenerationSettings`, surfaced in Settings ▸ AI + `AiConfig.generation`,
-  edited via `aiSetGeneration`): `maxRounds` (the emit→render→review cap — the #1 cost lever), `thinkingBudget`
-  (extended-thinking tokens, 0 = off), `critic` (run the independent audit critic — Claude only). Three
-  one-click PRESETS (`GENERATION_PRESETS`: Saver/Balanced/Thorough) set all three; the DEFAULT is **Saver**
-  (3 rounds, no thinking, no critic) — deliberately cheap. `generate.ts` reads these per-run (env
-  `BW_AI_MAX_ROUNDS`/`BW_AI_THINKING_BUDGET` still override); `maxRoundsFor` honors an explicit budget
-  down to 1 (so Saver can stop before the full design-pass sequence — `rounds.ts`).
+  edited via `aiSetGeneration`): `maxRounds` (the emit→render→review cap — the #1 cost lever), `thinkingEffort`
+  (a Claude reasoning-EFFORT level `off`/`low`/`medium`/`high`/`xhigh`/`max` — the current models use adaptive
+  thinking + an `effort` knob, so the old fixed `budget_tokens` is gone; `off` disables thinking), `critic`
+  (run the independent audit critic — Claude only). Three one-click PRESETS (`GENERATION_PRESETS`:
+  Saver/Balanced/Thorough) set all three; the DEFAULT is **Saver** (3 rounds, no thinking, no critic) —
+  deliberately cheap. `generate.ts` reads these per-run (env `BW_AI_MAX_ROUNDS`/`BW_AI_THINKING_EFFORT` still
+  override); `maxRoundsFor` honors an explicit budget down to 1 (so Saver can stop before the full
+  design-pass sequence — `rounds.ts`). The Claude SDK driver maps a non-`off` effort to `{thinking:
+  {type:'adaptive'}, effort}` and `off` to `{thinking:{type:'disabled'}}` (legacy stored `thinkingBudget`
+  numbers migrate: 0 → `off`, any positive → `medium`).
 
 - **The two AI SDKs are externalized from the Vite main bundle** (`vite.main.config.ts` `external`) and
   loaded via dynamic `import()` inside each `providers/` driver (so a provider's SDK only loads when
@@ -970,8 +974,8 @@ send (see `authHint`). Old single-Claude credentials migrate to `claude-subscrip
   the failing items — it has no stake in the build, so it catches what the builder rationalizes. The
   critic is OFF by default (it's an extra call) and only runs when the user's `critic` knob is on AND
   the provider is claude-subscription (Codex has none → self-report). `BW_AI_CRITIC_MODEL` can point it
-  at a cheaper model. **Extended thinking is tunable** (`thinkingBudget` knob / `BW_AI_THINKING_BUDGET`,
-  `0` disables; default OFF under the Saver preset) — when on it plans geometry, and the system prompt
+  at a cheaper model. **Extended thinking is tunable** (`thinkingEffort` knob / `BW_AI_THINKING_EFFORT`,
+  `off` disables; default OFF under the Saver preset) — when on it plans geometry, and the system prompt
   tells it to plan → emit → review rather than emit immediately. The render round-trip: main calls a `CapturePreview`
   callback (`generate.ts`) → `IPC_EVENTS.aiRenderRequest` to the renderer → `App.tsx` runs `load()` +
   `Viewer.capture()` (synchronous multi-angle JPEGs, downscaled to 512 via `REVIEW_SNAP`) → replies on

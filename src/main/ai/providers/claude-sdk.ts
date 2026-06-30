@@ -131,6 +131,14 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
   const server = sdk.createSdkMcpServer({ name: 'blockwright', version: '1.0.0', tools: [emit] });
   const promptInput = p.images.length > 0 ? imagePrompt(p.userText, p.images) : p.userText;
 
+  // The current Claude models (Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an
+  // `effort` level — the fixed `budgetTokens` budget is rejected there — so map the
+  // effort knob to {adaptive + effort}, or disable thinking outright when it's `off`.
+  const thinkingOpts =
+    p.thinkingEffort === 'off'
+      ? { thinking: { type: 'disabled' as const } }
+      : { thinking: { type: 'adaptive' as const }, effort: p.thinkingEffort };
+
   let resultSubtype: string | null = null;
   for await (const msg of sdk.query({
     prompt: promptInput,
@@ -141,7 +149,7 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
       tools: [],
       allowedTools: [`mcp__blockwright__${EMIT_TOOL_NAME}`],
       settingSources: [],
-      thinking: p.thinkingBudget > 0 ? { type: 'enabled', budgetTokens: p.thinkingBudget } : { type: 'disabled' },
+      ...thinkingOpts,
       includePartialMessages: true,
       abortController: p.abort,
       env: authEnv(p.credential.id),

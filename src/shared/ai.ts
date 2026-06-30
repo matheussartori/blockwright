@@ -62,7 +62,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     keyPlaceholder: 'sk-ant-oat… (optional)',
     models: [
       { id: 'claude-opus-4-8', label: 'Opus 4.8' },
-      { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+      { id: 'claude-sonnet-5', label: 'Sonnet 5' },
       { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
     ],
     defaultModel: 'claude-opus-4-8',
@@ -115,7 +115,18 @@ export interface AiProviderState {
 // thinking (output) and the optional independent critic (an extra model call).
 // These three knobs let the user trade quality for cost; the default (Balanced)
 // is the original full-quality run, with Saver as the cheap draft fallback.
-// Env vars (BW_AI_MAX_ROUNDS / BW_AI_THINKING_BUDGET) still override.
+// Env vars (BW_AI_MAX_ROUNDS / BW_AI_THINKING_EFFORT) still override.
+
+/** Reasoning-effort level for Claude's extended thinking. The current Claude models
+ *  (Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an `effort` level — the
+ *  fixed `budget_tokens` budget is removed there — so this replaces the old numeric
+ *  `thinkingBudget`. `off` disables thinking entirely; the rest map to the Agent
+ *  SDK's `effort` knob (the SDK silently downgrades a level the model doesn't support,
+ *  e.g. `xhigh` → `high`). Codex has no equivalent and ignores it. */
+export type ThinkingEffort = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/** The effort levels in order, for the Settings dropdown + stored-value validation. */
+export const THINKING_EFFORTS: readonly ThinkingEffort[] = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 /** The user-tunable cost/quality knobs for generation. */
 export interface GenerationSettings {
@@ -124,21 +135,20 @@ export interface GenerationSettings {
    *  the #1 cost lever. Fewer = cheaper + faster, but less polish. `0` = AUTO: the
    *  cap scales with the build's volume, floored to the full design-pass sequence. */
   maxRounds: number;
-  /** Extended-thinking budget in tokens (0 = off). The model plans geometry in
-   *  thinking; more = better massing/roofs but more output tokens. */
-  thinkingBudget: number;
+  /** Reasoning effort for Claude's extended thinking (`off` = no thinking). The model
+   *  plans geometry while thinking; deeper effort = better massing/roofs but more
+   *  output tokens. Claude only — Codex ignores it (see {@link ThinkingEffort}). */
+  thinkingEffort: ThinkingEffort;
   /** Run the INDEPENDENT audit critic — a separate fresh-context model call on the
    *  final pass that judges the build. Catches more, but costs an extra call.
    *  Claude only (Codex has no critic; the flag is ignored there). */
   critic: boolean;
 }
 
-/** Bounds the UI + main clamp `maxRounds`/`thinkingBudget` to. */
+/** Bounds the UI + main clamp `maxRounds` to. */
 export const GENERATION_LIMITS = {
   minRounds: 1,
   maxRounds: 10,
-  minThinking: 0,
-  maxThinking: 8000,
 } as const;
 
 /** A named cost preset (the simple one-click control) + its underlying settings. */
@@ -157,20 +167,20 @@ export const GENERATION_PRESETS: GenerationPreset[] = [
   {
     id: 'balanced',
     label: 'Balanced',
-    blurb: 'The full design-pass sequence (rounds auto-scaled to build size), extended thinking, and the independent critic. The quality baseline for real builds.',
-    settings: { maxRounds: 0, thinkingBudget: 5000, critic: true },
+    blurb: 'The full design-pass sequence (rounds auto-scaled to build size), medium thinking effort, and the independent critic. The quality baseline for real builds.',
+    settings: { maxRounds: 0, thinkingEffort: 'medium', critic: true },
   },
   {
     id: 'thorough',
     label: 'Thorough',
-    blurb: 'Most expensive — a high fixed round cap and the deepest thinking on top of the critic.',
-    settings: { maxRounds: 10, thinkingBudget: 8000, critic: true },
+    blurb: 'Most expensive — a high fixed round cap and the deepest thinking effort on top of the critic.',
+    settings: { maxRounds: 10, thinkingEffort: 'high', critic: true },
   },
   {
     id: 'saver',
     label: 'Saver',
     blurb: 'Cheapest — a few quick passes, no extended thinking, no critic. Best for quick drafts.',
-    settings: { maxRounds: 3, thinkingBudget: 0, critic: false },
+    settings: { maxRounds: 3, thinkingEffort: 'off', critic: false },
   },
 ];
 
@@ -184,7 +194,7 @@ export function presetIdFor(s: GenerationSettings): GenerationPreset['id'] | 'cu
   const hit = GENERATION_PRESETS.find(
     (p) =>
       p.settings.maxRounds === s.maxRounds &&
-      p.settings.thinkingBudget === s.thinkingBudget &&
+      p.settings.thinkingEffort === s.thinkingEffort &&
       p.settings.critic === s.critic,
   );
   return hit?.id ?? 'custom';

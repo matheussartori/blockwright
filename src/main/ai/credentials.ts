@@ -18,7 +18,9 @@ import {
   DEFAULT_GENERATION_SETTINGS,
   DEFAULT_PROVIDER,
   GENERATION_LIMITS,
+  THINKING_EFFORTS,
   providerMeta,
+  type ThinkingEffort,
   type AiConfig,
   type AiProviderId,
   type AiProviderMeta,
@@ -125,10 +127,19 @@ function normalizeGeneration(g: Partial<GenerationSettings> | undefined): Genera
     const n = typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : def;
     return Math.max(lo, Math.min(hi, n));
   };
+  // Accept a valid effort string, else migrate the legacy numeric `thinkingBudget`
+  // (0 → off, any positive budget → medium), else fall back to the default.
+  const legacy = g as { thinkingEffort?: unknown; thinkingBudget?: unknown } | undefined;
+  const effort = (): ThinkingEffort => {
+    const v = legacy?.thinkingEffort;
+    if (typeof v === 'string' && (THINKING_EFFORTS as readonly string[]).includes(v)) return v as ThinkingEffort;
+    if (typeof legacy?.thinkingBudget === 'number') return legacy.thinkingBudget > 0 ? 'medium' : 'off';
+    return d.thinkingEffort;
+  };
   return {
     // 0 = AUTO (volume-scaled); otherwise clamp to the explicit min..max round bounds.
     maxRounds: g?.maxRounds === 0 ? 0 : clamp(g?.maxRounds, GENERATION_LIMITS.minRounds, GENERATION_LIMITS.maxRounds, d.maxRounds),
-    thinkingBudget: clamp(g?.thinkingBudget, GENERATION_LIMITS.minThinking, GENERATION_LIMITS.maxThinking, d.thinkingBudget),
+    thinkingEffort: effort(),
     critic: typeof g?.critic === 'boolean' ? g.critic : d.critic,
   };
 }

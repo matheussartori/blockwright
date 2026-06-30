@@ -11,7 +11,7 @@ import { localizeData, aiProviderKey, aiPresetKey } from '@/shared/i18n/registry
 import {
   AI_PROVIDERS, GENERATION_LIMITS, GENERATION_PRESETS, presetIdFor, providerMeta,
   type AiConfig, type AiProviderId, type AiProviderMeta, type AiProviderState, type AiStability,
-  type GenerationSettings,
+  type GenerationSettings, type ThinkingEffort,
 } from '@/shared/ai';
 
 /** A "Stable"/"Beta" maturity badge (reuses the `.ai-pill` chrome). */
@@ -91,13 +91,15 @@ export function AiTab() {
   );
 }
 
-/** Named "thinking budget" steps, so the user picks Off/Light/Standard/Deep instead
- *  of raw token counts. The tokens match the presets so the preset highlight is stable. */
-const THINKING_OPTS: { tokens: number; key: MessageKey }[] = [
-  { tokens: 0, key: 'ai.thinkOff' },
-  { tokens: 1500, key: 'ai.thinkLight' },
-  { tokens: 3000, key: 'ai.thinkStandard' },
-  { tokens: 5000, key: 'ai.thinkDeep' },
+/** Reasoning-effort steps for Claude's thinking, so the user picks Off/Low/Medium/High/…
+ *  instead of raw token counts (the current models use adaptive thinking + effort). */
+const THINKING_OPTS: { effort: ThinkingEffort; key: MessageKey }[] = [
+  { effort: 'off', key: 'ai.thinkOff' },
+  { effort: 'low', key: 'ai.thinkLow' },
+  { effort: 'medium', key: 'ai.thinkMedium' },
+  { effort: 'high', key: 'ai.thinkHigh' },
+  { effort: 'xhigh', key: 'ai.thinkXhigh' },
+  { effort: 'max', key: 'ai.thinkMax' },
 ];
 
 /** The global generation cost/quality control: a one-click preset row (Balanced /
@@ -180,15 +182,12 @@ function GenerationCard({
             <span className="setting-label">{t('ai.genThinking')}</span>
             <select
               className="input setting-select"
-              value={String(g.thinkingBudget)}
-              onChange={(e) => set({ thinkingBudget: Number(e.target.value) })}
+              value={g.thinkingEffort}
+              onChange={(e) => set({ thinkingEffort: e.target.value as ThinkingEffort })}
             >
               {THINKING_OPTS.map((o) => (
-                <option key={o.tokens} value={o.tokens}>{t(o.key)}</option>
+                <option key={o.effort} value={o.effort}>{t(o.key)}</option>
               ))}
-              {!THINKING_OPTS.some((o) => o.tokens === g.thinkingBudget) && (
-                <option value={g.thinkingBudget}>{g.thinkingBudget}</option>
-              )}
             </select>
           </label>
           <p className="setting-note">{t('ai.genThinkingNote')}</p>
