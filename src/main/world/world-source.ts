@@ -4,9 +4,9 @@
 // non-spanning) is decoded today; older formats fail soft (skipped with a log) until M6.
 import type { DimensionId, RegionRef, StructureLocation, WorldMeta } from '@/shared/types';
 import { RegionFile } from './anvil/region-file';
-import { decodeChunk, type ColumnData } from './anvil/chunk-decode';
+import { decodeChunk, decodeEntities, type ColumnData } from './anvil/chunk-decode';
 import { readLevelDat } from './anvil/level-dat';
-import { availableDimensions, isWorldDir, listRegions as listRegionsOnDisk, regionFilePath, regionForChunk } from './anvil/world-paths';
+import { availableDimensions, entitiesFilePath, isWorldDir, listRegions as listRegionsOnDisk, regionFilePath, regionForChunk } from './anvil/world-paths';
 
 /** First DataVersion with a PALETTED section format the decoder understands (Minecraft 1.13 = 1519).
  *  1.13–1.17 nest sections under `Level.Sections` (spanning before 1.16); 1.18+ use root `sections`.
@@ -32,6 +32,7 @@ function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
 
 export class WorldSource {
   private readonly regionCache = new Map<string, RegionFile | null>();
+  private readonly entityRegionCache = new Map<string, RegionFile | null>();
   private readonly chunkCache = new Map<string, ColumnData | null>();
   private readonly structureCache = new Map<DimensionId, StructureLocation[]>();
   private warnedOldVersion = false;
@@ -73,6 +74,22 @@ export class WorldSource {
     return region;
   }
 
+  /** The sibling ENTITY region file (1.17+ `entities/*.mca`), or null when absent (older worlds keep
+   *  entities inside the chunk). Cached like block regions. */
+  private async entityRegion(dim: DimensionId, rx: number, rz: number): Promise<RegionFile | null> {
+    const key = `${dim}:${rx}:${rz}`;
+    const cached = lruGet(this.entityRegionCache, key);
+    if (cached !== undefined) return cached;
+    let region: RegionFile | null;
+    try {
+      region = await RegionFile.open(entitiesFilePath(this.root, dim, rx, rz));
+    } catch {
+      region = null; // no entities file (pre-1.17, or ungenerated) — cache the miss
+    }
+    lruSet(this.entityRegionCache, key, region, REGION_CACHE_MAX);
+    return region;
+  }
+
   /** Decode one chunk column, or null if absent/unsupported. Never throws — a bad chunk is logged
    *  and skipped so one corrupt column can't sink the whole fly-through. */
   async getChunk(dim: DimensionId, cx: number, cz: number): Promise<ColumnData | null> {
@@ -94,6 +111,18 @@ export class WorldSource {
           }
         } else {
           column = decodeChunk(nbt);
+          // 1.17+ stores entities in a separate `entities/*.mca`. If the chunk carried none inline
+          // (empty on modern worlds), pull them from the entity region. Best-effort — a missing or
+          // corrupt entity file just leaves the chunk without entities.
+          if (column && column.entities.length === 0) {
+            try {
+              const er = await this.entityRegion(dim, rx, rz);
+              const enbt = er ? await er.readChunkNBT(lx, lz) : null;
+              if (enbt) column.entities = decodeEntities(enbt);
+            } catch {
+              /* entities are best-effort — never sink the chunk */
+            }
+          }
         }
       }
     } catch (e) {
@@ -143,6 +172,7 @@ export class WorldSource {
   /** Drop cached buffers (on close / workspace change). */
   dispose(): void {
     this.regionCache.clear();
+    this.entityRegionCache.clear();
     this.chunkCache.clear();
     this.structureCache.clear();
   }

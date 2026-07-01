@@ -38,7 +38,7 @@ function toPayload(col: ColumnData): ChunkRenderPayload {
     for (let c = 0; c < 4096; c++) blocks[c] = local[s.blocks[c]];
     return { sectionY: s.sectionY, blocks, uniform: false, fill: 0 };
   });
-  return { cx: col.cx, cz: col.cz, palette, sections, textureKeys: [], heightmap: null, grassTint: null, empty: false };
+  return { cx: col.cx, cz: col.cz, palette, sections, textureKeys: [], heightmap: null, grassTint: null, entities: [], empty: false };
 }
 
 /** Expand a payload to the non-air block list the geometry core meshes (mirrors the worker). */

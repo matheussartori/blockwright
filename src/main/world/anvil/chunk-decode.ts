@@ -3,7 +3,7 @@
 // A 1.18 chunk stores `sections: [{ Y, block_states:{ palette, data }, biomes:{ palette, data } }]`
 // where `data` is a NON-spanning packed long array (bits = max(4, ceil(log2(len))), YZX cell order,
 // palette length 1 ⇒ no data array, the whole 16³ section is that block).
-import type { RawBlockEntity, RawPaletteEntry } from '../../structure/io/raw';
+import type { RawBlockEntity, RawEntity, RawPaletteEntry } from '../../structure/io/raw';
 import { AIR, omitKeys } from '../../structure/io/raw';
 import { bitsForBlockStates, bitsForPalette, pairsToBig, unpackNonSpanning, unpackSpanning } from '../../structure/io/long-bits';
 
@@ -41,6 +41,10 @@ export interface ColumnData {
    *  or null when the chunk doesn't store it. Drives the mid-LOD surface mesh. */
   heightmap: Int16Array | null;
   blockEntities: RawBlockEntity[];
+  /** Entities (armor stands, item frames, mobs) in this chunk. On 1.17+ these are read from the
+   *  sibling `entities/*.mca` set and merged in by the reader; on older worlds they live inside the
+   *  chunk NBT itself (decoded here). Empty when the chunk has none. */
+  entities: RawEntity[];
 }
 
 interface SectionNBT {
@@ -109,6 +113,7 @@ export function decodeChunk(nbt: Record<string, unknown>): ColumnData | null {
     sections,
     heightmap: decodeHeightmap(src, minY, spanning),
     blockEntities: decodeBlockEntities(src),
+    entities: decodeEntities(src),
   };
 }
 
@@ -148,6 +153,25 @@ function decodeBlockEntities(nbt: Record<string, unknown>): RawBlockEntity[] {
     const z = Number(be.z);
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
     out.push({ pos: [x, y, z], id: String(be.id ?? ''), nbt: omitKeys(be, ['x', 'y', 'z', 'id']) });
+  }
+  return out;
+}
+
+/** Read an `Entities` list into RawEntity[]. The list lives at the ROOT of a 1.17+ `entities/*.mca`
+ *  chunk, or (legacy) inside the block chunk under `Entities` / `Level.Entities`. Each entry is a
+ *  flat entity compound — `Pos` (doubles), plus `id`/`Rotation`/`Pose`/… — kept whole as `nbt` so
+ *  the shared `resolveEntities` reads its fields directly (an armor stand's pose/flags survive). */
+export function decodeEntities(nbt: Record<string, unknown>): RawEntity[] {
+  const level = nbt.Level as Record<string, unknown> | undefined;
+  const list = (nbt.Entities ?? level?.Entities) as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(list)) return [];
+  const out: RawEntity[] = [];
+  for (const e of list) {
+    const p = e.Pos as unknown[] | undefined;
+    if (!Array.isArray(p) || p.length < 3) continue;
+    const pos: [number, number, number] = [Number(p[0]), Number(p[1]), Number(p[2])];
+    if (pos.some((n) => !Number.isFinite(n))) continue;
+    out.push({ pos, blockPos: [Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])], nbt: e });
   }
   return out;
 }

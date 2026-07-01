@@ -182,7 +182,7 @@ export class Viewer {
     const parent = new THREE.Group();
     for (const p of pieces) {
       const group = buildStructure(p.data, textures, this.showJigsaw, this.hideShell);
-      group.add(buildEntities(p.data, textures));
+      group.add(buildEntities(p.data.entities, textures));
       group.rotation.y = (p.quarterTurns * Math.PI) / 2;
       group.position.set(p.offset[0], p.offset[1], p.offset[2]);
       parent.add(group);

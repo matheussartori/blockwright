@@ -5,9 +5,10 @@
 // camera over IPC, meshes them off-thread at the right LOD, and adds/removes chunk groups — the
 // whole world stays viewable without holding it all in memory.
 import * as THREE from 'three';
-import type { BlockwrightApi, ChunkRenderPayload, DimensionId } from '@/shared/types';
+import type { BlockwrightApi, ChunkRenderPayload, DimensionId, StructureEntity } from '@/shared/types';
 import type { LoadedTexture, TextureLoader } from '../viewer/texture-loader';
 import { geometryFor, materialFor } from '../viewer/mesh-builder';
+import { buildEntities } from '../viewer/entity-mesh';
 import { BORDER_PLANE_BYTES, occluderStates, type MaterialBuffers, type NeighborBorders } from '../viewer/geometry-core';
 import type { TexInfo } from '../viewer/model-geometry';
 import { computeBorderPlanes, type ChunkBorderPlanes } from './chunk-borders';
@@ -325,7 +326,9 @@ export class WorldView {
       entry.pendingLod = null;
       entry.jobId = null;
       if (epoch !== this.epoch || this.chunks.get(key(cx, cz)) !== entry) return;
-      const next = this.assemble(buffers, cx, cz, edgeSides);
+      // Entities are drawn only at the near LOD (they're small detail, pointless over a surface mesh).
+      const entities = lod === 'near' ? entry.payload?.entities ?? [] : [];
+      const next = this.assemble(buffers, cx, cz, edgeSides, entities);
       const old = entry.group;
       this.scene.add(next);
       if (old) {
@@ -337,7 +340,13 @@ export class WorldView {
     });
   }
 
-  private assemble(buffers: MaterialBuffers[], cx: number, cz: number, edgeSides: EdgeDir[] = []): THREE.Group {
+  private assemble(
+    buffers: MaterialBuffers[],
+    cx: number,
+    cz: number,
+    edgeSides: EdgeDir[] = [],
+    entities: StructureEntity[] = [],
+  ): THREE.Group {
     const group = new THREE.Group();
     for (const mb of buffers) {
       let mat = this.matCache.get(mb.key);
@@ -348,6 +357,13 @@ export class WorldView {
       group.add(new THREE.Mesh(geometryFor(mb), mat));
     }
     for (const d of edgeSides) group.add(this.borderWall(d));
+    if (entities.length) {
+      // Entity `pos` is ABSOLUTE world coords; the chunk group sits at (cx*16, 0, cz*16), so an inner
+      // group at the negated origin cancels it out and lands each entity at its true world position.
+      const ents = buildEntities(entities, this.loaded);
+      ents.position.set(-cx * 16, 0, -cz * 16);
+      group.add(ents);
+    }
     group.position.set(cx * 16, 0, cz * 16);
     return group;
   }

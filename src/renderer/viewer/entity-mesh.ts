@@ -12,7 +12,7 @@
 // space with the linear transform diag(-1,-1,1) — two axis flips, a proper 180° rotation
 // about Z, so winding/normals stay consistent — plus a lift so the feet land on `pos.y`.
 import * as THREE from 'three';
-import type { ArmorStandPose, StructureData, StructureEntity } from '@/shared/types';
+import type { ArmorStandPose, StructureEntity } from '@/shared/types';
 import type { LoadedTexture } from './texture-loader';
 
 const DEG = Math.PI / 180;
@@ -157,11 +157,13 @@ function buildFallbackCube(color: Vec3): THREE.Mesh {
   return mesh;
 }
 
-/** Build one group holding a mesh per entity in `data`, placed at its position + yaw.
- *  `textures` is the viewer's loaded texture map (so the armor stand can sample its atlas). */
-export function buildEntities(data: StructureData, textures: Map<string, LoadedTexture>): THREE.Group {
+/** Build one group holding a mesh per entity, each placed at its position + yaw. `textures` is the
+ *  viewer's loaded texture map (so the armor stand can sample its atlas). Positions are taken from
+ *  each entity's `pos` verbatim — the caller's group frame decides whether those are structure-local
+ *  (single structure) or world coords (a streamed world chunk). */
+export function buildEntities(entities: StructureEntity[], textures: Map<string, LoadedTexture>): THREE.Group {
   const group = new THREE.Group();
-  for (const e of data.entities ?? []) {
+  for (const e of entities) {
     const root = new THREE.Group();
     const tex = e.textureKey ? textures.get(e.textureKey) : undefined;
     if (e.id === 'minecraft:armor_stand' && tex) {

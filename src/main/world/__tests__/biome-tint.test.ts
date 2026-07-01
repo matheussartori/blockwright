@@ -10,6 +10,7 @@ function col(sections: Partial<SectionData>[]): ColumnData {
     minSectionY: 0,
     heightmap: null,
     blockEntities: [],
+    entities: [],
     sections: sections.map((s) => ({
       sectionY: 0,
       palette: [],

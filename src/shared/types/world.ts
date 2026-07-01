@@ -1,7 +1,7 @@
 // World-viewer contracts shared by main and renderer (type-only). A "world" is a Minecraft save
 // folder (level.dat + region/*.mca) opened view-only and flown through in 3D — parallel to the
 // single-structure `StructureData` path, but streamed chunk-by-chunk with LOD.
-import type { PaletteEntry } from './structure';
+import type { PaletteEntry, StructureEntity } from './structure';
 
 /** A dimension's resource id — the three vanilla ones OR a mod dimension `namespace:path`
  *  (e.g. `theplacebeyond:bleak_db599711`). Resolved to a region folder in `world-paths.ts`. */
@@ -92,6 +92,9 @@ export interface ChunkRenderPayload {
   /** Dominant biome grass/foliage tint (sRGB 0..1) applied to `tintindex` faces, or null (default
    *  green). Per-chunk, so foliage varies by biome without a full per-block colormap. */
   grassTint: [number, number, number] | null;
-  /** True when the chunk exists on disk but has no renderable (non-air) sections. */
+  /** Entities to draw (armor stands, item frames, mobs) resolved to render shapes — their texture
+   *  keys are folded into `textureKeys`. Only drawn at the near LOD. Empty when the chunk has none. */
+  entities: StructureEntity[];
+  /** True when the chunk exists on disk but has no renderable (non-air) sections AND no entities. */
   empty: boolean;
 }

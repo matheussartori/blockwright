@@ -11,19 +11,36 @@ export const OVERWORLD = 'minecraft:overworld';
 export const NETHER = 'minecraft:the_nether';
 export const END = 'minecraft:the_end';
 
-/** Region sub-folder for a dimension id, relative to the world root. Vanilla ids map to the classic
- *  folders; any other `ns:path` id resolves under `dimensions/ns/path/region`. */
-export function regionDir(root: string, dim: DimensionId): string {
-  if (dim === NETHER) return path.join(root, 'DIM-1', 'region');
-  if (dim === END) return path.join(root, 'DIM1', 'region');
-  if (dim === OVERWORLD) return path.join(root, 'region');
+/** A dimension's data sub-folder (`region`, `entities`, …) relative to the world root. Vanilla ids
+ *  map to the classic folders; any other `ns:path` id resolves under `dimensions/ns/path/<sub>`. */
+function dimSubdir(root: string, dim: DimensionId, sub: string): string {
+  if (dim === NETHER) return path.join(root, 'DIM-1', sub);
+  if (dim === END) return path.join(root, 'DIM1', sub);
+  if (dim === OVERWORLD) return path.join(root, sub);
   const [ns, ...rest] = dim.split(':');
-  return path.join(root, 'dimensions', ns, rest.join(':'), 'region');
+  return path.join(root, 'dimensions', ns, rest.join(':'), sub);
 }
 
-/** Absolute path to one region file. */
+/** Block-region sub-folder for a dimension id. */
+export function regionDir(root: string, dim: DimensionId): string {
+  return dimSubdir(root, dim, 'region');
+}
+
+/** Entity sub-folder for a dimension id. Since Minecraft 1.17 entities live in their OWN region set
+ *  (`entities/r.<rx>.<rz>.mca`), separate from the block `region/` files (older worlds stored them
+ *  inside the chunk itself). */
+export function entitiesDir(root: string, dim: DimensionId): string {
+  return dimSubdir(root, dim, 'entities');
+}
+
+/** Absolute path to one block-region file. */
 export function regionFilePath(root: string, dim: DimensionId, rx: number, rz: number): string {
   return path.join(regionDir(root, dim), `r.${rx}.${rz}.mca`);
+}
+
+/** Absolute path to one entity-region file (1.17+ `entities/` set). */
+export function entitiesFilePath(root: string, dim: DimensionId, rx: number, rz: number): string {
+  return path.join(entitiesDir(root, dim), `r.${rx}.${rz}.mca`);
 }
 
 /** Split a chunk coordinate into its region + local (in-region) coordinates. */

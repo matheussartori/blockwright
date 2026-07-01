@@ -22,6 +22,7 @@ function column(): ColumnData {
     minSectionY: 0,
     heightmap: null,
     blockEntities: [],
+    entities: [],
     sections: [
       {
         sectionY: 0,

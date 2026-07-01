@@ -8,6 +8,8 @@ import type { ChunkRenderPayload, ChunkSectionPayload } from '@/shared/types';
 import type { PaletteEntry } from '@/shared/types';
 import { blockStateString, type RawPaletteEntry } from '../structure/io/raw';
 import { resolveBlockEntry } from '../structure/catalog/block-catalog';
+import { resolveEntities } from '../structure/assets/entity';
+import { hasContent } from '../structure/assets/content-pack';
 import type { ColumnData } from './anvil/chunk-decode';
 import { grassTintFor } from './biome-tint';
 
@@ -66,6 +68,12 @@ export function resolveColumn(col: ColumnData): ChunkRenderPayload {
     }
   }
 
+  // Resolve entities to render shapes (armor stand → real model when its texture is on disk, else a
+  // fallback cube) and fold their texture keys into the preload set. Skip entirely for the common
+  // entity-free chunk (also keeps the content-pack probe off the hot path).
+  const entities = col.entities.length ? resolveEntities(col.entities, hasContent()) : [];
+  for (const e of entities) if (e.textureKey) textureKeys.add(e.textureKey);
+
   return {
     cx: col.cx,
     cz: col.cz,
@@ -74,6 +82,7 @@ export function resolveColumn(col: ColumnData): ChunkRenderPayload {
     textureKeys: [...textureKeys],
     heightmap: col.heightmap,
     grassTint: grassTintFor(col),
-    empty: sections.length === 0,
+    entities,
+    empty: sections.length === 0 && entities.length === 0,
   };
 }

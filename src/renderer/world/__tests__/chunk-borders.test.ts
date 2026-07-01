@@ -19,6 +19,7 @@ function payload(section: { blocks: Uint16Array }): ChunkRenderPayload {
     textureKeys: [],
     heightmap: null,
     grassTint: null,
+    entities: [],
     empty: false,
   };
 }
