@@ -494,6 +494,8 @@ export const en = {
   'inspector.blocks': 'Blocks',
   'inspector.palette': 'Palette',
   'inspector.jigsaws': 'Jigsaws',
+  'inspector.entities': 'Entities',
+  'inspector.focusEntity': 'Focus this entity',
   'inspector.flat': 'flat',
   'inspector.focusBlock': 'Focus this block',
 

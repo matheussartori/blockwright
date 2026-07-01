@@ -73,6 +73,30 @@ function groupBlocks(data: StructureData): BlockGroup[] {
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+interface EntityGroup {
+  name: string;
+  color: [number, number, number];
+  /** Floored positions (for the focus camera) of every occurrence. */
+  positions: [number, number, number][];
+}
+
+/** Group structure entities (armor stands, mobs, …) by id. These have no palette block —
+ *  they render from `StructureData.entities` — so the inspector lists them separately. The
+ *  swatch reuses each entity's deterministic fallback color (same source the palette uses). */
+function groupEntities(data: StructureData): EntityGroup[] {
+  const groups = new Map<string, EntityGroup>();
+  for (const e of data.entities ?? []) {
+    const name = e.id.replace('minecraft:', '');
+    let g = groups.get(name);
+    if (!g) {
+      g = { name, color: e.color, positions: [] };
+      groups.set(name, g);
+    }
+    g.positions.push([Math.floor(e.pos[0]), Math.floor(e.pos[1]), Math.floor(e.pos[2])]);
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function rgb(color: [number, number, number]): string {
   return `rgb(${color.map((c) => Math.round(c * 255)).join(',')})`;
 }
@@ -83,6 +107,7 @@ export function InspectorContent() {
   const textureIcons = useSettings((s) => s.blockTextureIcons);
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
+  const entityGroups = useMemo(() => (structure ? groupEntities(structure) : []), [structure]);
   // The file's full palette size (air-like entries included — they're real palette entries).
   const paletteCount = structure?.palette.length ?? 0;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -138,6 +163,12 @@ export function InspectorContent() {
               <dd>{structure.jigsaws.length}</dd>
             </div>
           )}
+          {structure.entities.length > 0 && (
+            <div>
+              <dt>{t('inspector.entities')}</dt>
+              <dd>{structure.entities.length}</dd>
+            </div>
+          )}
         </dl>
       </div>
       <div className="palette-list">
@@ -169,6 +200,43 @@ export function InspectorContent() {
                         type="button"
                         className="instance-row"
                         title={t('inspector.focusBlock')}
+                        onClick={() => viewer?.focusBlock(pos)}
+                      >
+                        <span className="instance-idx">{i + 1}</span>
+                        <span className="instance-pos">{pos.join(', ')}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+        {entityGroups.map((g) => {
+          const key = `entity:${g.name}`;
+          const open = expanded.has(key);
+          return (
+            <div className="palette-group" key={key}>
+              <button
+                type="button"
+                className="palette-row"
+                aria-expanded={open}
+                onClick={() => toggle(key)}
+              >
+                <span className={`bw-caret${open ? ' open' : ''}`}>▸</span>
+                <span className="swatch" style={{ background: rgb(g.color) }} />
+                <span className="block-name">{g.name}</span>
+                <span className="chip">{t('inspector.entities')}</span>
+                <span className="block-count">({g.positions.length})</span>
+              </button>
+              {open && (
+                <ul className="block-instances">
+                  {g.positions.map((pos, i) => (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        className="instance-row"
+                        title={t('inspector.focusEntity')}
                         onClick={() => viewer?.focusBlock(pos)}
                       >
                         <span className="instance-idx">{i + 1}</span>

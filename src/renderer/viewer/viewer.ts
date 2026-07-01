@@ -10,6 +10,7 @@ import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REV
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
+import { buildEntities } from './entity-mesh';
 import { SelectionOverlay } from './selection-overlay';
 import { SymmetryOverlay } from './symmetry-overlay';
 import { HoverOverlay } from './hover-overlay';
@@ -170,6 +171,7 @@ export class Viewer {
     const parent = new THREE.Group();
     for (const p of pieces) {
       const group = buildStructure(p.data, textures, this.showJigsaw, this.hideShell);
+      group.add(buildEntities(p.data, textures));
       group.rotation.y = (p.quarterTurns * Math.PI) / 2;
       group.position.set(p.offset[0], p.offset[1], p.offset[2]);
       parent.add(group);

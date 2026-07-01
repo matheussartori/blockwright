@@ -58,6 +58,44 @@ export interface StructureBlock {
   pos: [number, number, number];
 }
 
+/** Per-bone Euler rotation (degrees, Minecraft model frame) from an armor stand's `Pose`
+ *  NBT. Any bone absent = its default (zeroed) pose. */
+export interface ArmorStandPose {
+  head?: [number, number, number];
+  body?: [number, number, number];
+  leftArm?: [number, number, number];
+  rightArm?: [number, number, number];
+  leftLeg?: [number, number, number];
+  rightLeg?: [number, number, number];
+}
+
+/** A renderable structure entity (armor stand, item frame, mob, …). Unlike block
+ *  entities — which the renderer synthesizes from the block NAME — entities have no
+ *  block in the palette, so the loader carries the few fields the viewer needs to
+ *  draw them directly. `pos` is the precise (float) position in the structure's local
+ *  space; `rotation` is the y-yaw in degrees. */
+export interface StructureEntity {
+  /** Entity id, e.g. "minecraft:armor_stand". */
+  id: string;
+  pos: [number, number, number];
+  /** Y-rotation (yaw) in degrees; 0 when the entity has no `Rotation`. */
+  rotation: number;
+  /** Deterministic fallback color [r,g,b] in 0..1, drawn as a cube when no real model
+   *  (or texture) is available — the same treatment blocks get. */
+  color: [number, number, number];
+  /** The resolved entity texture key ("namespace/path") when it exists in the content
+   *  pack / workspace; null → render the fallback cube. Armor stand only for now. */
+  textureKey: string | null;
+  /** Armor-stand only: a "small" stand renders at half scale. */
+  small?: boolean;
+  /** Armor-stand only: whether the arms are shown. */
+  showArms?: boolean;
+  /** Armor-stand only: whether the stone base plate is hidden. */
+  noBasePlate?: boolean;
+  /** Armor-stand only: per-bone limb rotations from `Pose`. */
+  pose?: ArmorStandPose;
+}
+
 /** How a jigsaw constrains the rotation of the piece attached to it. */
 export type JigsawJoint = 'rollable' | 'aligned';
 
@@ -98,6 +136,9 @@ export interface StructureData {
   blockCount: number;
   /** Jigsaw connection points found in this structure (empty when none). */
   jigsaws: JigsawConnector[];
+  /** Structure entities (armor stands, item frames, mobs) to draw. Empty when none —
+   *  these have no palette block, so the renderer builds their meshes from this list. */
+  entities: StructureEntity[];
   /** Storeys recognised from the geometry on load (see `detectFloors`) — the app no
    *  longer asks the user to define the floor plan by hand. Seeds the (editable) Floors
    *  panel + the viewer bands; absent for structures with no clear floor plane. */

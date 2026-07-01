@@ -90,6 +90,12 @@ src/
                              synthesized from a 64×64 atlas: box-uv.ts (shared box/UV helper),
                              chest.ts, bed.ts, banner.ts (wall), skull.ts, decorated-pot.ts,
                              index.ts (dispatcher)
+        entity.ts            Project the raw `entities` (armor stands, item frames, mobs — NOT
+                             blocks, so no palette entry) into render-ready `StructureEntity`s:
+                             id/pos/yaw/fallback-color/resolved-texture-key + armor-stand display
+                             flags & `Pose`. `resolveEntities(raw, canResolve)` (canResolve gates
+                             the armor-stand texture disk check); the viewer draws the result (see
+                             renderer `viewer/entity-mesh.ts`).
       catalog/
         block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
                              namespace-aware) + a representative texture per block → the Block Catalog.
@@ -489,8 +495,11 @@ src/
                           re-encodes via IPC → a new version)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
-                          bridge) + mesh/geometry/texture building. Focused concerns split out of the
-                          Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
+                          bridge) + mesh/geometry/texture building (mesh-builder.ts for blocks;
+                          entity-mesh.ts for `StructureData.entities` — the vanilla armor-stand box
+                          model textured from the entity atlas with `Pose`/flags applied, else a
+                          fallback cube, added per-piece alongside the block group). Focused concerns
+                          split out of the Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
                           navigation + framing), capture.ts (the AI-review screenshot paths: orbit/
                           cutaway/section — encoded via the shared `REVIEW_SNAP` = JPEG@512 to keep the
                           re-sent/accumulating review images cheap; cutaways scale ~1/storey and yield 0
@@ -1274,6 +1283,12 @@ writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re
   **Entities** (armor stands, item frames, mobs) ride along the same way: `RawStructure.entities`
   ({pos, blockPos, nbt}) is read by `readAuthoring`/`readRaw` and written back on a `.nbt` write, so a
   format conversion — and the jigsaw split (which partitions them per piece) — no longer drops them.
+  Unlike block entities, entities have no palette block, so they'd otherwise be invisible — the load
+  path DOES render them: `loadStructure` projects each raw entity into a `StructureData.entities`
+  (`StructureEntity`) via `assets/entity.ts` `resolveEntities`, and the viewer draws them
+  (`viewer/entity-mesh.ts`) — the armor stand as its real vanilla box model (entity texture + `Pose`
+  + Small/ShowArms/NoBasePlate flags), every other id as a deterministic fallback cube. They're also
+  listed (grouped by id, with a focus jump) in the Inspector alongside the block palette.
 
 ### Updates
 
@@ -1313,6 +1328,9 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   before the normal model path: `fluid.ts` (water/lava) and the `block-entity/` dispatcher
   (chest/bed/banner/skull/decorated-pot). Each builds `ResolvedModel`s directly. **Add a new kind as its own file**
   in `block-entity/` and wire it into `block-entity/index.ts` — don't lump them together.
+  Don't confuse these with structure ENTITIES (armor stands, mobs): those aren't blocks — they carry
+  no palette entry — so they're resolved in `assets/entity.ts` and drawn by the renderer's
+  `viewer/entity-mesh.ts`, not through `resolveBlock`/`block-entity/`.
   - Entity geometry uses `box-uv.ts`: `boxFaces` is the standard Minecraft box-UV unwrap
     (front lands on +z/south) into a 64×64 atlas; `FACING_Y` maps `facing` to a y-rotation
     (base front = +z). Chests = bottom/lid/lock; beds = mattress slab + 2 legs per half

@@ -72,7 +72,8 @@ refines through an emit → render → review loop — previewed live in the vie
 - **Floor-plan editing** — define named vertical levels, highlighted as bands in the viewer, that ride
   along as context on every generation prompt
 - Jigsaw assembly preview, a Block Catalog browser with live 3D previews, block-entity rendering
-  (chests, beds, banners, skulls, decorated pots) and animated fluids
+  (chests, beds, banners, skulls, decorated pots), entity rendering (armor stands as their real
+  vanilla model with pose and display flags) and animated fluids
 - Floating, dockable tool windows and a light/dark themed UI
 
 ## Usage

@@ -7,6 +7,7 @@ import { getActiveWorkspace, hasContent } from '../assets/content-pack';
 import { collectTextures } from '../assets/model-loader';
 import { isAir, resolveBlock } from '../assets/blockstate-resolver';
 import { fallbackColor } from '../assets/fallback-color';
+import { resolveEntities } from '../assets/entity';
 import { extractJigsaws } from '../jigsaw/jigsaw';
 import { decodeSchem } from './schematic';
 import { decodeLitematic } from './litematica';
@@ -14,7 +15,7 @@ import { decodeLitematic } from './litematica';
 // The raw structure shape lives in ./raw (shared by every codec); re-exported here so the
 // existing `from './load-structure'` importers (jigsaw extraction) keep resolving it.
 export type { RawPaletteEntry, RawBlock } from './raw';
-import type { RawPaletteEntry, RawBlock } from './raw';
+import type { RawEntity, RawPaletteEntry, RawBlock } from './raw';
 
 /** Lightweight structure metadata for jigsaw assembly: just size + connectors,
  *  skipping the (expensive) model resolution that full loading does. */
@@ -44,6 +45,7 @@ export function buildStructureData(
   size: [number, number, number],
   rawPalette: RawPaletteEntry[],
   rawBlocks: RawBlock[],
+  rawEntities: RawEntity[] = [],
 ): StructureData {
   const withContent = hasContent();
   // Resolve models if the vanilla pack is present or a mod workspace is open
@@ -64,6 +66,11 @@ export function buildStructureData(
   const textureSet = new Set<string>();
   for (const entry of palette) collectTextures(entry.models, textureSet);
 
+  // Entities carry their own texture keys (e.g. an armor stand's atlas); fold them into the
+  // load set so the viewer fetches them alongside the block textures.
+  const entities = resolveEntities(rawEntities, canResolve);
+  for (const e of entities) if (e.textureKey) textureSet.add(e.textureKey);
+
   return {
     name: path.basename(filePath),
     path: filePath,
@@ -74,6 +81,7 @@ export function buildStructureData(
     hasContent: withContent,
     blockCount: blocks.filter((b) => !palette[b.state]?.air).length,
     jigsaws: extractJigsaws(rawPalette, rawBlocks),
+    entities,
   };
 }
 
@@ -85,16 +93,32 @@ export async function loadStructure(filePath: string): Promise<StructureData> {
   const lower = filePath.toLowerCase();
   if (lower.endsWith('.schem') || lower.endsWith('.litematic')) {
     const raw = lower.endsWith('.schem') ? await decodeSchem(buffer) : await decodeLitematic(buffer);
-    return buildStructureData(filePath, raw.size, raw.palette, raw.blocks);
+    return buildStructureData(filePath, raw.size, raw.palette, raw.blocks, raw.entities ?? []);
   }
   const { parsed } = await nbt.parse(buffer);
   const root = nbt.simplify(parsed) as {
     size?: number[];
     palette?: RawPaletteEntry[];
     blocks?: RawBlock[];
+    entities?: RawEntityNbt[];
   };
   const size = (root.size ?? [0, 0, 0]) as [number, number, number];
-  return buildStructureData(filePath, size, root.palette ?? [], root.blocks ?? []);
+  return buildStructureData(filePath, size, root.palette ?? [], root.blocks ?? [], toRawEntities(root.entities));
+}
+
+/** The `.nbt` `entities` list shape (before projection). */
+type RawEntityNbt = { pos?: number[]; blockPos?: number[]; nbt?: Record<string, unknown> };
+
+/** Normalize the `.nbt` `entities` list into RawEntity[] (dropping any without a position;
+ *  `blockPos` defaults to the float `pos`, `nbt` to an empty compound). */
+function toRawEntities(entities: RawEntityNbt[] | undefined): RawEntity[] {
+  return (entities ?? [])
+    .filter((e) => Array.isArray(e.pos))
+    .map((e) => ({
+      pos: e.pos as [number, number, number],
+      blockPos: (e.blockPos ?? e.pos) as [number, number, number],
+      nbt: e.nbt ?? {},
+    }));
 }
 
 function normalizeProps(

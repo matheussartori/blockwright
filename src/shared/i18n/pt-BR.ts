@@ -496,6 +496,8 @@ export const ptBR: Messages = {
   'inspector.blocks': 'Blocos',
   'inspector.palette': 'Paleta',
   'inspector.jigsaws': 'Jigsaws',
+  'inspector.entities': 'Entidades',
+  'inspector.focusEntity': 'Focar esta entidade',
   'inspector.flat': 'chapado',
   'inspector.focusBlock': 'Focar este bloco',
 
