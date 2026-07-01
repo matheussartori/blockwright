@@ -58,6 +58,12 @@ refines through an emit → render → review loop — previewed live in the vie
 - **In-app block editor** — select, move, mirror/rotate, extrude, paint, replace and delete blocks
   directly in the viewer, with live symmetry, undo/redo, and orientation that stays correct on every
   transform; each save writes a new `.nbt` version so a mistake is never fatal
+- **World viewer** — open a whole Minecraft save and fly through it view-only. Chunks stream in
+  around the camera with level-of-detail (full block geometry near, a cheaper heightmap surface far)
+  and unload behind you, so an entire world explores without loading it all at once. Reads Anvil
+  `region/*.mca` directly (1.13+), meshes off the main thread in a worker pool, and reuses the same
+  geometry core as the structure renderer — plus a top-down minimap, day/night, a dimension switcher,
+  and a find-structures search that jumps you to any village, stronghold or mod structure
 - **Schematic interop** — open and export **WorldEdit `.schem`** and **Litematica `.litematic`**
   schematics alongside native `.nbt`, preserving block entities (chest contents, sign text) on conversion
 - **Mod workspace support** — render modded structures with their own textures, and **export** a
@@ -135,6 +141,26 @@ Without a content pack, structures still load but blocks render as flat determin
 
 Recently opened files are remembered and listed under **File ▸ Open Recent** and on the welcome
 screen.
+
+### Exploring a world
+
+**File ▸ Open World…** (Cmd/Ctrl+Shift+W, or the welcome screen) opens a Minecraft save folder — the
+directory holding `level.dat` and `region/` — and drops you into a view-only fly-through of the actual
+world. Press **F** to fly, **WASD** to move. Chunks stream in around the camera and unload behind you,
+so an entire world stays explorable without loading it all at once:
+
+- **Level of detail** — nearby chunks render as full block geometry (caves, overhangs and interiors
+  visible from any angle); distant ones fall back to a cheaper heightmap surface, widening the view
+  without the cost. The **Render distance** control trades reach for performance.
+- **Navigation** — jump to **spawn**, the last **player** position, an explicit **X/Y/Z** coordinate,
+  or any **generated structure** (a village, stronghold, or mod structure) via the find-structures
+  search. A top-down **minimap** fills in with real terrain colours as you explore.
+- **Dimensions & mood** — switch between the Overworld, Nether, End, and any mod dimensions present on
+  disk, and toggle **day/night** lighting.
+
+Worlds from **Minecraft 1.13+** are supported (the paletted chunk format); recently opened worlds are
+remembered under **File ▸ Open Recent World** and on the welcome screen. The world is never modified —
+it's a read-only viewer.
 
 ### Generating a structure
 
@@ -337,6 +363,9 @@ screen-recording permission. Set these env vars when launching:
 | `BW_CAPTURE_DELAY`| Override the capture delay in ms (raise it on cold starts) |
 | `BW_CONTENT`      | Override the content-pack location                        |
 | `BW_WORKSPACE`    | Activate a mod workspace on startup                       |
+| `BW_OPEN_WORLD`   | Path to a Minecraft world folder to open on startup       |
+| `BW_WORLD_CAM`    | Override the world fly-through's initial camera position (`x,y,z`) |
+| `BW_WORLD_LOOK`   | Aim the initial world camera at an explicit target (`x,y,z`) |
 | `BW_FORCE_UPDATE_CHECK` | Run the update check in dev; a version (e.g. `9.9.9`) forces a synthetic newer release |
 
 ## Architecture
@@ -349,8 +378,10 @@ src/
   main.ts        Main entry: app lifecycle, open-file, scheme/protocol/IPC wiring
   preload.ts     Exposes window.blockwright (contextBridge) — the only renderer→main bridge
   main/          Window, IPC handlers, native menu, recents, workspaces, structure loading,
-                 the authoring/NBT compiler, the composable generation domain, and AI generation
-  renderer/      React UI shell (Vite + React) and the imperative Three.js viewer
+                 the authoring/NBT compiler, the composable generation domain, AI generation,
+                 and the Anvil world reader (region files → resolved chunk render payloads)
+  renderer/      React UI shell (Vite + React), the imperative Three.js viewer, and the streamed
+                 world view (chunk mesh worker pool + LOD)
   shared/        IPC channel names and type-only contracts shared by both bundles
 knowledge/       AI knowledge base (NBT authoring guides), shipped as an extraResource
 content/         A user-supplied Minecraft content pack (configured at runtime, not bundled;

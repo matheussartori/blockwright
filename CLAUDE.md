@@ -76,8 +76,12 @@ src/
                             encodeSchem (v2) + parseBlockState. Decodes to the SAME raw shape as `.nbt`
                             (from raw.ts/nbt-tags.ts). See "Schematic interop".
         litematica.ts       Litematica `.litematic` interop: decodeLitematic (multi-region, bit-packed long
-                            array, SPANNING) + encodeLitematic (single region) + the BigInt bit-array
-                            helpers (bitsForPalette/pack/unpackBlockStates, unit-tested).
+                            array, SPANNING) + encodeLitematic (single region). The BigInt long-array
+                            packing lives in `long-bits.ts` now (imported here + by the world decoder).
+        long-bits.ts        Shared BigInt long-array bit-packing (SPANNING + NON-spanning): bitsForPalette/
+                            bitsForBlockStates + pack/unpack + pairsToBig/bigToPairs (prismarine-nbt's
+                            [hi,lo] int32 pairs ↔ unsigned bigints). Unit-tested (`__tests__/long-bits.test.ts`);
+                            consumed by `.litematic` (spanning) AND the Anvil chunk decoder (world viewer).
         convert.ts          Format-aware export: readRaw (.nbt|.schem|.litematic → raw) + convertStructure
                             (writes by the dest extension; .nbt→.nbt copies losslessly, else re-encodes). Export As.
       assets/               The resource/model layer (block name+props → resolved models + textures):
@@ -265,6 +269,27 @@ src/
     mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
     structure/mc-data-version.ts  The single DEFAULT_DATA_VERSION (3955 = MC 1.21.1) every codec/compiler/
                             AI-schema stamps, so a version bump is one edit (was ~10 scattered literals)
+    world/                  The World Viewer's MAIN side: read a Minecraft save + resolve chunks to
+                            render payloads. See "World viewer" below.
+      active-world.ts       The single open-world singleton (mirrors content-pack's active-workspace):
+                            open/get/close a WorldSource, disposing the previous one.
+      world-service.ts      The API the IPC handlers delegate to: openWorld (activate + meta),
+                            getChunkPayload/getChunksPayload (chunk coords → resolved payloads),
+                            listWorldRegions, findWorldStructures — composes the singleton + reader + resolver.
+      world-source.ts       The lazy, cached world READER (pure data, no asset resolution): opens region
+                            files on demand, bounded LRU of region buffers + decoded columns, getChunk /
+                            listRegions / findStructures. Version-gated on DataVersion (1.13+ paletted).
+      chunk-resolve.ts      Bridge a decoded ColumnData → ChunkRenderPayload via the EXISTING asset
+                            pipeline (resolveBlockEntry), memoised by block-state string (a world has
+                            millions of blocks but few hundred states); clear the memo on content/workspace switch.
+      biome-tint.ts         Per-chunk dominant grass/foliage tint (sRGB) for tintindex faces + the minimap.
+      anvil/                The Anvil disk format (pure, testable):
+        world-paths.ts       isWorldDir / availableDimensions / listRegions / region+chunk path math
+                             (vanilla + mod dimensions under DIM/…/region).
+        level-dat.ts         Parse level.dat → name/dataVersion/versionName/spawn/player.
+        region-file.ts       Open a .mca: read the header, inflate a chunk's NBT, listPresent (for scans).
+        chunk-decode.ts      Decode a 1.13+ chunk NBT → ColumnData (sections/heightmap/block entities);
+                             handles 1.18+ root `sections` + legacy `Level.Sections`, spanning vs non-spanning.
     ai/                     AI structure generation (File ▸ New Structure)
       generate.ts           Provider-agnostic orchestrator: owns sessions, the round budget + live
                             progress, and the shared EmitRunState; wires the per-emit handler and
@@ -495,10 +520,20 @@ src/
                           re-encodes via IPC → a new version)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
-                          bridge) + mesh/geometry/texture building (mesh-builder.ts for blocks;
+                          bridge) + mesh/geometry/texture building. The geometry MATH is a shared,
+                          WORKER-SAFE core: geometry-core.ts (buildGeometryBuffers — resolved palette +
+                          blocks → per-material transferable vertex buffers, with optional neighbour
+                          face-culling for the world path; `packBuffers` freezes an accumulator's arrays
+                          into a MaterialBuffers ONCE, reused by the world's surface-LOD mesher) +
+                          model-geometry.ts (addModel/addFallbackCube — pure quad math, THREE math only,
+                          no scene/texture). mesh-builder.ts then WRAPS those buffers into
+                          BufferGeometry+Material+Mesh where it has the real GPU textures (geometryFor/
+                          materialFor, shared by the structure path + world chunk assembly); the world
+                          chunk-mesh worker calls the SAME core, so the two renderers can't drift (a
+                          golden test pins the structure output).
                           entity-mesh.ts for `StructureData.entities` — the vanilla armor-stand box
                           model textured from the entity atlas with `Pose`/flags applied, else a
-                          fallback cube, added per-piece alongside the block group). Focused concerns
+                          fallback cube, added per-piece alongside the block group. Focused concerns
                           split out of the Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
                           navigation + framing), capture.ts (the AI-review screenshot paths: orbit/
                           cutaway/section — encoded via the shared `REVIEW_SNAP` = JPEG@512 to keep the
@@ -515,11 +550,35 @@ src/
                           [blue]/VOID_MARK [red], mirroring Minecraft's show-invisible-blocks colors). The Viewer also exposes `pickBlock(x,y)`
                           (raycast → block cell, via stepping along the ray) + `pickPlacement(x,y)` (empty
                           cell in front) + `setSelection`/`setSymmetryPlane`/`setVoids`/`setHover`/`setPaintNav`.
+                          The Viewer also owns WORLD MODE (enter/exitWorldMode, setWorldDimension/
+                          RenderDistance, setDaylight, cameraPosition/Yaw, worldStats/Minimap,
+                          goToWorldCoord) — it holds a `WorldView` and calls `update(camera)` each frame.
+    world/                The World Viewer's RENDERER side: stream a Minecraft world's chunks around the
+                          camera with LOD. See "World viewer" below.
+                          world-view.ts        The streamed scene: a map of loaded chunk meshes, a
+                                               camera-distance load queue over IPC, frustum culling, LRU
+                                               eviction under a hard cap, cross-chunk seam re-meshing +
+                                               world-generation-edge border walls. update(camera) each frame.
+                          worker-pool.ts       A small pool of chunk-mesh workers (load-balanced, cancellable
+                                               jobs) + worker-protocol.ts (the request/response shape) +
+                                               chunk-mesh.worker.ts (calls the shared geometry core / surface
+                                               mesher off-thread, transfers typed-array buffers back).
+                          surface.ts           Mid/far LOD: a cheap SURFACE mesh from the heightmap (top
+                                               quads + cliff skirts) + chunkSurfaceColor for the minimap.
+                          lod.ts               LOD bands + `lodForDistance` (hysteresis so a chunk on a
+                                               boundary doesn't thrash levels).
+                          chunk-borders.ts     Per-chunk EDGE occluder planes so a solid-against-solid chunk
+                                               seam culls like an interior one (fed to a neighbour's near build).
+                          components/          WorldHud (thin orchestrator: top-bar controls + coord/stream
+                                               readout, composes WorldGotoForm + WorldStructureFinder) +
+                                               WorldMinimap (2D top-down canvas map).
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain
-                          (structure, workspace, jigsaw, generation, export, edit, app, api =
-                          BlockwrightApi) + an index.ts barrel — so `@/shared/types` stays the one import path
+                          (structure, workspace, jigsaw, generation, export, edit, world, app, api =
+                          BlockwrightApi) + an index.ts barrel — so `@/shared/types` stays the one import path.
+                          world.ts = WorldMeta/WorldDimension/DimensionId/RegionRef/StructureLocation +
+                          the ChunkRenderPayload/ChunkSectionPayload streamed to the mesh worker.
     jigsaw.ts             Pure jigsaw geometry/alignment (rotation, attachment, AABB, seeded RNG)
     domain/               Pure domain predicates shared by BOTH processes (no Node/electron) so the
                           two sides can't drift: applies-to.ts (moduleAppliesTo — the renderer's
@@ -1290,6 +1349,53 @@ writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re
   + Small/ShowArms/NoBasePlate flags), every other id as a deterministic fallback cube. They're also
   listed (grouped by id, with a focus jump) in the Inspector alongside the block palette.
 
+### World viewer
+
+**File ▸ Open World…** (Cmd+Shift+W / welcome / recents / `BW_OPEN_WORLD`) opens a whole Minecraft
+save folder (`level.dat` + `region/*.mca`) as a **view-only fly-through** — parallel to the
+single-structure `.nbt` path, but the world is far too big to hold in memory, so it's STREAMED
+chunk-by-chunk with level-of-detail. The world is never modified.
+
+- **Main reads the disk, renderer streams the scene.** `main/world/` owns the Anvil format (pure,
+  testable `anvil/`: world-paths / level-dat / region-file / chunk-decode) and a lazy cached
+  `WorldSource` (bounded LRU over region buffers + decoded columns). `chunk-resolve.ts` bridges a
+  decoded `ColumnData` → `ChunkRenderPayload` through the **existing** asset pipeline
+  (`resolveBlockEntry`), memoised by block-state string — a world has millions of blocks but only a
+  few hundred distinct states, so each resolves once. The active world is a singleton
+  (`active-world.ts`, mirrors content-pack's active-workspace) referenced by the IPC handlers via
+  `world-service.ts`, so chunk requests don't re-pass the path. Typed-array chunk grids
+  structured-clone across the bridge (no JSON of block data).
+- **The renderer's `WorldView`** (`renderer/world/world-view.ts`) requests the chunks around the
+  camera over a bounded in-flight queue, meshes them OFF the main thread in a **worker pool**
+  (`worker-pool.ts` + `chunk-mesh.worker.ts` + `worker-protocol.ts`), swaps chunk groups in/out, frustum-culls,
+  and LRU-evicts under a hard resident cap. `update(camera)` runs each frame from the Viewer.
+- **Shared geometry core, one source of truth.** The worker calls the SAME
+  `viewer/geometry-core.ts buildGeometryBuffers` as the single-structure path (with neighbour
+  face-culling ON for the world — a solid stone section would else emit 4096 cubes of buried faces).
+  A golden test pins the structure output so the two renderers can't drift.
+- **Cross-chunk seams.** A chunk is meshed in isolation, so a face on its X/Z border has no neighbour
+  to cull against and would wall off the view when you fly through terrain. `chunk-borders.ts`
+  precomputes each chunk's four EDGE occluder planes (bit-packed) on the main thread; the view hands a
+  neighbour's facing edge into a near build (`NeighborBorders`) so a solid-against-solid seam culls
+  like an interior one. A late-arriving neighbour re-meshes the seam (a neighbour-mask bit flips).
+- **LOD** (`lod.ts`): near = full block geometry; mid = a textured heightmap SURFACE (top quads +
+  cliff skirts, `surface.ts`); far = the same surface in flat biome-tinted colour. Bands scale with
+  the render-distance control, with hysteresis so a boundary chunk doesn't thrash levels. A
+  world-generation EDGE (ungenerated or empty proto-chunk) is drawn as a translucent red border wall
+  with its cross-section culled, not the raw sliced "paredão".
+- **HUD** (`renderer/world/components/`): `WorldHud` is a thin orchestrator (top-bar controls + the
+  coord/stream readout) composing `WorldGotoForm` (go-to X/Y/Z) + `WorldStructureFinder` (scan +
+  jump to any generated structure, `world-source.ts findStructures`, cached per dimension) +
+  `WorldMinimap` (a 2D top-down canvas that fills in with real terrain colours). Day/night is a
+  lighting mood toggle (no sky sim); the dimension switcher lists only dimensions with region data
+  on disk (vanilla + mod). `biome-tint.ts` gives each chunk its dominant grass/foliage tint.
+- **Version support:** 1.13+ paletted chunks (1.18+ root `sections`, legacy `Level.Sections`,
+  spanning vs non-spanning handled in `chunk-decode.ts` via `structure/io/long-bits.ts`); pre-1.13
+  numeric-ID worlds fail soft (logged + skipped). Dev capture: `BW_WORLD_CAM`/`BW_WORLD_LOOK` aim the
+  initial fly-through camera for a headless screenshot.
+- **Add support for an older format / a HUD control:** extend `chunk-decode.ts` (+ its `__tests__`)
+  for the format; a new HUD panel is its own component composed into `WorldHud`.
+
 ### Updates
 
 Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) at launch:
@@ -1464,3 +1570,7 @@ The app can screenshot itself headlessly. Set env vars when launching:
   `BW_CAPTURE_DELAY=8000` (ms).
 - `BW_CONTENT=/path/to/content` — override the content-pack location.
 - `BW_WORKSPACE=/path/to/mod-project` — activate a mod workspace on startup.
+- `BW_OPEN_WORLD=/path/to/save` — open a Minecraft world folder (the World Viewer) on startup.
+- `BW_WORLD_CAM=x,y,z` / `BW_WORLD_LOOK=x,y,z` — override the initial world fly-through camera
+  position / look target, so a headless capture can start underground / at a cliff (caves, grass
+  sides, bedrock, world edges).

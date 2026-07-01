@@ -120,6 +120,26 @@ export interface BuildGeometryOptions {
 
 const posKey = (x: number, y: number, z: number): string => `${x},${y},${z}`;
 
+/** The raw, growable vertex arrays every accumulator carries before it's frozen into typed buffers. */
+export interface RawVertexArrays {
+  positions: number[];
+  normals: number[];
+  uvs: number[];
+  colors: number[];
+}
+
+/** Freeze one accumulator's vertex arrays into transferable typed buffers, tagged with its material
+ *  flags. Shared by the block-geometry core and the surface-LOD mesher so the packing lives once. */
+export function packBuffers(raw: RawVertexArrays, meta: Omit<MaterialBuffers, keyof RawVertexArrays>): MaterialBuffers {
+  return {
+    ...meta,
+    positions: new Float32Array(raw.positions),
+    normals: new Float32Array(raw.normals),
+    uvs: new Float32Array(raw.uvs),
+    colors: new Float32Array(raw.colors),
+  };
+}
+
 /** Is this palette entry a full opaque cube (so it hides neighbour faces)? A model-less coloured
  *  fallback counts; a translucent (stained glass) or non-full model does not. */
 function isFullOpaqueCube(entry: PaletteEntry, textures: Map<string, TexInfo>): boolean {
@@ -198,18 +218,16 @@ export function buildGeometryBuffers(
   const out: MaterialBuffers[] = [];
   for (const [key, a] of accums) {
     if (a.positions.length === 0) continue;
-    out.push({
-      key,
-      textured: a.textured,
-      translucent: !!a.translucent,
-      doubleSided: a.doubleSided !== false,
-      textureKey: a.textureKey,
-      color: a.color,
-      positions: new Float32Array(a.positions),
-      normals: new Float32Array(a.normals),
-      uvs: new Float32Array(a.uvs),
-      colors: new Float32Array(a.colors),
-    });
+    out.push(
+      packBuffers(a, {
+        key,
+        textured: a.textured,
+        translucent: !!a.translucent,
+        doubleSided: a.doubleSided !== false,
+        textureKey: a.textureKey,
+        color: a.color,
+      }),
+    );
   }
   return out;
 }

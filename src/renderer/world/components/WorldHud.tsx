@@ -1,17 +1,20 @@
 // The world-viewer HUD: floating overlays on the world-mode viewport. A top bar with the dimension
-// switcher + render-distance control + jump-to-spawn/player + go-to-coordinate, and a bottom chip
-// with the live coordinate readout + streaming indicator. Reads the world meta from the active doc
-// and drives the viewer imperatively; glassy panels using the shared tokens.
+// switcher + render-distance control + jump-to-spawn/player + go-to-coordinate + find-structures +
+// day/night, and a bottom chip with the live coordinate readout + streaming indicator. Reads the
+// world meta from the active doc and drives the viewer imperatively; the go-to and structure panels
+// are their own components (this file just orchestrates + composes them). Glassy panels via the
+// shared tokens.
 import { useEffect, useMemo, useState } from 'react';
 import { Crosshair, Locate, MapPinned, Moon, Sun, UserRound } from 'lucide-react';
-import type { DimensionId, StructureLocation } from '@/shared/types';
-import { api } from '../../api';
+import type { DimensionId } from '@/shared/types';
 import { useViewer } from '../../viewer/ViewerProvider';
 import { useActiveDoc, useT } from '../../hooks/useStores';
 import { Select } from '../../components/ui/Select';
 import { Stepper } from '../../components/ui/Stepper';
 import { Tooltip } from '../../components/ui/Tooltip';
 import { WorldMinimap } from './WorldMinimap';
+import { WorldGotoForm } from './WorldGotoForm';
+import { WorldStructureFinder } from './WorldStructureFinder';
 
 export function WorldHud() {
   const viewer = useViewer();
@@ -24,29 +27,14 @@ export function WorldHud() {
   const [renderDistance, setRenderDistance] = useState(10);
   const [gotoOpen, setGotoOpen] = useState(false);
   const [day, setDay] = useState(true);
-  const [target, setTarget] = useState<[number, number, number]>(meta?.spawn ?? [0, 64, 0]);
   const [structOpen, setStructOpen] = useState(false);
-  const [structs, setStructs] = useState<StructureLocation[] | null>(null);
-  const [structQuery, setStructQuery] = useState('');
 
-  // Reset per-world state when the tab's world changes.
+  // Reset per-world state + close the panels when the tab's world changes.
   useEffect(() => {
     setDim(meta?.dimensions[0]?.id ?? 'minecraft:overworld');
-    setTarget(meta?.spawn ?? [0, 64, 0]);
-    setStructs(null);
+    setGotoOpen(false);
     setStructOpen(false);
   }, [meta?.root]);
-
-  // Scan for structures on first open of the panel (per dimension); cached in main after that.
-  useEffect(() => {
-    if (!structOpen) return;
-    setStructs(null);
-    let live = true;
-    void api.findWorldStructures(dim).then((s) => live && setStructs(s));
-    return () => {
-      live = false;
-    };
-  }, [structOpen, dim]);
 
   // Poll the camera + streaming stats each frame for the readout.
   useEffect(() => {
@@ -149,72 +137,23 @@ export function WorldHud() {
         </div>
 
         {gotoOpen && (
-          <form
-            className="world-hud-goto"
-            onSubmit={(e) => {
-              e.preventDefault();
-              jump(target);
+          <WorldGotoForm
+            initial={meta.spawn}
+            onJump={(pos) => {
+              jump(pos);
               setGotoOpen(false);
             }}
-          >
-            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
-              <label key={axis}>
-                {axis}
-                <input
-                  type="number"
-                  value={target[i]}
-                  onChange={(e) => {
-                    const next = [...target] as [number, number, number];
-                    next[i] = Number(e.target.value);
-                    setTarget(next);
-                  }}
-                />
-              </label>
-            ))}
-            <button type="submit" className="world-hud-btn primary">
-              {t('world.go')}
-            </button>
-          </form>
+          />
         )}
 
         {structOpen && (
-          <div className="world-hud-structs">
-            <input
-              className="world-hud-search"
-              type="search"
-              placeholder={t('world.searchStructures')}
-              value={structQuery}
-              onChange={(e) => setStructQuery(e.target.value)}
-              autoFocus
-            />
-            {structs === null ? (
-              <div className="world-hud-struct-empty">{t('world.scanning')}</div>
-            ) : (
-              (() => {
-                const q = structQuery.trim().toLowerCase();
-                const list = q ? structs.filter((s) => s.label.toLowerCase().includes(q)) : structs;
-                return list.length === 0 ? (
-                  <div className="world-hud-struct-empty">{t('world.noStructures')}</div>
-                ) : (
-                  <ul className="world-hud-struct-list">
-                    {list.map((s, i) => (
-                      <li key={`${s.id}-${i}`}>
-                        <button
-                          onClick={() => {
-                            jump([s.x, s.y, s.z]);
-                            setStructOpen(false);
-                          }}
-                        >
-                          <span className="world-hud-struct-name">{s.label}</span>
-                          <span className="world-hud-struct-pos">{s.x} {s.y} {s.z}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                );
-              })()
-            )}
-          </div>
+          <WorldStructureFinder
+            dim={dim}
+            onJump={(pos) => {
+              jump(pos);
+              setStructOpen(false);
+            }}
+          />
         )}
       </div>
 

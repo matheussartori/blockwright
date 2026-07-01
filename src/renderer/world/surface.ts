@@ -5,14 +5,10 @@
 // chunks). `mid` textures the quads with the surface block's texture; `far` uses a flat colour. Runs
 // in the chunk-mesh worker.
 import type { ChunkRenderPayload, ChunkSectionPayload, PaletteEntry } from '@/shared/types';
-import type { MaterialBuffers } from '../viewer/geometry-core';
+import { packBuffers, type MaterialBuffers, type RawVertexArrays } from '../viewer/geometry-core';
 import type { TexInfo } from '../viewer/model-geometry';
 
-interface Accum {
-  positions: number[];
-  normals: number[];
-  uvs: number[];
-  colors: number[];
+interface Accum extends RawVertexArrays {
   textured: boolean;
   textureKey?: string;
   color?: [number, number, number];
@@ -152,19 +148,17 @@ export function buildSurface(
   const out: MaterialBuffers[] = [];
   for (const [key, a] of accums) {
     if (!a.positions.length) continue;
-    out.push({
-      key,
-      textured: a.textured,
-      translucent: false,
-      // Surface quads + skirts are viewed from any angle (grazing fly-through), so keep both sides.
-      doubleSided: true,
-      textureKey: a.textureKey,
-      color: a.color,
-      positions: new Float32Array(a.positions),
-      normals: new Float32Array(a.normals),
-      uvs: new Float32Array(a.uvs),
-      colors: new Float32Array(a.colors),
-    });
+    out.push(
+      packBuffers(a, {
+        key,
+        textured: a.textured,
+        translucent: false,
+        // Surface quads + skirts are viewed from any angle (grazing fly-through), so keep both sides.
+        doubleSided: true,
+        textureKey: a.textureKey,
+        color: a.color,
+      }),
+    );
   }
   return out;
 }
