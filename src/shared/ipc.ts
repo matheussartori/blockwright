@@ -150,6 +150,23 @@ export const IPC_CHANNELS = {
   /** The buffered main-process logs captured before/while the renderer mounts,
    *  so the Console dock starts populated → LogEntry[]. */
   logBacklog: 'log:backlog',
+  /** Open a Minecraft world folder → WorldMeta (name, dims, spawn, player, dataVersion), or null
+   *  if cancelled. Optional payload: a folder path (from recents/menu); omitted = folder picker. */
+  worldOpen: 'world:open',
+  /** Meta of the currently-open world (payload: none) → WorldMeta | null. */
+  worldMeta: 'world:meta',
+  /** Region coordinates available in a dimension (payload: DimensionId) → RegionRef[]. */
+  worldListRegions: 'world:list-regions',
+  /** Resolve one chunk (payload: dim, cx, cz) → ChunkRenderPayload | null (typed arrays cloned). */
+  worldGetChunk: 'world:get-chunk',
+  /** Batch chunk resolve (payload: dim, coords[]) → (ChunkRenderPayload | null)[]. */
+  worldGetChunks: 'world:get-chunks',
+  /** Find generated structures in a dimension (payload: dim) → StructureLocation[] (cached). */
+  worldFindStructures: 'world:find-structures',
+  /** The persisted recently-opened worlds → WorldRef[]. */
+  recentWorldsList: 'recent-worlds:list',
+  /** Clear the recently-opened worlds list → WorldRef[] (empty). */
+  recentWorldsClear: 'recent-worlds:clear',
 } as const;
 
 /** Fire-and-forget messages pushed from main to the renderer. */
@@ -207,4 +224,9 @@ export const IPC_EVENTS = {
   /** A newer release is available — payload is an UpdateInfo. Pushed by the
    *  startup auto-check (macOS/Linux) and the manual menu check. */
   updateAvailable: 'update-available',
+  /** Ask the renderer to open a world folder (File ▸ Open World / recents / BW_OPEN_WORLD) —
+   *  payload is the world folder path. */
+  openWorld: 'open-world',
+  /** Recently-opened worlds changed — payload is the new WorldRef[]. */
+  recentWorldsChanged: 'recent-worlds-changed',
 } as const;

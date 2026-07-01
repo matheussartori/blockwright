@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
 import { plannerStore } from './state/planner';
+import { documentsStore } from './state/documents';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import { useActiveDoc } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
@@ -38,6 +39,7 @@ import { ExportModal } from './components/export/ExportModal';
 import { EditorPanel } from './components/editor/EditorPanel';
 import { EditorLayer } from './components/editor/EditorLayer';
 import { editorStore } from './state/editor';
+import { WorldHud } from './world/components/WorldHud';
 
 function Shell() {
   const viewer = useViewer();
@@ -45,6 +47,9 @@ function Shell() {
   const activeDoc = useActiveDoc();
   const structure = activeDoc?.structure ?? null;
   const fileOpen = structure !== null;
+  // A world doc streams into the viewport (view-only fly-through) — not a structure, so the
+  // build planner / editor / inspector don't apply; the stage is just the viewer + the world HUD.
+  const isWorld = activeDoc?.kind === 'world';
   const availability = {
     inspector: fileOpen,
     jigsaw: structure !== null && structure.jigsaws.length > 0,
@@ -89,6 +94,11 @@ function Shell() {
                   onLoad={(p) => void flow.openFile(p)}
                   onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
                   onGenerate={flow.newDoc}
+                  onOpenWorld={(root) =>
+                    void api.openWorld(root).then((meta) => {
+                      if (meta) documentsStore.getState().openWorldDoc(meta);
+                    })
+                  }
                   onExample={(text) => {
                     // Start a fresh build pre-filled with the example prompt: newDoc resets
                     // the planner draft, so set the notes AFTER it lands on the planner.
@@ -97,19 +107,20 @@ function Shell() {
                   }}
                 />
               )}
-              {activeDoc && !fileOpen && !activeDoc.loading && (
+              {activeDoc && !fileOpen && !activeDoc.loading && !isWorld && (
                 activeDoc.busy ? (
                   <StageBuilding progress={activeDoc.progress ?? null} startedAt={activeDoc.startedAt ?? null} />
                 ) : (
                   <NewBuildPanel />
                 )
               )}
+              {isWorld && <WorldHud />}
               <FloatingPanels availability={availability} />
               {fileOpen && <EditorLayer />}
               {fileOpen && <EditorPanel />}
               {/* The Generate surface (new-build planner / building stage) puts its config
                   column on the left, so the badge sits bottom-right there to stay clear of it. */}
-              <WorkspaceBadge side={activeDoc && !fileOpen ? 'right' : 'left'} />
+              <WorkspaceBadge side={activeDoc && !fileOpen && !isWorld ? 'right' : 'left'} />
               <WorkspaceSuggest
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}

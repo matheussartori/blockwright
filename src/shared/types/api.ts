@@ -4,6 +4,7 @@ import type { AiConfig, AiProviderId, GenerationSettings } from '../ai';
 import type { LanguageInfo, LanguagePref } from '../i18n';
 import type { StructureData } from './structure';
 import type { Workspace } from './workspace';
+import type { ChunkRenderPayload, DimensionId, RegionRef, StructureLocation, WorldMeta, WorldRef } from './world';
 import type { AssembleOptions, JigsawPlan, JigsawCandidate } from './jigsaw';
 import type {
   GenerateImage,
@@ -63,6 +64,23 @@ export interface BlockwrightApi {
   /** Recently opened mod workspaces, most-recent first. Both return the updated list. */
   listRecentWorkspaces: () => Promise<Workspace[]>;
   clearRecentWorkspaces: () => Promise<Workspace[]>;
+  // ── World viewer ──────────────────────────────────────────────────────────
+  /** Open a Minecraft world folder → its meta, or null if cancelled. Omit `root` for a folder
+   *  picker; pass a path (recents/menu) to open it directly. Activates it in main. */
+  openWorld: (root?: string) => Promise<WorldMeta | null>;
+  /** Meta of the currently-open world, or null. */
+  getWorldMeta: () => Promise<WorldMeta | null>;
+  /** Region coordinates available in a dimension of the active world. */
+  listWorldRegions: (dim: DimensionId) => Promise<RegionRef[]>;
+  /** Resolve one chunk into a render payload (typed-array grids), or null if absent. */
+  getChunk: (dim: DimensionId, cx: number, cz: number) => Promise<ChunkRenderPayload | null>;
+  /** Batch chunk resolve (a ring of chunks) in one round-trip; preserves input order. */
+  getChunks: (dim: DimensionId, coords: { cx: number; cz: number }[]) => Promise<(ChunkRenderPayload | null)[]>;
+  /** Find generated structures in a dimension (cached after the first scan). */
+  findWorldStructures: (dim: DimensionId) => Promise<StructureLocation[]>;
+  /** Recently opened worlds, most-recent first. Both return the updated list. */
+  listRecentWorlds: () => Promise<WorldRef[]>;
+  clearRecentWorlds: () => Promise<WorldRef[]>;
   /** Absolute paths of the active workspace's `.nbt` structures (empty when none). */
   listWorkspaceStructures: () => Promise<string[]>;
   /** Persist a user-chosen Minecraft version for the active workspace; returns it. */
@@ -209,6 +227,10 @@ export interface BlockwrightApi {
   onWorkspaceChanged: (cb: (workspace: Workspace | null) => void) => void;
   /** Notified when the recent-workspaces list changes. */
   onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => void;
+  /** Main asks the renderer to open a world folder (File ▸ Open World / recents / BW_OPEN_WORLD). */
+  onOpenWorld: (cb: (root: string) => void) => void;
+  /** The recent-worlds list changed in main — payload is the new list. */
+  onRecentWorldsChanged: (cb: (worlds: WorldRef[]) => void) => void;
   /** Notified when main requests closing the current structure (native File menu). */
   onCloseStructure: (cb: () => void) => void;
   /** Notified when main requests opening the Settings panel (native menu / Cmd+,). */

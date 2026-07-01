@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -28,6 +28,10 @@ import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/jigsaw/template-pool';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
+import { addRecentWorld, clearRecentWorlds, getRecentWorlds } from './recent-worlds';
+import { activeWorldMeta, findWorldStructures, getChunkPayload, getChunksPayload, listWorldRegions, openWorld as openWorldSource } from './world/world-service';
+import { clearChunkResolveCache } from './world/chunk-resolve';
+import { isWorldDir } from './world/anvil/world-paths';
 import {
   activateWorkspace,
   applyWorkspace,
@@ -38,7 +42,7 @@ import {
   setWorkspaceVersion,
 } from './workspace';
 import { planExport, runExport } from './export';
-import { notifyRecentWorkspaces, openFileDialog } from './window';
+import { notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
 import { reassembleAssemblyDialog, reimportWorldDialog } from './export/reassemble';
 import { renameProject } from './ai/rename-project';
@@ -138,6 +142,7 @@ export function registerIpc(): void {
     // next load reads from it (the renderer re-probes / reopens to pick up textures).
     clearJsonCache();
     clearModelCache();
+    clearChunkResolveCache();
     return dir;
   });
   ipcMain.handle(IPC_CHANNELS.appVersion, async () => app.getVersion());
@@ -164,6 +169,53 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.recentWorkspacesClear, async () => {
     const list = clearRecentWorkspaces();
     notifyRecentWorkspaces();
+    buildAppMenu();
+    return list;
+  });
+
+  // ── World viewer ────────────────────────────────────────────────────────────
+  // Open a world folder (a given path from recents/menu, else a native picker),
+  // activate it, remember it, and return its meta. Chunk requests then reference
+  // the active world in main (no re-passing the path). Typed-array chunk grids
+  // structured-clone across the bridge — no JSON serialization of block data.
+  ipcMain.handle(IPC_CHANNELS.worldOpen, async (_e, root?: string) => {
+    const dir = root ?? (await openWorldDialog());
+    if (!dir) return null;
+    if (!(await isWorldDir(dir))) {
+      dialog.showErrorBox(mt('dialog.openWorldTitle'), mt('dialog.notAWorld'));
+      return null;
+    }
+    const meta = await openWorldSource(dir);
+    // Dev-only: BW_WORLD_CAM="x,y,z" overrides the initial framing spawn, so a headless capture can
+    // start the fly-through underground / at a cliff to verify caves, grass sides, bedrock, etc.
+    const camEnv = process.env.BW_WORLD_CAM;
+    if (camEnv) {
+      const c = camEnv.split(',').map(Number);
+      if (c.length === 3 && c.every((n) => Number.isFinite(n))) meta.spawn = [c[0], c[1], c[2]];
+    }
+    const lookEnv = process.env.BW_WORLD_LOOK;
+    if (lookEnv) {
+      const c = lookEnv.split(',').map(Number);
+      if (c.length === 3 && c.every((n) => Number.isFinite(n))) meta.debugLook = [c[0], c[1], c[2]];
+    }
+    addRecentWorld({ root: dir, name: meta.name });
+    notifyRecentWorlds();
+    buildAppMenu();
+    return meta;
+  });
+  ipcMain.handle(IPC_CHANNELS.worldMeta, async () => activeWorldMeta());
+  ipcMain.handle(IPC_CHANNELS.worldListRegions, async (_e, dim: DimensionId) => listWorldRegions(dim));
+  ipcMain.handle(IPC_CHANNELS.worldGetChunk, async (_e, dim: DimensionId, cx: number, cz: number) =>
+    getChunkPayload(dim, cx, cz),
+  );
+  ipcMain.handle(IPC_CHANNELS.worldGetChunks, async (_e, dim: DimensionId, coords: { cx: number; cz: number }[]) =>
+    getChunksPayload(dim, coords),
+  );
+  ipcMain.handle(IPC_CHANNELS.worldFindStructures, async (_e, dim: DimensionId) => findWorldStructures(dim));
+  ipcMain.handle(IPC_CHANNELS.recentWorldsList, async () => getRecentWorlds());
+  ipcMain.handle(IPC_CHANNELS.recentWorldsClear, async () => {
+    const list = clearRecentWorlds();
+    notifyRecentWorlds();
     buildAppMenu();
     return list;
   });

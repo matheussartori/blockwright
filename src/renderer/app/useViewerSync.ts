@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { settingsStore } from '../state/settings';
 import { documentsStore, activeDocument } from '../state/documents';
+import { api } from '../api';
 import type { Viewer } from '../viewer/viewer';
 
 export function useViewerSync(viewer: Viewer | null): void {
@@ -21,6 +22,11 @@ export function useViewerSync(viewer: Viewer | null): void {
       const id = doc?.id ?? null;
       if (id === lastId) return;
       lastId = id;
+      if (doc?.kind === 'world' && doc.worldMeta) {
+        viewer.enterWorldMode(doc.worldMeta, api); // streams the world around the camera
+        return;
+      }
+      if (viewer.worldActive) viewer.exitWorldMode();
       if (doc?.structure) void viewer.show(doc.structure);
       else viewer.clear();
     };

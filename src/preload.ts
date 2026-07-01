@@ -8,9 +8,15 @@ import type {
   BlockNote,
   BlockwrightApi,
   BuildSelection,
+  ChunkRenderPayload,
+  DimensionId,
   ModBlockScope,
   ChatRecord,
   ExportResult,
+  RegionRef,
+  StructureLocation,
+  WorldMeta,
+  WorldRef,
   ReassembleResult,
   RenameProjectResult,
   WorkspaceExportRequest,
@@ -87,6 +93,19 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesList),
   clearRecentWorkspaces: (): Promise<Workspace[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesClear),
+  openWorld: (root?: string): Promise<WorldMeta | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldOpen, root),
+  getWorldMeta: (): Promise<WorldMeta | null> => ipcRenderer.invoke(IPC_CHANNELS.worldMeta),
+  listWorldRegions: (dim: DimensionId): Promise<RegionRef[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldListRegions, dim),
+  getChunk: (dim: DimensionId, cx: number, cz: number): Promise<ChunkRenderPayload | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldGetChunk, dim, cx, cz),
+  getChunks: (dim: DimensionId, coords: { cx: number; cz: number }[]): Promise<(ChunkRenderPayload | null)[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldGetChunks, dim, coords),
+  findWorldStructures: (dim: DimensionId): Promise<StructureLocation[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldFindStructures, dim),
+  listRecentWorlds: (): Promise<WorldRef[]> => ipcRenderer.invoke(IPC_CHANNELS.recentWorldsList),
+  clearRecentWorlds: (): Promise<WorldRef[]> => ipcRenderer.invoke(IPC_CHANNELS.recentWorldsClear),
   listWorkspaceStructures: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceStructures),
   setWorkspaceVersion: (version: string): Promise<Workspace | null> =>
@@ -183,6 +202,12 @@ const api: BlockwrightApi = {
   },
   onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => {
     ipcRenderer.on(IPC_EVENTS.recentWorkspacesChanged, (_e, list: Workspace[]) => cb(list));
+  },
+  onOpenWorld: (cb: (root: string) => void) => {
+    ipcRenderer.on(IPC_EVENTS.openWorld, (_e, root: string) => cb(root));
+  },
+  onRecentWorldsChanged: (cb: (worlds: WorldRef[]) => void) => {
+    ipcRenderer.on(IPC_EVENTS.recentWorldsChanged, (_e, list: WorldRef[]) => cb(list));
   },
   onCloseStructure: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.closeStructure, () => cb());

@@ -2,7 +2,7 @@
 // the active workspace's structures plus recent files / workspaces. Shown
 // whenever no structure is open. Scrolls when content is tall so nothing is cut.
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, FileBox, FolderOpen, LayoutGrid, Sparkles } from 'lucide-react';
+import { BookOpen, FileBox, FolderOpen, Globe, LayoutGrid, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
 import type { Workspace } from '@/shared/types';
 import { api } from '../api';
@@ -20,6 +20,7 @@ export function Welcome({
   onActivateWorkspace,
   onGenerate,
   onExample,
+  onOpenWorld,
 }: {
   onOpen: () => void;
   onLoad: (path: string) => void;
@@ -27,10 +28,13 @@ export function Welcome({
   onGenerate: () => void;
   /** Start a fresh build pre-filled with the given example prompt. */
   onExample: (text: string) => void;
+  /** Open a Minecraft world (no arg = folder picker; a root = a recent world). */
+  onOpenWorld: (root?: string) => void;
 }) {
   const t = useT();
   const recents = useApp((s) => s.recents);
   const recentWorkspaces = useApp((s) => s.recentWorkspaces);
+  const recentWorlds = useApp((s) => s.recentWorlds);
   const workspaceStructures = useApp((s) => s.workspaceStructures);
 
   const [query, setQuery] = useState('');
@@ -57,7 +61,7 @@ export function Welcome({
   }, [sortedStructures, query]);
 
   const total = sortedStructures.length;
-  const hasLists = total > 0 || recents.length > 0 || recentWorkspaces.length > 0;
+  const hasLists = total > 0 || recents.length > 0 || recentWorkspaces.length > 0 || recentWorlds.length > 0;
 
   return (
     <div className="welcome">
@@ -89,6 +93,13 @@ export function Welcome({
               <span className="action-body">
                 <span className="action-title">{t('welcome.workspaceTitle')}</span>
                 <span className="action-sub">{t('welcome.workspaceSub')}</span>
+              </span>
+            </button>
+            <button className="action-card" onClick={() => onOpenWorld()}>
+              <span className="action-ic"><Globe size={20} strokeWidth={1.8} aria-hidden /></span>
+              <span className="action-body">
+                <span className="action-title">{t('welcome.worldTitle')}</span>
+                <span className="action-sub">{t('welcome.worldSub')}</span>
               </span>
             </button>
             <button className="action-card" onClick={() => store.getState().setCatalogOpen(true)}>
@@ -163,7 +174,7 @@ export function Welcome({
                 </section>
               )}
 
-              {(recents.length > 0 || recentWorkspaces.length > 0) && (
+              {(recents.length > 0 || recentWorkspaces.length > 0 || recentWorlds.length > 0) && (
                 <div className="welcome-cols">
                   {recents.length > 0 && (
                     <section className="list-card">
@@ -201,6 +212,24 @@ export function Welcome({
                           >
                             <span className="recent-name">{ws.name}</span>
                             <span className="recent-path">{ws.namespace}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                  {recentWorlds.length > 0 && (
+                    <section className="list-card">
+                      <div className="list-head">
+                        <span className="list-title">{t('welcome.recentWorlds')}</span>
+                        <button className="link" onClick={() => void api.clearRecentWorlds()}>
+                          {t('common.clear')}
+                        </button>
+                      </div>
+                      <ul className="list-body">
+                        {recentWorlds.map((w) => (
+                          <li key={w.root} className="recent-row" title={w.root} onClick={() => onOpenWorld(w.root)}>
+                            <span className="recent-name">{w.name}</span>
+                            <span className="recent-path">{dirname(w.root)}</span>
                           </li>
                         ))}
                       </ul>

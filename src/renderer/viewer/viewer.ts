@@ -4,8 +4,9 @@
 // (mesh-builder) + texture loading (texture-loader), screenshot paths (capture), the
 // floor-plan overlay (floor-regions), and the inspector focus box (highlight).
 import * as THREE from 'three';
-import type { StructureData } from '@/shared/types';
+import type { BlockwrightApi, DimensionId, StructureData, WorldMeta } from '@/shared/types';
 import { CameraController, type NavMode } from './camera-controller';
+import { WorldView } from '../world/world-view';
 import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REVIEW_SNAP, type SnapOpts } from './capture';
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
@@ -63,6 +64,14 @@ export class Viewer {
   /** Last rendered pieces, kept so a settings toggle can rebuild without a reload. */
   private lastPieces: AssemblyPiece[] | null = null;
 
+  /** The streamed world view (world mode); null in structure mode. */
+  private world: WorldView | null = null;
+
+  /** Scene lights, kept so the world time-of-day toggle can dim them. */
+  private hemiLight: THREE.HemisphereLight;
+  private sunLight: THREE.DirectionalLight;
+  private fillLight: THREE.DirectionalLight;
+
   /** Notified whenever the navigation mode changes (for the UI to reflect it). */
   onModeChange: ((mode: NavMode) => void) | null = null;
 
@@ -80,17 +89,18 @@ export class Viewer {
     this.nav = new CameraController(
       this.renderer.domElement,
       container.clientWidth / container.clientHeight,
-      { offscreen, canToggle: () => this.current !== null },
+      { offscreen, canToggle: () => this.current !== null || this.world !== null },
     );
     this.nav.onModeChange = (mode) => this.onModeChange?.(mode);
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.05));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
-    sun.position.set(0.6, 1, 0.45);
-    this.scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-    fill.position.set(-0.5, 0.4, -0.6);
-    this.scene.add(fill);
+    this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x6b7280, 1.05);
+    this.scene.add(this.hemiLight);
+    this.sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    this.sunLight.position.set(0.6, 1, 0.45);
+    this.scene.add(this.sunLight);
+    this.fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    this.fillLight.position.set(-0.5, 0.4, -0.6);
+    this.scene.add(this.fillLight);
 
     if (!offscreen) {
       new ResizeObserver(() => this.onResize()).observe(container);
@@ -103,6 +113,7 @@ export class Viewer {
     this.timer.update();
     this.nav.update(this.timer.getDelta());
     this.highlight.update();
+    this.world?.update(this.nav.camera);
     this.renderer.render(this.scene, this.nav.camera);
   };
 
@@ -186,6 +197,99 @@ export class Viewer {
     this.floors.reapply(this.current);
     if (preserveCamera) this.nav.controls.update();
     else this.nav.frame(box);
+  }
+
+  // ── World mode ──────────────────────────────────────────────────────────────
+  /** Enter world-viewer mode: drop any structure and start streaming the world's chunks around the
+   *  camera (view-only fly-through). Frames the camera at spawn. */
+  enterWorldMode(meta: WorldMeta, api: BlockwrightApi): void {
+    this.clear();
+    this.world?.dispose();
+    const dim: DimensionId = meta.dimensions[0]?.id ?? 'minecraft:overworld';
+    this.world = new WorldView(this.scene, this.textures, api, dim);
+    this.frameWorldAt(meta.spawn);
+    // Dev-only (BW_WORLD_LOOK): aim the initial camera at an explicit target for headless capture.
+    if (meta.debugLook) {
+      this.nav.camera.position.set(meta.spawn[0], meta.spawn[1], meta.spawn[2]);
+      this.nav.controls.target.set(meta.debugLook[0], meta.debugLook[1], meta.debugLook[2]);
+      this.nav.controls.update();
+    }
+  }
+
+  /** True while a world is loaded (world mode). */
+  get worldActive(): boolean {
+    return this.world !== null;
+  }
+
+  /** Leave world mode: dispose the streamed scene + workers, back to empty. */
+  exitWorldMode(): void {
+    this.world?.dispose();
+    this.world = null;
+    this.nav.setMode('orbit');
+    this.setDaylight(true); // don't leave structure mode dark if the user toggled night
+  }
+
+  /** Switch the active dimension (Overworld/Nether/End) and re-frame at its origin. */
+  setWorldDimension(dim: DimensionId): void {
+    this.world?.setDimension(dim);
+  }
+
+  /** How many chunks stream in around the camera (render-distance control). */
+  setWorldRenderDistance(chunks: number): void {
+    this.world?.setRenderDistance(chunks);
+  }
+
+  /** Day/night lighting for the world view (a mood toggle — no live sky simulation). */
+  setDaylight(day: boolean): void {
+    this.hemiLight.intensity = day ? 1.05 : 0.35;
+    this.hemiLight.groundColor.set(day ? 0x6b7280 : 0x14161c);
+    this.hemiLight.color.set(day ? 0xffffff : 0x8895b3);
+    this.sunLight.intensity = day ? 1.5 : 0.35;
+    this.sunLight.color.set(day ? 0xffffff : 0xaab6d8);
+    this.fillLight.intensity = day ? 0.5 : 0.2;
+  }
+
+  /** Loaded / pending chunk counts for the HUD streaming indicator. */
+  worldStats(): { loaded: number; pending: number } {
+    return this.world?.stats() ?? { loaded: 0, pending: 0 };
+  }
+
+  /** Current camera world position (for the HUD coordinate readout). */
+  cameraPosition(): [number, number, number] {
+    const p = this.nav.camera.position;
+    return [p.x, p.y, p.z];
+  }
+
+  /** Camera heading in radians (0 = looking toward -Z / north), for the minimap indicator. */
+  cameraYaw(): number {
+    const d = this.nav.camera.getWorldDirection(new THREE.Vector3());
+    return Math.atan2(d.x, -d.z);
+  }
+
+  /** Minimap cells (per-chunk top-down colours) for the world map overlay. */
+  worldMinimap(): { cx: number; cz: number; color: [number, number, number] }[] {
+    return this.world?.minimapCells() ?? [];
+  }
+
+  /** Fly the camera to a world coordinate (go-to-coordinate / jump-to-spawn/player). */
+  goToWorldCoord(pos: [number, number, number]): void {
+    if (!this.world) return;
+    this.frameWorldAt(pos);
+  }
+
+  /** Position the camera near a world point with a HORIZONTAL fly-through view (looking across the
+   *  landscape, not down at it). The render distance controls how far chunks STREAM, not the start. */
+  private frameWorldAt(pos: [number, number, number]): void {
+    const s = 24; // half-span in blocks — sets fly speed + near/far clip
+    const box = new THREE.Box3(
+      new THREE.Vector3(pos[0] - s, pos[1] - 4, pos[2] - s),
+      new THREE.Vector3(pos[0] + s, pos[1] + s, pos[2] + s),
+    );
+    this.nav.frame(box);
+    // Override to a ground-level, near-horizontal view (a proper fly-through start).
+    this.nav.camera.position.set(pos[0], pos[1] + 14, pos[2] + 34);
+    this.nav.controls.target.set(pos[0], pos[1] + 6, pos[2]);
+    this.nav.controls.update();
   }
 
   /** Center the camera on a single block (local coords of the loaded structure)

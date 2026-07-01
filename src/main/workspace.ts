@@ -10,6 +10,7 @@ import {
 } from './structure/assets/content-pack';
 import { clearModelCache } from './structure/assets/model-loader';
 import { clearDictionaryCache } from './structure/assets/block-dictionary';
+import { clearChunkResolveCache } from './world/chunk-resolve';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
 import { detectMcVersion } from './mc-version-detect';
@@ -39,6 +40,7 @@ export function applyWorkspace(ws: Workspace | null): void {
   clearJsonCache();
   clearModelCache();
   clearDictionaryCache();
+  clearChunkResolveCache();
   if (ws) {
     addRecentWorkspace(ws);
     notifyRecentWorkspaces();

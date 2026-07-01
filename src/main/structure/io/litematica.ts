@@ -11,64 +11,14 @@ import { AIR, omitKeys, type RawBlock, type RawBlockEntity, type RawStructure } 
 import { compound, compoundList, createPaletteInterner, emptyList, int, longArray, longFromMs, str, xyz, type Tag } from './nbt-tags';
 import { inferCompound } from '../authoring/nbt-encode';
 import { DEFAULT_DATA_VERSION } from '../mc-data-version';
+import { bigToPairs, bitsForPalette, pairsToBig, packSpanning, unpackSpanning } from './long-bits';
 
-const U64 = (1n << 64n) - 1n;
-
-// ── bit-packed long array (the spanning scheme) ─────────────────────────────────────
-
-/** Bits per palette index: `max(2, ceil(log2(paletteSize)))`, minimum 2. */
-export function bitsForPalette(paletteSize: number): number {
-  return Math.max(2, 32 - Math.clz32(Math.max(1, paletteSize - 1)));
-}
-
-/** Read entry `index` from the packed longs (entries may span two longs). */
-function getAt(longs: bigint[], bits: number, index: number): number {
-  const mask = (1n << BigInt(bits)) - 1n;
-  const startOffset = index * bits;
-  const startArr = Math.floor(startOffset / 64);
-  const endArr = Math.floor(((index + 1) * bits - 1) / 64);
-  const startBit = BigInt(startOffset % 64);
-  const lo = longs[startArr] ?? 0n;
-  if (startArr === endArr) return Number((lo >> startBit) & mask);
-  const endOffset = BigInt(64 - (startOffset % 64));
-  return Number((((lo >> startBit) | ((longs[endArr] ?? 0n) << endOffset)) & mask));
-}
-
-/** Write `value` at entry `index` into the packed longs. */
-function setAt(longs: bigint[], bits: number, index: number, value: number): void {
-  const mask = (1n << BigInt(bits)) - 1n;
-  const v = BigInt(value) & mask;
-  const startOffset = index * bits;
-  const startArr = Math.floor(startOffset / 64);
-  const endArr = Math.floor(((index + 1) * bits - 1) / 64);
-  const startBit = BigInt(startOffset % 64);
-  longs[startArr] = (((longs[startArr] ?? 0n) & (U64 ^ ((mask << startBit) & U64))) | ((v << startBit) & U64)) & U64;
-  if (startArr !== endArr) {
-    const endOffset = 64 - (startOffset % 64);
-    const j1 = BigInt(bits - endOffset);
-    longs[endArr] = ((((longs[endArr] ?? 0n) >> j1) << j1) | (v >> BigInt(endOffset))) & U64;
-  }
-}
-
-/** Pack `ids` (count entries of `bits` each) into the long array. */
-export function packBlockStates(ids: number[], bits: number): bigint[] {
-  const longs = new Array<bigint>(Math.max(0, Math.ceil((ids.length * bits) / 64))).fill(0n);
-  for (let i = 0; i < ids.length; i++) setAt(longs, bits, i, ids[i]);
-  return longs;
-}
-
-/** Unpack `count` entries of `bits` each from the long array. */
-export function unpackBlockStates(longs: bigint[], bits: number, count: number): number[] {
-  const ids = new Array<number>(count);
-  for (let i = 0; i < count; i++) ids[i] = getAt(longs, bits, i);
-  return ids;
-}
-
-// prismarine-nbt long ↔ unsigned BigInt
-const pairsToBig = (pairs: [number, number][]): bigint[] =>
-  pairs.map(([hi, lo]) => ((BigInt(hi >>> 0) << 32n) | BigInt(lo >>> 0)) & U64);
-const bigToPairs = (longs: bigint[]): [number, number][] =>
-  longs.map((u) => [Number((u >> 32n) & 0xffffffffn) | 0, Number(u & 0xffffffffn) | 0]);
+// Litematica uses the SPANNING packing (pre-1.16). The bit helpers live in `./long-bits` now,
+// shared with the Anvil world reader (which uses the non-spanning variant). Re-exported here for
+// back-compat with existing importers/tests.
+export { bitsForPalette };
+export const packBlockStates = packSpanning;
+export const unpackBlockStates = unpackSpanning;
 
 /** Litematica's cell order: `i = y*sizeX*sizeZ + z*sizeX + x` (Y outer, Z, X inner). */
 const litIndex = (x: number, y: number, z: number, sx: number, sz: number): number => y * sx * sz + z * sx + x;

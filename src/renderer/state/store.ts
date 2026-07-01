@@ -6,7 +6,7 @@
 // Uses Zustand's framework-agnostic vanilla store, consumed in components via
 // `useStore`.
 import { createStore } from 'zustand/vanilla';
-import type { UpdateInfo, Workspace } from '@/shared/types';
+import type { UpdateInfo, Workspace, WorldRef } from '@/shared/types';
 
 export type NavMode = 'orbit' | 'fly';
 
@@ -29,6 +29,8 @@ export interface AppState {
   workspace: Workspace | null;
   /** Recently opened mod workspaces, most-recent first (mirrors main). */
   recentWorkspaces: Workspace[];
+  /** Recently opened worlds, most-recent first (mirrors main). */
+  recentWorlds: WorldRef[];
   /** Absolute paths of the active workspace's `.nbt` structures. */
   workspaceStructures: string[];
   /** Live viewer navigation mode, reflected by the Controls window. */
@@ -65,6 +67,7 @@ export interface AppState {
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
   setRecentWorkspaces: (workspaces: Workspace[]) => void;
+  setRecentWorlds: (worlds: WorldRef[]) => void;
   setWorkspaceStructures: (paths: string[]) => void;
   setNavMode: (mode: NavMode) => void;
   setContentVersion: (version: string | null) => void;
@@ -90,6 +93,7 @@ export const store = createStore<AppState>((set) => ({
   recents: [],
   workspace: null,
   recentWorkspaces: [],
+  recentWorlds: [],
   workspaceStructures: [],
   navMode: 'orbit',
   contentVersion: FALLBACK_CONTENT_VERSION,
@@ -109,6 +113,7 @@ export const store = createStore<AppState>((set) => ({
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
   setRecentWorkspaces: (recentWorkspaces) => set({ recentWorkspaces }),
+  setRecentWorlds: (recentWorlds) => set({ recentWorlds }),
   setWorkspaceStructures: (workspaceStructures) => set({ workspaceStructures }),
   setNavMode: (navMode) => set({ navMode }),
   setContentVersion: (contentVersion) => set({ contentVersion }),

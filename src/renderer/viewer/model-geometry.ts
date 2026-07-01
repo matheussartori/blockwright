@@ -1,8 +1,22 @@
 // Low-level geometry helpers: turning resolved model elements into transformed
-// quads (positions/normals/uvs/colors) accumulated per material.
+// quads (positions/normals/uvs/colors) accumulated per material. This module is
+// WORKER-SAFE — it references no THREE.Texture / DOM / scene objects (only THREE's
+// pure math classes), so the world chunk-mesh worker and the structure mesh path
+// share it. Textures are identified by KEY here; the actual GPU texture is looked
+// up on the main thread when materials are built (see mesh-builder / world-view).
 import * as THREE from 'three';
 import type { FaceDir, ModelElement, ResolvedModel } from '@/shared/types';
-import type { LoadedTexture } from './texture-loader';
+
+/** The only texture facts the geometry math needs (animation frames + alpha kind).
+ *  A `LoadedTexture` is structurally a superset, so the structure path passes its
+ *  map straight in; the worker gets these precomputed (canvas-based detection can't
+ *  run off the main thread). */
+export interface TexInfo {
+  frames: number;
+  translucent: boolean;
+  /** Average sRGB colour (0..1) — used by the far-LOD surface + minimap, ignored by full geometry. */
+  avgColor?: [number, number, number];
+}
 
 const FACES: FaceDir[] = ['down', 'up', 'north', 'south', 'east', 'west'];
 
@@ -28,26 +42,36 @@ const FACE_DEFS: Record<FaceDir, FaceDef> = {
   east: { normal: [1, 0, 0], corners: [[3, 4, 5], [3, 4, 2], [3, 1, 2], [3, 1, 5]] },
 };
 
-/** A per-material accumulator of raw geometry buffers. */
+/** A per-material accumulator of raw geometry buffers. Textures are named by KEY;
+ *  the GPU texture is resolved from the key by the material builder (main thread). */
 export interface Accum {
   positions: number[];
   normals: number[];
   uvs: number[];
   colors: number[];
   textured: boolean;
-  texture?: THREE.Texture;
+  textureKey?: string;
   color?: [number, number, number];
   translucent?: boolean;
+  /** Whether this material renders both faces (plants/panes/glass) or backface-culls (full cubes). */
+  doubleSided?: boolean;
 }
 
 /** Factory that returns (creating on demand) the accumulator for a material key. */
 export type GetAccum = (
   key: string,
   textured: boolean,
-  tex?: THREE.Texture,
+  textureKey?: string,
   color?: [number, number, number],
   translucent?: boolean,
+  doubleSided?: boolean,
 ) => Accum;
+
+/** How far (in blocks) to nudge a coplanar OVERLAY element outward along its face normal so it wins
+ *  the depth test against the base element it decorates (e.g. grass_block's green side overlay sits
+ *  on the same cube as the dirt side — without this they z-fight and the dirt wins from most angles,
+ *  making grass sides look like bare dirt). A hair: sub-pixel at 16px/block, invisible as a gap. */
+const OVERLAY_PUSH = 0.0015;
 
 const tmpV = new THREE.Vector3();
 const tmpN = new THREE.Vector3();
@@ -120,8 +144,9 @@ function pushQuad(
   uv: [number, number][],
   tint: THREE.Color,
 ): void {
-  // Two triangles: 0-1-2 and 0-2-3.
-  const order = [0, 1, 2, 0, 2, 3];
+  // Two triangles wound so the outward (normal-facing) side is FRONT — matches THREE's default CCW
+  // front-face, so backface culling (FrontSide, used for full opaque cubes) shows the outside.
+  const order = [0, 2, 1, 0, 3, 2];
   for (const i of order) {
     a.positions.push(v[i].x, v[i].y, v[i].z);
     a.normals.push(n.x, n.y, n.z);
@@ -135,39 +160,51 @@ export function addModel(
   model: ResolvedModel,
   pos: [number, number, number],
   fallback: [number, number, number],
-  textures: Map<string, LoadedTexture>,
+  textures: Map<string, TexInfo>,
   getAccum: GetAccum,
+  cull?: ReadonlySet<FaceDir>,
+  biomeTint?: [number, number, number],
+  doubleSided = true,
 ): void {
   const sm = stateMatrix(model.x, model.y);
+  const grass = biomeTint ? new THREE.Color().setRGB(biomeTint[0], biomeTint[1], biomeTint[2], THREE.SRGBColorSpace) : TINT;
+  const sideSuffix = doubleSided ? '' : '|s'; // single-sided materials get their own bucket
+  const seenBoxes = new Set<string>();
   for (const el of model.elements) {
+    // A later element sharing an earlier element's box is a coplanar OVERLAY (e.g. grass_block's
+    // side-overlay cube over the dirt-side cube); nudge it outward so it wins the depth test.
+    const boxKey = `${el.from.join(',')}|${el.to.join(',')}`;
+    const overlayPush = seenBoxes.has(boxKey) ? OVERLAY_PUSH : 0;
+    seenBoxes.add(boxKey);
     const em = elementMatrix(el.rotation);
     const matrix = em ? sm.clone().multiply(em) : sm;
     for (const dir of FACES) {
+      if (cull?.has(dir)) continue; // neighbour is an opaque full cube (world face-culling)
       const face = el.faces[dir];
       if (!face) continue;
 
       const loaded = face.texture ? textures.get(face.texture) : undefined;
       const accum = loaded
-        ? getAccum(`t:${face.texture}`, true, loaded.texture, undefined, loaded.translucent)
-        : getAccum(`c:${fallback.join(',')}`, false, undefined, fallback);
+        ? getAccum(`t:${face.texture}${sideSuffix}`, true, face.texture!, undefined, loaded.translucent, doubleSided)
+        : getAccum(`c:${fallback.join(',')}${sideSuffix}`, false, undefined, fallback, undefined, doubleSided);
 
       const def = FACE_DEFS[dir];
       const uvs = faceUVs(face.uv, face.rotation, loaded?.frames ?? 1);
       let tint = WHITE;
       if (face.tint) tint = new THREE.Color().setRGB(face.tint[0], face.tint[1], face.tint[2], THREE.SRGBColorSpace);
-      else if (face.tintindex !== undefined && face.tintindex >= 0) tint = TINT;
+      else if (face.tintindex !== undefined && face.tintindex >= 0) tint = grass;
 
-      // Transform the 4 corners and the normal.
+      // Transform the normal first so a coplanar overlay can be nudged out along it.
+      tmpN.set(...def.normal).transformDirection(matrix);
       const box = [el.from[0], el.from[1], el.from[2], el.to[0], el.to[1], el.to[2]];
       const verts: THREE.Vector3[] = def.corners.map((c) => {
         tmpV.set(box[c[0]], box[c[1]], box[c[2]]).applyMatrix4(matrix);
         return new THREE.Vector3(
-          tmpV.x / 16 + pos[0],
-          tmpV.y / 16 + pos[1],
-          tmpV.z / 16 + pos[2],
+          tmpV.x / 16 + pos[0] + tmpN.x * overlayPush,
+          tmpV.y / 16 + pos[1] + tmpN.y * overlayPush,
+          tmpV.z / 16 + pos[2] + tmpN.z * overlayPush,
         );
       });
-      tmpN.set(...def.normal).transformDirection(matrix);
 
       pushQuad(accum, verts, tmpN, uvs, tint);
     }
@@ -176,9 +213,10 @@ export function addModel(
 
 /** A plain colored unit cube for blocks without a resolvable model.
  *  The color is carried by the material; vertices stay white. */
-export function addFallbackCube(a: Accum, pos: [number, number, number]): void {
+export function addFallbackCube(a: Accum, pos: [number, number, number], cull?: ReadonlySet<FaceDir>): void {
   const box = [0, 0, 0, 16, 16, 16];
   for (const dir of FACES) {
+    if (cull?.has(dir)) continue;
     const def = FACE_DEFS[dir];
     const verts = def.corners.map((c) => {
       return new THREE.Vector3(

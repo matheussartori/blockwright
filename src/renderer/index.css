@@ -6509,3 +6509,208 @@ body.row-resizing {
   margin-left: auto;
   gap: 6px;
 }
+
+/* ── World viewer HUD ─────────────────────────────────────────────────────── */
+/* Floating overlay on the world-mode viewport: live coordinates + streaming state.
+   Glassy panels using the shared tokens; sits clear of the traffic-light region. */
+.world-hud {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 20;
+  font-size: 12px;
+}
+.world-hud-coords {
+  font-family: var(--mono);
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+.world-hud-stream {
+  color: var(--text-muted);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+/* World HUD — top bar (dimension / controls / goto) + hint. */
+.world-hud-top {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  z-index: 20;
+}
+.world-hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+.world-hud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.world-hud-btn:hover {
+  background: var(--panel-strong);
+}
+.world-hud-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.world-hud-btn.primary {
+  width: auto;
+  padding: 0 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.world-hud-render {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.world-hud-goto {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+.world-hud-goto label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.world-hud-goto input {
+  width: 68px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--mono);
+}
+.world-hud-hint {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 20;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  pointer-events: none;
+}
+
+.world-hud-dim { min-width: 150px; }
+
+/* World minimap — 2D top-down chunk map (bottom-right). */
+.world-minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 160px;
+  height: 160px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+  pointer-events: none;
+  background: var(--elevated);
+}
+
+/* World structure-search panel. */
+.world-hud-structs {
+  width: 260px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+.world-hud-search {
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+}
+.world-hud-struct-empty {
+  padding: 12px 6px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.world-hud-struct-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.world-hud-struct-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+.world-hud-struct-list button:hover {
+  background: var(--panel-strong);
+}
+.world-hud-struct-pos {
+  font-family: var(--mono);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}

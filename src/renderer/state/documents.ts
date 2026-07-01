@@ -9,7 +9,7 @@
 // Like the other renderer stores this is a framework-agnostic Zustand vanilla
 // store, consumed in components via the `useDocuments` / `useActiveDoc` hooks.
 import { createStore } from 'zustand/vanilla';
-import type { StructureData, GenerateProgress, ChatMessage, VersionInfo, FloorDef } from '@/shared/types';
+import type { StructureData, GenerateProgress, ChatMessage, VersionInfo, FloorDef, WorldMeta } from '@/shared/types';
 import { basename } from '../ui/path';
 
 /** One message in a document's AI chat transcript. Same shape the composer shows
@@ -17,6 +17,11 @@ import { basename } from '../ui/path';
 export type DocChatMessage = ChatMessage;
 
 export interface Document {
+  /** What this tab holds: a single structure (the default), or a streamed Minecraft WORLD (the
+   *  world viewer — view-only fly-through; no AI/edit/versions apply). */
+  kind: 'structure' | 'world';
+  /** For a world doc: the opened world's meta (root/name/dims/spawn/…); null for a structure doc. */
+  worldMeta: WorldMeta | null;
   /** Stable tab id (distinct from the AI session id). */
   id: string;
   /** AI generation session id; also the chat-history key for Untitled docs. */
@@ -82,6 +87,8 @@ export interface DocumentsState {
   /** Focus the tab for `filePath` if open, else create one (loading is the
    *  caller's job). Returns the doc id. */
   openDoc: (filePath: string) => string;
+  /** Focus the tab for this world (by root) if open, else create a world doc. Returns the doc id. */
+  openWorldDoc: (meta: WorldMeta) => string;
   closeDoc: (id: string) => void;
   setActive: (id: string) => void;
   /** Deselect every tab and return to the Home screen (tabs stay open). */
@@ -96,6 +103,8 @@ export interface DocumentsState {
 
 function freshDoc(over: Partial<Document> = {}): Document {
   return {
+    kind: 'structure',
+    worldMeta: null,
     id: crypto.randomUUID(),
     sessionId: crypto.randomUUID(),
     title: 'Untitled',
@@ -137,6 +146,21 @@ export const documentsStore = createStore<DocumentsState>((set, get) => ({
       return existing.id;
     }
     const doc = freshDoc({ filePath, title: basename(filePath) });
+    set((s) => ({ documents: [...s.documents, doc], activeId: doc.id }));
+    return doc.id;
+  },
+
+  openWorldDoc: (meta) => {
+    const existing = get().documents.find((d) => d.kind === 'world' && d.worldMeta?.root === meta.root);
+    if (existing) {
+      // Refresh the meta (spawn/player may have moved) and focus it.
+      set((s) => ({
+        documents: s.documents.map((d) => (d.id === existing.id ? { ...d, worldMeta: meta } : d)),
+        activeId: existing.id,
+      }));
+      return existing.id;
+    }
+    const doc = freshDoc({ kind: 'world', worldMeta: meta, title: meta.name });
     set((s) => ({ documents: [...s.documents, doc], activeId: doc.id }));
     return doc.id;
   },

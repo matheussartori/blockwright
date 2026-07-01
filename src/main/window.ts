@@ -9,10 +9,12 @@ import { IPC_EVENTS } from '@/shared/ipc';
 import { mt } from './language';
 import { getRecents } from './recents';
 import { getRecentWorkspaces } from './recent-workspaces';
+import { getRecentWorlds } from './recent-worlds';
 import { getActiveWorkspace } from './structure/assets/content-pack';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
+let pendingOpenWorld: string | null = null;
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
@@ -55,6 +57,29 @@ export async function openDirectoryDialog(): Promise<string | null> {
     ? await dialog.showOpenDialog(mainWindow, options)
     : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths[0];
+}
+
+/** Show the native directory picker for choosing a Minecraft world folder. */
+export async function openWorldDialog(): Promise<string | null> {
+  const options: OpenDialogOptions = {
+    title: mt('dialog.openWorldTitle'),
+    properties: ['openDirectory'],
+  };
+  const result = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, options)
+    : await dialog.showOpenDialog(options);
+  return result.canceled ? null : result.filePaths[0];
+}
+
+/** Ask the renderer to open a world folder now, or queue it until first paint. */
+export function openWorld(root: string): void {
+  if (mainWindow) mainWindow.webContents.send(IPC_EVENTS.openWorld, root);
+  else pendingOpenWorld = root;
+}
+
+/** Push the recent-worlds list to the renderer (keeps the welcome view in sync). */
+export function notifyRecentWorlds(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.recentWorldsChanged, getRecentWorlds());
 }
 
 /** Ask the renderer to export the current build (it picks the source + name). */
@@ -206,6 +231,11 @@ function onDidFinishLoad() {
   if (initial) {
     mainWindow?.webContents.send(IPC_EVENTS.openPath, initial);
     pendingOpenPath = null;
+  }
+  const initialWorld = pendingOpenWorld ?? process.env.BW_OPEN_WORLD ?? null;
+  if (initialWorld) {
+    mainWindow?.webContents.send(IPC_EVENTS.openWorld, initialWorld);
+    pendingOpenWorld = null;
   }
   // Dev-only: render to a PNG and exit (used for automated visual checks).
   if (process.env.BW_CAPTURE) {

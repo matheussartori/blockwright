@@ -9,6 +9,10 @@ export interface LoadedTexture {
   // panes). These render with alpha blending instead of a binary alphaTest cut,
   // so the colored body shows through instead of being discarded.
   translucent: boolean;
+  /** Average (alpha-weighted) sRGB colour of the first frame, 0..1 — drives the far-LOD surface
+   *  colour + the minimap, so distant terrain reads with real block colours (grass green, sand tan)
+   *  instead of a deterministic hash. */
+  avgColor: [number, number, number];
 }
 
 export class TextureLoader {
@@ -49,29 +53,50 @@ export class TextureLoader {
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    return { texture, frames, translucent: detectTranslucency(img) };
+    const { translucent, avgColor } = analyzeImage(img, frames);
+    return { texture, frames, translucent, avgColor };
   }
 }
 
-/** Whether an image carries partial-alpha pixels (not just 0/255 cutout alpha).
- *  Stained glass blocks/panes are uniformly translucent; plain glass is binary. */
-function detectTranslucency(img: CanvasImageSource & { width: number; height: number }): boolean {
+/** Analyse a texture image in one canvas pass: partial-alpha detection (stained glass vs binary
+ *  cutout) + the alpha-weighted average colour of its FIRST animation frame (for far-LOD / minimap).
+ *  Colours are read in the texture's storage space (sRGB) and returned 0..1. */
+function analyzeImage(
+  img: CanvasImageSource & { width: number; height: number },
+  frames: number,
+): { translucent: boolean; avgColor: [number, number, number] } {
   const w = img.width;
   const h = img.height;
-  if (!w || !h) return false;
+  if (!w || !h) return { translucent: false, avgColor: [0.5, 0.5, 0.5] };
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return false;
+  if (!ctx) return { translucent: false, avgColor: [0.5, 0.5, 0.5] };
   ctx.drawImage(img, 0, 0);
-  const { data } = ctx.getImageData(0, 0, w, h);
+  const frameH = Math.max(1, Math.floor(h / Math.max(1, frames))); // first frame only
+  const { data } = ctx.getImageData(0, 0, w, frameH);
   let partial = 0;
-  for (let i = 3; i < data.length; i += 4) {
-    const a = data[i];
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let wsum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
     if (a > 12 && a < 243) partial++;
+    if (a > 8) {
+      const aw = a / 255;
+      r += data[i] * aw;
+      g += data[i + 1] * aw;
+      b += data[i + 2] * aw;
+      wsum += aw;
+    }
   }
-  // Require a meaningful fraction so a few antialiased edge pixels don't flip an
-  // otherwise-opaque texture into the (more expensive, sort-sensitive) blend path.
-  return partial > w * h * 0.1;
+  const avg: [number, number, number] = wsum
+    ? [r / wsum / 255, g / wsum / 255, b / wsum / 255]
+    : [0.5, 0.5, 0.5];
+  // Require a meaningful fraction so a few antialiased edge pixels don't flip an otherwise-opaque
+  // texture into the (more expensive, sort-sensitive) blend path. `partial` is counted over the
+  // whole strip but that's fine — the threshold scales with total pixels.
+  return { translucent: partial > w * h * 0.1, avgColor: avg };
 }

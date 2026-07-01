@@ -99,3 +99,6 @@ out/
 
 # Claude Code local settings (per-machine permission allowlist, paths) — never commit
 .claude/settings.local.json
+
+# Spike / throwaway scripts (M0 de-risk work — not shipped)
+scratch/

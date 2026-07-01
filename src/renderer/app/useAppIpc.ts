@@ -29,6 +29,12 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
     const st = store.getState();
     api.onOpenPath((p) => void openFile(p));
     api.onFileDrop((p) => void openFile(p));
+    api.onOpenWorld((root) =>
+      void (async () => {
+        const meta = await api.openWorld(root);
+        if (meta) documentsStore.getState().openWorldDoc(meta);
+      })(),
+    );
     api.onCloseStructure(() => close());
     api.onOpenSettings((section) => {
       if (section) st.setSettingsSection(section);
@@ -47,6 +53,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
     api.onUpdateAvailable((info) => st.setUpdate(info));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
+    api.onRecentWorldsChanged((list) => st.setRecentWorlds(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
     api.onToggleWindow((id) => {
       const w = windowsStore.getState();
@@ -62,6 +69,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
       st.setWorkspace(await api.getWorkspace());
       st.setWorkspaceStructures(await api.listWorkspaceStructures());
       st.setRecentWorkspaces(await api.listRecentWorkspaces());
+      st.setRecentWorlds(await api.listRecentWorlds());
       const version = await api.getContentVersion();
       if (version) st.setContentVersion(version);
       // Pull any launch-time update detection the push may have raced past.

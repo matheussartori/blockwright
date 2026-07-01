@@ -23,6 +23,8 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'gen.autoSuffix', 'gen.heightTotalMode', 'viewer.contentPack',
   'editor.axisX', 'editor.axisY', 'editor.axisZ',
   'viewer.nbtLimit48', // "48³ (1.16+)" — a numeric label, identical in both languages
+  // World-viewer: loanwords / proper nouns kept as-is in pt-BR (Minecraft terms).
+  'world.spawn', 'world.dimNether', 'world.dimEnd', 'world.chunksLoaded',
 ]);
 
 describe('i18n chrome coverage', () => {

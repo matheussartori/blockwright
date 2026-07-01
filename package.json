@@ -91,6 +91,7 @@
     "dotenv": "^17.4.2",
     "electron-squirrel-startup": "^1.0.1",
     "lucide-react": "^1.17.0",
+    "lz4js": "^0.2.0",
     "prismarine-nbt": "^2.8.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

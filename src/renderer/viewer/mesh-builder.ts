@@ -1,13 +1,11 @@
-// Turns a resolved StructureData into Three.js meshes, building one merged
-// geometry per material (texture or fallback color) for efficient rendering.
+// Turns a resolved StructureData into Three.js meshes, one merged geometry per material (texture or
+// fallback colour). The pure geometry math lives in the shared, worker-safe `geometry-core`; this
+// module only WRAPS the resulting buffers into BufferGeometry + Material + Mesh, where it has the
+// real GPU textures. (The world chunk-mesh worker reuses the same core.)
 import * as THREE from 'three';
 import type { StructureData } from '@/shared/types';
 import type { LoadedTexture } from './texture-loader';
-import { addFallbackCube, addModel, type Accum, type GetAccum } from './model-geometry';
-
-/** Blocks that are worldgen markers rather than real geometry. Hidden unless the
- *  matching setting is on; vanilla replaces a jigsaw with its `final_state`. */
-const JIGSAW_NAME = 'minecraft:jigsaw';
+import { buildGeometryBuffers, type MaterialBuffers } from './geometry-core';
 
 export function buildStructure(
   data: StructureData,
@@ -15,95 +13,45 @@ export function buildStructure(
   showJigsaw = false,
   hideShell = false,
 ): THREE.Group {
-  const accums = new Map<string, Accum>();
-
-  const getAccum: GetAccum = (key, textured, tex, color, translucent) => {
-    let a = accums.get(key);
-    if (!a) {
-      a = { positions: [], normals: [], uvs: [], colors: [], textured, texture: tex, color, translucent };
-      accums.set(key, a);
-    }
-    return a;
-  };
-
-  // When hiding the shell, find the occupied bounding box once so we can drop any
-  // block sitting on one of its six boundary planes — the piece's outer "casco".
-  const bounds = hideShell ? occupiedBounds(data) : null;
-
-  for (const block of data.blocks) {
-    const entry = data.palette[block.state];
-    if (entry && !showJigsaw && entry.name === JIGSAW_NAME) continue;
-    if (bounds && isShell(block.pos, bounds)) continue;
-    if (!entry || entry.air || entry.models.length === 0) {
-      if (entry && !entry.air) {
-        addFallbackCube(getAccum(`c:${entry.color.join(',')}`, false, undefined, entry.color), block.pos);
-      }
-      continue;
-    }
-    for (const model of entry.models) {
-      addModel(model, block.pos, entry.color, textures, getAccum);
-    }
-  }
-
+  // LoadedTexture is a structural superset of the core's TexInfo (frames + translucent).
+  const buffers = buildGeometryBuffers(data, textures, { showJigsaw, hideShell });
   const group = new THREE.Group();
-  for (const a of accums.values()) {
-    if (a.positions.length === 0) continue;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(a.positions, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(a.normals, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(a.uvs, 2));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(a.colors, 3));
-
-    const mat = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-    });
-    if (a.textured && a.texture) {
-      mat.map = a.texture;
-      if (a.translucent) {
-        // Stained glass & panes: blend the partially-transparent body instead of
-        // discarding it. depthWrite off so blocks behind stay visible through it.
-        mat.transparent = true;
-        mat.alphaTest = 0;
-        mat.depthWrite = false;
-      } else {
-        // Opaque/cutout textures (incl. plain glass's binary alpha): hard cut.
-        mat.alphaTest = 0.5;
-        mat.transparent = false;
-      }
-    } else if (a.color) {
-      mat.color = new THREE.Color(a.color[0], a.color[1], a.color[2]);
-    }
-    group.add(new THREE.Mesh(geo, mat));
-  }
+  for (const mb of buffers) group.add(new THREE.Mesh(geometryFor(mb), materialFor(mb, textures)));
   return group;
 }
 
-/** Min/max of the piece's non-air blocks — the box whose surface is the shell.
- *  We use the actual occupied extent (not the declared `size`) so air padding
- *  around a structure doesn't push the shell plane out into empty space. */
-type Bounds = { min: [number, number, number]; max: [number, number, number] };
-function occupiedBounds(data: StructureData): Bounds | null {
-  const min: [number, number, number] = [Infinity, Infinity, Infinity];
-  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
-  let any = false;
-  for (const block of data.blocks) {
-    const entry = data.palette[block.state];
-    if (!entry || entry.air) continue;
-    any = true;
-    for (let i = 0; i < 3; i++) {
-      if (block.pos[i] < min[i]) min[i] = block.pos[i];
-      if (block.pos[i] > max[i]) max[i] = block.pos[i];
-    }
-  }
-  return any ? { min, max } : null;
+/** Wrap a material's transferable buffers into a Three.js BufferGeometry. Shared by the structure
+ *  path and the world chunk-mesh assembly (both receive `MaterialBuffers`). */
+export function geometryFor(mb: MaterialBuffers): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(mb.positions, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(mb.normals, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(mb.uvs, 2));
+  geo.setAttribute('color', new THREE.BufferAttribute(mb.colors, 3));
+  return geo;
 }
 
-/** A block is shell if it lies on any of the bounding box's six boundary planes. */
-function isShell(pos: [number, number, number], b: Bounds): boolean {
-  return (
-    pos[0] === b.min[0] || pos[0] === b.max[0] ||
-    pos[1] === b.min[1] || pos[1] === b.max[1] ||
-    pos[2] === b.min[2] || pos[2] === b.max[2]
-  );
+/** Build the Lambert material for a set of buffers, resolving the GPU texture by key. */
+export function materialFor(mb: MaterialBuffers, textures: Map<string, LoadedTexture>): THREE.MeshLambertMaterial {
+  // Full opaque cubes backface-cull (FrontSide) so flying inside terrain reveals cave interiors from
+  // the player's side, not the outer shell's back faces; plants/panes/glass stay DoubleSide.
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: mb.doubleSided ? THREE.DoubleSide : THREE.FrontSide });
+  const loaded = mb.textured && mb.textureKey ? textures.get(mb.textureKey) : undefined;
+  if (loaded) {
+    mat.map = loaded.texture;
+    if (mb.translucent) {
+      // Stained glass & panes: blend the partially-transparent body instead of discarding it.
+      // depthWrite off so blocks behind stay visible through it.
+      mat.transparent = true;
+      mat.alphaTest = 0;
+      mat.depthWrite = false;
+    } else {
+      // Opaque/cutout textures (incl. plain glass's binary alpha): hard cut.
+      mat.alphaTest = 0.5;
+      mat.transparent = false;
+    }
+  } else if (mb.color) {
+    mat.color = new THREE.Color(mb.color[0], mb.color[1], mb.color[2]);
+  }
+  return mat;
 }

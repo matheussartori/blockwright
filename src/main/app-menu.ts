@@ -10,6 +10,7 @@ import { notifyLanguageChanged } from './window';
 import { checkForUpdatesManually } from './update-check';
 import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
+import { clearRecentWorlds, getRecentWorlds } from './recent-worlds';
 import { getActiveWorkspace } from './structure/assets/content-pack';
 import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './workspace';
 import {
@@ -27,10 +28,13 @@ import {
   notifyNewStructure,
   notifyRecents,
   notifyRecentWorkspaces,
+  notifyRecentWorlds,
   notifyResetWindows,
   notifyWindowToggle,
   openFile,
   openFileDialog,
+  openWorld,
+  openWorldDialog,
 } from './window';
 
 const isMac = process.platform === 'darwin';
@@ -79,6 +83,12 @@ async function openWorkspaceFromMenu(): Promise<void> {
   const { error } = await promptOpenWorkspace();
   if (error) dialog.showErrorBox(mt('dialog.openWorkspaceTitle'), error);
   buildAppMenu(); // reflect the active workspace (Close item, etc.)
+}
+
+/** Pick a world folder (main-side dialog) and hand it to the renderer, which opens it as a tab. */
+async function openWorldFromMenu(): Promise<void> {
+  const dir = await openWorldDialog();
+  if (dir) openWorld(dir);
 }
 
 /** Persist a language pick from the menu, tell the renderer, and rebuild the
@@ -138,6 +148,18 @@ export function buildAppMenu(): void {
         },
       ]
     : [{ label: mt('menu.noRecentWorkspaces'), enabled: false }];
+
+  const recentWorlds = getRecentWorlds();
+  const openRecentWorld: MenuItemConstructorOptions[] = recentWorlds.length
+    ? [
+        ...recentWorlds.map((w) => ({ label: w.name, toolTip: w.root, click: () => openWorld(w.root) })),
+        { type: 'separator' as const },
+        {
+          label: mt('menu.clearRecentWorlds'),
+          click: () => { clearRecentWorlds(); notifyRecentWorlds(); buildAppMenu(); },
+        },
+      ]
+    : [{ label: mt('menu.noRecentWorlds'), enabled: false }];
 
   // The Settings item lives where each OS expects it: under the app menu on
   // macOS (Cmd+,), and under File on Windows/Linux (Ctrl+,). Both route to the
@@ -335,6 +357,9 @@ export function buildAppMenu(): void {
             buildAppMenu();
           },
         },
+        { type: 'separator' },
+        { label: mt('menu.openWorld'), accelerator: 'CmdOrCtrl+Shift+W', click: openWorldFromMenu },
+        { label: mt('menu.openRecentWorld'), submenu: openRecentWorld },
         { type: 'separator' },
         ...(isMac ? [] : [settingsItem, languageItem, { type: 'separator' as const }]),
         isMac
