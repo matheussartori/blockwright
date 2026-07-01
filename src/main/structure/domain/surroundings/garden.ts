@@ -18,19 +18,12 @@
 // ≤3 cells above ground (the lamp-post lanterns) — landscaping, never construction.
 import type { AuthoringOp } from '../../authoring/types';
 import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
-import { mulberry32 } from '../rng';
-import { inCut, rimCells, seededChamfers, type Pt } from './outline';
+import { rimCells, type Pt } from './outline';
 import type { SurroundingsModule } from './types';
+import { fitsRect, lampPost, midX, midZ, yardScaffold, type Rect } from './yard-features';
 
 /** Bushes/beds must not despawn in-game — every leaf is placed persistent. */
 const LEAF = { persistent: 'true' };
-
-/** An axis-aligned horizontal region of the yard (inclusive). */
-interface Rect { x0: number; x1: number; z0: number; z1: number }
-
-const fitsRect = (r: Rect, w: number, d: number): boolean => r.x1 - r.x0 + 1 >= w && r.z1 - r.z0 + 1 >= d;
-const midX = (r: Rect): number => Math.floor((r.x0 + r.x1) / 2);
-const midZ = (r: Rect): number => Math.floor((r.z0 + r.z1) / 2);
 
 /** The centered sub-rect of `r` clamped to at most `w`×`d` cells. */
 function clampRect(r: Rect, w: number, d: number): Rect {
@@ -100,16 +93,11 @@ export const garden: SurroundingsModule = {
     const lantern = palette.get('light');
     const ops: AuthoringOp[] = [];
 
-    // Cells already claimed by paths/features, so beds and scatter never overlap them.
-    const used = new Set<string>();
-    const mark = (x: number, z: number): void => { used.add(`${x},${z}`); };
-    const free = (x: number, z: number): boolean => !used.has(`${x},${z}`);
-    const rnd = mulberry32(seed);
-
-    // The seeded chamfered outline — scaled with the yard's margins, so a bigger plot
-    // earns deeper cuts. Cells beyond it get NOTHING: the footprint isn't a rectangle.
-    const ch = seededChamfers(rnd, m, 2, 6);
-    const cut = (x: number, z: number): boolean => inCut(b, ch, x, z);
+    // The shared yard scaffold: the occupancy tracker (cells claimed by paths/features,
+    // so beds and scatter never overlap them), the seeded PRNG, and the seeded chamfered
+    // outline — scaled with the yard's margins, so a bigger plot earns deeper cuts. Cells
+    // beyond the outline get NOTHING: the footprint isn't a rectangle.
+    const { mark, free, rnd, ch, cut } = yardScaffold(b, m, seed, 2, 6);
 
     // --- Lawn base: the ring at ground level, clipped to the chamfered outline ---------
     const strips: Rect[] = [
@@ -137,8 +125,7 @@ export const garden: SurroundingsModule = {
       if (p.z === b.z0 && gateXs.includes(p.x)) return; // the gate bay (doors laid below)
       const flanksGate = p.z === b.z0 && (p.x === cx - 1 || p.x === cx + 2);
       if (flanksGate || i % 9 === 0) {
-        ops.push({ op: 'fill', from: [p.x, gy + 1, p.z], to: [p.x, gy + 2, p.z], state: pier });
-        ops.push({ op: 'block', pos: [p.x, gy + 3, p.z], state: lantern });
+        ops.push(...lampPost(p.x, p.z, gy, 2, pier, lantern));
       } else {
         ops.push({ op: 'block', pos: [p.x, gy + 1, p.z], state: stone });
         ops.push({ op: 'block', pos: [p.x, gy + 2, p.z], state: rail });

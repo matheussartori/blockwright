@@ -4,6 +4,7 @@
 // caller (e.g. a rustic finish) can reuse the same proven geometry. Pure role-based ops;
 // the decoration/defaults supply the concrete blocks.
 import type { AuthoringOp } from '../../authoring/types';
+import { roofStair } from './shell-kit';
 import { logProps, type Box, type RolePalette } from './types';
 
 /** The storey lines a build derived, threaded into the veranda so it aligns with the host. */
@@ -104,7 +105,7 @@ export function frontVeranda(box: Box, palette: RolePalette, plan: Plan): Author
   }
 
   // 5. Porch comforts: stair "chairs" facing the yard + lanterns hung from the porch roof.
-  const chair = palette.get('roof', { facing: 'south', half: 'bottom', shape: 'straight' });
+  const chair = roofStair(palette, 'south');
   for (const sx of [left + 1, right - 1]) ops.push({ op: 'block', pos: [sx, y0 + 1, z0 + 1], state: chair });
   for (const lx of [cx - 3, cx + 3]) if (lx > left && lx < right) ops.push({ op: 'block', pos: [lx, groundTop, z0 + 1], state: lantern });
 

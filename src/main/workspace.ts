@@ -12,7 +12,8 @@ import { clearModelCache } from './structure/assets/model-loader';
 import { clearDictionaryCache } from './structure/assets/block-dictionary';
 import { clearChunkResolveCache } from './world/chunk-resolve';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
-import { notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
+import { getPinnedWorkspace, setPinnedWorkspace } from './pinned-workspace';
+import { notifyPinnedWorkspace, notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
 import { detectMcVersion } from './mc-version-detect';
 
 // A picked folder may be the project root (Gradle layout) or the resources dir.
@@ -44,8 +45,30 @@ export function applyWorkspace(ws: Workspace | null): void {
   if (ws) {
     addRecentWorkspace(ws);
     notifyRecentWorkspaces();
+    // Keep the pinned record fresh (name / detected MC version) when the pinned
+    // workspace itself is (re)opened, so the next launch activates current data.
+    if (getPinnedWorkspace()?.root === ws.root) setPinnedWorkspace(ws);
   }
   notifyWorkspace();
+}
+
+/** Close the active workspace. An explicit close also clears the pin — the user
+ *  is saying "I don't want this workspace", so it must not come back at launch. */
+export function closeWorkspace(): void {
+  applyWorkspace(null);
+  if (getPinnedWorkspace()) {
+    setPinnedWorkspace(null);
+    notifyPinnedWorkspace();
+  }
+}
+
+/** Pin (true) the ACTIVE workspace so it auto-activates at every launch, or unpin
+ *  (false). Returns the pinned workspace, or null when nothing is pinned. */
+export function pinActiveWorkspace(pin: boolean): Workspace | null {
+  const next = pin ? getActiveWorkspace() : null;
+  setPinnedWorkspace(next);
+  notifyPinnedWorkspace();
+  return next;
 }
 
 /** Apply a known workspace (from a recents entry or a detected mod), validating
@@ -68,6 +91,7 @@ export function setWorkspaceVersion(version: string): Workspace | null {
   const updated: Workspace = { ...ws, minecraftVersion: version };
   setActiveWorkspace(updated);
   addRecentWorkspace(updated); // replaces the entry with the same root (now versioned)
+  if (getPinnedWorkspace()?.root === updated.root) setPinnedWorkspace(updated);
   notifyRecentWorkspaces();
   notifyWorkspace();
   return updated;
@@ -102,6 +126,27 @@ export function detectWorkspaceForFile(filePath: string): Workspace | null {
     namespace,
     minecraftVersion: detectMcVersion(root),
   };
+}
+
+/** How many ancestor directories of a world save to inspect for a mod project.
+ *  A dev-run world sits at `<project>/run/saves/<world>` (Forge/NeoForge) or
+ *  `<project>/run/<world>` (Fabric), so the project root is 2–3 levels up. */
+const WORLD_ANCESTOR_DEPTH = 6;
+
+/** Detect whether a world save folder lives inside a mod project's dev run dir,
+ *  so opening it can offer to load that workspace (mirrors detectWorkspaceForFile
+ *  for loose `.nbt`s). Walks up the world dir's ancestors trying detectWorkspace.
+ *  A regular `.minecraft/saves` world has no mod assets above it → null. */
+export function detectWorkspaceForWorld(worldRoot: string): Workspace | null {
+  let dir = path.dirname(worldRoot);
+  for (let i = 0; i < WORLD_ANCESTOR_DEPTH; i++) {
+    const ws = detectWorkspace(dir);
+    if (ws) return ws;
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // filesystem root
+    dir = parent;
+  }
+  return null;
 }
 
 /** List the `.nbt` structures a workspace ships under `data/<namespace>/structure`,

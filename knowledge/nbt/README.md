@@ -64,7 +64,7 @@ authoring format.
 | [`10-design-principles.md`](10-design-principles.md) | What makes a build look *good*: palette, depth, roof typology, entrances, windows, rooms, landscaping. |
 | [`11-furniture-and-interior-detailing.md`](11-furniture-and-interior-detailing.md) | Block-by-block furniture grammar: stair+trapdoor sofas, tables, fireplaces, chandeliers, rugs, wall/ceiling detailing. |
 | [`12-exterior-and-facade-detailing.md`](12-exterior-and-facade-detailing.md) | Block-by-block facade grammar & style archetypes: timber framing, dormers, balconies, porches, towers, chimneys, mansion massing & grounds. |
-| [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`house`/`tower`) × decoration (`cozy`), then layer your own ops on top. |
+| [`13-templates.md`](13-templates.md) | The `template` op: stand up a whole shell from a structure type (`cottage`/`keep`/`church`/…) × decoration (`cozy`/`castle`/…), then layer your own ops on top. |
 | [`14-furnishing-by-space.md`](14-furnishing-by-space.md) | Match furnishing density to floor space: the snug/standard/grand tiers, room presets as a decoration-agnostic base, and how the `[Room plan]` brief drives it — so a big room never reads empty. |
 
 ### Module guides (loaded only when selected / relevant)
@@ -75,30 +75,26 @@ guide rides in the system prompt (or one pulled in by a matching prompt keyword)
 core stays small — and a roof/basement guide loads **only when that exact type is picked**,
 never speculatively. Categories:
 
-| File | Category | What it covers |
-|------|----------|----------------|
-| [`modules/structure/cottage.md`](modules/structure/cottage.md) | structure | The `cottage` house type: design it yourself (no template) + a house refinement checklist. |
-| [`modules/structure/keep.md`](modules/structure/keep.md) | structure | The `keep` tower type: base→shaft→crown massing, exterior detailing, crowns, furnished floors, lighting. |
-| [`modules/decoration/cozy.md`](modules/decoration/cozy.md) | decoration | The `cozy` look: warm palette, lighting, soft furnishings, hearth, plants. |
-| [`modules/roof/gable.md`](modules/roof/gable.md) | roof | The `gable` roof: two slopes + a triangular gable end, ridge axis, overhang/fascia, attic void. |
-| [`modules/roof/hip.md`](modules/roof/hip.md) | roof | The `hip` roof: four sloped sides, wrap-around eave, dormers for light, no gable ends. |
-| [`modules/basement/cellar.md`](modules/basement/cellar.md) | basement | The `cellar` undercroft: sealed stone shell + lit pillars; furnish as storage/workshop/wine cellar. |
-| [`modules/basement/crypt.md`](modules/basement/crypt.md) | basement | The `crypt` burial vault: processional aisle, catacomb columns, bone niches, soul-lit. |
-| [`modules/basement/cult-temple.md`](modules/basement/cult-temple.md) | basement | The `cult-temple` sunken sanctum: altar focus, ritual circle, dark ceremonial dressing. |
-| [`modules/room/living.md`](modules/room/living.md) | room | The `living` room: hearth focal point, seating cluster, rug, dressing, warm light. |
-| [`modules/room/kitchen.md`](modules/room/kitchen.md) | room | The `kitchen`: counter run, cooktop/oven, sink, storage, a small dining nook. |
-| [`modules/room/library.md`](modules/room/library.md) | room | The `library`: book-lined walls, central study table, reading chair, chandelier. |
-| [`modules/room/bedroom.md`](modules/room/bedroom.md) | room | The `bedroom`: one made bed, nightstands, wardrobe, rug, curtained window. |
-| [`modules/room/dormitory.md`](modules/room/dormitory.md) | room | The `dormitory` (shared bedrooms): rows of beds with partitions, shared wardrobe, windows. |
-| [`modules/room/storage.md`](modules/room/storage.md) | room | The `storage` room: walls of barrels/chests, shelving, sacks/crates, one working lantern. |
+Every module has a guide at `modules/<category>/<id>.md` — one file per registered
+module, so the directory listing IS the up-to-date index:
+
+| Directory | Category | Modules |
+|-----------|----------|---------|
+| [`modules/structure/`](modules/structure/) | structure | `cottage`, `villa`, `farmhouse`, `raised-cottage`, `manor` (house group) · `keep`, `spire` (tower group) · `church` |
+| [`modules/decoration/`](modules/decoration/) | decoration | `cozy`, `haunted`, `modern`, `farmhouse`, `sakura`, `gothic`, `castle`, `chapel`, `cursed` |
+| [`modules/roof/`](modules/roof/) | roof | `gable`, `hip`, `flat` |
+| [`modules/basement/`](modules/basement/) | basement | `cellar`, `crypt`, `cult-temple` |
+| [`modules/attic/`](modules/attic/) | attic | `storage`, `bedroom` |
+| [`modules/room/`](modules/room/) | room | `living`, `kitchen`, `library`, `bedroom`, `dormitory`, `storage` + the horror set (`ritual`, `dungeon`, `morgue`, `seance`) |
+| [`modules/surroundings/`](modules/surroundings/) | surroundings | `modern`, `garden`, `graveyard` |
 
 > Picking a roof/basement briefs the model in plain language and loads its guide. The modules
-> also carry their own code geometry (a generic `build()` + optional host-specific extras), used
-> for the gallery preview — but in normal generation **you (the model) still build the roof/basement
-> yourself** following the guide; the code geometry isn't stamped into your output. Each module
-> declares `appliesTo` (the structures it pairs with, `['house']` for now) — a growing link that
-> filters the picker and gates which guide loads, and lets a roof/basement be reused on future
-> structure types.
+> also carry their own code geometry (a generic `build()` + optional host-specific extras): the
+> gallery preview renders it, and a **seeded shell compiles it in** — when the user picked a
+> structure type, its roof/basement/yard is code-built and locked, and your job is the interior
+> and detail. Only on a free-form build (no structure selected) do you build the roof/basement
+> yourself from the guide. Each module declares `appliesTo` (the structure types or groups it
+> pairs with) — a growing link that filters the picker and gates which guide loads.
 
 > **Room** modules are *guidance-only* (no code geometry). The user assigns up to two rooms to
 > each floor of a storeyed structure (the house); each assigned room loads its guide and rides into

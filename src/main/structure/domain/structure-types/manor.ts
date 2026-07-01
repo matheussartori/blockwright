@@ -14,7 +14,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { addStairCore } from './stair-core';
-import { ceilingLanterns, chimneyBreast, cornerPosts, roofCap, roofFormFor, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
+import { ceilingLanterns, chimneyBreast, cornerPosts, roofCap, roofFormFor, roofStair, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 import { insetHouseBox, yardFor } from '../surroundings';
 import { box as mkBox, logProps, type Box, type FloorPlanEntry, type StructureType } from './types';
 
@@ -192,7 +192,7 @@ export const manor: StructureType = {
       const slitY1 = Math.min(slitY0 + 1, topY - 1);
       ops.push({ op: 'fill', from: [tcx, slitY0, z1], to: [tcx, slitY1, z1], state: win });
       ops.push({ op: 'fill', from: [x1, slitY0, tcz], to: [x1, slitY1, tcz], state: win });
-      const capStair = (facing: string) => palette.get('roof', { facing, half: 'bottom', shape: 'straight' });
+      const capStair = (facing: string): number => roofStair(palette, facing);
       const capY = topY + 1;
       ops.push({ op: 'block', pos: [tcx, capY, az0], state: capStair('south') });
       ops.push({ op: 'block', pos: [tcx, capY, z1], state: capStair('north') });
@@ -237,7 +237,7 @@ export const manor: StructureType = {
       ops.push({ op: 'line', from: [cx - 1, y0 + 3, tz0], to: [cx + 1, y0 + 3, tz0], state: accent });
       // Steep pyramidal cap: stair rings stepping inward and up to a finial.
       const tcz = Math.floor((tz0 + tz1) / 2);
-      const capStair = (facing: string) => palette.get('roof', { facing, half: 'bottom', shape: 'straight' });
+      const capStair = (facing: string): number => roofStair(palette, facing);
       let cy = tTop + 1;
       for (let r = 0; cy <= y1; r++, cy++) {
         const ax0 = tx0 + r, ax1 = tx1 - r, bz0 = tz0 + r, bz1 = tz1 - r;

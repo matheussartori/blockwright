@@ -34,13 +34,16 @@ import { clearChunkResolveCache } from './world/chunk-resolve';
 import { isWorldDir } from './world/anvil/world-paths';
 import {
   activateWorkspace,
-  applyWorkspace,
+  closeWorkspace,
   detectWorkspaceForFile,
+  detectWorkspaceForWorld,
   listWorkspaceBiomes,
   listWorkspaceStructures,
+  pinActiveWorkspace,
   promptOpenWorkspace,
   setWorkspaceVersion,
 } from './workspace';
+import { getPinnedWorkspace } from './pinned-workspace';
 import { planExport, runExport } from './export';
 import { notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
@@ -124,7 +127,7 @@ export function registerIpc(): void {
     return workspace;
   });
   ipcMain.handle(IPC_CHANNELS.workspaceClose, async () => {
-    applyWorkspace(null);
+    closeWorkspace();
     buildAppMenu();
     return null;
   });
@@ -165,6 +168,15 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.workspaceDetectFile, async (_e, filePath: string) =>
     detectWorkspaceForFile(filePath),
   );
+  ipcMain.handle(IPC_CHANNELS.workspaceDetectWorld, async (_e, root: string) =>
+    detectWorkspaceForWorld(root),
+  );
+  ipcMain.handle(IPC_CHANNELS.workspacePin, async (_e, pin: boolean) => {
+    const ws = pinActiveWorkspace(pin);
+    buildAppMenu(); // the File ▸ Pin Workspace checkmark follows
+    return ws?.root ?? null;
+  });
+  ipcMain.handle(IPC_CHANNELS.workspacePinnedGet, async () => getPinnedWorkspace()?.root ?? null);
   ipcMain.handle(IPC_CHANNELS.recentWorkspacesList, async () => getRecentWorkspaces());
   ipcMain.handle(IPC_CHANNELS.recentWorkspacesClear, async () => {
     const list = clearRecentWorkspaces();

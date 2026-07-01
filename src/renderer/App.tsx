@@ -9,7 +9,6 @@ import { useEffect, useRef } from 'react';
 import { api } from './api';
 import { store } from './state/store';
 import { plannerStore } from './state/planner';
-import { documentsStore } from './state/documents';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
 import { useActiveDoc } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
@@ -17,10 +16,11 @@ import { useAiRenderBridge } from './app/useAiRenderBridge';
 import { useAppIpc } from './app/useAppIpc';
 import { useViewerSync } from './app/useViewerSync';
 import { TabBar } from './components/TabBar';
+import { ActivityBar } from './components/ActivityBar';
+import { ProjectPanel } from './components/ProjectPanel';
 import { Statusbar } from './components/Statusbar';
 import { Loading } from './components/Loading';
 import { Welcome } from './components/Welcome';
-import { WorkspaceBadge } from './components/WorkspaceBadge';
 import { WorkspaceSuggest } from './components/WorkspaceSuggest';
 import { UpdateBanner } from './components/UpdateBanner';
 import { SettingsModal } from './components/SettingsModal';
@@ -78,12 +78,22 @@ function Shell() {
     editorStore.getState().setActive(false);
   }, [activeDoc?.id]);
 
+  const openWorld = (root?: string) => void flow.openWorld(root);
+
   return (
     <>
       <div className="topbar">
         <TabBar onNew={flow.newDoc} onClose={flow.closeDocById} />
       </div>
-      <div className="stage-area">
+      <div className="workbench">
+        <ActivityBar onNewBuild={flow.newDoc} />
+        <ProjectPanel
+          onLoad={(p) => void flow.openFile(p)}
+          onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
+          onOpenWorld={openWorld}
+          onOpen={() => void flow.open()}
+        />
+        <div className="stage-area">
         <div className="stage-col">
           <main className="stage">
             <div className="stage-main">
@@ -94,11 +104,7 @@ function Shell() {
                   onLoad={(p) => void flow.openFile(p)}
                   onActivateWorkspace={(ws) => void api.activateWorkspace(ws)}
                   onGenerate={flow.newDoc}
-                  onOpenWorld={(root) =>
-                    void api.openWorld(root).then((meta) => {
-                      if (meta) documentsStore.getState().openWorldDoc(meta);
-                    })
-                  }
+                  onOpenWorld={openWorld}
                   onExample={(text) => {
                     // Start a fresh build pre-filled with the example prompt: newDoc resets
                     // the planner draft, so set the notes AFTER it lands on the planner.
@@ -118,9 +124,6 @@ function Shell() {
               <FloatingPanels availability={availability} />
               {fileOpen && <EditorLayer />}
               {fileOpen && <EditorPanel />}
-              {/* The Generate surface (new-build planner / building stage) puts its config
-                  column on the left, so the badge sits bottom-right there to stay clear of it. */}
-              <WorkspaceBadge side={activeDoc && !fileOpen && !isWorld ? 'right' : 'left'} />
               <WorkspaceSuggest
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}
@@ -132,8 +135,9 @@ function Shell() {
           </main>
           <ConsoleDock />
         </div>
-        <InspectorDock availability={availability} />
-        <BuildPlanner />
+          <InspectorDock availability={availability} />
+          <BuildPlanner />
+        </div>
       </div>
       <Statusbar />
       <SettingsModal />

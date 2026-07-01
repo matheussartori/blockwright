@@ -1,8 +1,8 @@
 // Auth + per-provider configuration for AI structure generation.
 //
-// Blockwright can drive several backends (see shared/ai.ts). Each carries its own
-// credential: a subscription/CLI login or token (Claude Code, Codex) or a paid
-// API key (Anthropic, OpenAI, Gemini). Secrets are stored together in one blob,
+// Blockwright drives two subscription backends (see shared/ai.ts) — the Claude
+// Agent SDK (Claude Code login) and the Codex CLI (ChatGPT login). Each carries
+// its own credential: a CLI login or token. Secrets are stored together in one blob,
 // encrypted at rest via the OS keychain (Electron `safeStorage`), and only ever
 // leave the main process as the right env var / client option handed to the
 // provider. Environment variables, when present, win and lock the field in-app.

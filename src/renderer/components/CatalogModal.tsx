@@ -11,10 +11,12 @@ import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import type { BlockDictEntry, BlockDictionary, CatalogBlock, ModBlockScope } from '@/shared/types';
 import type { TFunction } from '@/shared/i18n';
+import { hashString31 } from '../ui/hash';
 import { Modal } from './ui/Modal';
 import { Segmented } from './ui/Segmented';
 import { Select } from './ui/Select';
 import { PreviewFrame } from './ui/PreviewFrame';
+import { ModScopeControl } from './generate/ModScopeControl';
 
 type ViewMode = 'grid' | 'list';
 type NsFilter = 'all' | 'minecraft' | 'mod';
@@ -30,9 +32,7 @@ const ROLE_IDS = [
 
 /** Deterministic swatch colour for a block with no resolvable texture. */
 function fallbackColor(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return `hsl(${h % 360} 32% 45%)`;
+  return `hsl(${hashString31(id) % 360} 32% 45%)`;
 }
 
 const VIEW_ICONS = {
@@ -235,26 +235,14 @@ export function CatalogModal() {
 
         <aside className="catalog-side">
           {modNamespace && dict && (
-            <div className="catalog-scope">
-              <span className="catalog-scope-label">{t('catalog.scopeTitle')}</span>
-              <Segmented<ModBlockScope>
-                ariaLabel={t('catalog.scopeTitle')}
-                value={dict.scope}
-                onChange={changeScope}
-                options={[
-                  { value: 'off', label: t('catalog.scopeOff') },
-                  { value: 'mix', label: t('catalog.scopeMix') },
-                  { value: 'prefer', label: t('catalog.scopePrefer') },
-                ]}
-              />
-              <span className="catalog-scope-hint">
-                {dict.scope === 'off'
-                  ? t('catalog.scopeHintOff')
-                  : dict.scope === 'mix'
-                    ? t('catalog.scopeHintMix')
-                    : t('catalog.scopeHintPrefer')}
-              </span>
-            </div>
+            <ModScopeControl
+              scope={dict.scope}
+              onChange={changeScope}
+              className="catalog-scope"
+              labelClassName="catalog-scope-label"
+              hintClassName="catalog-scope-hint"
+              t={t}
+            />
           )}
 
           <div className="catalog-preview">

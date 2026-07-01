@@ -10,6 +10,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { MAX_STOREY_H, MIN_FLOOR_H } from '@/shared/domain/storeys';
+import { disposeObject } from '../../viewer/dispose';
 
 /** A Minecraft player is 1.8 blocks tall — the reference the figure is built to. */
 export const PLAYER_H = 1.8;
@@ -289,7 +290,7 @@ export function BuildScalePreview({
     const prevYaw = contentRef.current?.rotation.y;
     if (contentRef.current) {
       scene.remove(contentRef.current);
-      disposeGroup(contentRef.current);
+      disposeObject(contentRef.current);
       contentRef.current = null;
     }
     bandMeshesRef.current = [];
@@ -457,14 +458,4 @@ function frameCamera(camera: THREE.PerspectiveCamera | null, size: THREE.Vector3
   camera.position.copy(dir.multiplyScalar(dist));
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
-}
-
-function disposeGroup(group: THREE.Group): void {
-  group.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-    else mat?.dispose();
-  });
 }

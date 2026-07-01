@@ -3,6 +3,7 @@
 // drag (clamped to the stage), redock, minimize and close — all backed by the
 // persisted `windows` store. A closed window is reopened from the View menu.
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { ChevronDown, PanelRight, X } from 'lucide-react';
 import { windowsStore, WINDOW_WIDTHS, type PanelId } from '../state/windows';
 import { useT, useWindows } from '../hooks/useStores';
 
@@ -83,7 +84,7 @@ export function FloatingWindow({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().setFloating(id, false)}
         >
-          ⤢
+          <PanelRight size={13} strokeWidth={1.8} aria-hidden />
         </button>
         <button
           type="button"
@@ -93,7 +94,7 @@ export function FloatingWindow({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().toggleMinimized(id)}
         >
-          ⌄
+          <ChevronDown size={13} strokeWidth={1.8} aria-hidden />
         </button>
         <button
           type="button"
@@ -103,7 +104,7 @@ export function FloatingWindow({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => windowsStore.getState().setVisible(id, false)}
         >
-          ✕
+          <X size={13} strokeWidth={1.8} aria-hidden />
         </button>
       </div>
       {!state.minimized && (

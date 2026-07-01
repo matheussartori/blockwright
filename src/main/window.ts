@@ -9,6 +9,7 @@ import { IPC_EVENTS } from '@/shared/ipc';
 import { mt } from './language';
 import { getRecents } from './recents';
 import { getRecentWorkspaces } from './recent-workspaces';
+import { getPinnedWorkspace } from './pinned-workspace';
 import { getRecentWorlds } from './recent-worlds';
 import { getActiveWorkspace } from './structure/assets/content-pack';
 
@@ -125,6 +126,11 @@ export function notifyWorkspace(): void {
 /** Push the recent-workspaces list to the renderer (keeps the welcome view in sync). */
 export function notifyRecentWorkspaces(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentWorkspacesChanged, getRecentWorkspaces());
+}
+
+/** Push the pinned workspace's root (or null) to the renderer (drives the statusbar pin). */
+export function notifyPinnedWorkspace(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.pinnedWorkspaceChanged, getPinnedWorkspace()?.root ?? null);
 }
 
 /** Ask the renderer to close the current structure (back to the welcome view). */

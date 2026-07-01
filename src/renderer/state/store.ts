@@ -16,10 +16,12 @@ export interface Notice {
   warn: boolean;
 }
 
-/** A detected mod workspace offered for the just-opened loose `.nbt`. */
+/** A detected mod workspace offered for a just-opened loose `.nbt` (kind 'file',
+ *  filePath = the structure) or Minecraft world (kind 'world', filePath = its root). */
 export interface Suggestion {
   workspace: Workspace;
   filePath: string;
+  kind: 'file' | 'world';
 }
 
 export interface AppState {
@@ -29,6 +31,8 @@ export interface AppState {
   workspace: Workspace | null;
   /** Recently opened mod workspaces, most-recent first (mirrors main). */
   recentWorkspaces: Workspace[];
+  /** Root of the PINNED workspace (auto-activates at launch), or null (mirrors main). */
+  pinnedWorkspaceRoot: string | null;
   /** Recently opened worlds, most-recent first (mirrors main). */
   recentWorlds: WorldRef[];
   /** Absolute paths of the active workspace's `.nbt` structures. */
@@ -67,6 +71,7 @@ export interface AppState {
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
   setRecentWorkspaces: (workspaces: Workspace[]) => void;
+  setPinnedWorkspaceRoot: (root: string | null) => void;
   setRecentWorlds: (worlds: WorldRef[]) => void;
   setWorkspaceStructures: (paths: string[]) => void;
   setNavMode: (mode: NavMode) => void;
@@ -93,6 +98,7 @@ export const store = createStore<AppState>((set) => ({
   recents: [],
   workspace: null,
   recentWorkspaces: [],
+  pinnedWorkspaceRoot: null,
   recentWorlds: [],
   workspaceStructures: [],
   navMode: 'orbit',
@@ -113,6 +119,7 @@ export const store = createStore<AppState>((set) => ({
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
   setRecentWorkspaces: (recentWorkspaces) => set({ recentWorkspaces }),
+  setPinnedWorkspaceRoot: (pinnedWorkspaceRoot) => set({ pinnedWorkspaceRoot }),
   setRecentWorlds: (recentWorlds) => set({ recentWorlds }),
   setWorkspaceStructures: (workspaceStructures) => set({ workspaceStructures }),
   setNavMode: (navMode) => set({ navMode }),

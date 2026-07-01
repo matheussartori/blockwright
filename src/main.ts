@@ -12,7 +12,8 @@ import { registerTextureScheme, registerTextureProtocol } from '@/main/texture-p
 import { registerIpc } from '@/main/ipc';
 import { createWindow, openFile } from '@/main/window';
 import { buildAppMenu } from '@/main/app-menu';
-import { applyWorkspace, detectWorkspace } from '@/main/workspace';
+import { activateWorkspace, applyWorkspace, detectWorkspace } from '@/main/workspace';
+import { getPinnedWorkspace, setPinnedWorkspace } from '@/main/pinned-workspace';
 import { initAutoUpdates } from '@/main/updater';
 
 // Mirror the main-process console into the in-app Console dock from the very
@@ -59,6 +60,11 @@ app.on('ready', () => {
   if (process.env.BW_WORKSPACE) {
     const ws = detectWorkspace(process.env.BW_WORKSPACE);
     if (ws) applyWorkspace(ws);
+  } else {
+    // A PINNED workspace auto-activates at every launch (until unpinned/closed).
+    // A stale pin (the project moved/deleted) is dropped silently.
+    const pinned = getPinnedWorkspace();
+    if (pinned && !activateWorkspace(pinned)) setPinnedWorkspace(null);
   }
   createWindow();
   buildAppMenu();

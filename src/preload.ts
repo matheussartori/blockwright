@@ -89,6 +89,12 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.workspaceActivate, ws),
   detectFileWorkspace: (path: string): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceDetectFile, path),
+  detectWorldWorkspace: (root: string): Promise<Workspace | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceDetectWorld, root),
+  pinWorkspace: (pin: boolean): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspacePin, pin),
+  getPinnedWorkspace: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspacePinnedGet),
   listRecentWorkspaces: (): Promise<Workspace[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.recentWorkspacesList),
   clearRecentWorkspaces: (): Promise<Workspace[]> =>
@@ -202,6 +208,9 @@ const api: BlockwrightApi = {
   },
   onRecentWorkspacesChanged: (cb: (workspaces: Workspace[]) => void) => {
     ipcRenderer.on(IPC_EVENTS.recentWorkspacesChanged, (_e, list: Workspace[]) => cb(list));
+  },
+  onPinnedWorkspaceChanged: (cb: (root: string | null) => void) => {
+    ipcRenderer.on(IPC_EVENTS.pinnedWorkspaceChanged, (_e, root: string | null) => cb(root));
   },
   onOpenWorld: (cb: (root: string) => void) => {
     ipcRenderer.on(IPC_EVENTS.openWorld, (_e, root: string) => cb(root));

@@ -32,11 +32,18 @@ export const WINDOW_WIDTHS: Record<WindowId, number> = {
   generate: 380,
   versions: 240,
   console: 0,
+  project: 0, // left dock — width comes from `leftWidth`, never floats
 };
 
 /** Default / minimum height of the bottom Console dock (px), persisted + resizable. */
 export const DEFAULT_CONSOLE_H = 240;
 export const MIN_CONSOLE_H = 120;
+
+/** The left activity rail's fixed width (px) — keep in sync with --rail-w in CSS. */
+export const RAIL_W = 46;
+/** Width bounds for the two resizable side panels (Project / inspector dock). */
+export const LEFT_PANEL = { default: 248, min: 200, max: 420 };
+export const RIGHT_PANEL = { default: 360, min: 300, max: 560 };
 
 const TITLEBAR_H = 36; // the single slim top bar (see .tabbar)
 const STATUS_H = 30;
@@ -46,10 +53,20 @@ const JIGSAW_H = 360;
 
 const STORAGE_KEY = 'blockwright.windows';
 
-/** Current stage rect in px (window minus the titlebar and status bar). */
+/** Current stage rect in px (window minus the titlebar, status bar, and the
+ *  left chrome — activity rail + the Project panel when it's open). */
 function stageSize(): { w: number; h: number } {
+  let chrome = RAIL_W;
+  try {
+    // The store is declared below; during module init (defaults()) it doesn't
+    // exist yet — fall back to the rail alone.
+    const s = windowsStore.getState();
+    if (s.projectVisible) chrome += s.leftWidth;
+  } catch {
+    /* module still initializing */
+  }
   return {
-    w: window.innerWidth,
+    w: Math.max(0, window.innerWidth - chrome),
     h: Math.max(0, window.innerHeight - TITLEBAR_H - STATUS_H),
   };
 }
@@ -75,7 +92,8 @@ export function homePosition(id: WindowId): { x: number; y: number } {
         y: MARGIN,
       };
     case 'console':
-      // Bottom dock — docked, not free-floating; position is unused.
+    case 'project':
+      // Docked surfaces (bottom dock / left panel) — position is unused.
       return { x: MARGIN, y: MARGIN };
   }
 }
@@ -107,6 +125,12 @@ interface WindowsLayout {
   sidebarCollapsed: boolean;
   /** Height of the bottom Console dock in px (resizable, persisted). */
   consoleHeight: number;
+  /** Whether the left Project panel (workspace / recents explorer) is open. */
+  projectVisible: boolean;
+  /** Width of the left Project panel in px (resizable, persisted). */
+  leftWidth: number;
+  /** Width of the right inspector dock in px (resizable, persisted). */
+  rightWidth: number;
 }
 
 function defaults(): WindowsLayout {
@@ -125,6 +149,9 @@ function defaults(): WindowsLayout {
     activeTab: 'inspector',
     sidebarCollapsed: false,
     consoleHeight: DEFAULT_CONSOLE_H,
+    projectVisible: true,
+    leftWidth: LEFT_PANEL.default,
+    rightWidth: RIGHT_PANEL.default,
   };
 }
 
@@ -157,6 +184,13 @@ function load(): WindowsLayout {
       base.activeTab = saved.activeTab;
     }
     if (typeof saved.sidebarCollapsed === 'boolean') base.sidebarCollapsed = saved.sidebarCollapsed;
+    if (typeof saved.projectVisible === 'boolean') base.projectVisible = saved.projectVisible;
+    if (typeof saved.leftWidth === 'number') {
+      base.leftWidth = Math.min(LEFT_PANEL.max, Math.max(LEFT_PANEL.min, saved.leftWidth));
+    }
+    if (typeof saved.rightWidth === 'number') {
+      base.rightWidth = Math.min(RIGHT_PANEL.max, Math.max(RIGHT_PANEL.min, saved.rightWidth));
+    }
     return base;
   } catch {
     return base;
@@ -176,17 +210,32 @@ export interface WindowsStore extends WindowsLayout {
   setSidebarCollapsed: (collapsed: boolean) => void;
   /** Set the bottom Console dock's height (clamped to the minimum). */
   setConsoleHeight: (height: number) => void;
+  /** Show/hide the left Project panel (the activity rail's Files toggle). */
+  setProjectVisible: (visible: boolean) => void;
+  /** Resize the left Project panel (clamped to LEFT_PANEL bounds). */
+  setLeftWidth: (width: number) => void;
+  /** Resize the right inspector dock (clamped to RIGHT_PANEL bounds). */
+  setRightWidth: (width: number) => void;
   /** Re-dock every panel, re-show the sidebar, and reset floating positions. */
   resetAll: () => void;
 }
 
 export const windowsStore = createStore<WindowsStore>((set) => ({
   ...load(),
-  setPos: (id, x, y) => set((s) => ({ [id]: { ...s[id], x, y } }) as Partial<WindowsStore>),
-  toggleMinimized: (id) =>
-    set((s) => ({ [id]: { ...s[id], minimized: !s[id].minimized } }) as Partial<WindowsStore>),
-  setVisible: (id, visible) =>
-    set((s) => ({ [id]: { ...s[id], visible } }) as Partial<WindowsStore>),
+  setPos: (id, x, y) => {
+    if (id === 'project') return; // docked-only, never positioned
+    set((s) => ({ [id]: { ...s[id], x, y } }) as Partial<WindowsStore>);
+  },
+  toggleMinimized: (id) => {
+    if (id === 'project') return;
+    set((s) => ({ [id]: { ...s[id], minimized: !s[id].minimized } }) as Partial<WindowsStore>);
+  },
+  setVisible: (id, visible) => {
+    // `project` carries visibility only (like the View menu expects); it lives
+    // in its own flat flag rather than a WindowState.
+    if (id === 'project') return set({ projectVisible: visible });
+    set((s) => ({ [id]: { ...s[id], visible } }) as Partial<WindowsStore>);
+  },
   openPanel: (id) =>
     set((s) => {
       const cur = s[id];
@@ -205,6 +254,11 @@ export const windowsStore = createStore<WindowsStore>((set) => ({
   setActiveTab: (id) => set({ activeTab: id }),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setConsoleHeight: (height) => set({ consoleHeight: Math.max(MIN_CONSOLE_H, height) }),
+  setProjectVisible: (projectVisible) => set({ projectVisible }),
+  setLeftWidth: (width) =>
+    set({ leftWidth: Math.min(LEFT_PANEL.max, Math.max(LEFT_PANEL.min, width)) }),
+  setRightWidth: (width) =>
+    set({ rightWidth: Math.min(RIGHT_PANEL.max, Math.max(RIGHT_PANEL.min, width)) }),
   resetAll: () => set(defaults()),
 }));
 
@@ -219,6 +273,9 @@ function snapshot(s: WindowsStore): WindowsLayout {
     activeTab: s.activeTab,
     sidebarCollapsed: s.sidebarCollapsed,
     consoleHeight: s.consoleHeight,
+    projectVisible: s.projectVisible,
+    leftWidth: s.leftWidth,
+    rightWidth: s.rightWidth,
   };
 }
 

@@ -16,8 +16,9 @@ import { planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
 import type { ParamValues } from '../params';
 import { insetHouseBox, yardFor } from '../surroundings';
-import type { Box, FloorPlanEntry, RolePalette, StructureType } from './types';
+import type { Box, FloorPlanEntry, StructureType } from './types';
 import { addStairCore } from './stair-core';
+import { arrowSlit, crenellations, roofHatch } from './crown';
 import { ceilingLanterns, seatDoor, storeyEntries, storeySlabs } from './shell-kit';
 
 /** The tower's level plan — ONE source shared by `build()` and `floors()`. The shaft stacks
@@ -131,10 +132,7 @@ export const keep: StructureType = {
     for (let f = 0; f < floors; f++) {
       const wy = slabYs[f] + 2; // sill, two cells above the floor slab
       if (wy + 1 >= wallTop) continue; // no headroom left under the deck for a slit
-      const slit = (x: number, z: number): void => {
-        ops.push({ op: 'block', pos: [x, wy, z], state: win });
-        ops.push({ op: 'block', pos: [x, wy + 1, z], state: win });
-      };
+      const slit = (x: number, z: number): void => { ops.push(...arrowSlit(x, z, wy, wy + 1, win)); };
       if (f !== 0) slit(cx, z0); // skip the front-ground wall — the door is there
       slit(cx, z1);
       slit(x0, cz);
@@ -178,50 +176,3 @@ export const keep: StructureType = {
     return storeyEntries(slabYs, wallTop);
   },
 };
-
-/** Roof-deck access: a code-owned ladder climbing the TOP storey up THROUGH the deck so the
- *  player can reach the keep's content — the walkable battlemented crown. Hung on the WEST
- *  wall one cell in from the front-left corner (clear of the front-wall door and the
- *  back-right stair core), it runs from just above the top floor up to the deck and PUNCHES
- *  the deck cell at its own column (the hatch); the climber rises out of it and steps onto
- *  the surrounding deck. Always laid — even a single-storey keep earns a way up top. */
-function roofHatch(
-  rect: { x0: number; z0: number; x1: number; z1: number },
-  topY: number,
-  deckY: number,
-  palette: RolePalette,
-): AuthoringOp[] {
-  const { x0, z0, z1 } = rect;
-  if (deckY - topY < 2) return []; // the deck sits right on the top floor — nothing to climb
-  const cz = Math.floor((z0 + z1) / 2);
-  let lz = z0 + 1; // front-left, a cell off the corner
-  if (lz === cz) lz = Math.min(z1 - 1, z0 + 2); // dodge the centred arrow slit on the west wall
-  const lx = x0 + 1; // one cell in from the west wall, which backs the ladder (faces east)
-  const ladder = palette.get('ladder', { facing: 'east' });
-  const ops: AuthoringOp[] = [];
-  // Rungs from just above the top floor up to (and through) the deck — the top rung replaces
-  // the deck block, opening the hatch the climber emerges from onto the crown.
-  for (let y = topY + 1; y <= deckY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
-  return ops;
-}
-
-/** A crenellated parapet ring at height `y`: a merlon on every other perimeter cell (the
- *  gaps between are the crenels), walked once around the rim so the corners carry merlons. */
-function crenellations(
-  rect: { x0: number; z0: number; x1: number; z1: number },
-  y: number,
-  state: number,
-): AuthoringOp[] {
-  const { x0, z0, x1, z1 } = rect;
-  const ops: AuthoringOp[] = [];
-  let i = 0;
-  const place = (x: number, z: number): void => {
-    if (i % 2 === 0) ops.push({ op: 'block', pos: [x, y, z], state });
-    i++;
-  };
-  for (let x = x0; x <= x1; x++) place(x, z0);
-  for (let z = z0 + 1; z <= z1; z++) place(x1, z);
-  for (let x = x1 - 1; x >= x0; x--) place(x, z1);
-  for (let z = z1 - 1; z >= z0 + 1; z--) place(x0, z);
-  return ops;
-}

@@ -13,6 +13,7 @@ import type { DocumentFlow } from './useDocumentFlow';
 type IpcHandlers = Pick<
   DocumentFlow,
   | 'openFile'
+  | 'openWorld'
   | 'openAssembly'
   | 'reimportWorld'
   | 'close'
@@ -23,18 +24,13 @@ type IpcHandlers = Pick<
   | 'onWorkspaceChanged'
 >;
 
-export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc, exportActive, exportToWorldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
+export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, close, newDoc, exportActive, exportToWorldActive, exportToWorkspaceActive, onWorkspaceChanged }: IpcHandlers): void {
   // One-time IPC wiring + initial loads.
   useEffect(() => {
     const st = store.getState();
     api.onOpenPath((p) => void openFile(p));
     api.onFileDrop((p) => void openFile(p));
-    api.onOpenWorld((root) =>
-      void (async () => {
-        const meta = await api.openWorld(root);
-        if (meta) documentsStore.getState().openWorldDoc(meta);
-      })(),
-    );
+    api.onOpenWorld((root) => void openWorld(root));
     api.onCloseStructure(() => close());
     api.onOpenSettings((section) => {
       if (section) st.setSettingsSection(section);
@@ -53,10 +49,13 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
     api.onUpdateAvailable((info) => st.setUpdate(info));
     api.onRecentsChanged((paths) => st.setRecents(paths));
     api.onRecentWorkspacesChanged((list) => st.setRecentWorkspaces(list));
+    api.onPinnedWorkspaceChanged((root) => st.setPinnedWorkspaceRoot(root));
     api.onRecentWorldsChanged((list) => st.setRecentWorlds(list));
     api.onWorkspaceChanged((ws) => void onWorkspaceChanged(ws));
     api.onToggleWindow((id) => {
       const w = windowsStore.getState();
+      // `project` (left panel) tracks visibility in its own flat flag.
+      if (id === 'project') return w.setProjectVisible(!w.projectVisible);
       // `controls` (shortcuts popover) and `console` (bottom dock) are plain
       // visibility toggles; the dockable sidebar panels surface via openPanel.
       if (!w[id].visible && id !== 'controls' && id !== 'console') w.openPanel(id);
@@ -69,6 +68,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
       st.setWorkspace(await api.getWorkspace());
       st.setWorkspaceStructures(await api.listWorkspaceStructures());
       st.setRecentWorkspaces(await api.listRecentWorkspaces());
+      st.setPinnedWorkspaceRoot(await api.getPinnedWorkspace());
       st.setRecentWorlds(await api.listRecentWorlds());
       const version = await api.getContentVersion();
       if (version) st.setContentVersion(version);
@@ -76,7 +76,7 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
       const pending = await api.getPendingUpdate();
       if (pending) st.setUpdate(pending);
     })();
-  }, [openFile, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
+  }, [openFile, openWorld, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
 
   // Mirror file-open + window state to main (drives Close File and the View menu).
   // Only re-sends when the *reported* shape changes.
@@ -98,6 +98,8 @@ export function useAppIpc({ openFile, openAssembly, reimportWorld, close, newDoc
         versions: { visible: w.versions.visible, available: hasVersions },
         // The Console dock is always available (logs exist regardless of state).
         console: { visible: w.console.visible, available: true },
+        // The left Project panel is always available (workspace + recents).
+        project: { visible: w.projectVisible, available: true },
       };
       const key = JSON.stringify({ open, renamable, report });
       if (key === lastKey.current) return;

@@ -139,6 +139,10 @@ src/
         params.ts          ParamSpec/ParamDef + resolveParams + paramFields (single per-type param decl)
         compose.ts         composeStructure (THE cross) + composeBlockNames + isKnownStructure
                            (decoration param accepts `decoration` or legacy `theme`)
+        compose-basement.ts The central-basement machinery split out of compose.ts:
+                           selectedBasement/basementHeight (re-exported via compose.ts) +
+                           composeBasementStack (the multi-level below-grade stack every seeded
+                           archetype's central basement path runs through)
         index.ts           barrel + catalog (listModuleCatalog), selection→guide mapping
                            (selectedGuides/promptGuides), buildModulePreview (gallery)
         shell-kit.ts       The shared house-shell PARTS kit (like stair-core: a parts kit, not a base
@@ -179,8 +183,12 @@ src/
                            `floors()`) + stair-core.ts (addStairCore — the shared switchback stair core every
                            code-built type lays, taking the build's RolePalette; a `parts` helper, no cross-type
                            imports — its flights are INSET one cell from the far wall so the global stairwell
-                           pass can seat their landings, see "Seeded archetypes") + farmhouse-parts.ts
-                           (farmhouse-only pieces) + index.ts (registry).
+                           pass can seat their landings, see "Seeded archetypes") + crown.ts (the shared
+                           tower-crown parts kit: walkPerimeter/crenellations/roofHatch/arrowSlit — keep
+                           and spire compose their battlements/hatch/slits from it instead of duplicating
+                           the perimeter walk) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts
+                           (registry; also LEGACY_ALIASES). shell-kit also carries roofStair(palette,
+                           facing) — the one-liner for a bottom/straight roof-stairs palette entry.
                            A type emits ops in terms of roles (never concrete blocks), composes its casco
                            from shell-kit parts, keeps ONE `plan()` feeding both `build()` and `floors()`,
                            and delegates roof/basement to modules. See "Seeded archetypes" below.
@@ -224,8 +232,12 @@ src/
                            grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
                            a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
                            computed area + the gallery lists. So a big floor never comes out empty.
-        surroundings/      Category "surroundings": one file per yard typology (modern, garden) +
-                           types.ts (SurroundingsModule, required `appliesTo`) + outline.ts (the shared
+        surroundings/      Category "surroundings": one file per yard typology (modern, garden,
+                           graveyard) + types.ts (SurroundingsModule, required `appliesTo`) +
+                           yard-features.ts (the shared yard scaffold garden + graveyard build on:
+                           rect helpers + the seeded occupancy/chamfer `yardScaffold`, lampPost,
+                           weepingTree/deadTree — modern keeps its own ops-threading style) +
+                           outline.ts (the shared
                            seeded chamfered OUTLINE: rimCells/inCut/seededChamfers — the lawn is CLIPPED
                            to it, so the yard's footprint is never the plain rectangle) + index.ts
                            (registry + `insetHouseBox` + the shared `yardFor` every host's build()/
@@ -368,7 +380,10 @@ src/
                           anchored, complete the flue / drop a floating cap / keep one chimney). NEW
                           always-on checks plug in here; new per-structure fixes add a `FinalizePass`
                           id + a module `finalize` entry.
-                            rebuildStairwells (passes/stairwells.ts) is the DEFINITIVE circulation pass:
+                            rebuildStairwells (passes/stairwells/ — index.ts is the pass; the pure
+                          helpers live beside it: planes.ts = floor-plane detection + houseFootprint,
+                          materials.ts, hints.ts = the model's flight/ladder hints, patch-holes.ts =
+                          patchOrphanHoles) is the DEFINITIVE circulation pass:
                           always-on + self-gating — it detects the storey FLOOR PLANES,
                           collects the model's flight/ladder hints (which gap each serves), strips the
                           broken geometry, and rebuilds ONE clean connector per gap — a straight stair
@@ -403,15 +418,28 @@ src/
                           returns a CompileReport ({fixes,warnings}) for the generator to surface.
   renderer/                React app (Vite + @vitejs/plugin-react). No Node/fs/electron — IPC only.
     index.tsx             Entry: initTheme() then createRoot(#app).render(<App/>) (no StrictMode — see gotchas)
-    App.tsx               Orchestration: layout (TabBar/stage/Statusbar) + composition of the app/ hooks
+    App.tsx               Orchestration: the WORKBENCH layout (TabBar / ActivityBar / ProjectPanel /
+                          stage / Statusbar) + composition of the app/ hooks
     app/                  The Shell's concerns, one hook per responsibility: useDocumentFlow (open/load/
                           close + workspace-suggest handlers), useAppIpc (native-menu/file IPC wiring +
                           file/window-state report to main), useAiRenderBridge (the self-review render→
                           screenshot bridge), useViewerSync (store→viewer effects), capture.ts (helpers)
     api.ts                Typed accessor for window.blockwright (the preload bridge)
-    components/           FloatingWindow (shared window chrome), Statusbar, Welcome (themed Logo + action
-                          cards), TabBar (the single slim top bar — no separate titlebar), WorkspaceBadge/
-                          Suggest, Loading, SettingsModal (tabbed shell; each tab is a component in
+    components/           ActivityBar (the left icon rail: House=Home on top, Project/New-build/Catalog/
+                          Modules, then Console/Guide/Settings pinned at the bottom; active surface marked
+                          by an accent "voxel pip"), ProjectPanel (the left explorer: active workspace +
+                          its structures searchable + recent files/workspaces/worlds; toggled from the rail
+                          or View ▸ Project Panel (Cmd+B), width resizable + persisted), FloatingWindow
+                          (shared window chrome), Statusbar (left: the active-workspace segment — the old
+                          floating WorkspaceBadge, now a status segment that opens the workspace picker;
+                          then the structure summary; right: pack state), Welcome (the START PAGE: the
+                          hero is a real PROMPT card — typing a description + Generate/Enter lands in the
+                          planner pre-filled (the example chips below it fill the field, still editable);
+                          the open actions are a quiet 2×2 tile grid; compact recents on the right — the
+                          full lists live in ProjectPanel), TabBar (the
+                          single slim top bar — no separate titlebar; per-tab doc-kind icon: Box=structure,
+                          Globe=world, Sparkles=new build; Home lives on the rail, not in the strip),
+                          WorkspaceSuggest, Loading, SettingsModal (tabbed shell; each tab is a component in
                           components/settings/: Appearance/Viewer/Ai/About), VersionSelectModal, CatalogModal
                           (Block Catalog: list/grid + 3D preview — store.catalogOpen), ModulesModal
                           (Module Gallery: a host-first composition blueprint — pick a structure, see the
@@ -431,7 +459,10 @@ src/
                           sized PER FLOOR — one height input per storey with a link/chain toggle; there is no
                           "Total" height mode), the YARD-SIZE control when a surroundings ring is picked
                           (the SAME boxed number-stepper panel as the floor heights: Width X / Depth Z in
-                          cells, nudged in 2-cell steps) + per-floor rooms), FloorsSection (the ▦ Floors editor), BuildCard (the chat
+                          cells, nudged in 2-cell steps) + per-floor rooms), size-controls.tsx (the shared
+                          boxed-panel primitives those size sections compose: SizePanel/SizeRow/LinkToggle),
+                          ModScopeControl (the off/mix/prefer mod-blocks Segmented + hint, shared by
+                          BuildPlanner + CatalogModal), FloorsSection (the ▦ Floors editor), BuildCard (the chat
                           build card), BuildProgress (the COMPACT live progress bar — phase + design-pass +
                           a determinate fill from designStep/designSteps + elapsed/tokens, shared by the dock
                           and the stage), StageBuilding (the centered "building…" card shown over an empty
@@ -519,6 +550,8 @@ src/
                           undo/redo snapshot stack; ops patch the active doc's StructureData; save
                           re-encodes via IPC → a new version)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
+    ui/hash.ts            the renderer's deterministic string hashes, declared once: hashString31
+                          (catalog swatch hue) + hashFnv1a (the size-preview's seeded-RNG seed)
     viewer/               Three.js Viewer (scene/lights/loading/render loop) + ViewerProvider (React
                           bridge) + mesh/geometry/texture building. The geometry MATH is a shared,
                           WORKER-SAFE core: geometry-core.ts (buildGeometryBuffers — resolved palette +
@@ -535,7 +568,12 @@ src/
                           model textured from the entity atlas with `Pose`/flags applied, else a
                           fallback cube, added per-piece alongside the block group. Focused concerns
                           split out of the Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
-                          navigation + framing), capture.ts (the AI-review screenshot paths: orbit/
+                          navigation + framing), world-mode.ts (WorldMode — the world-mode facade: owns
+                          the WorldView lifecycle, day/night lighting, HUD stats/minimap, goTo/framing;
+                          the Viewer's world methods are thin delegates), dispose.ts (disposeObject —
+                          the ONE traverse-and-dispose helper every scene teardown uses: viewer clear,
+                          world chunk eviction, the preview components, floor-regions),
+                          capture.ts (the AI-review screenshot paths: orbit/
                           cutaway/section — encoded via the shared `REVIEW_SNAP` = JPEG@512 to keep the
                           re-sent/accumulating review images cheap; cutaways scale ~1/storey and yield 0
                           for a shallow single-volume build the section already reveals), floor-regions.ts
@@ -550,9 +588,9 @@ src/
                           [blue]/VOID_MARK [red], mirroring Minecraft's show-invisible-blocks colors). The Viewer also exposes `pickBlock(x,y)`
                           (raycast → block cell, via stepping along the ray) + `pickPlacement(x,y)` (empty
                           cell in front) + `setSelection`/`setSymmetryPlane`/`setVoids`/`setHover`/`setPaintNav`.
-                          The Viewer also owns WORLD MODE (enter/exitWorldMode, setWorldDimension/
-                          RenderDistance, setDaylight, cameraPosition/Yaw, worldStats/Minimap,
-                          goToWorldCoord) — it holds a `WorldView` and calls `update(camera)` each frame.
+                          The Viewer's WORLD-MODE surface (enter/exitWorldMode, setWorldDimension/
+                          RenderDistance, setDaylight, worldStats/Minimap, goToWorldCoord) delegates to
+                          the WorldMode facade, which calls `update(camera)` each frame.
     world/                The World Viewer's RENDERER side: stream a Minecraft world's chunks around the
                           camera with LOD. See "World viewer" below.
                           world-view.ts        The streamed scene: a map of loaded chunk meshes, a
@@ -680,7 +718,22 @@ Opened workspaces are remembered in `recent-workspaces.ts` and surfaced both on 
 inside a mod (`<root>/data/<namespace>/structure/...nbt` with a matching `assets/<namespace>`) with
 no workspace active triggers `detectWorkspaceForFile`, and the renderer shows a bottom-left prompt
 offering to load that workspace; accepting activates it and re-renders the file so mod textures
-resolve.
+resolve. Opening a **world** with no workspace active gets the same prompt via
+`detectWorkspaceForWorld` (walks the world dir's ancestors — a dev-run save sits at
+`<project>/run/saves/<world>` — trying `detectWorkspace`); accepting soft-refreshes the streamed
+chunks (`onWorkspaceChanged` → `refreshWorld`), no reload path needed. The suggestion carries a
+`kind: 'file' | 'world'` so the prompt's label matches.
+
+A workspace can be **pinned** (`main/pinned-workspace.ts`, one record persisted in userData): the
+pinned workspace auto-activates at every launch (BW_WORKSPACE still wins in dev; a stale pin is
+dropped silently) until the user unpins it, pins another, or **closes the workspace** (an explicit
+close = "I don't want this back", so `closeWorkspace()` clears the pin — both the menu and the IPC
+close path go through it). The CONTROL is the statusbar pin beside the workspace segment
+(hover-revealed; accent + filled while pinned) and the File ▸ Pin Workspace checkbox; the Project
+panel shows passive pin glyphs on the active card + the pinned recent row. The renderer mirrors the
+pinned ROOT (`store.pinnedWorkspaceRoot`, `pinnedWorkspaceChanged` event) — the pin state is always
+`pinnedRoot === workspace.root`, and `applyWorkspace`/`setWorkspaceVersion` keep the pinned record's
+name/version fresh when the pinned workspace itself changes.
 
 Each workspace also carries a **target Minecraft version** (`mc-version-detect.ts` reads it from
 `fabric.mod.json` / `mods.toml` / `gradle.properties` / `pack.mcmeta`; if none is found the renderer
@@ -1473,6 +1526,15 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
 - **Forge entry naming:** keep `src/main.ts` and `src/preload.ts` at the top level —
   Forge names the output bundles by entry basename, and `main` in package.json points at
   `.vite/build/main.js`.
+- **Workbench chrome:** row 2 of the shell grid is `.workbench` — the fixed **ActivityBar** rail
+  (width `RAIL_W`/`--rail-w`, keep in sync), the toggleable **ProjectPanel** (left, resizable via
+  `leftWidth`), then `.stage-area` (`flex: 1` — the viewport + console column, the right inspector
+  dock resizable via `rightWidth`, and the BuildPlanner overlay anchor). Chrome surfaces (rail,
+  panels, top/status bars, console) use the opaque **`--chrome`** token, a step quieter than `--bg`
+  so the 3D viewport reads as the lit stage. Both side panels resize via `ui/resize.ts startColDrag`
+  + a `.col-resize` handle; widths are clamped by `LEFT_PANEL`/`RIGHT_PANEL` and persisted.
+  `project` is a `WindowId` (View ▸ Project Panel, Cmd+B) but tracks visibility only in the flat
+  `projectVisible` flag — `setVisible('project')` maps to it, `setPos`/`toggleMinimized` no-op.
 - **Floating windows:** Controls / Inspector / Jigsaw share one chrome (`components/FloatingWindow.tsx`):
   titled, draggable (clamped to the stage), redock / minimize / **close** (close hides via
   `setVisible(false)` — reopen from the View menu). Layout lives in `state/windows.ts`
@@ -1491,8 +1553,8 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   (Cmd+Shift+B) + Module Gallery (Cmd+Shift+M) modals via their own divider group (they're modals,
   not window toggles, so they `notifyOpenCatalog/Modules` → `store.setCatalogOpen/ModulesOpen`).
 - **Home / tabs:** `activeId === null` (documents store) is the **Home** state — the Welcome screen
-  shows whenever there's no active doc, even with tabs still open. The title-bar **House icon**
-  (`TabBar`, `goHome()`, a lucide `House`) returns there; clicking a tab
+  shows whenever there's no active doc, even with tabs still open. The **app mark at the top of the
+  activity rail** (`ActivityBar`, `goHome()`) returns there; clicking a tab
   restores it. The Generate dock tab has no close button (close it from View ▸ Generate, like
   Info/Versions). A brand-new tab (the "+" / File ▸ New / Welcome ▸ Generate) lands on the inline
   NewBuildPanel (Details-first), NOT the chat dock — `newDoc` resets the planner draft + does not

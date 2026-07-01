@@ -52,8 +52,8 @@ refines through an emit → render → review loop — previewed live in the vie
 - **AI structure generation** from a prompt or reference image, refined live through an
   emit → render → review loop — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT Plus/Pro)
   subscription, no API credits, with cost presets (Saver / Balanced / Thorough) to trade quality for spend
-- **Composable build planner** — steer a generation by picking a structure type (a **House** or a
-  **Tower**, each with a code-built shell the AI furnishes), a decoration, roof, basement, attic,
+- **Composable build planner** — steer a generation by picking a structure type (a **House**, a
+  **Tower**, or a **Church**, each with a code-built shell the AI furnishes), a decoration, roof, basement, attic,
   surrounding yard and per-floor interior rooms, with live 3D previews of every part in the Module Gallery
 - **In-app block editor** — select, move, mirror/rotate, extrude, paint, replace and delete blocks
   directly in the viewer, with live symmetry, undo/redo, and orientation that stays correct on every
@@ -166,8 +166,8 @@ it's a read-only viewer.
 
 **File ▸ New Structure** opens the full-stage **Build Planner**, where you describe the build
 (optionally attaching a reference image) and pick a structure type, decoration, roof, basement,
-in-roof attic and surroundings (a yard wrapping the house — a fenced cottage garden or a modern
-pool terrace, whose size you set by hand on each axis; the W×D you set is the building shell, and
+in-roof attic and surroundings (a yard wrapping the house — a fenced cottage garden, a modern
+pool terrace or a graveyard, whose size you set by hand on each axis; the W×D you set is the building shell, and
 the compiled box grows around it by the chosen yard margins) to steer it — and, for a multi-storey
 house, assign up to two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2:
 bedrooms + library_) and set a height per floor (optionally linked so the whole stack moves
@@ -238,7 +238,8 @@ A **mod workspace** points Blockwright at a mod project folder so those assets r
 
 - **File ▸ Open Mod Workspace…** (or the welcome button) picks a mod project folder.
 - Blockwright locates its resources root and the mod's namespace under `assets/`, then registers
-  it as an extra asset source. A badge in the bottom-left shows the active workspace.
+  it as an extra asset source. The statusbar's workspace segment shows the active workspace (and
+  opens the picker); **pin** it there (or File ▸ Pin Workspace) to have it auto-activate at launch.
 - The mod's structures (`data/<namespace>/structure/*.nbt`) are listed on the welcome screen and
   render with their custom textures.
 - Opening a loose `.nbt` that lives inside a mod prompts you to activate that mod's workspace.

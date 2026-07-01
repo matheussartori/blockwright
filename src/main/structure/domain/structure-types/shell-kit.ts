@@ -63,6 +63,12 @@ export function storeyEntries(slabYs: readonly number[], wallTop: number): Floor
   });
 }
 
+/** Intern the straight, bottom-half roof stair facing `facing` — the one spelling of the
+ *  `palette.get('roof', …)` state every type's eave/cap/porch-step detail was hand-writing. */
+export function roofStair(palette: RolePalette, facing: string): number {
+  return palette.get('roof', { facing, half: 'bottom', shape: 'straight' });
+}
+
 /** A seated double door (lower + upper halves) facing north at (x, y, z). */
 export function seatDoor(palette: RolePalette, x: number, y: number, z: number): AuthoringOp[] {
   return [

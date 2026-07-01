@@ -14,7 +14,7 @@
 // Roof/Attic slot); Basement, Surroundings and Room modules link via the `tower` group.
 //
 // Massing in semantic roles (the decoration supplies the blocks); ships its own dark-stone
-// kit so it reads as a cursed spire even under a sparse decoration. Paired with `haunted`.
+// kit so it reads as a cursed spire even under a sparse decoration. Paired with `cursed`.
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { mulberry32 } from '../rng';
@@ -22,6 +22,7 @@ import type { ParamValues } from '../params';
 import { insetHouseBox, yardFor } from '../surroundings';
 import type { Box, FloorPlanEntry, RolePalette, StructureType } from './types';
 import { addStairCore } from './stair-core';
+import { arrowSlit, crenellations, roofHatch } from './crown';
 import { ceilingLanterns, seatDoor, storeyEntries } from './shell-kit';
 
 /** A clamped rect ([x0,x1]×[z0,z1]) at horizontal inset `m` from a box. */
@@ -73,7 +74,7 @@ export const spire: StructureType = {
     'lancet windows, full-height corner buttress piers tipped with lit spires, and a spiky ' +
     'crenellated crown. The carved exterior scales with width — a fat tower is densely ' +
     'articulated, never a box. Owns its crown in code (no Roof slot); links to every Basement, ' +
-    'Surroundings and Room module. Best with the Haunted decoration.',
+    'Surroundings and Room module. Best with the Cursed decoration.',
   knowledge: 'nbt/modules/structure/spire.md',
   preview: { size: [15, 38, 15], params: { decoration: 'cursed', floors: 5 } },
   // A tall spire reads with one cramped program per level, but a fat tower can take two.
@@ -229,8 +230,7 @@ export const spire: StructureType = {
       const wTop = Math.min(wy + (tierTop(f) - wy >= 3 ? 2 : 1), tierTop(f) - 1);
       if (wTop < wy) continue;
       const slit = (x: number, z: number, inX: number, inZ: number): void => {
-        for (let y = wy; y <= wTop; y++) ops.push({ op: 'block', pos: [x, y, z], state: win });
-        ops.push({ op: 'block', pos: [x + inX, wTop, z + inZ], state: lantern }); // glow just inside
+        ops.push(...arrowSlit(x, z, wy, wTop, win, { inX, inZ, lantern }));
       };
       if (f !== 0) slit(cx, r.z0, 0, 1);
       slit(cx, r.z1, 0, -1);
@@ -340,24 +340,6 @@ function tierRibs(r: Rect, m: number, yLo: number, yHi: number, state: number): 
   return ops;
 }
 
-/** A spiky crenellated parapet ring at height `y`: a merlon on every other rim cell (crenel
- *  gaps between), the corners raised a course higher to read as mini pinnacles. */
-function crenellations(r: Rect, y: number, merlon: number, cap: number): AuthoringOp[] {
-  const ops: AuthoringOp[] = [];
-  let i = 0;
-  const place = (x: number, z: number): void => {
-    const isCorner = (x === r.x0 || x === r.x1) && (z === r.z0 || z === r.z1);
-    if (isCorner) { ops.push({ op: 'block', pos: [x, y, z], state: merlon }); ops.push({ op: 'block', pos: [x, y + 1, z], state: cap }); }
-    else if (i % 2 === 0) ops.push({ op: 'block', pos: [x, y, z], state: merlon });
-    i++;
-  };
-  for (let x = r.x0; x <= r.x1; x++) place(x, r.z0);
-  for (let z = r.z0 + 1; z <= r.z1; z++) place(r.x1, z);
-  for (let x = r.x1 - 1; x >= r.x0; x--) place(x, r.z1);
-  for (let z = r.z1 - 1; z >= r.z0 + 1; z--) place(r.x0, z);
-  return ops;
-}
-
 /** A cantilevered lantern ARM projecting `out` from a wall at (wx,wy,wz): a slab arm reaching
  *  outward (dir `dx`/`dz`, one of them ±1), a fence chain dropping from its tip, and a hanging
  *  lantern below — the hanging iron cages of the references. Reach is clamped by `m` so it
@@ -434,21 +416,5 @@ function gothicDoor(cx: number, frontZ: number, groundY: number, tierTop: number
     ops.push({ op: 'block', pos: [cx - 1, barY, frontZ], state: glass });
     ops.push({ op: 'block', pos: [cx + 1, barY, frontZ], state: glass });
   }
-  return ops;
-}
-
-/** Roof-deck access: a code-owned ladder climbing the TOP storey up THROUGH the crown deck so
- *  the player reaches the walkable battlement. Hung on the inner face of the west wall, a cell
- *  off the corner (clear of the door + the stair core), it runs from just above the top floor
- *  up to the deck and PUNCHES the deck cell at its column (the hatch). */
-function roofHatch(rTop: Rect, topY: number, deckY: number, palette: RolePalette): AuthoringOp[] {
-  if (deckY - topY < 2) return [];
-  const cz = Math.floor((rTop.z0 + rTop.z1) / 2);
-  let lz = rTop.z0 + 1;
-  if (lz === cz) lz = Math.min(rTop.z1 - 1, rTop.z0 + 2); // dodge the centred west slit
-  const lx = rTop.x0 + 1; // one in from the west wall, which backs the ladder (faces east)
-  const ladder = palette.get('ladder', { facing: 'east' });
-  const ops: AuthoringOp[] = [];
-  for (let y = topY + 1; y <= deckY; y++) ops.push({ op: 'block', pos: [lx, y, lz], state: ladder });
   return ops;
 }

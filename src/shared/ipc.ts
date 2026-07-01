@@ -41,6 +41,12 @@ export const IPC_CHANNELS = {
   workspaceActivate: 'workspace:activate',
   /** Detect whether a `.nbt` path belongs to a mod project — returns a Workspace or null. */
   workspaceDetectFile: 'workspace:detect-file',
+  /** Detect whether a world save sits inside a mod project (dev run dir) — returns a Workspace or null. */
+  workspaceDetectWorld: 'workspace:detect-world',
+  /** Pin (true) the ACTIVE workspace / unpin (false) — returns the pinned root or null. */
+  workspacePin: 'workspace:pin',
+  /** The pinned workspace's root path, or null when none is pinned. */
+  workspacePinnedGet: 'workspace:pinned-get',
   recentWorkspacesList: 'recent-workspaces:list',
   recentWorkspacesClear: 'recent-workspaces:clear',
   /** Persist a user-chosen Minecraft version for the active workspace. */
@@ -178,6 +184,8 @@ export const IPC_EVENTS = {
   workspaceChanged: 'workspace-changed',
   /** Recent-workspaces list changed — payload is the new Workspace[]. */
   recentWorkspacesChanged: 'recent-workspaces-changed',
+  /** Pinned workspace changed (statusbar pin / native menu) — payload is the pinned root or null. */
+  pinnedWorkspaceChanged: 'pinned-workspace-changed',
   /** Request the renderer to close the current structure and return to welcome. */
   closeStructure: 'close-structure',
   /** Request the renderer to open the Settings panel (native menu / Cmd+,). */

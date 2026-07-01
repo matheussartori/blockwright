@@ -5,6 +5,7 @@
 // clears the scene). State (`regions`) is kept here so the bands survive a build;
 // `group` holds the live meshes.
 import * as THREE from 'three';
+import { disposeObject } from './dispose';
 
 /** A named vertical band highlighted in the viewer (one per floor-plan level),
  *  spanning the inclusive y range `from`..`to`. */
@@ -71,15 +72,8 @@ export class FloorRegionsOverlay {
   clearMeshes(): void {
     if (!this.group) return;
     this.scene.remove(this.group);
-    this.group.traverse((o) => {
-      const obj = o as Partial<THREE.Mesh> & { material?: THREE.Material | THREE.Material[] };
-      obj.geometry?.dispose();
-      const mat = obj.material as (THREE.Material & { map?: THREE.Texture }) | undefined;
-      if (mat) {
-        mat.map?.dispose();
-        mat.dispose();
-      }
-    });
+    // Textures too: the label sprites' canvas textures are created here, so they're ours to free.
+    disposeObject(this.group, { textures: true });
     this.group = null;
   }
 

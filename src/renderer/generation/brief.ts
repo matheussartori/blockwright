@@ -24,6 +24,7 @@ import {
   expandSizeForSurroundings,
   resolveSurroundMargins,
 } from '@/shared/domain/surroundings';
+import { hashFnv1a } from '../ui/hash';
 
 /** Max interior rooms a single floor can be assigned in the composer. */
 export const ROOMS_PER_FLOOR = 2;
@@ -397,14 +398,9 @@ export function roomArea(size: { w: number; d: number; h: number }, roomsOnFloor
   return Math.round(interior / Math.max(1, roomsOnFloor));
 }
 
-/** Small string→seed hash + a tiny seeded PRNG, so the auto room assignment is STABLE for a
- *  given structure/decoration/size (re-rendering the same build picks the same rooms) without
- *  pulling in the main-process rng (this is renderer-pure). */
-function hashSeed(str: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
+/** A tiny seeded PRNG (seeded via the shared `hashFnv1a` string hash), so the auto room
+ *  assignment is STABLE for a given structure/decoration/size (re-rendering the same build
+ *  picks the same rooms) without pulling in the main-process rng (this is renderer-pure). */
 function seededRng(seed: number): () => number {
   let a = seed >>> 0;
   return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -440,7 +436,7 @@ function effectiveRoomRows(
   const pool = (moodPool.length ? moodPool : fits).map((r) => r.id);
   // Seeded shuffle so the same build is stable but different builds vary.
   const size = effectiveSize(d, s);
-  const rng = seededRng(hashSeed(`${s.id}|${d.decoration ?? ''}|${size.w}x${size.d}x${size.h}|${n}`));
+  const rng = seededRng(hashFnv1a(`${s.id}|${d.decoration ?? ''}|${size.w}x${size.d}x${size.h}|${n}`));
   const order = [...pool];
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
   const maxPer = maxRoomsForStructure(s);

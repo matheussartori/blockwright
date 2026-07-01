@@ -3,7 +3,7 @@
 > Loads when the user picks the **Cursed** decoration. It sets the MATERIALS + mood, not
 > the massing — the structure type owns the shape. Cursed is the STONE counterpart to
 > Haunted: where Haunted is a derelict timber house, Cursed is a derelict blackstone
-> monolith (the look of the haunted tower's references).
+> monolith (the look of the spire's references).
 
 ## The palette
 
@@ -30,6 +30,6 @@ interior dim and blue-lit — the dread comes from the cold light and the cracke
 
 ## Pairs well with
 
-The **Haunted tower** (auto-selected together) for a cursed blackstone spire. Also strong on
+The **Spire** (auto-selected together) for a cursed blackstone spire. Also strong on
 a **Crypt** or **Cult temple** basement, or any keep you want to read as an abandoned, cursed
 stone sanctum rather than a kept castle.

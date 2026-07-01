@@ -27,8 +27,9 @@ export type RenameProjectResult =
   | { ok: false; error: string };
 
 /** The standardized panels/windows the View menu can show/hide. `console` is the
- *  bottom log dock (see `LogEntry`); like `controls` it tracks visibility only. */
-export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions' | 'console';
+ *  bottom log dock (see `LogEntry`); `project` is the left explorer panel — like
+ *  `controls`, both track visibility only. */
+export type WindowId = 'controls' | 'inspector' | 'jigsaw' | 'generate' | 'versions' | 'console' | 'project';
 
 /** A newer GitHub Release than the running app, surfaced as the update banner.
  *  Carries enough to tell the user what's new + send them to the download page

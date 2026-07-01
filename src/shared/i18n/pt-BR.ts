@@ -23,6 +23,7 @@ export const ptBR: Messages = {
   'menu.openRecentWorkspace': 'Abrir workspace recente',
   'menu.noRecentWorkspaces': 'Nenhum workspace recente',
   'menu.clearRecentWorkspaces': 'Limpar workspaces recentes',
+  'menu.pinWorkspace': 'Fixar workspace',
   'menu.closeWorkspace': 'Fechar workspace',
   'menu.openWorld': 'Abrir mundo…',
   'menu.openRecentWorld': 'Abrir mundo recente',
@@ -33,6 +34,7 @@ export const ptBR: Messages = {
   'menu.language': 'Idioma',
   'menu.languageSystem': 'Sistema',
   'menu.generate': 'Gerar',
+  'menu.projectPanel': 'Painel do projeto',
   'menu.inspector': 'Inspetor',
   'menu.jigsaw': 'Jigsaw',
   'menu.versions': 'Versões',
@@ -123,8 +125,17 @@ export const ptBR: Messages = {
   'tab.closeTab': 'Fechar aba',
   'tab.newTab': 'Nova aba',
 
+  // Activity rail + Project panel (the workbench chrome).
+  'rail.aria': 'Barra de atividades',
+  'rail.newBuild': 'Nova construção',
+  'project.title': 'Projeto',
+  'project.empty': 'Nada por aqui ainda — abra uma estrutura, um workspace ou um mundo para começar.',
+
   // Welcome screen.
   'welcome.tagline': 'Crie, visualize e gere estruturas de Minecraft em 3D com IA.',
+  'welcome.promptPlaceholder': 'Descreva uma construção — uma cabana, uma torre, uma capela…',
+  'welcome.generateCta': 'Gerar',
+  'welcome.openHeading': 'Abrir',
   'welcome.generateTitle': 'Gerar com IA',
   'welcome.generateSub': 'Descreva uma construção, receba uma estrutura',
   'welcome.openTitle': 'Abrir estrutura',
@@ -236,13 +247,19 @@ export const ptBR: Messages = {
   'about.renderer': 'Renderizador',
   'about.craftedBy': 'Feito por',
   'about.creditsRest':
-    '. A geração por IA usa o provedor que você escolher em Configurações ▸ IA — sua assinatura do Claude ou ChatGPT, ou uma chave de API da Anthropic, OpenAI ou Gemini.',
+    '. A geração por IA usa o provedor que você escolher em Configurações ▸ IA — sua assinatura do Claude ou ChatGPT.',
   'about.built': 'Feito com Electron, Vite, React e Three.js. Leitura de estruturas pelo prismarine-nbt.',
 
-  // Workspace badge / suggestion.
+  // Workspace badge / suggestion / pin.
   'workspace.label': 'Workspace',
   'workspace.partOfMod': 'Parte do mod',
+  'workspace.worldOfMod': 'Mundo do mod',
   'workspace.loadWorkspace': 'Carregar workspace',
+  'workspace.pin': 'Fixar workspace',
+  'workspace.pinDesc': 'Reabre automaticamente ao iniciar o Blockwright',
+  'workspace.unpin': 'Desafixar workspace',
+  'workspace.unpinDesc': 'Deixa de reabrir ao iniciar',
+  'workspace.pinned': 'Fixado — reabre ao iniciar',
 
   // Update check (banner + manual menu check dialogs).
   'update.available': 'Atualização disponível',
@@ -269,8 +286,8 @@ export const ptBR: Messages = {
   'gen.example1': 'Uma pequena cabana de carvalho com interior mobiliado',
   'gen.example2': 'Uma torre de vigia de pedra, base 5×5, 12 blocos de altura',
   'gen.example3': 'Um chalé aconchegante com telhado inclinado de pinheiro e uma varanda',
-  'gen.noKeyPre': 'Ainda não há chave de API da Anthropic. ',
-  'gen.noKeyLink': 'Adicione uma em Configurações',
+  'gen.noKeyPre': 'Nenhum provedor de IA conectado ainda. ',
+  'gen.noKeyLink': 'Configure um em Configurações',
   'gen.noKeyPost': ' para começar a gerar.',
   'gen.emptyDescPre': 'Descreva uma estrutura para o Claude construir. Ele lê os guias NBT do Blockwright, gera um ',
   'gen.emptyDescPost': ' e o renderiza aqui.',
@@ -335,8 +352,6 @@ export const ptBR: Messages = {
   'gen.depth': 'Profundidade',
   'gen.height': 'Altura',
   'gen.autoSuffix': ' (auto)',
-  'gen.heightTotalMode': 'Total',
-  'gen.heightFloorsMode': 'Por andar',
   'gen.linkHeights': 'Alturas vinculadas — todos os andares mudam juntos',
   'gen.unlinkHeights': 'Alturas independentes — defina cada andar separadamente',
   'gen.fieldYardSize': 'Tamanho do quintal',

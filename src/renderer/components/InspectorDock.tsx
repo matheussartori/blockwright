@@ -2,9 +2,11 @@
 // panel (Info / Jigsaw) lives here as a tab by default and can be torn off into
 // a FloatingWindow; both render the exact same content component. Availability
 // is passed in from App (Info = a structure is open, Jigsaw = it has jigsaws).
-import type { FC } from 'react';
+import type { ComponentType, FC } from 'react';
+import { ChevronsLeft, ChevronsRight, History, Info, PictureInPicture2, Puzzle, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
 import { windowsStore, type PanelId } from '../state/windows';
+import { startColDrag } from '../ui/resize';
 import { useT, useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
@@ -14,11 +16,13 @@ import { GenerateContent } from './NewStructurePanel';
 
 type Availability = Record<PanelId, boolean>;
 
-const PANELS: Record<PanelId, { title: MessageKey; Content: FC }> = {
-  inspector: { title: 'panel.info', Content: InspectorContent },
-  jigsaw: { title: 'panel.jigsaw', Content: JigsawContent },
-  versions: { title: 'panel.versions', Content: VersionsContent },
-  generate: { title: 'panel.generate', Content: GenerateContent },
+type PanelIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+
+const PANELS: Record<PanelId, { title: MessageKey; icon: PanelIcon; Content: FC }> = {
+  inspector: { title: 'panel.info', icon: Info, Content: InspectorContent },
+  jigsaw: { title: 'panel.jigsaw', icon: Puzzle, Content: JigsawContent },
+  versions: { title: 'panel.versions', icon: History, Content: VersionsContent },
+  generate: { title: 'panel.generate', icon: Sparkles, Content: GenerateContent },
 };
 
 const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];
@@ -35,6 +39,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
   const generate = useWindows((s) => s.generate);
   const activeTab = useWindows((s) => s.activeTab);
   const collapsed = useWindows((s) => s.sidebarCollapsed);
+  const width = useWindows((s) => s.rightWidth);
 
   const state: Record<PanelId, typeof inspector> = { inspector, jigsaw, versions, generate };
   // Tabs are the panels that are shown, docked (not floating), and available.
@@ -55,7 +60,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
           aria-label={t('panel.expandSidebar')}
           onClick={() => windowsStore.getState().setSidebarCollapsed(false)}
         >
-          ‹
+          <ChevronsLeft size={15} strokeWidth={1.8} aria-hidden />
         </button>
       </aside>
     );
@@ -64,21 +69,34 @@ export function InspectorDock({ availability }: { availability: Availability }) 
   const { Content } = PANELS[active];
 
   return (
-    <aside className="inspector-dock">
+    <aside className="inspector-dock" style={{ width }}>
+      <div
+        className="col-resize start"
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          startColDrag(e, windowsStore.getState().rightWidth, -1, (w) =>
+            windowsStore.getState().setRightWidth(w),
+          );
+        }}
+      />
       <div className="dock-head">
         <div className="dock-tabs" role="tablist">
-          {tabs.map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={id === active}
-              className={`dock-tab${id === active ? ' active' : ''}`}
-              onClick={() => windowsStore.getState().setActiveTab(id)}
-            >
-              {t(PANELS[id].title)}
-            </button>
-          ))}
+          {tabs.map((id) => {
+            const Icon = PANELS[id].icon;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={id === active}
+                className={`dock-tab${id === active ? ' active' : ''}`}
+                onClick={() => windowsStore.getState().setActiveTab(id)}
+              >
+                <Icon size={13} strokeWidth={1.8} aria-hidden />
+                {t(PANELS[id].title)}
+              </button>
+            );
+          })}
         </div>
         <div className="dock-actions">
           <button
@@ -88,7 +106,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
             aria-label={t('panel.detachAria')}
             onClick={() => windowsStore.getState().setFloating(active, true)}
           >
-            ⤢
+            <PictureInPicture2 size={14} strokeWidth={1.8} aria-hidden />
           </button>
           <button
             type="button"
@@ -97,7 +115,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
             aria-label={t('panel.collapseSidebar')}
             onClick={() => windowsStore.getState().setSidebarCollapsed(true)}
           >
-            ›
+            <ChevronsRight size={14} strokeWidth={1.8} aria-hidden />
           </button>
         </div>
       </div>

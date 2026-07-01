@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { BlockwrightApi, ChunkRenderPayload, DimensionId, StructureEntity } from '@/shared/types';
 import type { LoadedTexture, TextureLoader } from '../viewer/texture-loader';
+import { disposeObject } from '../viewer/dispose';
 import { geometryFor, materialFor } from '../viewer/mesh-builder';
 import { buildEntities } from '../viewer/entity-mesh';
 import { BORDER_PLANE_BYTES, occluderStates, type MaterialBuffers, type NeighborBorders } from '../viewer/geometry-core';
@@ -503,7 +504,5 @@ export class WorldView {
 
 /** Dispose only the geometries in a chunk group (materials are shared + cached in the view). */
 function disposeGeometries(group: THREE.Group): void {
-  group.traverse((obj) => {
-    if (obj instanceof THREE.Mesh) obj.geometry.dispose();
-  });
+  disposeObject(group, { materials: false });
 }

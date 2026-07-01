@@ -18,7 +18,6 @@ import { windowsStore } from '../../state/windows';
 import { runGeneration } from '../../state/generation';
 import { usePlanner, useT, useLocale, useActiveDoc, useApp } from '../../hooks/useStores';
 import { api } from '../../api';
-import { Segmented } from '../ui/Segmented';
 import {
   basementAreaOf,
   buildBrief,
@@ -47,6 +46,7 @@ import {
 } from '../../generation/details';
 import type { SurroundSizing } from '@/shared/domain/surroundings';
 import { DetailsSection } from './DetailsSection';
+import { ModScopeControl } from './ModScopeControl';
 import { ATTIC_COLOR, BASEMENT_COLOR, BuildScalePreview, PLAYER_H } from './BuildScalePreview';
 import type { GenerationCatalog, ModBlockScope } from '@/shared/types';
 
@@ -253,28 +253,15 @@ function PlannerView({ inline, onClose }: { inline: boolean; onClose?: () => voi
             onRemoveRoom={onRemoveRoom}
           />
           {modNamespace && modScope && (
-            <div className="planner-modblocks">
-              <span className="gen-chip-label">
-                {t('catalog.scopeTitle')} · <code>{modNamespace}</code>
-              </span>
-              <Segmented<ModBlockScope>
-                ariaLabel={t('catalog.scopeTitle')}
-                value={modScope}
-                onChange={changeModScope}
-                options={[
-                  { value: 'off', label: t('catalog.scopeOff') },
-                  { value: 'mix', label: t('catalog.scopeMix') },
-                  { value: 'prefer', label: t('catalog.scopePrefer') },
-                ]}
-              />
-              <span className="planner-modblocks-hint">
-                {modScope === 'off'
-                  ? t('catalog.scopeHintOff')
-                  : modScope === 'mix'
-                    ? t('catalog.scopeHintMix')
-                    : t('catalog.scopeHintPrefer')}
-              </span>
-            </div>
+            <ModScopeControl
+              scope={modScope}
+              onChange={changeModScope}
+              namespace={modNamespace}
+              className="planner-modblocks"
+              labelClassName="gen-chip-label"
+              hintClassName="planner-modblocks-hint"
+              t={t}
+            />
           )}
           <div className="planner-notes">
             <span className="gen-chip-label">

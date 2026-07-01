@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import type { StructureData } from '@/shared/types';
 import { buildStructure } from '../../viewer/mesh-builder';
 import { TextureLoader } from '../../viewer/texture-loader';
+import { disposeObject } from '../../viewer/dispose';
 
 /** Auto-rotation speed in radians/second — calm, not spinning. */
 const SPIN_RATE = 0.5;
@@ -93,7 +94,7 @@ export function StructurePreview({ data }: { data: StructureData | null }) {
     // Drop the previous build.
     if (contentRef.current) {
       scene.remove(contentRef.current);
-      disposeGroup(contentRef.current);
+      disposeObject(contentRef.current);
       contentRef.current = null;
     }
     if (!data) return;
@@ -138,15 +139,4 @@ function frameCamera(camera: THREE.PerspectiveCamera | null, size: THREE.Vector3
   camera.position.copy(dir.multiplyScalar(dist));
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
-}
-
-/** Free geometries/materials of a built group. */
-function disposeGroup(group: THREE.Group): void {
-  group.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-    if (mesh.geometry) mesh.geometry.dispose();
-    const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-    else mat?.dispose();
-  });
 }

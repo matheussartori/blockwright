@@ -29,6 +29,7 @@ export interface DocumentFlow {
   load: (docId: string, path: string, opts?: LoadOpts) => Promise<void>;
   openFile: (path: string) => Promise<void>;
   open: () => Promise<void>;
+  openWorld: (root?: string) => Promise<void>;
   openAssembly: () => Promise<void>;
   reimportWorld: () => Promise<void>;
   newDoc: () => void;
@@ -134,6 +135,19 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     const path = await api.openDialog();
     if (path) void openFile(path);
   }, [openFile]);
+
+  // Open a Minecraft world (no root = folder picker) as a world tab. Like opening a
+  // loose `.nbt`, a world that sits inside a mod project's dev run dir (and no active
+  // workspace) triggers the bottom-left workspace suggestion, so the mod's blocks
+  // render with their real textures in the fly-through.
+  const openWorld = useCallback(async (root?: string) => {
+    const meta = await api.openWorld(root);
+    if (!meta) return;
+    documentsStore.getState().openWorldDoc(meta);
+    if (store.getState().workspace !== null) return;
+    const ws = await api.detectWorldWorkspace(meta.root);
+    store.getState().setSuggest(ws ? { workspace: ws, filePath: meta.root, kind: 'world' } : null);
+  }, []);
 
   // Reassemble a split jigsaw assembly (Blockwright's own export, or an Export to World
   // datapack) back into one structure and open it as a new document, so an oversized build
@@ -271,7 +285,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   const maybeSuggestWorkspace = useCallback(async (path: string) => {
     if (store.getState().workspace !== null) return;
     const ws = await api.detectFileWorkspace(path);
-    store.getState().setSuggest(ws ? { workspace: ws, filePath: path } : null);
+    store.getState().setSuggest(ws ? { workspace: ws, filePath: path, kind: 'file' } : null);
   }, []);
 
   const acceptSuggest = useCallback(async () => {
@@ -280,6 +294,9 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     const active = await api.activateWorkspace(sug.workspace);
     store.getState().setSuggest(null);
     if (!active) return;
+    // A world doesn't reload from a path — onWorkspaceChanged already soft-refreshes
+    // the streamed chunks so the mod's textures resolve. Nothing more to do here.
+    if (sug.kind === 'world') return;
     // Re-render with the mod's textures, keeping the camera — and re-render the
     // structure CURRENTLY shown (the latest version, or whichever version is being
     // previewed), not the original file, which would jump the viewer back to the
@@ -314,5 +331,5 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     bindGenerationProgress();
   }, [load]);
 
-  return { load, openFile, open, openAssembly, reimportWorld, newDoc, close, closeDocById, exportActive, exportToWorldActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
+  return { load, openFile, open, openWorld, openAssembly, reimportWorld, newDoc, close, closeDocById, exportActive, exportToWorldActive, exportToWorkspaceActive, acceptSuggest, onWorkspaceChanged };
 }

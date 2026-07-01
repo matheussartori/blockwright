@@ -2,7 +2,7 @@
 
 > Module guide for the **gothic** decoration. It loads into the system prompt **only when
 > the user picks the Gothic decoration**. A decoration is the MATERIAL palette + mood; it
-> auto-pairs with the **Gothic structure type** (the towered, portico'd manor), so this is
+> auto-pairs with the **Manor structure type** (the towered, portico'd manor), so this is
 > the black-with-white-detailing half of a gothic manor.
 
 ## The palette

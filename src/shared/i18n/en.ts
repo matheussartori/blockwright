@@ -21,6 +21,7 @@ export const en = {
   'menu.openRecentWorkspace': 'Open Recent Workspace',
   'menu.noRecentWorkspaces': 'No Recent Workspaces',
   'menu.clearRecentWorkspaces': 'Clear Recent Workspaces',
+  'menu.pinWorkspace': 'Pin Workspace',
   'menu.closeWorkspace': 'Close Workspace',
   'menu.openWorld': 'Open World…',
   'menu.openRecentWorld': 'Open Recent World',
@@ -31,6 +32,7 @@ export const en = {
   'menu.language': 'Language',
   'menu.languageSystem': 'System',
   'menu.generate': 'Generate',
+  'menu.projectPanel': 'Project Panel',
   'menu.inspector': 'Inspector',
   'menu.jigsaw': 'Jigsaw',
   'menu.versions': 'Versions',
@@ -121,8 +123,17 @@ export const en = {
   'tab.closeTab': 'Close tab',
   'tab.newTab': 'New tab',
 
+  // Activity rail + Project panel (the workbench chrome).
+  'rail.aria': 'Activity bar',
+  'rail.newBuild': 'New build',
+  'project.title': 'Project',
+  'project.empty': 'Nothing here yet — open a structure, a workspace, or a world to get started.',
+
   // Welcome screen.
   'welcome.tagline': 'Build, view, and AI-generate Minecraft structures in 3D.',
+  'welcome.promptPlaceholder': 'Describe a build — a cottage, a keep, a chapel…',
+  'welcome.generateCta': 'Generate',
+  'welcome.openHeading': 'Open',
   'welcome.generateTitle': 'Generate with AI',
   'welcome.generateSub': 'Describe a build, get a structure',
   'welcome.openTitle': 'Open structure',
@@ -234,13 +245,19 @@ export const en = {
   'about.renderer': 'Renderer',
   'about.craftedBy': 'Crafted by',
   'about.creditsRest':
-    '. AI generation runs on the provider you choose in Settings ▸ AI — your Claude or ChatGPT subscription, or an Anthropic, OpenAI, or Gemini API key.',
+    '. AI generation runs on the provider you choose in Settings ▸ AI — your Claude or ChatGPT subscription.',
   'about.built': 'Built with Electron, Vite, React & Three.js. Structure parsing by prismarine-nbt.',
 
-  // Workspace badge / suggestion.
+  // Workspace badge / suggestion / pin.
   'workspace.label': 'Workspace',
   'workspace.partOfMod': 'Part of mod',
+  'workspace.worldOfMod': 'World of mod',
   'workspace.loadWorkspace': 'Load workspace',
+  'workspace.pin': 'Pin workspace',
+  'workspace.pinDesc': 'Reopens automatically when Blockwright starts',
+  'workspace.unpin': 'Unpin workspace',
+  'workspace.unpinDesc': 'Stops reopening at launch',
+  'workspace.pinned': 'Pinned — reopens at launch',
 
   // Update check (banner + manual menu check dialogs).
   'update.available': 'Update available',
@@ -267,8 +284,8 @@ export const en = {
   'gen.example1': 'A small oak cottage with a furnished interior',
   'gen.example2': 'A stone watchtower, 5×5 footprint, 12 blocks tall',
   'gen.example3': 'A cozy cabin with a pitched spruce roof and a porch',
-  'gen.noKeyPre': 'No Anthropic API key yet. ',
-  'gen.noKeyLink': 'Add one in Settings',
+  'gen.noKeyPre': 'No AI provider connected yet. ',
+  'gen.noKeyLink': 'Set one up in Settings',
   'gen.noKeyPost': ' to start generating.',
   'gen.emptyDescPre': 'Describe a structure for Claude to build. It reads the Blockwright NBT guides, generates a ',
   'gen.emptyDescPost': ', and renders it here.',
@@ -333,8 +350,6 @@ export const en = {
   'gen.depth': 'Depth',
   'gen.height': 'Height',
   'gen.autoSuffix': ' (auto)',
-  'gen.heightTotalMode': 'Total',
-  'gen.heightFloorsMode': 'Per floor',
   'gen.linkHeights': 'Heights linked — every floor moves together',
   'gen.unlinkHeights': 'Heights independent — set each floor on its own',
   'gen.fieldYardSize': 'Yard size',

@@ -2,7 +2,7 @@
 
 > Module guide for the **sakura** decoration. It loads into the system prompt **only when
 > the user picks the Sakura decoration**. A decoration is the MATERIAL palette + mood; it
-> auto-pairs with the **Sakura structure type** (the raised blossom cottage), so this is the
+> auto-pairs with the **Raised cottage structure type** (the raised blossom cottage), so this is the
 > pink-cherry half of a cherry-blossom home.
 
 ## The palette

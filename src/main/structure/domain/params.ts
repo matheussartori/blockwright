@@ -46,6 +46,17 @@ export function resolveParams(spec: ParamSpec, raw: Record<string, unknown>): Pa
   return out;
 }
 
+/** Coerce a loose `{ w, d }` (or `[w, d]`) raw param into a sane footprint, or undefined —
+ *  generic W×D coercion for the sizing params that ride in as raw `template` op params
+ *  (the basement area, the house shell size). */
+export function sanitizeWH(v: unknown): { w: number; d: number } | undefined {
+  const pair = Array.isArray(v) ? { w: v[0], d: v[1] } : (v as { w?: unknown; d?: unknown } | null);
+  const w = Number(pair?.w);
+  const d = Number(pair?.d);
+  if (!Number.isFinite(w) || !Number.isFinite(d) || w < 1 || d < 1) return undefined;
+  return { w: Math.trunc(w), d: Math.trunc(d) };
+}
+
 /** Project a param spec into renderer-facing fields for the composer's Details —
  *  one control per param. `unit` params (e.g. decay) are omitted (they belong to the
  *  decoration, not the structural picker), as are `module`-marked params (surfaced as

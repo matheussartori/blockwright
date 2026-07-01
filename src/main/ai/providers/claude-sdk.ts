@@ -9,6 +9,7 @@
 // vite.main.config.ts) and loaded dynamically here.
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { GenerateImage } from '@/shared/types';
+import { isAlwaysThinkingModel } from '@/shared/ai';
 import { EMIT_TOOL_NAME, EMIT_TOOL_DESCRIPTION, normalizeMode } from '../schema';
 import type { EmitArgs } from '../schema';
 import { DEFAULT_DATA_VERSION } from '../../structure/mc-data-version';
@@ -131,12 +132,16 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
   const server = sdk.createSdkMcpServer({ name: 'blockwright', version: '1.0.0', tools: [emit] });
   const promptInput = p.images.length > 0 ? imagePrompt(p.userText, p.images) : p.userText;
 
-  // The current Claude models (Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an
-  // `effort` level — the fixed `budgetTokens` budget is rejected there — so map the
-  // effort knob to {adaptive + effort}, or disable thinking outright when it's `off`.
+  // The current Claude models (Fable 5, Opus 4.8, Sonnet 5) use ADAPTIVE thinking
+  // steered by an `effort` level — the fixed `budgetTokens` budget is rejected there —
+  // so map the effort knob to {adaptive + effort}, or disable thinking outright when
+  // it's `off`. On an always-thinking model (Fable 5) an explicit `disabled` is a 400:
+  // the only valid "off" is omitting the config (the model still thinks adaptively).
   const thinkingOpts =
     p.thinkingEffort === 'off'
-      ? { thinking: { type: 'disabled' as const } }
+      ? isAlwaysThinkingModel(p.credential.model)
+        ? {}
+        : { thinking: { type: 'disabled' as const } }
       : { thinking: { type: 'adaptive' as const }, effort: p.thinkingEffort };
 
   let resultSubtype: string | null = null;
@@ -211,7 +216,8 @@ export const claudeSdkCritique: Critic = async (input) => {
       tools: [],
       allowedTools: [],
       settingSources: [],
-      thinking: { type: 'disabled' },
+      // Fable 5 rejects an explicit `disabled` (thinking is always on there) — omit.
+      ...(isAlwaysThinkingModel(model) ? {} : { thinking: { type: 'disabled' as const } }),
       abortController: input.abort,
       env: authEnv(input.credential.id),
       cwd: input.dir,

@@ -17,19 +17,12 @@
 // build box's height, and all foliage is placed persistent so it never despawns.
 import type { AuthoringOp } from '../../authoring/types';
 import { surroundMarginsForOuter } from '@/shared/domain/surroundings';
-import { mulberry32 } from '../rng';
-import { inCut, rimCells, seededChamfers } from './outline';
+import { rimCells } from './outline';
 import type { SurroundingsModule } from './types';
+import { deadTree, fitsRect, lampPost, midX, midZ, weepingTree, yardScaffold, type Rect, type TreeCtx } from './yard-features';
 
 /** Foliage must not despawn in-game — every leaf/plant is placed persistent. */
 const LEAF = { persistent: 'true' };
-
-/** An axis-aligned horizontal region of the yard (inclusive). */
-interface Rect { x0: number; x1: number; z0: number; z1: number }
-
-const fitsRect = (r: Rect, w: number, d: number): boolean => r.x1 - r.x0 + 1 >= w && r.z1 - r.z0 + 1 >= d;
-const midX = (r: Rect): number => Math.floor((r.x0 + r.x1) / 2);
-const midZ = (r: Rect): number => Math.floor((r.z0 + r.z1) / 2);
 
 export const graveyard: SurroundingsModule = {
   id: 'graveyard',
@@ -103,17 +96,13 @@ export const graveyard: SurroundingsModule = {
     const lantern = palette.get('light');
     const ops: AuthoringOp[] = [];
 
-    // Cells already claimed by paths/features, so graves/ruins/scatter never overlap.
-    const used = new Set<string>();
-    const mark = (x: number, z: number): void => { used.add(`${x},${z}`); };
-    const free = (x: number, z: number): boolean => !used.has(`${x},${z}`);
-    const rnd = mulberry32(seed);
-
-    // The seeded chamfered outline — generous cuts for an irregular, overgrown plot.
-    const ch = seededChamfers(rnd, m, 3, 9);
-    const cut = (x: number, z: number): boolean => inCut(b, ch, x, z);
+    // The shared yard scaffold: the occupancy tracker (cells claimed by paths/features,
+    // so graves/ruins/scatter never overlap), the seeded PRNG, and the seeded chamfered
+    // outline — generous cuts for an irregular, overgrown plot.
+    const { mark, free, rnd, ch, cut } = yardScaffold(b, m, seed, 3, 9);
     const outOfYard = (x: number, z: number): boolean =>
       cut(x, z) || (x >= hx0 && x <= hx1 && z >= hz0 && z <= hz1);
+    const canPlace = (x: number, z: number): boolean => free(x, z) && !outOfYard(x, z);
 
     // --- Lawn base: the ring at ground level, clipped to the chamfered outline ----------
     const strips: Rect[] = [
@@ -142,8 +131,7 @@ export const graveyard: SurroundingsModule = {
       const flanksGate = p.z === b.z0 && (p.x === cx - 2 || p.x === cx + 2);
       const isPier = flanksGate || i % 7 === 0;
       if (isPier) { // a stone pier topped with a soul lantern — the wall's light
-        ops.push({ op: 'fill', from: [p.x, gy + 1, p.z], to: [p.x, clampY(gy + 3), p.z], state: brick });
-        ops.push({ op: 'block', pos: [p.x, clampY(gy + 4), p.z], state: lantern });
+        ops.push(...lampPost(p.x, p.z, gy, 3, brick, lantern, clampY));
         return;
       }
       if (rnd() < 0.16) return; // a breach in the crumbling wall — left open
@@ -155,10 +143,8 @@ export const graveyard: SurroundingsModule = {
 
     // --- Gate: tall stone piers flanking the opening, a stair arch + lintel overhead,
     // a cobblestone threshold, and iron-bar leaves standing aside. ----------------------
-    const gateTop = clampY(gy + 5);
     for (const px of [cx - 2, cx + 2]) {
-      ops.push({ op: 'fill', from: [px, gy + 1, b.z0], to: [px, gateTop, b.z0], state: brick });
-      ops.push({ op: 'block', pos: [px, clampY(gateTop + 1), b.z0], state: lantern });
+      ops.push(...lampPost(px, b.z0, gy, 5, brick, lantern, clampY)); // a tall flanking pier
     }
     ops.push({ op: 'fill', from: [cx - 1, gy, b.z0], to: [cx + 1, gy, b.z0], state: cobble }); // threshold
     if (gy + 4 <= b.y1) { // the arch only when there's headroom for it
@@ -236,28 +222,9 @@ export const graveyard: SurroundingsModule = {
       }
     };
 
-    /** A great weeping tree: an oak trunk, a broad canopy, and trailing leaf strands
-     *  hanging from the rim — the focal point of the grounds. Marks a 5×5 footprint. */
-    const addTree = (tx: number, tz: number): void => {
-      const th = Math.min(5, b.y1 - gy - 1);
-      if (th < 3) return;
-      const topY = gy + th;
-      ops.push({ op: 'fill', from: [tx, gy + 1, tz], to: [tx, topY, tz], state: trunk });
-      // canopy: a 5×5 ring just under the crown, plus a 3×3 crown
-      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
-        if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue; // round the corners
-        ops.push({ op: 'block', pos: [tx + dx, topY, tz + dz], state: leaf });
-      }
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
-        ops.push({ op: 'block', pos: [tx + dx, clampY(topY + 1), tz + dz], state: leaf });
-      }
-      // weeping strands: leaves trailing down from the canopy rim
-      for (const [wx, wz] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -1], [2, 1], [-1, 2], [1, -2]] as [number, number][]) {
-        const drop = 1 + Math.floor(rnd() * 3);
-        for (let d = 1; d <= drop; d++) ops.push({ op: 'block', pos: [tx + wx, topY - d, tz + wz], state: leaf });
-      }
-      for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) mark(tx + dx, tz + dz);
-    };
+    // The shared tree builders' context (yard-features): the weeping tree — the focal
+    // point of the grounds — and the bare dead tree both draw from it.
+    const treeCtx: TreeCtx = { gy, yTop: b.y1, rnd, mark, clampY, trunk, leaf };
 
     /** A small stone mausoleum/crypt: a mossy hut with a slab roof, an iron grate door
      *  facing `dir` (toward the manor), and a soul lantern over the lintel. */
@@ -288,24 +255,11 @@ export const graveyard: SurroundingsModule = {
       }
     };
 
-    /** A bare dead tree: a short leafless oak trunk with the odd clinging leaf — gnarled
-     *  cemetery growth that breaks up the lawn without the weeping tree's bulk. */
-    const addDeadTree = (tx: number, tz: number): void => {
-      if (!free(tx, tz) || outOfYard(tx, tz)) return;
-      const th = Math.min(2 + Math.floor(rnd() * 3), b.y1 - gy - 1);
-      if (th < 2) return;
-      mark(tx, tz);
-      ops.push({ op: 'fill', from: [tx, gy + 1, tz], to: [tx, clampY(gy + th), tz], state: trunk });
-      if (rnd() < 0.6) ops.push({ op: 'block', pos: [tx, clampY(gy + th + 1), tz], state: leaf });
-      if (rnd() < 0.4) ops.push({ op: 'block', pos: [tx, clampY(gy + th), tz], state: leaf });
-    };
-
     /** A churchyard lamp post: a cobble-wall column carrying a soul lantern. */
     const addLampPost = (px: number, pz: number): void => {
-      if (!free(px, pz) || outOfYard(px, pz)) return;
+      if (!canPlace(px, pz)) return;
       mark(px, pz);
-      ops.push({ op: 'fill', from: [px, gy + 1, pz], to: [px, clampY(gy + 2), pz], state: cap });
-      ops.push({ op: 'block', pos: [px, clampY(gy + 3), pz], state: lantern });
+      ops.push(...lampPost(px, pz, gy, 2, cap, lantern, clampY));
     };
 
     // --- Focal features spread across the WHOLE plot ----------------------------------
@@ -328,7 +282,7 @@ export const graveyard: SurroundingsModule = {
     for (const r of regions) {
       const pick = rnd();
       if (pick < 0.26 && trees < MAX_TREES && fitsRect(r, 5, 5)) {
-        addTree(midX(r), midZ(r)); trees++;
+        ops.push(...weepingTree(treeCtx, midX(r), midZ(r))); trees++;
       } else if (pick < 0.46 && fitsRect(r, 4, 4) && !outOfYard(r.x0 + 1, r.z0 + 1)) {
         addCrypt({ x0: r.x0 + 1, x1: r.x0 + 1, z0: r.z0 + 1, z1: r.z0 + 1 });
       } else if (pick < 0.68 && fitsRect(r, 3, 4)) {
@@ -337,7 +291,7 @@ export const graveyard: SurroundingsModule = {
       } else if (pick < 0.85) {
         addRubble(midX(r), midZ(r));
       } else {
-        addDeadTree(midX(r), midZ(r));
+        ops.push(...deadTree(treeCtx, midX(r), midZ(r), canPlace));
         if (fitsRect(r, 3, 3)) addLampPost(midX(r) + 2 <= r.x1 ? midX(r) + 2 : midX(r), midZ(r));
       }
     }

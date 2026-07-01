@@ -10,7 +10,7 @@
 import type { AuthoringOp } from '../../authoring/types';
 import { planStoreys } from '@/shared/domain/storeys';
 import { insetHouseBox, yardFor } from '../surroundings';
-import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, seatDoor, storeySlabs, storeyEntries } from './shell-kit';
+import { ceilingLanterns, cornerPosts, roofCap, roofFormFor, roofStair, seatDoor, storeySlabs, storeyEntries } from './shell-kit';
 import { addStairCore } from './stair-core';
 import { type Box, type BuildArgs, box as mkBox, logProps, type FloorPlanEntry, type StructureType } from './types';
 
@@ -67,7 +67,7 @@ function ringStairs(
   palette: BuildArgs['palette'],
   x0: number, x1: number, z0: number, z1: number, y: number,
 ): void {
-  const s = (facing: string): number => palette.get('roof', { facing, half: 'bottom', shape: 'straight' });
+  const s = (facing: string): number => roofStair(palette, facing);
   ops.push({ op: 'fill', from: [x0, y, z0], to: [x1, y, z0], state: s('north') }); // front edge, sheds -z
   ops.push({ op: 'fill', from: [x0, y, z1], to: [x1, y, z1], state: s('south') }); // back edge, sheds +z
   ops.push({ op: 'fill', from: [x0, y, z0], to: [x0, y, z1], state: s('west') });  // left edge, sheds -x

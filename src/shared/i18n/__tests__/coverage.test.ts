@@ -20,7 +20,7 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'statusbar.jigsawLabel',
   'console.title', 'catalog.namespace', 'workspace.label', 'modules.presetsCount', 'modules.universal',
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',
-  'gen.autoSuffix', 'gen.heightTotalMode', 'viewer.contentPack',
+  'gen.autoSuffix', 'viewer.contentPack',
   'editor.axisX', 'editor.axisY', 'editor.axisZ',
   'viewer.nbtLimit48', // "48³ (1.16+)" — a numeric label, identical in both languages
   // World-viewer: loanwords / proper nouns kept as-is in pt-BR (Minecraft terms).

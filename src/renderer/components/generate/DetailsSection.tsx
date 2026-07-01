@@ -8,7 +8,6 @@
 // pulls in" is visible, not a wall of greyed selects. A pure view: the parent owns
 // `BuildDetails` and passes the reducers in (generation/details.ts).
 import { useState } from 'react';
-import { Link2, Unlink } from 'lucide-react';
 import { store } from '../../state/store';
 import { moduleAppliesTo } from '@/shared/domain/applies-to';
 import { modulesConflict } from '@/shared/domain/conflicts';
@@ -36,6 +35,7 @@ import {
 import type { ChipOption } from './chips';
 import { Select, type SelectOption } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
+import { LinkToggle, SizePanel, SizeRow } from './size-controls';
 import { FloorStack } from './FloorStack';
 import { ATTIC_COLOR, BASEMENT_COLOR } from './BuildScalePreview';
 import type { TFunction } from '@/shared/i18n';
@@ -303,30 +303,28 @@ function SizeSection({
   const axisLabel = (a: keyof SizeBox) => (a === 'w' ? t('gen.width') : a === 'd' ? t('gen.depth') : t('gen.height'));
 
   return (
-    <div className="gen-chip-group gen-size-section">
-      <div className="gen-size-head">
-        <span className="gen-chip-label">
+    <SizePanel
+      label={
+        <>
           {t('gen.sizeLabel')}
           {details.size || perFloor ? '' : t('gen.autoSuffix')}
-        </span>
-      </div>
-
+        </>
+      }
+    >
       {/* Footprint card — the house W × D (and H for a non-storeyed type). */}
       <div className="gen-size-card">
         <span className="gen-size-card-head">{t('gen.footprintLabel')}</span>
         {footprintAxes.map((axis) => (
-          <div key={axis} className="gen-size-row">
-            <span className="gen-size-row-tag">{axisLabel(axis)}</span>
-            <Stepper
-              value={sz[axis]}
-              min={SIZE_MIN}
-              max={SIZE_MAX}
-              disabled={busy}
-              ariaLabel={axisLabel(axis)}
-              size="sm"
-              onChange={(n) => onSize(axis, n, sz)}
-            />
-          </div>
+          <SizeRow
+            key={axis}
+            tag={axisLabel(axis)}
+            ariaLabel={axisLabel(axis)}
+            value={sz[axis]}
+            min={SIZE_MIN}
+            max={SIZE_MAX}
+            busy={busy}
+            onChange={(n) => onSize(axis, n, sz)}
+          />
         ))}
       </div>
 
@@ -335,50 +333,35 @@ function SizeSection({
         <div className="gen-size-card">
           <div className="gen-size-card-headrow">
             <span className="gen-size-card-head">{t('gen.storiesLabel')}</span>
-            <button
-              type="button"
-              className={`gen-link-toggle${linked ? ' on' : ''}`}
-              aria-pressed={linked}
-              disabled={busy}
-              title={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
-              aria-label={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
-              onClick={() => setLinked(!linked)}
-            >
-              {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
-            </button>
+            <LinkToggle linked={linked} setLinked={setLinked} busy={busy} t={t} />
           </div>
           {heights.map((h, i) => (
-            <div key={i} className="gen-size-row">
-              <span className="gen-size-row-tag">
-                {t('gen.roomFloor')} {i + 1}
-              </span>
-              <Stepper
-                value={h}
-                min={MIN_FLOOR_H}
-                max={MAX_STOREY_H}
-                disabled={busy}
-                ariaLabel={`${t('gen.roomFloor')} ${i + 1}`}
-                size="sm"
-                onChange={(n) => onFloorHeight(i, n, linked)}
-              />
-            </div>
+            <SizeRow
+              key={i}
+              tag={<>{t('gen.roomFloor')} {i + 1}</>}
+              ariaLabel={`${t('gen.roomFloor')} ${i + 1}`}
+              value={h}
+              min={MIN_FLOOR_H}
+              max={MAX_STOREY_H}
+              busy={busy}
+              onChange={(n) => onFloorHeight(i, n, linked)}
+            />
           ))}
           {details.attic && (
-            <div className="gen-size-row">
-              <span className="gen-size-row-tag">
-                <span className="planner-legend-dot" style={{ background: ATTIC_COLOR }} />
-                {t('gen.fieldAttic')}
-              </span>
-              <Stepper
-                value={overheads.attic}
-                min={MIN_FLOOR_H}
-                max={MAX_STOREY_H}
-                disabled={busy}
-                ariaLabel={t('gen.fieldAttic')}
-                size="sm"
-                onChange={(n) => onBandHeight('attic', n)}
-              />
-            </div>
+            <SizeRow
+              tag={
+                <>
+                  <span className="planner-legend-dot" style={{ background: ATTIC_COLOR }} />
+                  {t('gen.fieldAttic')}
+                </>
+              }
+              ariaLabel={t('gen.fieldAttic')}
+              value={overheads.attic}
+              min={MIN_FLOOR_H}
+              max={MAX_STOREY_H}
+              busy={busy}
+              onChange={(n) => onBandHeight('attic', n)}
+            />
           )}
           <div className="gen-size-total">
             <span>{t('gen.totalHeightLabel')}</span>
@@ -386,7 +369,7 @@ function SizeSection({
           </div>
         </div>
       )}
-    </div>
+    </SizePanel>
   );
 }
 
@@ -417,77 +400,58 @@ function BasementSection({
   const area = basementAreaOf(details, struct) ?? { w: SIZE_MIN, d: SIZE_MIN };
 
   return (
-    <div className="gen-chip-group gen-size-section">
-      <div className="gen-size-head">
-        <span className="gen-chip-label">
+    <SizePanel
+      label={
+        <>
           <span className="planner-legend-dot" style={{ background: BASEMENT_COLOR }} />
           {t('gen.fieldBasement')}
-        </span>
-      </div>
-
+        </>
+      }
+    >
       <div className="gen-size-card">
-        <div className="gen-size-row">
-          <span className="gen-size-row-tag">{t('gen.basementLevels')}</span>
-          <Stepper
-            value={levels.length}
-            min={1}
-            max={MAX_BASEMENT_LEVELS}
-            disabled={busy}
-            ariaLabel={t('gen.basementLevels')}
-            size="sm"
-            onChange={onBasementLevels}
-          />
-        </div>
+        <SizeRow
+          tag={t('gen.basementLevels')}
+          ariaLabel={t('gen.basementLevels')}
+          value={levels.length}
+          min={1}
+          max={MAX_BASEMENT_LEVELS}
+          busy={busy}
+          onChange={onBasementLevels}
+        />
         <div className="gen-size-card-headrow gen-size-card-subhead">
           <span className="gen-size-card-head">{t('gen.height')}</span>
-          {levels.length > 1 && (
-            <button
-              type="button"
-              className={`gen-link-toggle${linked ? ' on' : ''}`}
-              aria-pressed={linked}
-              disabled={busy}
-              title={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
-              aria-label={linked ? t('gen.linkHeights') : t('gen.unlinkHeights')}
-              onClick={() => setLinked(!linked)}
-            >
-              {linked ? <Link2 size={14} strokeWidth={1.9} aria-hidden /> : <Unlink size={14} strokeWidth={1.9} aria-hidden />}
-            </button>
-          )}
+          {levels.length > 1 && <LinkToggle linked={linked} setLinked={setLinked} busy={busy} t={t} />}
         </div>
         {levels.map((h, i) => (
-          <div key={i} className="gen-size-row">
-            <span className="gen-size-row-tag">{t('gen.basementLevelTag').replace('{n}', String(i + 1))}</span>
-            <Stepper
-              value={h}
-              min={MIN_FLOOR_H}
-              max={MAX_STOREY_H}
-              disabled={busy}
-              ariaLabel={t('gen.basementLevelTag').replace('{n}', String(i + 1))}
-              size="sm"
-              onChange={(n) => onBasementLevelHeight(i, n, linked)}
-            />
-          </div>
+          <SizeRow
+            key={i}
+            tag={t('gen.basementLevelTag').replace('{n}', String(i + 1))}
+            ariaLabel={t('gen.basementLevelTag').replace('{n}', String(i + 1))}
+            value={h}
+            min={MIN_FLOOR_H}
+            max={MAX_STOREY_H}
+            busy={busy}
+            onChange={(n) => onBasementLevelHeight(i, n, linked)}
+          />
         ))}
       </div>
 
       <div className="gen-size-card">
         <span className="gen-size-card-head">{t('gen.basementFootprint')}</span>
         {(['w', 'd'] as const).map((axis) => (
-          <div key={axis} className="gen-size-row">
-            <span className="gen-size-row-tag">{axis === 'w' ? t('gen.width') : t('gen.depth')}</span>
-            <Stepper
-              value={area[axis]}
-              min={SIZE_MIN}
-              max={SIZE_MAX}
-              disabled={busy}
-              ariaLabel={axis === 'w' ? t('gen.width') : t('gen.depth')}
-              size="sm"
-              onChange={(n) => onBasementArea(axis, n, area)}
-            />
-          </div>
+          <SizeRow
+            key={axis}
+            tag={axis === 'w' ? t('gen.width') : t('gen.depth')}
+            ariaLabel={axis === 'w' ? t('gen.width') : t('gen.depth')}
+            value={area[axis]}
+            min={SIZE_MIN}
+            max={SIZE_MAX}
+            busy={busy}
+            onChange={(n) => onBasementArea(axis, n, area)}
+          />
         ))}
       </div>
-    </div>
+    </SizePanel>
   );
 }
 
@@ -510,45 +474,41 @@ function YardSizeSection({
 }) {
   if (!ring) return null;
   return (
-    <div className="gen-chip-group gen-size-section gen-yard-size">
-      <div className="gen-size-head">
-        <span className="gen-chip-label">
+    <SizePanel
+      className="gen-yard-size"
+      label={
+        <>
           <span className="planner-legend-dot" style={{ background: 'var(--surround-dot, #4f9e5a)' }} />
           {t('gen.fieldYardSize')}
-        </span>
-      </div>
+        </>
+      }
+    >
       <div className="gen-size-card">
-        <div className="gen-size-row">
-          <span className="gen-size-row-tag">{t('gen.yardWidth')}</span>
-          <Stepper
-            value={ring.side}
-            min={SURROUND_MARGIN_MIN}
-            max={SURROUND_MARGIN_MAX}
-            step={SURROUND_MARGIN_STEP}
-            disabled={busy}
-            ariaLabel={t('gen.yardWidth')}
-            size="sm"
-            onChange={(n) => onSurroundSize({ side: n, front: ring.front, back: ring.back })}
-          />
-        </div>
-        <div className="gen-size-row">
-          <span className="gen-size-row-tag">{t('gen.yardDepth')}</span>
-          <Stepper
-            value={ring.front}
-            min={SURROUND_MARGIN_MIN}
-            max={SURROUND_MARGIN_MAX}
-            step={SURROUND_MARGIN_STEP}
-            disabled={busy}
-            ariaLabel={t('gen.yardDepth')}
-            size="sm"
-            onChange={(n) => onSurroundSize({ side: ring.side, front: n, back: n })}
-          />
-        </div>
+        <SizeRow
+          tag={t('gen.yardWidth')}
+          ariaLabel={t('gen.yardWidth')}
+          value={ring.side}
+          min={SURROUND_MARGIN_MIN}
+          max={SURROUND_MARGIN_MAX}
+          step={SURROUND_MARGIN_STEP}
+          busy={busy}
+          onChange={(n) => onSurroundSize({ side: n, front: ring.front, back: ring.back })}
+        />
+        <SizeRow
+          tag={t('gen.yardDepth')}
+          ariaLabel={t('gen.yardDepth')}
+          value={ring.front}
+          min={SURROUND_MARGIN_MIN}
+          max={SURROUND_MARGIN_MAX}
+          step={SURROUND_MARGIN_STEP}
+          busy={busy}
+          onChange={(n) => onSurroundSize({ side: ring.side, front: n, back: n })}
+        />
         <div className="gen-size-total">
           <span>{t('gen.yardRingHint')}</span>
           <span className="gen-size-total-val">{ring.side * 2 + ring.front + ring.back}</span>
         </div>
       </div>
-    </div>
+    </SizePanel>
   );
 }

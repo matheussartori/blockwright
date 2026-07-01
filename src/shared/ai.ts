@@ -61,6 +61,7 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     envVars: ['CLAUDE_CODE_OAUTH_TOKEN'],
     keyPlaceholder: 'sk-ant-oat… (optional)',
     models: [
+      { id: 'claude-fable-5', label: 'Fable 5' },
       { id: 'claude-opus-4-8', label: 'Opus 4.8' },
       { id: 'claude-sonnet-5', label: 'Sonnet 5' },
       { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
@@ -118,12 +119,20 @@ export interface AiProviderState {
 // Env vars (BW_AI_MAX_ROUNDS / BW_AI_THINKING_EFFORT) still override.
 
 /** Reasoning-effort level for Claude's extended thinking. The current Claude models
- *  (Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an `effort` level — the
- *  fixed `budget_tokens` budget is removed there — so this replaces the old numeric
+ *  (Fable 5, Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an `effort` level —
+ *  the fixed `budget_tokens` budget is removed there — so this replaces the old numeric
  *  `thinkingBudget`. `off` disables thinking entirely; the rest map to the Agent
  *  SDK's `effort` knob (the SDK silently downgrades a level the model doesn't support,
  *  e.g. `xhigh` → `high`). Codex has no equivalent and ignores it. */
 export type ThinkingEffort = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/** Models whose thinking is ALWAYS ON at the API level (Fable 5 / Mythos 5): an
+ *  explicit `thinking: {type: 'disabled'}` is rejected with a 400 there — the only
+ *  valid "off" is omitting the thinking config entirely (the model still thinks
+ *  adaptively). The Claude driver + critic consult this before mapping `off`. */
+export function isAlwaysThinkingModel(model: string): boolean {
+  return model.startsWith('claude-fable') || model.startsWith('claude-mythos');
+}
 
 /** The effort levels in order, for the Settings dropdown + stored-value validation. */
 export const THINKING_EFFORTS: readonly ThinkingEffort[] = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];

@@ -61,6 +61,15 @@ export interface BlockwrightApi {
   activateWorkspace: (workspace: Workspace) => Promise<Workspace | null>;
   /** Detect whether a `.nbt` path belongs to a mod project (returns its Workspace or null). */
   detectFileWorkspace: (path: string) => Promise<Workspace | null>;
+  /** Detect whether a world save sits inside a mod project's dev run dir (its Workspace or null). */
+  detectWorldWorkspace: (root: string) => Promise<Workspace | null>;
+  /** Pin (true) the active workspace so it auto-activates at launch / unpin (false).
+   *  Returns the pinned workspace's root, or null when nothing is pinned. */
+  pinWorkspace: (pin: boolean) => Promise<string | null>;
+  /** The pinned workspace's root path, or null when none is pinned. */
+  getPinnedWorkspace: () => Promise<string | null>;
+  /** Notified when the pinned workspace changes (statusbar pin / native menu). */
+  onPinnedWorkspaceChanged: (cb: (root: string | null) => void) => void;
   /** Recently opened mod workspaces, most-recent first. Both return the updated list. */
   listRecentWorkspaces: () => Promise<Workspace[]>;
   clearRecentWorkspaces: () => Promise<Workspace[]>;

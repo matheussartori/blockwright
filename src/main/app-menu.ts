@@ -12,7 +12,8 @@ import { clearRecents, getRecents } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { clearRecentWorlds, getRecentWorlds } from './recent-worlds';
 import { getActiveWorkspace } from './structure/assets/content-pack';
-import { activateWorkspace, applyWorkspace, promptOpenWorkspace } from './workspace';
+import { activateWorkspace, closeWorkspace, pinActiveWorkspace, promptOpenWorkspace } from './workspace';
+import { getPinnedWorkspace } from './pinned-workspace';
 import {
   notifyClose,
   notifyExportFile,
@@ -57,6 +58,7 @@ let windowsState: WindowsReport = {
   generate: { visible: false, available: true },
   versions: { visible: false, available: false },
   console: { visible: false, available: true },
+  project: { visible: true, available: true },
 };
 
 /** Update the open-file flag and rebuild the menu if it changed. */
@@ -120,79 +122,102 @@ function languageSubmenu(): MenuItemConstructorOptions[] {
   ];
 }
 
-/** Build + install the native application menu (File ▸ Open / Open Recent /
- *  Workspace, View ▸ windows, etc.). Re-called whenever the recents or the
- *  per-window visibility change, so the menu's items + checkmarks stay in sync. */
-export function buildAppMenu(): void {
-  const recents = getRecents();
-  const openRecent: MenuItemConstructorOptions[] = recents.length
+/** Shared shape of the three "Open Recent …" submenus: one item per recent
+ *  entry, a separator, then the Clear action — or a single disabled "none"
+ *  label when the list is empty. */
+function recentSubmenu<T>(opts: {
+  items: T[];
+  item: (entry: T) => MenuItemConstructorOptions;
+  clearLabel: string;
+  onClear: () => void;
+  emptyLabel: string;
+}): MenuItemConstructorOptions[] {
+  return opts.items.length
     ? [
-        ...recents.map((p) => ({ label: path.basename(p), toolTip: p, click: () => openFile(p) })),
+        ...opts.items.map(opts.item),
         { type: 'separator' as const },
-        { label: mt('menu.clearRecent'), click: () => { clearRecents(); refreshMenu(); } },
+        { label: opts.clearLabel, click: opts.onClear },
       ]
-    : [{ label: mt('menu.noRecentFiles'), enabled: false }];
+    : [{ label: opts.emptyLabel, enabled: false }];
+}
 
-  const recentWorkspaces = getRecentWorkspaces();
-  const openRecentWorkspace: MenuItemConstructorOptions[] = recentWorkspaces.length
-    ? [
-        ...recentWorkspaces.map((ws) => ({
-          label: ws.name,
-          toolTip: `${ws.namespace} · ${ws.root}`,
-          click: () => { activateWorkspace(ws); buildAppMenu(); },
-        })),
-        { type: 'separator' as const },
-        {
-          label: mt('menu.clearRecentWorkspaces'),
-          click: () => { clearRecentWorkspaces(); notifyRecentWorkspaces(); buildAppMenu(); },
-        },
-      ]
-    : [{ label: mt('menu.noRecentWorkspaces'), enabled: false }];
+/** File ▸ Open Recent — the recently opened structure files. */
+function openRecentSubmenu(): MenuItemConstructorOptions[] {
+  return recentSubmenu({
+    items: getRecents(),
+    item: (p) => ({ label: path.basename(p), toolTip: p, click: () => openFile(p) }),
+    clearLabel: mt('menu.clearRecent'),
+    onClear: () => { clearRecents(); refreshMenu(); },
+    emptyLabel: mt('menu.noRecentFiles'),
+  });
+}
 
-  const recentWorlds = getRecentWorlds();
-  const openRecentWorld: MenuItemConstructorOptions[] = recentWorlds.length
-    ? [
-        ...recentWorlds.map((w) => ({ label: w.name, toolTip: w.root, click: () => openWorld(w.root) })),
-        { type: 'separator' as const },
-        {
-          label: mt('menu.clearRecentWorlds'),
-          click: () => { clearRecentWorlds(); notifyRecentWorlds(); buildAppMenu(); },
-        },
-      ]
-    : [{ label: mt('menu.noRecentWorlds'), enabled: false }];
+/** File ▸ Open Recent Workspace — the recently opened mod workspaces. */
+function openRecentWorkspaceSubmenu(): MenuItemConstructorOptions[] {
+  return recentSubmenu({
+    items: getRecentWorkspaces(),
+    item: (ws) => ({
+      label: ws.name,
+      toolTip: `${ws.namespace} · ${ws.root}`,
+      click: () => { activateWorkspace(ws); buildAppMenu(); },
+    }),
+    clearLabel: mt('menu.clearRecentWorkspaces'),
+    onClear: () => { clearRecentWorkspaces(); notifyRecentWorkspaces(); buildAppMenu(); },
+    emptyLabel: mt('menu.noRecentWorkspaces'),
+  });
+}
 
-  // The Settings item lives where each OS expects it: under the app menu on
-  // macOS (Cmd+,), and under File on Windows/Linux (Ctrl+,). Both route to the
-  // same renderer-side panel via IPC.
-  const settingsItem: MenuItemConstructorOptions = {
+/** File ▸ Open Recent World — the recently opened Minecraft saves. */
+function openRecentWorldSubmenu(): MenuItemConstructorOptions[] {
+  return recentSubmenu({
+    items: getRecentWorlds(),
+    item: (w) => ({ label: w.name, toolTip: w.root, click: () => openWorld(w.root) }),
+    clearLabel: mt('menu.clearRecentWorlds'),
+    onClear: () => { clearRecentWorlds(); notifyRecentWorlds(); buildAppMenu(); },
+    emptyLabel: mt('menu.noRecentWorlds'),
+  });
+}
+
+// The Settings item lives where each OS expects it: under the app menu on
+// macOS (Cmd+,), and under File on Windows/Linux (Ctrl+,). Both route to the
+// same renderer-side panel via IPC.
+function settingsMenuItem(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.settings'),
     accelerator: 'CmdOrCtrl+,',
     click: () => notifyOpenSettings(),
   };
+}
 
-  const languageItem: MenuItemConstructorOptions = {
+function languageMenuItem(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.language'),
     submenu: languageSubmenu(),
   };
+}
 
-  // Check for Updates… lives where each OS expects it: under the app menu on
-  // macOS (the Apple convention — right below About), and under Help on
-  // Windows/Linux. Both route to the same manual update check.
-  const checkUpdatesItem: MenuItemConstructorOptions = {
+// Check for Updates… lives where each OS expects it: under the app menu on
+// macOS (the Apple convention — right below About), and under Help on
+// Windows/Linux. Both route to the same manual update check.
+function checkUpdatesMenuItem(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.checkForUpdates'),
     click: () => void checkForUpdatesManually(),
   };
+}
 
-  const appMenu: MenuItemConstructorOptions = {
+/** The macOS app menu (About / updates / settings / services / hide / quit). */
+function appMenu(): MenuItemConstructorOptions {
+  return {
     label: app.name,
     submenu: [
       // Route the native About to the in-app About (Settings ▸ About) so there's
       // one place for version/credits, not the default Electron panel.
       { label: mt('menu.about', { app: app.name }), click: () => notifyOpenSettings('about') },
-      checkUpdatesItem,
+      checkUpdatesMenuItem(),
       { type: 'separator' },
-      settingsItem,
-      languageItem,
+      settingsMenuItem(),
+      languageMenuItem(),
       { type: 'separator' },
       { role: 'services', label: mt('menu.services') },
       { type: 'separator' },
@@ -203,23 +228,30 @@ export function buildAppMenu(): void {
       { role: 'quit', label: mt('menu.quit', { app: app.name }) },
     ],
   };
+}
 
-  // Custom View menu: per-window show/hide toggles, the zoom roles, one
-  // full-screen toggle, and a Layout ▸ Reset. No Reload/DevTools.
-  const windowItem = (id: WindowId, label: string, accelerator: string): MenuItemConstructorOptions => ({
+/** One per-window show/hide checkbox for the View menu, driven by the
+ *  renderer-mirrored `windowsState`. */
+function windowItem(id: WindowId, label: string, accelerator: string): MenuItemConstructorOptions {
+  return {
     label,
     accelerator,
     type: 'checkbox',
     checked: windowsState[id].visible,
     enabled: windowsState[id].available,
     click: () => notifyWindowToggle(id),
-  });
+  };
+}
 
-  const viewMenu: MenuItemConstructorOptions = {
+/** Custom View menu: per-window show/hide toggles, the zoom roles, one
+ *  full-screen toggle, and a Layout ▸ Reset. No Reload/DevTools. */
+function viewMenu(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.view'),
     submenu: [
       windowItem('generate', mt('menu.generate'), 'CmdOrCtrl+G'),
       { type: 'separator' },
+      windowItem('project', mt('menu.projectPanel'), 'CmdOrCtrl+B'),
       windowItem('inspector', mt('menu.inspector'), 'CmdOrCtrl+1'),
       windowItem('jigsaw', mt('menu.jigsaw'), 'CmdOrCtrl+2'),
       windowItem('versions', mt('menu.versions'), 'CmdOrCtrl+3'),
@@ -244,10 +276,12 @@ export function buildAppMenu(): void {
       },
     ],
   };
+}
 
-  // Edit menu, built explicitly (instead of `role: 'editMenu'`) so its labels
-  // follow the app's i18n preference, not the OS locale.
-  const editMenu: MenuItemConstructorOptions = {
+/** Edit menu, built explicitly (instead of `role: 'editMenu'`) so its labels
+ *  follow the app's i18n preference, not the OS locale. */
+function editMenu(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.edit'),
     submenu: [
       { role: 'undo', label: mt('menu.undo') },
@@ -277,13 +311,15 @@ export function buildAppMenu(): void {
           ]),
     ],
   };
+}
 
-  // Window menu, built explicitly (instead of `role: 'windowMenu'`) for i18n.
-  // We deliberately DON'T set `role: 'window'`: that marks this as the system
-  // Window menu, and macOS then injects its own window-tiling items (Fill,
-  // Center, Move & Resize, …) localized with the OS UI language — never our
-  // app's i18n preference. Dropping the role keeps the menu fully translatable.
-  const windowMenu: MenuItemConstructorOptions = {
+/** Window menu, built explicitly (instead of `role: 'windowMenu'`) for i18n.
+ *  We deliberately DON'T set `role: 'window'`: that marks this as the system
+ *  Window menu, and macOS then injects its own window-tiling items (Fill,
+ *  Center, Move & Resize, …) localized with the OS UI language — never our
+ *  app's i18n preference. Dropping the role keeps the menu fully translatable. */
+function windowMenu(): MenuItemConstructorOptions {
+  return {
     label: mt('menu.window'),
     submenu: [
       { role: 'minimize', label: mt('menu.minimize') },
@@ -296,94 +332,124 @@ export function buildAppMenu(): void {
         : [{ role: 'close' as const, label: mt('menu.close') }]),
     ],
   };
+}
 
+/** The File menu: new/open/recents, the export actions, workspace + world
+ *  handling, and (on Windows/Linux) Settings/Language + Quit. */
+function fileMenu(): MenuItemConstructorOptions {
+  return {
+    label: mt('menu.file'),
+    submenu: [
+      {
+        label: mt('menu.newStructure'),
+        accelerator: 'CmdOrCtrl+N',
+        click: () => notifyNewStructure(),
+      },
+      { type: 'separator' },
+      {
+        label: mt('menu.openFile'),
+        accelerator: 'CmdOrCtrl+O',
+        click: async () => {
+          const p = await openFileDialog();
+          if (p) openFile(p);
+        },
+      },
+      { label: mt('menu.openRecent'), submenu: openRecentSubmenu() },
+      { label: mt('menu.openAssembly'), click: () => notifyOpenAssembly() },
+      { label: mt('menu.reimportWorld'), click: () => notifyReimportWorld() },
+      { type: 'separator' },
+      {
+        label: mt('menu.renameProject'),
+        enabled: projectOpen,
+        click: () => notifyRenameProject(),
+      },
+      {
+        label: mt('menu.exportFile'),
+        accelerator: 'CmdOrCtrl+Shift+S',
+        enabled: fileOpen,
+        click: () => notifyExportFile(),
+      },
+      {
+        label: mt('menu.exportToWorld'),
+        enabled: fileOpen,
+        click: () => notifyExportToWorld(),
+      },
+      {
+        label: mt('menu.exportToWorkspace'),
+        enabled: fileOpen,
+        click: () => notifyExportToWorkspace(),
+      },
+      { label: mt('menu.closeFile'), enabled: fileOpen, click: () => notifyClose() },
+      { type: 'separator' },
+      {
+        label: mt('menu.openWorkspace'),
+        accelerator: 'CmdOrCtrl+Shift+O',
+        click: openWorkspaceFromMenu,
+      },
+      { label: mt('menu.openRecentWorkspace'), submenu: openRecentWorkspaceSubmenu() },
+      {
+        // Pin the active workspace so it auto-activates at every launch (mirrors
+        // the statusbar pin; unpinned by unchecking, pinning another, or closing).
+        label: mt('menu.pinWorkspace'),
+        type: 'checkbox',
+        enabled: getActiveWorkspace() !== null,
+        checked:
+          getActiveWorkspace() !== null &&
+          getPinnedWorkspace()?.root === getActiveWorkspace()?.root,
+        click: (item) => {
+          pinActiveWorkspace(item.checked);
+          buildAppMenu();
+        },
+      },
+      {
+        label: mt('menu.closeWorkspace'),
+        enabled: getActiveWorkspace() !== null,
+        click: () => {
+          closeWorkspace();
+          buildAppMenu();
+        },
+      },
+      { type: 'separator' },
+      { label: mt('menu.openWorld'), accelerator: 'CmdOrCtrl+Shift+W', click: openWorldFromMenu },
+      { label: mt('menu.openRecentWorld'), submenu: openRecentWorldSubmenu() },
+      { type: 'separator' },
+      ...(isMac ? [] : [settingsMenuItem(), languageMenuItem(), { type: 'separator' as const }]),
+      isMac
+        ? { role: 'close', label: mt('menu.close') }
+        : { role: 'quit', label: mt('menu.quit', { app: app.name }) },
+    ],
+  };
+}
+
+/** The Help menu: the in-app Guide + (on Windows/Linux) Check for Updates. */
+function helpMenu(): MenuItemConstructorOptions {
+  return {
+    role: 'help',
+    label: mt('menu.help'),
+    submenu: [
+      {
+        label: mt('menu.guide'),
+        accelerator: 'CmdOrCtrl+Shift+/',
+        click: () => notifyOpenGuide(),
+      },
+      // On macOS, Check for Updates lives in the app menu (above); Windows/Linux
+      // keep it here in Help, the platform-conventional spot.
+      ...(isMac ? [] : [{ type: 'separator' as const }, checkUpdatesMenuItem()]),
+    ],
+  };
+}
+
+/** Build + install the native application menu (File ▸ Open / Open Recent /
+ *  Workspace, View ▸ windows, etc.). Re-called whenever the recents or the
+ *  per-window visibility change, so the menu's items + checkmarks stay in sync. */
+export function buildAppMenu(): void {
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac ? [appMenu] : []),
-    {
-      label: mt('menu.file'),
-      submenu: [
-        {
-          label: mt('menu.newStructure'),
-          accelerator: 'CmdOrCtrl+N',
-          click: () => notifyNewStructure(),
-        },
-        { type: 'separator' },
-        {
-          label: mt('menu.openFile'),
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            const p = await openFileDialog();
-            if (p) openFile(p);
-          },
-        },
-        { label: mt('menu.openRecent'), submenu: openRecent },
-        { label: mt('menu.openAssembly'), click: () => notifyOpenAssembly() },
-        { label: mt('menu.reimportWorld'), click: () => notifyReimportWorld() },
-        { type: 'separator' },
-        {
-          label: mt('menu.renameProject'),
-          enabled: projectOpen,
-          click: () => notifyRenameProject(),
-        },
-        {
-          label: mt('menu.exportFile'),
-          accelerator: 'CmdOrCtrl+Shift+S',
-          enabled: fileOpen,
-          click: () => notifyExportFile(),
-        },
-        {
-          label: mt('menu.exportToWorld'),
-          enabled: fileOpen,
-          click: () => notifyExportToWorld(),
-        },
-        {
-          label: mt('menu.exportToWorkspace'),
-          enabled: fileOpen,
-          click: () => notifyExportToWorkspace(),
-        },
-        { label: mt('menu.closeFile'), enabled: fileOpen, click: () => notifyClose() },
-        { type: 'separator' },
-        {
-          label: mt('menu.openWorkspace'),
-          accelerator: 'CmdOrCtrl+Shift+O',
-          click: openWorkspaceFromMenu,
-        },
-        { label: mt('menu.openRecentWorkspace'), submenu: openRecentWorkspace },
-        {
-          label: mt('menu.closeWorkspace'),
-          enabled: getActiveWorkspace() !== null,
-          click: () => {
-            applyWorkspace(null);
-            buildAppMenu();
-          },
-        },
-        { type: 'separator' },
-        { label: mt('menu.openWorld'), accelerator: 'CmdOrCtrl+Shift+W', click: openWorldFromMenu },
-        { label: mt('menu.openRecentWorld'), submenu: openRecentWorld },
-        { type: 'separator' },
-        ...(isMac ? [] : [settingsItem, languageItem, { type: 'separator' as const }]),
-        isMac
-          ? { role: 'close', label: mt('menu.close') }
-          : { role: 'quit', label: mt('menu.quit', { app: app.name }) },
-      ],
-    },
-    editMenu,
-    viewMenu,
-    windowMenu,
-    {
-      role: 'help',
-      label: mt('menu.help'),
-      submenu: [
-        {
-          label: mt('menu.guide'),
-          accelerator: 'CmdOrCtrl+Shift+/',
-          click: () => notifyOpenGuide(),
-        },
-        // On macOS, Check for Updates lives in the app menu (above); Windows/Linux
-        // keep it here in Help, the platform-conventional spot.
-        ...(isMac ? [] : [{ type: 'separator' as const }, checkUpdatesItem]),
-      ],
-    },
+    ...(isMac ? [appMenu()] : []),
+    fileMenu(),
+    editMenu(),
+    viewMenu(),
+    windowMenu(),
+    helpMenu(),
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
