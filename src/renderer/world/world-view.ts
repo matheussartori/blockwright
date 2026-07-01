@@ -69,6 +69,10 @@ interface ChunkEntry {
   /** Bitmask of which of the four neighbours' borders were available when this chunk was last
    *  near-meshed (bit 0=W,1=E,2=N,3=S), so a seam re-meshes once a late neighbour arrives. */
   meshedNeighbors: number;
+  /** Marked by `refresh()` (workspace/content switch): the cached payload was resolved against the
+   *  OLD asset source, so the chunk must re-fetch + re-mesh. Its current `group` stays on screen until
+   *  the reload swaps in (no flash); `pump`/`recomputeDesired` re-queue it despite already existing. */
+  stale: boolean;
 }
 
 export class WorldView {
@@ -119,6 +123,36 @@ export class WorldView {
     this.centerX = NaN; // force a desired-set recompute next frame
   }
 
+  /** Soft-refresh after an asset-resolution change (mod workspace / content pack switch): every loaded
+   *  chunk's cached payload was resolved against the old asset source, so re-fetch + re-mesh each one so
+   *  the newly-known block textures appear. The camera is untouched — we keep each chunk's current mesh
+   *  on screen and only swap it when its rebuild returns (no reload flash) — and the whole thing rides
+   *  the normal streaming machinery: mark every chunk `stale`, drop its stale resolution, and force a
+   *  desired-set recompute so `recomputeDesired`/`pump` re-queue the stale chunks from the current
+   *  camera position. Block resolution is main-side, so re-fetching `getChunk` is what picks up the new
+   *  textures — re-meshing the cached payload alone would not. */
+  refresh(): void {
+    if (!this.chunks.size) return;
+    this.epoch++; // invalidate any in-flight streaming/mesh results resolved before the switch
+    for (const e of this.chunks.values()) {
+      if (e.jobId !== null) {
+        this.pool.cancel(e.jobId);
+        e.jobId = null;
+      }
+      e.stale = true;
+      e.pendingLod = null;
+      e.payload = null;
+      e.tex = null;
+      e.borders = null;
+      e.meshedNeighbors = 0;
+      e.empty = false;
+      e.absent = false;
+      // e.group + e.lod are kept: the old mesh stays visible (and its LOD band via hysteresis) until
+      // the reload swaps in.
+    }
+    this.centerX = NaN; // force recomputeDesired next frame → re-queues every stale chunk
+  }
+
   /** LOD bands scale with render distance: near/mid keep their defaults but never exceed it. */
   private applyBands(): void {
     const rd = this.renderDistance;
@@ -156,7 +190,9 @@ export class WorldView {
         const cz = this.centerZ + dz;
         const k = key(cx, cz);
         wanted.add(k);
-        if (!this.chunks.has(k)) pending.push({ cx, cz, d: Math.max(Math.abs(dx), Math.abs(dz)) });
+        const e = this.chunks.get(k);
+        // Not loaded yet, OR stale (a refresh() marked it for re-fetch) → (re)queue it.
+        if (!e || e.stale) pending.push({ cx, cz, d: Math.max(Math.abs(dx), Math.abs(dz)) });
       }
     }
     pending.sort((a, b) => a.d - b.d);
@@ -182,15 +218,23 @@ export class WorldView {
     while (this.inflight < MAX_INFLIGHT && this.queue.length) {
       const { cx, cz } = this.queue.shift()!;
       const k = key(cx, cz);
-      if (this.chunks.has(k)) continue;
+      const existing = this.chunks.get(k);
+      if (existing && !existing.stale) continue; // already resident (a stale one still needs reloading)
       void this.load(cx, cz);
     }
   }
 
   private async load(cx: number, cz: number): Promise<void> {
     const k = key(cx, cz);
-    const entry: ChunkEntry = { cx, cz, group: null, payload: null, tex: null, lod: null, pendingLod: null, jobId: null, empty: false, absent: false, borders: null, meshedNeighbors: 0 };
-    this.chunks.set(k, entry);
+    // A stale entry (marked by refresh()) is RELOADED in place: reuse it so its current mesh stays on
+    // screen until the rebuild swaps in. A fresh coord gets a new entry.
+    let entry = this.chunks.get(k);
+    if (entry) {
+      entry.stale = false; // claim it
+    } else {
+      entry = { cx, cz, group: null, payload: null, tex: null, lod: null, pendingLod: null, jobId: null, empty: false, absent: false, borders: null, meshedNeighbors: 0, stale: false };
+      this.chunks.set(k, entry);
+    }
     this.inflight++;
     const epoch = this.epoch;
     try {
@@ -201,10 +245,12 @@ export class WorldView {
         // (retargetLod sees the neighbour mask change) to cull its cross-section toward here and grow
         // the red border wall.
         entry.absent = true;
+        this.dropGroup(entry); // a reload that turned ungenerated: drop the stale mesh
         return;
       }
       if (payload.empty) {
         entry.empty = true;
+        this.dropGroup(entry);
         return;
       }
       const loaded = await this.textures.load(payload.textureKeys);
@@ -398,6 +444,16 @@ export class WorldView {
       box.max.set(e.cx * 16 + 16, WORLD_MAX_Y, e.cz * 16 + 16);
       e.group.visible = frustum.intersectsBox(box);
     }
+  }
+
+  /** Remove a chunk's current mesh group (keeping the entry) — used when a reload finds the chunk is
+   *  now empty/ungenerated, so its stale mesh shouldn't linger. */
+  private dropGroup(e: ChunkEntry): void {
+    if (!e.group) return;
+    this.scene.remove(e.group);
+    disposeGeometries(e.group);
+    e.group = null;
+    e.lod = null;
   }
 
   private evict(k: string, e: ChunkEntry): void {

@@ -239,6 +239,13 @@ export class Viewer {
     this.world?.setRenderDistance(chunks);
   }
 
+  /** Soft-refresh the streamed world after an asset change (mod workspace / content pack switch):
+   *  re-fetch + re-mesh the loaded chunks so newly-known block textures appear, without moving the
+   *  camera. No-op when a world isn't active. */
+  refreshWorld(): void {
+    this.world?.refresh();
+  }
+
   /** Day/night lighting for the world view (a mood toggle — no live sky simulation). */
   setDaylight(day: boolean): void {
     this.hemiLight.intensity = day ? 1.05 : 0.35;

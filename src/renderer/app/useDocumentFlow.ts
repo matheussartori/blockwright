@@ -298,6 +298,10 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     st.setWorkspace(ws);
     st.setWorkspaceStructures(await api.listWorkspaceStructures());
     st.setSuggest(null);
+    // If a world is open, soft-refresh its streamed chunks so the workspace's blocks — which the app
+    // didn't know before — pick up their textures, without moving the camera. (A structure re-renders
+    // via acceptSuggest's load(); a world can't reload from a path, so the viewer re-fetches its chunks.)
+    if (viewerRef.current?.worldActive) viewerRef.current.refreshWorld();
     // A workspace whose version we couldn't detect needs one before jigsaw previews
     // can resolve; ask.
     if (ws && ws.minecraftVersion === null) st.setVersionPromptName(ws.name);
