@@ -1,9 +1,11 @@
 // The start page, shown whenever no tab is active. The hero is a real PROMPT —
-// describe a build right here (the example chips fill the field, still editable)
-// and Generate carries it into the build planner. The open actions sit below as
-// a quiet tile grid, and recents live in the right column for one-click resumes.
-// The full explorer (workspace structures + all recents) lives in the Project
-// panel — this page is the quick launcher, not the browser.
+// describe a build right here (the example suggestions fill the field, still
+// editable) and Generate carries it into the build planner. The prompt card is
+// the ONLY boxed element on the page: the open actions below are quiet
+// borderless rows sharing the recents' anatomy (icon + label + muted detail),
+// and the pack status + guide link fold into one hairline footer. The full
+// explorer (workspace structures + all recents) lives in the Project panel —
+// this page is the quick launcher, not the browser.
 import { useEffect, useState } from 'react';
 import { BookOpen, FileBox, FolderOpen, Globe, LayoutGrid, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
@@ -17,7 +19,7 @@ import { Logo } from './ui/Logo';
 /** The example prompts surfaced on the landing — clicking one fills the prompt. */
 const EXAMPLES: MessageKey[] = ['gen.example1', 'gen.example2', 'gen.example3'];
 
-function StartTile({
+function StartRow({
   icon,
   title,
   sub,
@@ -29,12 +31,10 @@ function StartTile({
   onClick: () => void;
 }) {
   return (
-    <button className="start-tile" title={sub} onClick={onClick}>
-      <span className="start-tile-ic">{icon}</span>
-      <span className="start-tile-body">
-        <span className="start-tile-title">{title}</span>
-        <span className="start-tile-sub">{sub}</span>
-      </span>
+    <button className="start-row" title={sub} onClick={onClick}>
+      {icon}
+      <span className="start-row-title">{title}</span>
+      <span className="start-row-sub">{sub}</span>
     </button>
   );
 }
@@ -115,66 +115,67 @@ export function Welcome({
                   }}
                 />
                 <div className="prompt-foot">
-                  <span className="prompt-hint">{t('gen.examplesLabel')} ↓</span>
                   <button className="btn primary prompt-go" onClick={submit}>
                     <Sparkles size={14} strokeWidth={1.8} aria-hidden />
                     {t('welcome.generateCta')}
                   </button>
                 </div>
               </div>
-              <div className="prompt-chips">
+              <div className="prompt-suggest">
                 {EXAMPLES.map((ex) => (
-                  <button key={ex} className="prompt-chip" title={t(ex)} onClick={() => setPrompt(t(ex))}>
+                  <button key={ex} className="prompt-suggest-item" title={t(ex)} onClick={() => setPrompt(t(ex))}>
                     {t(ex)}
                   </button>
                 ))}
               </div>
 
               <div className="start-heading">{t('welcome.openHeading')}</div>
-              <div className="start-tiles">
-                <StartTile
-                  icon={<FileBox size={17} strokeWidth={1.8} aria-hidden />}
+              <div className="start-list">
+                <StartRow
+                  icon={<FileBox size={15} strokeWidth={1.8} aria-hidden />}
                   title={t('welcome.openTitle')}
                   sub={t('welcome.openSub')}
                   onClick={onOpen}
                 />
-                <StartTile
-                  icon={<FolderOpen size={17} strokeWidth={1.8} aria-hidden />}
+                <StartRow
+                  icon={<FolderOpen size={15} strokeWidth={1.8} aria-hidden />}
                   title={t('welcome.workspaceTitle')}
                   sub={t('welcome.workspaceSub')}
                   onClick={() => void api.openWorkspace()}
                 />
-                <StartTile
-                  icon={<Globe size={17} strokeWidth={1.8} aria-hidden />}
+                <StartRow
+                  icon={<Globe size={15} strokeWidth={1.8} aria-hidden />}
                   title={t('welcome.worldTitle')}
                   sub={t('welcome.worldSub')}
                   onClick={() => onOpenWorld()}
                 />
-                <StartTile
-                  icon={<LayoutGrid size={17} strokeWidth={1.8} aria-hidden />}
+                <StartRow
+                  icon={<LayoutGrid size={15} strokeWidth={1.8} aria-hidden />}
                   title={t('welcome.catalogTitle')}
                   sub={t('welcome.catalogSub')}
                   onClick={() => store.getState().setCatalogOpen(true)}
                 />
               </div>
 
-              <div className="welcome-meta">
-                {hasPack !== null && (
-                  <span className={`welcome-hint${hasPack ? '' : ' info'}`}>
-                    <span className="welcome-hint-dot" />
+              <footer className="welcome-foot">
+                {hasPack !== null ? (
+                  <span className={`welcome-pack${hasPack ? '' : ' info'}`}>
+                    <span className="welcome-pack-dot" />
                     {hasPack ? t('welcome.packDetected') : t('welcome.packMissing')}
                     {!hasPack && (
-                      <button className="welcome-hint-action no-drag" onClick={() => void chooseContentPack()}>
+                      <button className="welcome-pack-action no-drag" onClick={() => void chooseContentPack()}>
                         {t('welcome.packChoose')}
                       </button>
                     )}
                   </span>
+                ) : (
+                  <span />
                 )}
                 <button className="welcome-guide-link" onClick={() => store.getState().setGuideOpen(true)}>
-                  <BookOpen size={14} strokeWidth={1.8} aria-hidden />
+                  <BookOpen size={13} strokeWidth={1.8} aria-hidden />
                   {t('welcome.guideLink')}
                 </button>
-              </div>
+              </footer>
             </section>
 
             {hasRecents && (

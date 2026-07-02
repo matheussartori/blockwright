@@ -868,43 +868,38 @@ body.col-resizing {
 .prompt-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   padding: 6px 10px 10px 16px;
 }
-.prompt-hint {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-/* Example chips — below the card at natural width so they read in full. */
-.prompt-chips {
+/* Example suggestions — quiet text rows under the card (no chip borders: the
+   prompt card is the page's only boxed element). Clicking one fills the field. */
+.prompt-suggest {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 9px;
+  flex-direction: column;
+  margin-top: 6px;
 }
-.prompt-chip {
+.prompt-suggest-item {
   -webkit-app-region: no-drag;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
   font: inherit;
-  font-size: 11px;
-  color: var(--text-2);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 8px;
   cursor: pointer;
   transition:
     color 0.13s ease,
-    border-color 0.13s ease,
     background 0.13s ease;
 }
-.prompt-chip:hover {
+.prompt-suggest-item:hover {
   color: var(--text);
-  border-color: var(--border-strong);
   background: var(--panel-strong);
 }
 .prompt-go {
@@ -914,78 +909,66 @@ body.col-resizing {
   gap: 6px;
 }
 
-/* Secondary "Open" actions as a quiet 2×2 tile grid. */
+/* Secondary "Open" actions — borderless rows sharing the recents' anatomy
+   (icon + label + muted detail), so the two columns read as one system. */
 .start-heading {
-  margin-top: 16px;
-  padding: 0 2px 2px;
+  margin-top: 14px;
+  padding: 0 8px 2px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
-.start-tiles {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.start-list {
+  display: flex;
+  flex-direction: column;
 }
-@media (max-width: 560px) {
-  .start-tiles {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.start-tile {
+.start-row {
   -webkit-app-region: no-drag;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  width: 100%;
   text-align: left;
-  padding: 10px 12px;
+  padding: 7px 8px;
   font: inherit;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--panel);
+  border: 0;
+  border-radius: 7px;
+  background: none;
   color: var(--text);
   cursor: pointer;
-  transition:
-    border-color 0.14s ease,
-    background 0.14s ease,
-    transform 0.08s ease;
+  transition: background 0.13s ease;
 }
-.start-tile:hover {
+.start-row:hover {
   background: var(--panel-strong);
-  border-color: var(--border-strong);
 }
-.start-tile:hover .start-tile-ic {
+.start-row svg {
+  flex: none;
+  color: var(--text-muted);
+  transition: color 0.13s ease;
+}
+.start-row:hover svg {
   color: var(--accent);
 }
-.start-tile:active {
-  transform: translateY(1px);
-}
-.start-tile-ic {
-  flex: none;
-  display: grid;
-  place-items: center;
-  color: var(--text-2);
-  transition: color 0.14s ease;
-}
-.start-tile-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.start-tile-title {
+.start-row-title {
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.start-tile-sub {
-  font-size: 11px;
+.start-row-sub {
+  margin-left: auto;
+  flex: none;
+  max-width: 55%;
+  font-size: 10.5px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
 }
 
 /* Right column: recents as quiet lists. */
@@ -1024,31 +1007,37 @@ body.col-resizing {
   color: var(--accent);
 }
 
-.welcome-hint {
+/* Footer: pack status + guide link fold into one quiet hairline row — plain
+   text, no pill chrome (mirrors the right column's bordered section heads). */
+.welcome-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 11px 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.welcome-pack {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 12px;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  min-width: 0;
 }
-.welcome-hint-dot {
+.welcome-pack-dot {
+  flex: none;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--ok);
 }
-.welcome-hint.warn .welcome-hint-dot {
-  background: var(--warn);
-}
 /* A missing content pack is OPTIONAL, not a warning — an accent dot, not amber. */
-.welcome-hint.info .welcome-hint-dot {
+.welcome-pack.info .welcome-pack-dot {
   background: var(--accent);
 }
-.welcome-hint-action {
+.welcome-pack-action {
   margin-left: 4px;
   padding: 0;
   font: inherit;
@@ -1058,7 +1047,7 @@ body.col-resizing {
   border: none;
   cursor: pointer;
 }
-.welcome-hint-action:hover {
+.welcome-pack-action:hover {
   text-decoration: underline;
 }
 
@@ -5962,34 +5951,23 @@ body.row-resizing {
 }
 
 /* --- Welcome guide link ---------------------------------------------------- */
-.welcome-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 14px;
-}
-.welcome-meta .welcome-guide-link {
-  margin-left: -12px; /* optically align the pill's text with the hint above */
-}
 .welcome-guide-link {
   -webkit-app-region: no-drag;
+  flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
+  gap: 6px;
+  padding: 0;
   font: inherit;
-  font-size: 12px;
-  color: var(--text-2);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: background 0.13s ease, color 0.13s ease;
+  transition: color 0.13s ease;
 }
 .welcome-guide-link:hover {
   color: var(--accent);
-  background: var(--accent-soft);
 }
 
 /* --- Guide modal ----------------------------------------------------------- */
