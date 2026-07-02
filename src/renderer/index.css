@@ -787,16 +787,12 @@ body.col-resizing {
   gap: 16px;
   text-align: left;
 }
-/* App mark — the themed logo image (dark/light plinth follows the theme). */
+/* App mark — the squircle app-icon tile (one artwork for every theme; the
+   rounded corners live in the artwork's own alpha, no CSS clipping). */
 .welcome-mark {
-  display: block;
-  line-height: 0;
-}
-.welcome-mark img {
   display: block;
   width: 52px;
   height: 52px;
-  border-radius: 13px;
   filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.28));
 }
 .welcome-hero h1 {
@@ -2386,10 +2382,10 @@ body.row-resizing {
   text-align: center;
   padding-top: 18px;
 }
-.about-logo img {
+.about-logo {
+  display: block;
   width: 72px;
   height: 72px;
-  border-radius: 18px;
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25));
 }
 .about-name {
@@ -5895,6 +5891,74 @@ body.row-resizing {
 }
 .stage-building-card .build-progress {
   margin-top: 8px;
+}
+
+/* --- Stage "no blocks" empty state (an opened file that places zero blocks) --
+   Same card family as .stage-building, kept deliberately NEUTRAL: no accent
+   glow, no pulse — an empty file is a fact to explain, not a moment to dress. */
+.stage-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, var(--panel));
+}
+.stage-empty-card {
+  width: min(440px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 30px 30px 26px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.stage-empty-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  color: var(--text-muted);
+  background: var(--chrome);
+  border: 1px solid var(--border);
+}
+.stage-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.stage-empty-sub {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow-wrap: anywhere; /* a long filename must wrap, not overflow the card */
+}
+.stage-empty-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint, var(--text-muted));
+}
+.stage-empty-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.stage-empty-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* --- Welcome guide link ---------------------------------------------------- */

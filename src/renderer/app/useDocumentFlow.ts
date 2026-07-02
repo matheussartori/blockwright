@@ -75,8 +75,10 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
         const data = await api.loadStructure(path);
         if (recent) api.addRecent(path);
         if (data.blocks.length === 0) {
-          documentsStore.getState().patchDoc(docId, { loading: false, ...(working ? { path } : {}) });
-          store.getState().setNotice({ text: `${data.name} — no structure blocks found`, warn: true });
+          // A parseable file with zero placed blocks: don't land the tab on the build
+          // planner — flag it so the stage shows the "no blocks" empty state instead.
+          documentsStore.getState().patchDoc(docId, { loading: false, emptyPath: path, ...(working ? { path } : {}) });
+          store.getState().setNotice(null);
           return;
         }
         // Seed the floor plan from the storeys main auto-detected on load — but only
@@ -87,7 +89,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
           working && cur && cur.floors.length === 0 && data.floors && data.floors.length > 0
             ? { floors: data.floors }
             : {};
-        documentsStore.getState().patchDoc(docId, { structure: data, loading: false, ...seedFloors, ...(working ? { path } : {}) });
+        documentsStore.getState().patchDoc(docId, { structure: data, emptyPath: null, loading: false, ...seedFloors, ...(working ? { path } : {}) });
         store.getState().setNotice(null);
         if (documentsStore.getState().activeId === docId && viewerRef.current) {
           await viewerRef.current.show(data, preserveCamera);

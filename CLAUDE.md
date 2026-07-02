@@ -440,7 +440,7 @@ src/
                           flip-when-no-room placement; shows after a hover delay but instantly on keyboard
                           focus, keeps the trigger's `aria-label`, respects reduced motion — wrap one trigger
                           element, no extra DOM box), Logo
-                          (themed <picture>), StructurePreview (standalone Three.js scene that frames any
+                          (the app mark — one squircle artwork, no theme swap), StructurePreview (standalone Three.js scene that frames any
                           StructureData; auto-fits camera), BlockPreview (thin wrapper for one block).
                           Build dialogs/controls from these so fonts/spacing/styles stay consistent. Prefer
                           `Select` over a native `<select>` or a fresh single-select chip group, and `Tooltip`
@@ -1530,7 +1530,8 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   rules — scope them to `:not([data-theme])`). (2) **`nativeTheme.themeSource`** (set from
   `state/theme.ts` via the `themeSet` IPC, mapped to light/dark via `nativeModeFor`) so the
   renderer's `prefers-color-scheme` (and the native traffic lights / dialogs) follow a forced
-  theme — the themed `Logo` (`<picture>`) and the boot splash rely on that tracking.
+  theme — the native traffic lights and dialogs rely on that tracking (the `Logo` mark is
+  theme-neutral now: one squircle artwork, no light/dark swap).
   `settings.theme` is `'system'` or a `ThemeId` from the **theme registry**
   (`renderer/state/themes.ts`: light/dark + the SKINS minecraft-light/-dark [launcher charcoal /
   minecraft.net paper white + grass-green #3c8527]); default system. Each registry entry mirrors a
@@ -1539,22 +1540,28 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   (`components/settings/ThemePicker.tsx`): one miniature-workbench card per theme drawn from the
   registry's preview colors (System = a diagonal light/dark split), a radiogroup, replacing the
   old 3-option Segmented. `--mono` is for numeric/dimensional data (sizes, counts, coords).
-- **App icon / logos:** the in-app logos live in `public/` (`logo-dark.png`, `logo-light.png`),
-  referenced relatively (`logo-dark.png`, not `/logo-dark.png`) so they resolve under `file://` when
-  packaged; the `Logo` component swaps them by theme. The app/dock icon is the standardized
-  **logo-dark**: `build/icon-master.png` (a trimmed, centered 1024² rounded-squircle master) drives the
-  Windows `build/icon.ico` (Windows draws the icon as-is, so the rounded squircle is correct there).
-  **macOS gets a FULL-BLEED master** instead — `build/icon-master-fullbleed.png` (the squircle scaled to
-  COVER the canvas + opaque navy corners, no transparent margin) → `build/icon.icns` (the packaged bundle
-  icon, via `forge.config`) + `build/icon.png` (the dev dock icon, `app.dock.setIcon`, darwin-only). The
-  full bleed is REQUIRED on macOS 26 (Tahoe): the OS composites every app icon onto a standardized rounded
-  tile and masks it to the squircle, so an icon with transparent padding leaves the system tile showing as
-  a WHITE BORDER around the artwork — a full-bleed square masked by the OS avoids it. The cube SUBJECT is
-  also zoomed to ~70% of the canvas (was ~50%, which read tiny on Tahoe's tile) — re-zoom by center-cropping
-  the full-bleed master ~76% and rescaling. Regenerate from the full-bleed master (rebuild the iconset →
-  `iconutil -c icns` + downscale to `icon.png`); re-derive the full-bleed master from `icon-master.png`
-  (cover-scale the squircle, fill corners navy). NOTE: the dev dock (`npm start`, `app.dock.setIcon`) takes
-  a raster PNG and macOS still tiles it — only the cube-zoom helps there; the `.icon` format below does NOT.
+- **App icon / logos:** ONE artwork everywhere — the repo-root `icon.png` (2048², an AI-generated
+  squircle tile whose fake-checkerboard "transparency" + watermark were cut away with a fitted
+  anti-aliased superellipse mask; the mask constants + every derived asset live in
+  **`build/make-icons.py`** — regenerate with `python3 build/make-icons.py` (needs Pillow+numpy;
+  `iconutil` step is darwin-only). The bottom edge of the mask includes the tile's dark bevel
+  UNDERSIDE (a cool-tinted ~18px band below the bright rim) — clipping it makes the bottom rim read
+  thinner than the top. There are NO light/dark logo variants anymore. Derived assets: the in-app
+  logo is `public/logo.png` (the transparent squircle, referenced relatively — `logo.png`, not
+  `/logo.png` — so it resolves under `file://` when packaged; the `Logo` component is a plain
+  `<img>`, and the artwork carries its own rounded corners in alpha, so no CSS `border-radius`
+  clipping on it). `build/icon-master.png` (the squircle centered on 1024² with a ~92px transparent
+  margin) drives the Windows `build/icon.ico` (Windows draws the icon as-is). **macOS gets a
+  FULL-BLEED master** — `build/icon-master-fullbleed.png` (1024² opaque) → `build/icon.icns` (the
+  packaged bundle icon, via `forge.config`) + `build/icon.png` (1024², the dev dock icon
+  `app.dock.setIcon` + the Linux deb/rpm icon). The full bleed is REQUIRED on macOS 26 (Tahoe): the
+  OS composites every legacy icon (.icns AND the dev-dock PNG — packaged renders the same as dev)
+  onto a standardized rounded tile and masks it to ITS squircle, so transparent padding shows as a
+  WHITE BORDER. And because Tahoe's mask corners (~22.4% radius) are SQUARER than the artwork's
+  (~29%), flat-filled corners show as navy gaps breaking the silver rim — so the full-bleed's
+  corners are the rim's straight-edge cross-sections extended with a 45° MITER (a 9-slice), keeping
+  the frame continuous under any OS mask radius up to the artwork's own. The only pixel-perfect
+  Tahoe icon remains the Icon Composer route (`Assets.car`, next bullet).
 - **macOS 26 Liquid Glass icon (packaged only):** the proper Tahoe icon is a compiled `Assets.car` +
   `CFBundleIconName`, NOT the `.icns`. Forge has no built-in support, so `forge.config.ts`
   `installLiquidGlassIcon` (a `packageAfterCopy` hook) drops `build/Assets.car` into the .app's

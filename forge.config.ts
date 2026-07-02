@@ -235,7 +235,7 @@ const config: ForgeConfig = {
     //   "Blockwright". Leaving it unset on darwin falls back to productName
     //   ("Blockwright") for the binary, the display name AND the .app bundle.
     ...(process.platform === 'darwin' ? {} : { executableName: 'blockwright' }),
-    // App icon (logo-dark). Forge/packager appends the platform extension:
+    // App icon (the squircle tile). Forge/packager appends the platform extension:
     // build/icon.icns on macOS, build/icon.ico on Windows.
     icon: './build/icon',
     // Unpack the agentic SDKs and their platform-native binaries from the asar so
@@ -302,7 +302,7 @@ const config: ForgeConfig = {
         runtimeVersion: '24.08',
         base: 'org.electronjs.Electron2.BaseApp',
         baseVersion: '24.08',
-        // The 1024² app icon (logo-dark); the maker installs it under the id above.
+        // The 1024² app icon (the squircle tile); the maker installs it under the id above.
         icon: './build/icon.png',
         // No extra files to copy into the bundle beyond what @electron/packager
         // produces (the type requires this field; [] is the default).

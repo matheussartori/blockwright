@@ -410,6 +410,13 @@ export const en = {
   'building.title': 'Building your structure…',
   'building.sub': 'Claude is designing, compiling and reviewing it — the first version will appear here shortly.',
 
+  // The stage "no blocks" empty state (an opened file that places zero blocks).
+  'emptyFile.title': 'No blocks in this file',
+  'emptyFile.sub': '{name} loaded, but it places no blocks — there is nothing to render.',
+  'emptyFile.hint': 'It may be an empty capture, or a placeholder written by another tool.',
+  'emptyFile.open': 'Open another file…',
+  'emptyFile.close': 'Close tab',
+
   // The in-app user Guide (Help ▸ Guide).
   'guide.title': 'Guide',
   'guide.footerTip': 'Tip: open this guide any time from Help ▸ Guide.',

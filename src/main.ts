@@ -38,7 +38,7 @@ app.on('open-file', (event, filePath) => {
   openFile(filePath);
 });
 
-/** The app/dock icon (the standardized logo-dark, `build/icon.png`). The packaged
+/** The app/dock icon (the squircle app-icon tile, `build/icon.png`). The packaged
  *  bundle icon comes from `build/icon.icns` (forge.config); this drives the dev
  *  dock icon. */
 function appIconPath(): string | null {
@@ -50,8 +50,8 @@ function appIconPath(): string | null {
 }
 
 app.on('ready', () => {
-  // Set the dock icon (macOS dev) / fallback runtime icon to logo-dark. Packaged
-  // builds also get it from build/icon.icns via forge.config.
+  // Set the dock icon (macOS dev) / fallback runtime icon to the app-icon tile.
+  // Packaged builds also get it from build/icon.icns via forge.config.
   const icon = appIconPath();
   if (icon && process.platform === 'darwin') app.dock?.setIcon(nativeImage.createFromPath(icon));
   registerTextureProtocol();

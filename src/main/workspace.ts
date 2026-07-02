@@ -15,6 +15,7 @@ import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { getPinnedWorkspace, setPinnedWorkspace } from './pinned-workspace';
 import { notifyPinnedWorkspace, notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
 import { detectMcVersion } from './mc-version-detect';
+import { readAuthoring } from './structure/authoring';
 
 // A picked folder may be the project root (Gradle layout) or the resources dir.
 const RESOURCE_CANDIDATES = ['src/main/resources', ''];
@@ -149,27 +150,38 @@ export function detectWorkspaceForWorld(worldRoot: string): Workspace | null {
   return null;
 }
 
-/** List the `.nbt` structures a workspace ships under `data/<namespace>/structure`,
- *  sorted by name. Returns absolute paths; empty when there's no workspace/folder. */
-export function listWorkspaceStructures(ws: Workspace | null): string[] {
+/** List the viewable `.nbt` structures a workspace ships DIRECTLY under
+ *  `data/<namespace>/structure`, sorted by name. Two deliberate filters keep the
+ *  Project panel to real structures: non-recursive (subfolders hold jigsaw-split
+ *  piece files, `<base>/p_i_j_k.nbt` — dozens of fragments per oversized
+ *  structure), and zero-block files are skipped (GameTest `empty_NxN` templates
+ *  and other placeholders have nothing to render — opening one only shows the
+ *  "no blocks" empty state). A file that fails to parse stays listed, so a
+ *  corrupt structure still surfaces its real error on open.
+ *  Returns absolute paths; empty when there's no workspace/folder. */
+export async function listWorkspaceStructures(ws: Workspace | null): Promise<string[]> {
   if (!ws) return [];
   const dir = path.join(ws.root, 'data', ws.namespace, 'structure');
-  const out: string[] = [];
-  const walk = (d: string): void => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(d, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const full = path.join(d, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.isFile() && e.name.endsWith('.nbt')) out.push(full);
-    }
-  };
-  walk(dir);
-  return out.sort((a, b) => a.localeCompare(b));
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const candidates = entries
+    .filter((e) => e.isFile() && e.name.endsWith('.nbt'))
+    .map((e) => path.join(dir, e.name));
+  const kept = await Promise.all(
+    candidates.map(async (full) => {
+      try {
+        const a = await readAuthoring(full);
+        return (a.blocks ?? []).length > 0 ? full : null;
+      } catch {
+        return full; // unparseable — keep it; opening reports the real error
+      }
+    }),
+  );
+  return kept.filter((p): p is string => p !== null).sort((a, b) => a.localeCompare(b));
 }
 
 /** List the custom biome ids a workspace defines under

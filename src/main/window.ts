@@ -183,7 +183,7 @@ export function notifyUpdateAvailable(info: UpdateInfo): void {
   mainWindow?.webContents.send(IPC_EVENTS.updateAvailable, info);
 }
 
-/** Window icon (the standardized logo-dark) for Windows/Linux — macOS uses the
+/** Window icon (the squircle app-icon tile) for Windows/Linux — macOS uses the
  *  app bundle icon. */
 function windowIcon(): string | undefined {
   if (process.platform === 'darwin') return undefined;

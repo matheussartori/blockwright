@@ -35,6 +35,10 @@ export interface Document {
    *  next edit (basePath) and is what the viewer shows. */
   path: string | null;
   structure: StructureData | null;
+  /** Set when the opened file parsed fine but places ZERO blocks (an empty capture /
+   *  placeholder): the path of that file. The stage shows the "no blocks" empty state
+   *  instead of the build planner; cleared whenever a real structure loads. */
+  emptyPath: string | null;
   loading: boolean;
   /** True while a generation is in flight for this doc's session. */
   busy: boolean;
@@ -111,6 +115,7 @@ function freshDoc(over: Partial<Document> = {}): Document {
     filePath: null,
     path: null,
     structure: null,
+    emptyPath: null,
     loading: false,
     busy: false,
     progress: null,

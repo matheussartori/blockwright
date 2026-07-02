@@ -412,6 +412,13 @@ export const ptBR: Messages = {
   'building.title': 'Construindo sua estrutura…',
   'building.sub': 'O Claude está projetando, compilando e revisando — a primeira versão aparece aqui em instantes.',
 
+  // O estado vazio "sem blocos" no palco (um arquivo aberto que não posiciona blocos).
+  'emptyFile.title': 'Nenhum bloco neste arquivo',
+  'emptyFile.sub': '{name} foi carregado, mas não posiciona nenhum bloco — não há nada para renderizar.',
+  'emptyFile.hint': 'Pode ser uma captura vazia ou um arquivo reservado criado por outra ferramenta.',
+  'emptyFile.open': 'Abrir outro arquivo…',
+  'emptyFile.close': 'Fechar aba',
+
   // O Guia do usuário no app (Ajuda ▸ Guia).
   'guide.title': 'Guia',
   'guide.footerTip': 'Dica: abra este guia quando quiser em Ajuda ▸ Guia.',

@@ -30,7 +30,6 @@
       #boot img {
         width: 76px;
         height: 76px;
-        border-radius: 19px;
         filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.3));
         animation: boot-pulse 1.6s ease-in-out infinite;
       }
@@ -49,10 +48,7 @@
   <body>
     <div id="app">
       <div id="boot" aria-hidden="true">
-        <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="logo-dark.png" />
-          <img src="logo-light.png" alt="Blockwright" />
-        </picture>
+        <img src="logo.png" alt="Blockwright" />
         <div class="boot-spinner"></div>
       </div>
     </div>

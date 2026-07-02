@@ -32,6 +32,7 @@ import { ImagePreview } from './components/ImagePreview';
 import { InspectorDock, FloatingPanels } from './components/InspectorDock';
 import { BuildPlanner, NewBuildPanel } from './components/generate/BuildPlanner';
 import { StageBuilding } from './components/generate/StageBuilding';
+import { StageEmptyFile } from './components/StageEmptyFile';
 import { ConsoleDock } from './components/ConsoleDock';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { GuideModal } from './components/GuideModal';
@@ -116,6 +117,9 @@ function Shell() {
               {activeDoc && !fileOpen && !activeDoc.loading && !isWorld && (
                 activeDoc.busy ? (
                   <StageBuilding progress={activeDoc.progress ?? null} startedAt={activeDoc.startedAt ?? null} />
+                ) : activeDoc.emptyPath ? (
+                  // The opened file has zero blocks — say so instead of landing on the planner.
+                  <StageEmptyFile path={activeDoc.emptyPath} onOpen={() => void flow.open()} onClose={flow.close} />
                 ) : (
                   <NewBuildPanel />
                 )
