@@ -4,6 +4,26 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-07-02
+
+### Added
+
+- Empty-file state — opening an `.nbt`/`.schem`/`.litematic` that parses fine but
+  places zero blocks now shows a clear "no blocks in this file" card instead of
+  the build planner, so an empty capture or another tool's placeholder is reported
+  as a fact about the file rather than an invitation to generate.
+
+### Changed
+
+- New app icon and logo — a single squircle artwork used everywhere, replacing the
+  separate light/dark logo variants.
+- Project panel structure list is cleaner — it now lists only the real structures
+  directly under a workspace's `structure` folder: jigsaw-split piece fragments in
+  subfolders and zero-block placeholder files (e.g. GameTest `empty_NxN` templates)
+  are filtered out, while a file that fails to parse still surfaces so its real
+  error shows on open.
+- Dependency upgrades.
+
 ## [2.0.0] - 2026-07-01
 
 ### Added
@@ -220,6 +240,7 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[2.0.1]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.1
 [2.0.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.0
 [1.4.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.1
 [1.4.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.0
