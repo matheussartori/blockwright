@@ -29,14 +29,11 @@ src/
                           still calling the original so the terminal keeps working
     app-menu.ts           Native application menu (OS menu bar): File ▸ Open / Open Recent / Workspace
                           + Help ▸ Check for Updates…
-    updater.ts            Update strategy, two layers (see "Updates" below): Squirrel auto-install
-                          (update-electron-app) + a notify-only GitHub-release check. initAutoUpdates
-                          wires both at launch (the notify check gated on the window finishing load
-                          so its push can't race the renderer's subscription).
-    update-check.ts       GitHub Releases API check: `detect` (fetch → cache → push banner) feeds the
-                          three call sites — background (silent), quiet (About card, inline), manual
-                          (Help menu, native dialog). `getPendingUpdate` is the renderer's mount-pull.
-                          BW_FORCE_UPDATE_CHECK is the dev escape hatch (see "Updates").
+    updater.ts            Update strategy, two layers wired by initAutoUpdates at launch: Squirrel
+                          auto-install (update-electron-app) + a notify-only GitHub-release check
+                          (update-check.ts). Details + the BW_FORCE_UPDATE_CHECK dev hatch under
+                          "Updates" below.
+    update-check.ts       The notify-only GitHub Releases API check (see "Updates" below).
     update-version.ts     Pure semver-ish compare (`isNewer`/`parseVersion`) — no electron import so
                           it's unit-testable (update-version.test.ts).
     recents.ts            Persisted "recently opened" files (last 10) in userData
@@ -45,9 +42,8 @@ src/
                           listWorkspaceStructures/listWorkspaceBiomes for the export dialog)
     texture-protocol.ts   Custom bw-texture:// privileged scheme serving namespaced PNGs
     export/               Writing a structure out. worldgen-json.ts (pure builders: jigsaw structure def /
-                          template_pool / structure_set / has_structure biome tag — spawn_overrides is
-                          REQUIRED in the 1.21 codec even when empty; `singleElementPoolJson` + a
-                          parameterized `structureJson` size/max_distance back the SPLIT assembly) +
+                          template_pool / structure_set / has_structure biome tag; `singleElementPoolJson` +
+                          a parameterized `structureJson` size/max_distance back the SPLIT assembly) +
                           index.ts (the WORKSPACE export — planExport = live preview of the files +
                           problems; runExport = write them) + local-export.ts (the NON-workspace exports:
                           `exportStructure` = "Export As…" a user-chosen file/format, `exportToWorld` =
@@ -153,45 +149,26 @@ src/
                            casco from these (the tower keep reuses the storey/door/light parts and adds
                            its own crenellated crown); per-type code is only the genuine identity geometry.
         structure-types/   Category "structure": one file per archetype, ALL SEEDED with code-built
-                           shells. NOTE (2026-06): the type IDS are now FORM-DESCRIPTIVE (the silhouette),
-                           not theme words — the theme lives in the paired `decoration`. The 'house' GROUP —
-                           cottage (was 'classic'; pitched storeyed home; its seed varies window rhythm/corner
-                           treatment/roof form/chimney side per run) + villa (was 'modern' = flat-roofed glass
-                           villa by default, but HONORS the Roof pick — a gable/hip crowns the upper volume in
-                           white quartz stairs, reserving the pitch height) + farmhouse (L plan + cross-gable +
-                           veranda) + raised-cottage (was 'sakura' = pink cherry cottage RAISED on a visible
-                           stone basement with an exterior stair to the upper entry) + manor (was 'gothic' =
-                           black+white manor with a central frontispiece tower, balustraded front veranda, mini
-                           corner tower, glass chapel wing + ivy eaves). The 'tower' GROUP — keep (was
-                           'tower-classic'; a battlemented stone KEEP: a tall square shaft of stacked storeys,
-                           arrow-slit windows, a seated arched door, a stair core, and a crenellated parapet over
-                           a walkable roof deck; OWNS its crown in code, so NO roof/attic slot; pairs with the
-                           'castle' decoration; links to every basement/surroundings/room) + spire (was
-                           'haunted-tower'; a derelict gothic SPIRE: a flared plinth, a vertically RIBBED shaft
-                           that steps inward in tiers, projecting iron-cage lantern arms, a carved SKULL FACE on a
-                           wide front, a gothic doorway under a glowing inverted cross, soul-lit lancet windows,
-                           buttress piers tipped with lit spires, a spiky crenellated crown — the carved detail
-                           SCALES WITH WIDTH; also owns its crown, links the same modules, pairs with 'cursed').
-                           The 'church' GROUP — church (a long buttressed NAVE under a steep gabled roof, tall
-                           arched windows, and a square front BELL TOWER rising clear of the ridge to a stepped
-                           spire topped by a CROSS; OWNS its roof+steeple in code, so NO roof/attic slot; pairs
-                           with the 'chapel' decoration — white plaster over stone — or 'castle' for grey stone;
-                           links to crypt/cellar/cult-temple basements + garden/graveyard surroundings + rooms).
-                           Legacy ids (classic/modern/sakura/gothic/tower-classic/haunted-tower) still resolve
-                           via LEGACY_ALIASES in structure-types/index.ts so saved builds keep working.
-                           + types.ts (contract: Box/logProps + `seedShell`/`pairedDecoration`/`complex` +
-                           `floors()`) + stair-core.ts (addStairCore — the shared switchback stair core every
-                           code-built type lays, taking the build's RolePalette; a `parts` helper, no cross-type
-                           imports — its flights are INSET one cell from the far wall so the global stairwell
-                           pass can seat their landings, see "Seeded archetypes") + crown.ts (the shared
-                           tower-crown parts kit: walkPerimeter/crenellations/roofHatch/arrowSlit — keep
-                           and spire compose their battlements/hatch/slits from it instead of duplicating
-                           the perimeter walk) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts
-                           (registry; also LEGACY_ALIASES). shell-kit also carries roofStair(palette,
-                           facing) — the one-liner for a bottom/straight roof-stairs palette entry.
-                           A type emits ops in terms of roles (never concrete blocks), composes its casco
-                           from shell-kit parts, keeps ONE `plan()` feeding both `build()` and `floors()`,
-                           and delegates roof/basement to modules. See "Seeded archetypes" below.
+                           shells. Type ids are FORM-DESCRIPTIVE (the silhouette — the theme lives in
+                           the paired `decoration`): the 'house' GROUP = cottage/villa/farmhouse/
+                           raised-cottage/manor; the 'tower' GROUP = keep/spire; the 'church' GROUP =
+                           church. Legacy ids (classic/modern/sakura/gothic/tower-classic/haunted-tower)
+                           still resolve via LEGACY_ALIASES in index.ts so saved builds keep working.
+                           Each archetype's silhouette, paired decoration and module links are described
+                           ONCE under "Seeded archetypes" below. + types.ts (contract: Box/logProps +
+                           `seedShell`/`pairedDecoration`/`complex` + `floors()`) + stair-core.ts
+                           (addStairCore — the shared switchback stair core every code-built type lays,
+                           taking the build's RolePalette; a `parts` helper, no cross-type imports — its
+                           flights are INSET one cell from the far wall so the global stairwell pass can
+                           seat their landings) + crown.ts (the shared tower-crown parts kit:
+                           walkPerimeter/crenellations/roofHatch/arrowSlit — keep and spire compose
+                           their battlements/hatch/slits from it instead of duplicating the perimeter
+                           walk) + farmhouse-parts.ts (farmhouse-only pieces) + index.ts (registry +
+                           LEGACY_ALIASES). shell-kit also carries roofStair(palette, facing) — the
+                           one-liner for a bottom/straight roof-stairs palette entry. A type emits ops
+                           in terms of roles (never concrete blocks), composes its casco from shell-kit
+                           parts, keeps ONE `plan()` feeding both `build()` and `floors()`, and
+                           delegates roof/basement to modules.
         decorations/       Category "decoration": one file per look (cozy/haunted/modern/farmhouse/sakura/
                            gothic/castle/chapel/cursed — castle = a UNIVERSAL dressed-stone/masonry look, the
                            keep's default; chapel = whitewashed plaster (smooth quartz) over dressed stone +
@@ -202,17 +179,11 @@ src/
                            DEFAULT_DECORATION='cozy'). A decoration maps roles→blocks + decay + weathering.
         basements/ roofs/  Categories "basement"/"roof"/"attic": one file per typology (roof: gable/
         attics/            hip/flat; basement: cellar/crypt/cult-temple; attic: storage/bedroom)
-                           + types.ts + index.ts (registry) each.
-                           SELECTABLE in the composer Details (filtered by the chosen structure's
-                           `appliesTo`) + listed in the gallery. Each carries GENERIC geometry
-                           (`build()`, any host) + optional HOST-SPECIFIC extras (`integrations[host]`,
-                           e.g. house-only gable vents), run by `composeModule`/`composeModulePreview`
-                           — roofs + basements render live in the gallery; a pick also rides into the
-                           prompt as guidance + loads only its knowledge guide. A structure type also
-                           DELEGATES its own roof/basement to these modules at build time (the house calls
-                           `args.composeModule(...)` — see "Composable generation domain"), so a module is
-                           the single source of that geometry. Each declares `appliesTo` (the structures it
-                           pairs with, e.g. ['house']) — a growing link driving Details filtering + guide gating.
+                           + types.ts + index.ts (registry) each. Geometry + knowledge modules,
+                           selectable in the composer Details and listed in the gallery; the two-layer
+                           `build()`/`integrations` model, the palette strategy and the host delegation
+                           are described ONCE under "basement/roof modules carry geometry + knowledge"
+                           in the domain section below.
         rooms/             Category "room": one file per interior program — the 'general' family
                            (living/kitchen/library/bedroom/dormitory/storage) + the 'horror' family
                            (ritual/dungeon/morgue/seance) — each a `defineRoom({...})` of PURE DATA +
@@ -220,61 +191,27 @@ src/
                            hosts + the `group`, default 'general') + types.ts (RoomModule = ModuleMeta +
                            required `knowledge` + `presets`, no geometry) + index.ts (registry, general
                            first then horror so each group's options stay contiguous for the grouped
-                           picker). Room program groups live in `groups.ts` `ROOM_GROUPS` (general/horror),
-                           merged with `STRUCTURE_GROUPS` into the catalog's `groups` so the renderer
-                           resolves either id to a label; the per-floor room picker (FloorStack) is a
-                           grouped, searchable `Select`. GUIDANCE-ONLY — no `build()`/`preview`:
-                           the user assigns up to two rooms per floor in the composer Details (house;
-                           one per floor on the tighter tower), each loads only its knowledge guide and
-                           rides into the prompt as a `[Room plan]` line per floor; the AI furnishes the
-                           interior. `appliesTo` defaults to ['house', 'tower'] (every room fits both).
-                           Each room also ships FURNISHING PRESETS tiered by floor SPACE (snug/standard/
-                           grand) — the SPACE × DECORATION organism (see `shared/domain/furnishing.ts`):
-                           a decoration-AGNOSTIC base layout per tier that the brief picks by the room's
-                           computed area + the gallery lists. So a big floor never comes out empty.
+                           picker). Room program groups live in `groups.ts` `ROOM_GROUPS` (general/
+                           horror), merged with `STRUCTURE_GROUPS` into the catalog's `groups` so the
+                           renderer resolves either id to a label; the per-floor room picker (FloorStack)
+                           is a grouped, searchable `Select`. GUIDANCE-ONLY (no geometry) + FURNISHING
+                           PRESETS tiered by floor space — the behaviour is described ONCE under
+                           "`room` modules" + "SPACE × DECORATION" in the domain section below.
         surroundings/      Category "surroundings": one file per yard typology (modern, garden,
                            graveyard) + types.ts (SurroundingsModule, required `appliesTo`) +
                            yard-features.ts (the shared yard scaffold garden + graveyard build on:
                            rect helpers + the seeded occupancy/chamfer `yardScaffold`, lampPost,
                            weepingTree/deadTree — modern keeps its own ops-threading style) +
-                           outline.ts (the shared
-                           seeded chamfered OUTLINE: rimCells/inCut/seededChamfers — the lawn is CLIPPED
-                           to it, so the yard's footprint is never the plain rectangle) + index.ts
-                           (registry + `insetHouseBox` + the shared `yardFor` every host's build()/
-                           floors() opens with). A GROUND-LEVEL landscaping RING laid OUTSIDE the
-                           building shell: the user's W×D is the SHELL, the compiled box grows by the
-                           ring margins. By default those AUTO-SCALE with the house (`SURROUND_SCALE` in
-                           `shared/domain/surroundings.ts` — base→max, +1 cell per 4 shell cells past 14),
-                           but the composer's YARD-SIZE control lets the user OVERRIDE them with explicit
-                           per-side cell margins (`SurroundSizing {side,front,back}`, the manual Width-X /
-                           Depth-Z steppers). `resolveSurroundMargins(id,w,d,override?)` is the single
-                           resolver (override wins, else auto); `surroundMargins`/`expandSizeForSurroundings`/
-                           `surroundMarginsForOuter`/`insetHouseBox`/`yardFor` all take the optional override
-                           — with an override the margins are used DIRECTLY (house = outer − override, no
-                           inversion), without one main inverts the auto expansion exactly via
-                           `surroundMarginsForOuter(id,W,D)`. Same math on both sides of IPC (the override
-                           rides through `BuildSelection.surroundSizing` → shell-seed `params.surroundSizing`
-                           → `BuildArgs.surroundSizing` + `floors()` + the module's `args.surroundSizing`).
-                           The host structure INSETS its massing and delegates the ring via
-                           `composeModule('surroundings', …, {surroundSizing})`. The module re-derives the
-                           house footprint from the same resolver, so host and ring always agree. Own palette
-                           over the decoration (like a basement — a lawn stays a lawn); ring stays ≤3
-                           cells tall (landscaping, never construction — the cap is the lamp-post
-                           lantern); leaves placed persistent.
-                           modern = pool terrace + stepped entry walk aligned with the door + chamfered
-                           hedge rim + planters + seeded bushes/bollards; `appliesTo: ['modern', 'tower']`
-                           (the host declares the `surroundings` param, marked `module:'surroundings'`).
-                           graveyard = a fenced cemetery yard (`appliesTo: ['manor', 'tower', 'church']`).
-                           garden = the cottage homestead yard for every non-modern house + the tower
-                           (`appliesTo: ['cottage','farmhouse','raised-cottage','manor','tower','church']`, all declare
-                           the param): a cobble-course + oak-fence perimeter whose corners are cut by
-                           SEEDED stepped chamfers (the outline varies every build), stone lamp posts,
-                           a double-door front gate aligned with the house door, a dirt walk + a loop
-                           path around the house, facade flower beds, and seeded features (fountain or
-                           stone well, hydrated crop plots, flower parterre, bushes). Uses the garden
-                           roles (`path`/`soil`/`crop`/`flower` in roles.ts). The ring is code-built
-                           geometry, shipped with the host's seeded shell (every house type seeds —
-                           see ai/shell-seed.ts).
+                           outline.ts (the shared seeded chamfered OUTLINE: rimCells/inCut/
+                           seededChamfers — the lawn is CLIPPED to it, so the yard's footprint is
+                           never the plain rectangle) + index.ts (registry + `insetHouseBox` + the
+                           shared `yardFor` every host's build()/floors() opens with). A GROUND-LEVEL
+                           landscaping RING laid OUTSIDE the building shell — the sizing model
+                           (auto-scale + manual override), the per-yard typologies and the host links
+                           are described ONCE under "`surroundings` modules" in the domain section
+                           below. Own palette over the decoration (like a basement — a lawn stays a
+                           lawn); ring stays ≤3 cells tall (landscaping, never construction — the cap
+                           is the lamp-post lantern); leaves placed persistent.
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
@@ -455,9 +392,9 @@ src/
                           toolbar), DetailsSection (the progressive Details — a PURE view: the structure
                           pick + every single-select slot/enum param render as the themed `ui/Select`
                           dropdown (NOT chip groups; the structure pick is `searchable` and grouped by
-                          family via `catalog.groups`), plus the size box (a storeyed structure is ALWAYS
-                          sized PER FLOOR — one height input per storey with a link/chain toggle; there is no
-                          "Total" height mode), the YARD-SIZE control when a surroundings ring is picked
+                          family via `catalog.groups`), plus the size box (per-floor heights with a
+                          link/chain toggle — the height model lives in generation/brief.ts below),
+                          the YARD-SIZE control when a surroundings ring is picked
                           (the SAME boxed number-stepper panel as the floor heights: Width X / Depth Z in
                           cells, nudged in 2-cell steps) + per-floor rooms), size-controls.tsx (the shared
                           boxed-panel primitives those size sections compose: SizePanel/SizeRow/LinkToggle),
@@ -532,7 +469,7 @@ src/
                           a block's `state`); mirror/rotate rewrite the directional blockstate via the shared
                           `structure/orientation.ts` (`transformProps`) — the transform WorldEdit never fixed.
                           See "Block editor" below.
-    windows/              ControlsWindow / InspectorWindow / JigsawWindow — the three floating windows
+    windows/              InspectorWindow / JigsawWindow / VersionsWindow — the three floating windows
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
                           windows.ts (floating-window layout + the Console dock visibility/height,
@@ -709,7 +646,7 @@ parent from the vanilla pack and the texture from the workspace. Resolved textur
 "Open Mod Workspace…" (File menu or welcome button) picks a mod project folder; `workspace.ts`
 locates its resources root (`src/main/resources` or the folder itself) and the non-`minecraft`
 namespace under `assets/`, then `applyWorkspace` registers it as an extra asset source and clears
-the JSON/model caches. A bottom-left badge shows the active workspace name. The mod's structures
+the JSON/model caches. The statusbar's workspace segment shows the active workspace name. The mod's structures
 (`data/<namespace>/structure/*.nbt`) then render with their custom textures, and are listed on the
 welcome screen.
 
@@ -877,14 +814,14 @@ decoration, and a new module is one small file.
   hides them from the house's own Details controls (no duplicate). **Add a roof/basement:** new file +
   register in its `index.ts`; give it `appliesTo` + optional `build()`/`integrations` + a
   `knowledge/nbt/modules/{roof,basement}/<id>.md`.
-- **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: living/kitchen/library/bedroom/dormitory/
-  storage): each is a `RoomModule` (`ModuleMeta` + required `knowledge` + `presets` — no `build`/`preview`),
+- **`room` modules are GUIDANCE-ONLY interiors** (`rooms/`: the 'general' family living/kitchen/
+  library/bedroom/dormitory/storage + the 'horror' family ritual/dungeon/morgue/seance): each is a `RoomModule` (`ModuleMeta` + required `knowledge` + `presets` — no `build`/`preview`),
   authored via the **`defineRoom` factory** (`rooms/define.ts`) so a room file is PURE DATA (id/label/
   description/presets) and the factory fills the boilerplate ONCE: `category:'room'`, the knowledge path
   (`nbt/modules/room/<id>.md`, derived from id so it can't drift), each preset's id (`<id>-<scale>`,
   derived from its tier), and the default host link (`['house', 'tower']`, override to reuse on more).
   The user assigns up to two rooms PER FLOOR in the composer Details (shown for a storeyed structure, i.e.
-  the house's `floors` param). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each
+  a `floors` param; one per floor on the tighter tower). The picked room ids ride along in `BuildSelection.rooms` (deduped) so each
   loads ONLY its own knowledge guide, and the per-floor layout is folded into the prompt as a `[Room plan]`
   line per floor (`buildRoomPlan` in `renderer/generation/brief.ts`). The AI furnishes each storey from those
   guides (partitioning a floor with two rooms into real, separated spaces). No geometry, so no gallery preview
@@ -892,9 +829,10 @@ decoration, and a new module is one small file.
   HOST-AGNOSTIC and carries ONLY this room's furniture vocabulary — the scale/preset/decoration mechanics live
   in the always-on core guide `14-furnishing-by-space.md`, so a room guide never repeats it (no wasted tokens).
   **Add a room:** new `defineRoom({...})` file in `rooms/` + register in its `index.ts` + a
-  `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to ['house'].
+  `knowledge/nbt/modules/room/<id>.md` guide + `presets` (one per scale tier). `appliesTo` defaults to
+  ['house', 'tower'].
 - **`surroundings` modules wrap the shell in a code-built YARD** (`surroundings/`: modern,
-  garden): a required single-select slot defaulting to **None**. The user's W×D stays the
+  garden, graveyard): a required single-select slot defaulting to **None**. The user's W×D stays the
   BUILDING SHELL — a pick grows the compiled box by the ring margins. By DEFAULT those auto-scale
   with the house (`SURROUND_SCALE` in `shared/domain/surroundings.ts`: base→max, bigger shell =
   wider ring), but the composer's YARD-SIZE steppers let the user OVERRIDE them with explicit
@@ -929,7 +867,8 @@ decoration, and a new module is one small file.
   cottage included): the fix for "the style keeps coming out as a wooden pitched box." A
   fresh AI build invents 100% of the geometry, and the model's strong rectangular-house prior overrides
   any advisory guide text — so styles the model can't reliably invent are NOT guidance; they're STRUCTURE
-  TYPES that OWN their massing in code. Each archetype's `build()` emits its silhouette: **villa** (was
+  TYPES that OWN their massing in code. Each archetype's `build()` emits its silhouette: **cottage**
+  (was 'classic') = the baseline pitched storeyed home; **villa** (was
   'modern') = stacked offset white-concrete volumes, glass curtain walls with dark mullions, set-back upper
   floor + railed roof terrace, FLAT roofs by default but it HONORS the Roof slot (a `roof` param flat/gable/hip,
   marked `module:'roof'` like the house's; gable/hip cap the upper volume with a low white-quartz pitch and
@@ -1535,7 +1474,7 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   + a `.col-resize` handle; widths are clamped by `LEFT_PANEL`/`RIGHT_PANEL` and persisted.
   `project` is a `WindowId` (View ▸ Project Panel, Cmd+B) but tracks visibility only in the flat
   `projectVisible` flag — `setVisible('project')` maps to it, `setPos`/`toggleMinimized` no-op.
-- **Floating windows:** Controls / Inspector / Jigsaw share one chrome (`components/FloatingWindow.tsx`):
+- **Floating windows:** Inspector / Jigsaw / Versions share one chrome (`components/FloatingWindow.tsx`):
   titled, draggable (clamped to the stage), redock / minimize / **close** (close hides via
   `setVisible(false)` — reopen from the View menu). Layout lives in `state/windows.ts`
   (persisted). The native **View** menu
@@ -1543,7 +1482,8 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   `{visible,available}` per window to main (`reportWindows`) so the menu's checkmarks/enabled state
   track the renderer (which owns the state). Don't inline window positions — go through the store.
 - **Console dock:** a `WindowId` like the others, but it's the **full-width bottom dock** (not a
-  sidebar tab or floating window), so — like `controls` — it tracks visibility only (plus a persisted,
+  sidebar tab or floating window), so — like `controls` (now the Keyboard Shortcuts overlay,
+  `ShortcutsHelp`, Cmd+/) — it tracks visibility only (plus a persisted,
   resizable `consoleHeight`) and is NOT a `PanelId`. App.tsx wraps the stage row + `ConsoleDock` in a
   `.stage-area` column so the console spans the full width (under the sidebar) while the stage shrinks
   (the WebGL canvas resizes instead of being covered). Toggled from View ▸ Console (Cmd+Shift+K); the
@@ -1593,8 +1533,7 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   theme — the themed `Logo` (`<picture>`) and the boot splash rely on that tracking.
   `settings.theme` is `'system'` or a `ThemeId` from the **theme registry**
   (`renderer/state/themes.ts`: light/dark + the SKINS minecraft-light/-dark [launcher charcoal /
-  minecraft.net paper white + grass-green #3c8527] and nether-light/-dark [netherrack maroon +
-  lava orange / quartz-ash + burnt crimson]); default system. Each registry entry mirrors a
+  minecraft.net paper white + grass-green #3c8527]); default system. Each registry entry mirrors a
   `[data-theme=…]` token block in `index.css` — **add a theme in BOTH places** (+ its
   `appearance.*` label in en/pt-BR). The picker is the **ThemePicker** card gallery
   (`components/settings/ThemePicker.tsx`): one miniature-workbench card per theme drawn from the

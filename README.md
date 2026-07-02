@@ -73,6 +73,8 @@ refines through an emit → render → review loop — previewed live in the vie
   or 32³ pre-1.16) is cut into a jigsaw assembly that reassembles voxel-perfectly in-world, so it loads
   despite the limit. **Export to World** drops a ready-to-run datapack straight into a save and hands you
   the `/place` command
+- **Round-trip in-game editing** — export a build into a world, edit it there with vanilla Structure
+  Blocks, then **Reimport from World** stitches the edits back in as a new version of the same project
 - **Structure library** — every generated build is saved to its own folder (latest `.nbt`, kept
   versions, and a generation log), revealed from the chat's build card
 - **Floor-plan editing** — define named vertical levels, highlighted as bands in the viewer, that ride
@@ -80,7 +82,9 @@ refines through an emit → render → review loop — previewed live in the vie
 - Jigsaw assembly preview, a Block Catalog browser with live 3D previews, block-entity rendering
   (chests, beds, banners, skulls, decorated pots), entity rendering (armor stands as their real
   vanilla model with pose and display flags) and animated fluids
-- Floating, dockable tool windows and a light/dark themed UI
+- An IDE-style workbench — activity bar, project explorer, console dock and floating tool windows —
+  with a **theme gallery** (light, dark and Minecraft-skinned themes) and an interface in **English
+  and Português (Brasil)**, following your OS by default
 
 ## Usage
 
@@ -277,6 +281,21 @@ voxel-perfectly in-world. The export dialog shows the piece count up front.
 (`<save>/datapacks/<name>/`) and shows you the exact command to spawn it (`/place jigsaw …` for a split
 build, `/place template …` for a single one), with a one-click copy. Run `/reload` in the world and paste
 it — no manual file shuffling.
+
+### Editing in-game and reimporting
+
+An export isn't a one-way trip — you can polish a build with Minecraft's own tools and bring the
+result back:
+
+1. **Export to World** the build, place it in your world, and edit it freely in-game. Vanilla
+   **Structure Blocks** are enough: a single structure loads/saves under its exported name, and a
+   split build's pieces each appear inside an outlined box with their own SAVE structure block.
+2. Save the structure block(s), then use **File ▸ Reimport from World…** in Blockwright — it reads
+   the edited pieces back and stitches them into a single structure, committed as a **new version**
+   of the same project.
+
+**File ▸ Open Jigsaw Assembly…** reopens a previously exported split-assembly folder as one
+structure, and **File ▸ Rename Project…** renames a generated project's library folder.
 
 ## Development
 
