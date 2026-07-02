@@ -5,9 +5,9 @@
 // match the rest of the renderer.
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_NBT_SIZE_PREF, type NbtSizePref } from '@/shared/domain/split';
+import { isThemePref, type ThemePref } from './themes';
 
-/** Color theme: follow the OS, or force light/dark. */
-export type ThemePref = 'system' | 'light' | 'dark';
+export type { ThemePref } from './themes';
 
 export interface Settings {
   /** Color theme. `system` follows the OS appearance (the default). */
@@ -51,7 +51,11 @@ function load(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...SETTINGS_DEFAULTS };
-    return { ...SETTINGS_DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) };
+    const merged = { ...SETTINGS_DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) };
+    // A stored theme id that no longer exists would leave `data-theme` pointing
+    // at no CSS block (base dark tokens) — fall back to system instead.
+    if (!isThemePref(merged.theme)) merged.theme = 'system';
+    return merged;
   } catch {
     return { ...SETTINGS_DEFAULTS };
   }

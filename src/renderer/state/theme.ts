@@ -5,17 +5,19 @@
 // <html> element (which wins over the media query), or removes it to fall back to
 // system. Kept tiny and framework-free so it can run at startup from index.tsx.
 import { settingsStore, type ThemePref } from './settings';
+import { nativeModeFor } from './themes';
 import { api } from '../api';
 
 /** Reflect a theme preference onto <html> AND the native window. Setting
  *  `data-theme` flips our CSS instantly; `setThemeSource` flips the macOS vibrancy
  *  material + traffic lights (and the OS-level prefers-color-scheme) so a forced
- *  light theme isn't dark text on a vibrancy backdrop stuck in dark mode. */
+ *  light theme isn't dark text on a vibrancy backdrop stuck in dark mode. A skin
+ *  (minecraft/nether) maps to its light/dark side for the native chrome. */
 export function applyTheme(pref: ThemePref): void {
   const root = document.documentElement;
   if (pref === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', pref);
-  void api.setThemeSource(pref);
+  void api.setThemeSource(nativeModeFor(pref));
 }
 
 /** Apply the persisted theme now and keep it in sync as the setting changes.

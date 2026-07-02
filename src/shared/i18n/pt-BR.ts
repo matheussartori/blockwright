@@ -202,6 +202,8 @@ export const ptBR: Messages = {
   'appearance.system': 'Sistema',
   'appearance.light': 'Claro',
   'appearance.dark': 'Escuro',
+  'appearance.minecraftLight': 'Minecraft claro',
+  'appearance.minecraftDark': 'Minecraft escuro',
   'appearance.themeNote': '“Sistema” segue a aparência clara/escura do seu sistema operacional.',
   'appearance.languageGroup': 'Idioma',
   'appearance.language': 'Idioma',

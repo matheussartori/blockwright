@@ -4,6 +4,50 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-07-01
+
+### Added
+
+- World Viewer — open a whole Minecraft save (`level.dat` + `region/*.mca`) and
+  fly through it as a view-only world. It streams chunks around the camera with
+  level-of-detail (full geometry up close, a textured heightmap surface farther
+  out), meshes them off the main thread, and never modifies the world. Includes a
+  2D minimap, a go-to coordinate jump, a structure finder that scans and jumps to
+  any generated structure, a day/night lighting toggle, and a dimension switcher
+  (vanilla and mod dimensions with region data on disk). Open it from File ▸ Open
+  World… (Cmd+Shift+W), the welcome screen or recents. Supports 1.13+ paletted
+  worlds.
+- Church structure type — a long buttressed nave under a steep gabled roof with
+  tall arched windows, fronted by a square bell tower that rises to a stepped
+  spire topped by a cross (its roof and steeple are built in code).
+- Chapel decoration — whitewashed plaster over dressed stone with a steep dark
+  roof; the church's default look.
+- Theme picker — Settings ▸ Appearance now shows a gallery of theme cards (each a
+  miniature workbench preview) in place of the old light/dark toggle, and adds two
+  Minecraft skins: Minecraft Light (launcher charcoal on paper white) and
+  Minecraft Dark, both with the grass-green accent. System still follows your OS.
+
+### Changed
+
+- UI 2.0 — an IDE-grade workbench redesign: a left ActivityBar icon rail, a
+  toggleable Project panel (active workspace, its structures, and recent files /
+  workspaces / worlds), a reworked Welcome start page, a single slim tab bar, and
+  an active-workspace segment in the status bar (replacing the floating badge).
+- Structure types renamed to form-descriptive ids — the id now names the
+  silhouette and the theme lives in the paired decoration: classic → cottage,
+  modern → villa, gothic → manor, sakura → raised-cottage, tower-classic → keep,
+  haunted-tower → spire. Saved builds using the old ids keep working.
+- Updated the Claude model lineup (Opus 4.8, Sonnet 5) — the current models use
+  adaptive thinking steered by an effort level.
+- Entities now render in the World Viewer, and entity rendering was reworked.
+- Dependency upgrades.
+
+### Fixed
+
+- Switching the mod workspace while a world is open now soft-refreshes the
+  streamed chunks so mod textures resolve, instead of leaving the old ones.
+- Entity rendering in the world.
+
 ## [1.4.1] - 2026-06-29
 
 ### Changed
@@ -176,6 +220,8 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[2.0.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.0
+[1.4.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.1
 [1.4.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.0
 [1.3.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.3.0
 [1.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v1.2.0

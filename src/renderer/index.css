@@ -95,6 +95,49 @@
   color-scheme: dark;
 }
 
+/* ── Theme skins ─────────────────────────────────────────────────────────────
+   Extra themes beyond the default pair, selected in Settings ▸ Appearance
+   (ThemePicker). Each is a full data-theme block; the registry that lists them
+   (and mirrors these preview colors) is renderer/state/themes.ts — keep in sync.
+
+   Minecraft: the launcher/minecraft.net palette — near-neutral charcoal (dark)
+   / paper white (light) chrome around the signature grass-green CTA (#3c8527). */
+:root[data-theme='minecraft-dark'] {
+  color-scheme: dark;
+  --bg: #1e1e1f;
+  --bg-solid: #1e1e1f;
+  --chrome: #131314;
+  --panel: rgba(255, 255, 255, 0.05);
+  --panel-strong: rgba(255, 255, 255, 0.085);
+  --elevated: #2b2b2d;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --text: #ececec;
+  --text-2: rgba(236, 236, 236, 0.72);
+  --text-muted: rgba(236, 236, 236, 0.46);
+  --accent: #3c8527;
+  --accent-hover: #52a535;
+  --accent-soft: rgba(82, 165, 53, 0.16);
+}
+:root[data-theme='minecraft-light'] {
+  color-scheme: light;
+  --bg: #f4f4f4;
+  --bg-solid: #f4f4f4;
+  --chrome: #e8e8e6;
+  --panel: rgba(0, 0, 0, 0.045);
+  --panel-strong: rgba(0, 0, 0, 0.07);
+  --elevated: #ffffff;
+  --border: rgba(0, 0, 0, 0.11);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --text: #242425;
+  --text-2: rgba(36, 36, 37, 0.66);
+  --text-muted: rgba(36, 36, 37, 0.48);
+  --accent: #3c8527;
+  --accent-hover: #2a641c;
+  --accent-soft: rgba(60, 133, 39, 0.13);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
 * {
   box-sizing: border-box;
 }
@@ -3457,6 +3500,135 @@ body.row-resizing {
   color: var(--accent-text);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
+/* Theme gallery (Settings ▸ Appearance) — one miniature-workbench card per
+   theme, drawn in that theme's own palette (inline colors from state/themes.ts).
+   The classes here do layout only; every color comes from the card itself. */
+.theme-picker {
+  -webkit-app-region: no-drag;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 10px 12px;
+  padding: 2px 0 6px;
+}
+.theme-card {
+  font: inherit;
+  padding: 0;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+}
+.theme-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.theme-card-preview {
+  position: relative;
+  display: block;
+  aspect-ratio: 8 / 5;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 2px transparent;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.theme-card:hover .theme-card-preview {
+  border-color: var(--border-strong);
+}
+.theme-card.active .theme-card-preview {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+.theme-card-name {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+.theme-card:hover .theme-card-name {
+  color: var(--text);
+}
+.theme-card.active .theme-card-name {
+  color: var(--text);
+  font-weight: 600;
+}
+.theme-card-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+/* The miniature itself: chrome top bar + activity rail framing a lit stage,
+   with the voxel-cube mark and a floating panel (two text lines + a CTA). */
+.theme-mini {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.theme-mini-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 13%;
+}
+.theme-mini-rail {
+  position: absolute;
+  top: 13%;
+  left: 0;
+  bottom: 0;
+  width: 11%;
+}
+.theme-mini-cube {
+  position: absolute;
+  left: 24%;
+  top: 36%;
+  width: 26%;
+  height: auto;
+}
+.theme-mini-panel {
+  position: absolute;
+  top: 26%;
+  right: 7%;
+  width: 33%;
+  border-radius: 3px;
+  padding: 9% 5%;
+  display: flex;
+  flex-direction: column;
+  gap: 17%;
+}
+.theme-mini-panel i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+}
+.theme-mini-panel i:nth-child(2) {
+  width: 70%;
+}
+.theme-mini-panel .theme-mini-btn {
+  height: 5px;
+  width: 55%;
+  border-radius: 2.5px;
+}
+/* The System card: default light with default dark clipped to the lower-right
+   half, split on the diagonal. */
+.theme-mini-split {
+  position: absolute;
+  inset: 0;
+  display: block;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+
 .setting-note {
   font-size: 12px;
   line-height: 1.5;

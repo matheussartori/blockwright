@@ -200,6 +200,8 @@ export const en = {
   'appearance.system': 'System',
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
+  'appearance.minecraftLight': 'Minecraft Light',
+  'appearance.minecraftDark': 'Minecraft Dark',
   'appearance.themeNote': '“System” follows your operating system’s light/dark appearance.',
   'appearance.languageGroup': 'Language',
   'appearance.language': 'Language',

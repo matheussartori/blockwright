@@ -1585,13 +1585,21 @@ Two complementary layers, both wired by `initAutoUpdates()` (`main/updater.ts`) 
   the app/window background AND (because the viewer's WebGL canvas is `alpha:true`) the 3D scene's
   backdrop, so the welcome and the NBT viewer share one background. Two things move together:
   (1) CSS — base `:root` is dark, the OS drives the *default* via `@media (prefers-color-scheme:
-  light) { :root:not([data-theme]) }`, and an explicit choice sets `[data-theme="light|dark"]`
+  light) { :root:not([data-theme]) }`, and an explicit choice sets `[data-theme="<id>"]`
   (wins; strict CSP forbids a no-FOUC inline script, so don't add bare `prefers-color-scheme`
   rules — scope them to `:not([data-theme])`). (2) **`nativeTheme.themeSource`** (set from
-  `state/theme.ts` via the `themeSet` IPC) so the renderer's `prefers-color-scheme` (and the native
-  traffic lights / dialogs) follow a forced theme — the themed `Logo` (`<picture>`) and the boot
-  splash rely on that tracking. `settings.theme` is 'system'|'light'|'dark' (default system).
-  `--mono` is for numeric/dimensional data (sizes, counts, coords).
+  `state/theme.ts` via the `themeSet` IPC, mapped to light/dark via `nativeModeFor`) so the
+  renderer's `prefers-color-scheme` (and the native traffic lights / dialogs) follow a forced
+  theme — the themed `Logo` (`<picture>`) and the boot splash rely on that tracking.
+  `settings.theme` is `'system'` or a `ThemeId` from the **theme registry**
+  (`renderer/state/themes.ts`: light/dark + the SKINS minecraft-light/-dark [launcher charcoal /
+  minecraft.net paper white + grass-green #3c8527] and nether-light/-dark [netherrack maroon +
+  lava orange / quartz-ash + burnt crimson]); default system. Each registry entry mirrors a
+  `[data-theme=…]` token block in `index.css` — **add a theme in BOTH places** (+ its
+  `appearance.*` label in en/pt-BR). The picker is the **ThemePicker** card gallery
+  (`components/settings/ThemePicker.tsx`): one miniature-workbench card per theme drawn from the
+  registry's preview colors (System = a diagonal light/dark split), a radiogroup, replacing the
+  old 3-option Segmented. `--mono` is for numeric/dimensional data (sizes, counts, coords).
 - **App icon / logos:** the in-app logos live in `public/` (`logo-dark.png`, `logo-light.png`),
   referenced relatively (`logo-dark.png`, not `/logo-dark.png`) so they resolve under `file://` when
   packaged; the `Logo` component swaps them by theme. The app/dock icon is the standardized
