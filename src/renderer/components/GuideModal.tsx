@@ -6,16 +6,16 @@
 import { useState, type ReactNode } from 'react';
 import {
   Compass, Sparkles, Orbit, Blocks, MessagesSquare, FolderTree,
-  MousePointer2, Move3D, Scan, Eye, Layers, PencilLine, SlidersHorizontal, History,
+  MousePointer2, Move3D, Eye, Layers, PencilLine, SlidersHorizontal, History,
   Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload, FlipHorizontal2,
-  SquarePlus, Columns2, FileDown, Globe, Package,
+  Columns2, FileDown, Globe, Package, Brush, SquareDashed, CircleHelp, Search, Map, RefreshCcw,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { Modal } from './ui/Modal';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
-type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'export' | 'workspaces';
+type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'world' | 'export' | 'workspaces';
 
 const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'overview', icon: Compass, label: 'guide.navOverview' },
@@ -24,6 +24,7 @@ const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'details', icon: Blocks, label: 'guide.navDetails' },
   { id: 'edit', icon: MessagesSquare, label: 'guide.navEdit' },
   { id: 'blocks', icon: Boxes, label: 'guide.navBlocks' },
+  { id: 'world', icon: Globe, label: 'guide.navWorld' },
   { id: 'export', icon: Upload, label: 'guide.navExport' },
   { id: 'workspaces', icon: FolderTree, label: 'guide.navWorkspaces' },
 ];
@@ -67,6 +68,7 @@ export function GuideModal() {
         {section === 'details' && <Details t={t} />}
         {section === 'edit' && <Edit t={t} />}
         {section === 'blocks' && <BlockTools t={t} />}
+        {section === 'world' && <World t={t} />}
         {section === 'export' && <Export t={t} />}
         {section === 'workspaces' && <Workspaces t={t} />}
       </div>
@@ -127,8 +129,8 @@ function Viewer({ t }: { t: TFunction }) {
       <ul className="guide-list">
         <li><MousePointer2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.viewer.orbitT')}</b> {t('guide.viewer.orbit')}</span></li>
         <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.viewer.flyT')}</b> {t('guide.viewer.fly')}</span></li>
-        <li><Scan size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.viewer.frameT')}</b> {t('guide.viewer.frame')}</span></li>
         <li><Eye size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.viewer.insideT')}</b> {t('guide.viewer.inside')}</span></li>
+        <li><CircleHelp size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.viewer.helpT')}</b> {t('guide.viewer.help')}</span></li>
       </ul>
     </Block>
   );
@@ -170,14 +172,30 @@ function BlockTools({ t }: { t: TFunction }) {
       <ul className="guide-list">
         <li><MousePointer2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.selectT')}</b> {t('guide.blocks.select')}</span></li>
         <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.moveT')}</b> {t('guide.blocks.move')}</span></li>
-        <li><SquarePlus size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.placeT')}</b> {t('guide.blocks.place')}</span></li>
+        <li><Brush size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.paintT')}</b> {t('guide.blocks.paint')}</span></li>
         <li><FlipHorizontal2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.transformT')}</b> {t('guide.blocks.transform')}</span></li>
         <li><ArrowUpFromLine size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.extrudeT')}</b> {t('guide.blocks.extrude')}</span></li>
         <li><TrendingUp size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.stairsT')}</b> {t('guide.blocks.stairs')}</span></li>
         <li><Replace size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.replaceT')}</b> {t('guide.blocks.replace')}</span></li>
+        <li><SquareDashed size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.voidT')}</b> {t('guide.blocks.void')}</span></li>
         <li><Columns2 size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.blocks.symmetryT')}</b> {t('guide.blocks.symmetry')}</span></li>
       </ul>
       <p className="guide-tip"><Save size={14} strokeWidth={1.9} aria-hidden />{t('guide.blocks.tip')}</p>
+    </Block>
+  );
+}
+
+function World({ t }: { t: TFunction }) {
+  return (
+    <Block icon={<Globe size={18} strokeWidth={1.8} />} title={t('guide.world.title')}>
+      <p className="guide-lead">{t('guide.world.lead')}</p>
+      <ul className="guide-list">
+        <li><Move3D size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.world.flyT')}</b> {t('guide.world.fly')}</span></li>
+        <li><Search size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.world.findT')}</b> {t('guide.world.find')}</span></li>
+        <li><Map size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.world.hudT')}</b> {t('guide.world.hud')}</span></li>
+        <li><RefreshCcw size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.world.backT')}</b> {t('guide.world.back')}</span></li>
+      </ul>
+      <p className="guide-tip"><Globe size={14} strokeWidth={1.9} aria-hidden />{t('guide.world.tip')}</p>
     </Block>
   );
 }
@@ -202,6 +220,7 @@ function Workspaces({ t }: { t: TFunction }) {
       <p className="guide-lead">{t('guide.workspaces.lead')}</p>
       <p className="guide-p">{t('guide.workspaces.p1')}</p>
       <p className="guide-p">{t('guide.workspaces.p2')}</p>
+      <p className="guide-p">{t('guide.workspaces.p3')}</p>
       <p className="guide-tip"><Upload size={14} strokeWidth={1.9} aria-hidden />{t('guide.workspaces.export')}</p>
     </Block>
   );

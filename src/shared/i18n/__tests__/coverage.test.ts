@@ -25,6 +25,7 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'viewer.nbtLimit48', // "48³ (1.16+)" — a numeric label, identical in both languages
   // World-viewer: loanwords / proper nouns kept as-is in pt-BR (Minecraft terms).
   'world.spawn', 'world.dimNether', 'world.dimEnd', 'world.chunksLoaded',
+  'guide.world.hudT', // "HUD." — the same loanword in both languages
 ]);
 
 describe('i18n chrome coverage', () => {
