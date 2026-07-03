@@ -12,6 +12,7 @@ import type {
   DimensionId,
   ModBlockScope,
   ChatRecord,
+  ExportMode,
   ExportResult,
   RegionRef,
   StructureLocation,
@@ -176,8 +177,8 @@ const api: BlockwrightApi = {
   sendRenderResult: (result: RenderResult) => {
     ipcRenderer.invoke(IPC_CHANNELS.aiRenderResult, result);
   },
-  setFileOpen: (open: boolean) => {
-    ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open);
+  setFileOpen: (open: boolean, oversized: boolean) => {
+    ipcRenderer.invoke(IPC_CHANNELS.setFileOpen, open, oversized);
   },
   setProjectOpen: (open: boolean) => {
     ipcRenderer.invoke(IPC_CHANNELS.setProjectOpen, open);
@@ -186,8 +187,8 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.projectRename, currentFile, newName, sessionId),
   reassembleAssembly: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.assemblyReassemble),
   reimportWorld: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.worldReimport),
-  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit),
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit, mode),
   exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.exportWorld, srcPath, suggestedName, nbtLimit),
   reportWindows: (state: WindowsReport) => {
@@ -236,8 +237,8 @@ const api: BlockwrightApi = {
   onExportToWorld: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportToWorld, () => cb());
   },
-  onExportFile: (cb: () => void) => {
-    ipcRenderer.on(IPC_EVENTS.exportFile, () => cb());
+  onExportFile: (cb: (mode: ExportMode) => void) => {
+    ipcRenderer.on(IPC_EVENTS.exportFile, (_e, mode: ExportMode) => cb(mode ?? 'nbt'));
   },
   onExportToWorkspace: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.exportToWorkspace, () => cb());

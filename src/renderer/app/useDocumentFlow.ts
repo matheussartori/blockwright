@@ -3,7 +3,7 @@
 // on-screen viewer follows the active tab. These handlers are the single place that
 // mutates the documents store from user actions (menus, the welcome screen, drops).
 import { useCallback, useEffect, type MutableRefObject } from 'react';
-import type { Workspace } from '@/shared/types';
+import type { ExportMode, Workspace } from '@/shared/types';
 import { api } from '../api';
 import { sanitizeResourceName } from '@/shared/domain/worldgen';
 import { effectiveNbtLimit } from '@/shared/domain/split';
@@ -35,7 +35,7 @@ export interface DocumentFlow {
   newDoc: () => void;
   close: () => void;
   closeDocById: (id: string) => void;
-  exportActive: () => Promise<void>;
+  exportActive: (mode?: ExportMode) => Promise<void>;
   exportToWorldActive: () => Promise<void>;
   exportToWorkspaceActive: () => void;
   acceptSuggest: () => Promise<void>;
@@ -183,14 +183,16 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
   // Export the active tab's CURRENT version (the promoted one, else the latest) to a
   // location the user picks. The source is a real `.nbt` on disk, so main just copies
   // it. Suggest the file's own name, or "<title>.nbt" for an untitled AI build.
-  const exportActive = useCallback(async () => {
+  // `mode` picks the flavour: 'nbt' = one pure file (never split — mods need the raw
+  // file whatever its size), 'jigsaw' = the split assembly (menu-gated to oversized).
+  const exportActive = useCallback(async (mode: ExportMode = 'nbt') => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc) return;
     const src = currentBasePath(doc);
     if (!src) return; // nothing loaded to export
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
-    const result = await api.exportStructure(src, suggested, nbtLimit);
+    const result = await api.exportStructure(src, suggested, nbtLimit, mode);
     if (result.ok) {
       const text = result.splitPieces ? `Split into ${result.splitPieces} jigsaw pieces` : `Exported to ${basename(result.path)}`;
       store.getState().setNotice({ text, warn: false });

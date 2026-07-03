@@ -3,8 +3,10 @@
 // report back to main that keeps the View menu's checkmarks and Close File in sync.
 import { useEffect } from 'react';
 import type { WindowsReport } from '@/shared/types';
+import { effectiveNbtLimit } from '@/shared/domain/split';
 import { api } from '../api';
 import { store } from '../state/store';
+import { settingsStore } from '../state/settings';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
 import type { DocumentFlow } from './useDocumentFlow';
@@ -37,7 +39,7 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
       st.setSettingsOpen(true);
     });
     api.onNewStructure(() => newDoc());
-    api.onExportFile(() => void exportActive());
+    api.onExportFile((mode) => void exportActive(mode));
     api.onExportToWorld(() => void exportToWorldActive());
     api.onExportToWorkspace(() => exportToWorkspaceActive());
     api.onRenameProject(() => st.setRenameOpen(true));
@@ -78,14 +80,19 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
     })();
   }, [openFile, openWorld, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
 
-  // Mirror file-open + window state to main (drives Close File and the View menu).
-  // Only re-sends when the *reported* shape changes.
+  // Mirror file-open + window state to main (drives Close File, the export items'
+  // enabled state, and the View menu). Only re-sends when the *reported* shape changes.
   useEffect(() => {
     const lastKey = { current: '' };
     const send = () => {
       const w = windowsStore.getState();
       const doc = activeDocument(documentsStore.getState());
       const open = doc?.structure != null;
+      // Whether the open structure exceeds the configured Structure Block size
+      // limit on any axis — gates File ▸ Export as Jigsaw (a within-limit build
+      // has nothing to split; Export as NBT stays available regardless).
+      const limit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
+      const oversized = open && doc!.structure!.size.some((axis) => axis > limit);
       const hasJigsaw = open && doc!.structure!.jigsaws.length > 0;
       const hasVersions = (doc?.versions.length ?? 0) > 0;
       // A generated project (its own library folder) is renamable.
@@ -101,19 +108,25 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
         // The left Project panel is always available (workspace + recents).
         project: { visible: w.projectVisible, available: true },
       };
-      const key = JSON.stringify({ open, renamable, report });
+      const key = JSON.stringify({ open, oversized, renamable, report });
       if (key === lastKey.current) return;
       lastKey.current = key;
-      api.setFileOpen(open);
+      api.setFileOpen(open, oversized);
       api.setProjectOpen(renamable);
       api.reportWindows(report);
     };
     send();
     const u1 = windowsStore.subscribe(send);
     const u2 = documentsStore.subscribe(send);
+    // The size-limit pref (Settings ▸ Viewer) and the workspace's MC version both
+    // feed the `auto` limit, so a change to either can flip `oversized`.
+    const u3 = settingsStore.subscribe(send);
+    const u4 = store.subscribe(send);
     return () => {
       u1();
       u2();
+      u3();
+      u4();
     };
   }, []);
 }

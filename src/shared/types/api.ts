@@ -17,7 +17,7 @@ import type {
   BuildSelection,
   FloorDef,
 } from './generation';
-import type { BlockDictionary, BlockNote, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
+import type { BlockDictionary, BlockNote, ExportMode, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
 import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
@@ -169,8 +169,10 @@ export interface BlockwrightApi {
   onAiRenderRequest: (cb: (req: RenderRequest) => void) => void;
   /** Reply to an onAiRenderRequest with the captured image(s) or an error. */
   sendRenderResult: (result: RenderResult) => void;
-  /** Report whether a structure is currently open, so main can enable/disable Close File. */
-  setFileOpen: (open: boolean) => void;
+  /** Report whether a structure is currently open (drives Close File / Export as NBT),
+   *  and whether it exceeds the configured Structure Block size limit (drives the
+   *  Export as Jigsaw item's enabled state). */
+  setFileOpen: (open: boolean, oversized: boolean) => void;
   /** Report whether the active doc is a renamable generated project, so main can
    *  enable/disable File ▸ Rename Project…. */
   setProjectOpen: (open: boolean) => void;
@@ -184,10 +186,11 @@ export interface BlockwrightApi {
    *  resolves to the written temp file the renderer then opens. */
   reimportWorld: () => Promise<ReassembleResult>;
   /** Copy a compiled `.nbt` (srcPath) to a user-chosen location via a Save dialog;
-   *  `suggestedName` seeds the dialog's filename. `nbtLimit` is the resolved size limit —
-   *  a `.nbt` export over it is cut into a jigsaw assembly folder instead. Returns where it
-   *  landed, or a canceled/error result. */
-  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
+   *  `suggestedName` seeds the dialog's filename. `mode` picks the flavour: `nbt` writes
+   *  one pure file regardless of size (mods need that), `jigsaw` cuts it into a jigsaw
+   *  assembly folder (`nbtLimit` is the resolved per-axis size limit it must exceed).
+   *  Returns where it landed, or a canceled/error result. */
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode) => Promise<ExportResult>;
   /** Install the build into a user-chosen Minecraft world save for editing + round-trip: within
    *  the size limit → the raw `.nbt` loadable with one structure block; oversized → an editing
    *  datapack of ≤-limit pieces with SAVE-mode structure blocks. Reimport from World brings it back. */
@@ -250,9 +253,9 @@ export interface BlockwrightApi {
   onResetWindows: (cb: () => void) => void;
   /** Notified when File ▸ New Structure is chosen (opens the AI generation panel). */
   onNewStructure: (cb: () => void) => void;
-  /** Notified when File ▸ Export File is chosen; the handler picks the build to
-   *  save and calls `exportStructure`. */
-  onExportFile: (cb: () => void) => void;
+  /** Notified when File ▸ Export as NBT / Export as Jigsaw is chosen; the handler
+   *  picks the build to save and calls `exportStructure` with the requested mode. */
+  onExportFile: (cb: (mode: ExportMode) => void) => void;
   /** Notified when File ▸ Export to World is chosen; the handler picks the build and
    *  calls `exportToWorld`. */
   onExportToWorld: (cb: () => void) => void;

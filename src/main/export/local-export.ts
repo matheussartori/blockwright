@@ -7,7 +7,7 @@ import { clipboard, dialog, type MessageBoxOptions, type OpenDialogOptions, type
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { ExportResult } from '@/shared/types';
+import type { ExportMode, ExportResult } from '@/shared/types';
 import type { MessageKey } from '@/shared/i18n';
 import { DEFAULT_WORLDGEN, sanitizeResourceName, validateSplit, type ValidationIssue } from '@/shared/domain/worldgen';
 import { LIMIT_MODERN, outConnectorName, splitManifest, splitPlan, SPLIT_MANIFEST_FILE, type SplitPlan } from '@/shared/domain/split';
@@ -82,24 +82,31 @@ async function passesSplitLimits(split: SplitPlan): Promise<boolean> {
 }
 
 /** Export the current build (`srcPath`, a real `.nbt`/`.schem` on disk) to a user-chosen
- *  location + FORMAT via the native Save dialog. The chosen extension drives the encoding:
- *  `.nbt` (vanilla structure) or `.schem`/`.litematic` (WorldEdit/Litematica). `.nbt`→`.nbt` is
- *  a lossless copy; anything else converts via `convertStructure`.
+ *  location via the native Save dialog, in one of two MODES:
  *
- *  A `.nbt` export bigger than `nbtLimit` can't load as one Structure Block file, so it's cut
- *  into a JIGSAW assembly written to a sibling `<name>_jigsaw/` folder (a drop-in `data/<ns>/...`
- *  tree) — `.schem`/`.litematic` are unaffected (their mods load arbitrary sizes). A native
- *  dialog then explains it needs a datapack to spawn. */
-export async function exportStructure(srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> {
+ *  • `nbt` (Export as NBT…) — ONE pure file, never split, whatever the size: mods load
+ *    arbitrary `.nbt` sizes (only a vanilla Structure Block caps at `nbtLimit`), so the raw
+ *    file must always be exportable. The chosen extension drives the encoding: `.nbt`
+ *    (vanilla structure) or `.schem`/`.litematic` (WorldEdit/Litematica); `.nbt`→`.nbt` is a
+ *    lossless copy, anything else converts via `convertStructure`.
+ *  • `jigsaw` (Export as Jigsaw…) — the build cut into a JIGSAW assembly written to a
+ *    `<name>_jigsaw/` folder (a drop-in `data/<ns>/...` tree) that reassembles voxel-perfectly
+ *    in-world. Only meaningful when the structure EXCEEDS `nbtLimit` (the menu item is gated
+ *    on that); a within-limit build is refused with a pointer at Export as NBT. A native
+ *    dialog then explains the assembly needs a datapack to spawn. */
+export async function exportStructure(srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode = 'nbt'): Promise<ExportResult> {
   if (!fs.existsSync(srcPath)) return { ok: false, error: 'The structure file no longer exists on disk.' };
+  const jigsaw = mode === 'jigsaw';
   const options: SaveDialogOptions = {
-    title: mt('dialog.exportTitle'),
+    title: mt(jigsaw ? 'dialog.exportJigsawTitle' : 'dialog.exportTitle'),
     defaultPath: suggestedName,
-    filters: [
-      { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
-      { name: mt('dialog.schemFilter'), extensions: ['schem'] },
-      { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
-    ],
+    filters: jigsaw
+      ? [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }]
+      : [
+          { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
+          { name: mt('dialog.schemFilter'), extensions: ['schem'] },
+          { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
+        ],
   };
   const win = getMainWindow();
   const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
@@ -107,25 +114,32 @@ export async function exportStructure(srcPath: string, suggestedName: string, nb
   const destPath = result.filePath;
 
   try {
-    if (destPath.toLowerCase().endsWith('.nbt') && nbtLimit > 0) {
-      const raw = await readRaw(srcPath);
-      const split = splitPlan(raw.size, nbtLimit);
-      if (split.oversized) {
-        if (!(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
-        const stem = sanitizeResourceName(path.basename(destPath).replace(/\.nbt$/i, ''));
-        const folder = path.join(path.dirname(destPath), `${stem}_jigsaw`);
-        const { files, warnings } = buildJigsawAssembly(raw, stem, split);
-        await writeSplitFiles(files, folder);
-        await writeManifest(folder, stem, raw.size, nbtLimit);
-        await showSplitNotice(folder, split.pieceCount, warnings);
-        return { ok: true, path: folder, splitPieces: split.pieceCount };
-      }
-    }
+    if (jigsaw) return await exportJigsawAssembly(srcPath, destPath, nbtLimit);
     await convertStructure(srcPath, destPath);
     return { ok: true, path: destPath };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/** The `jigsaw` mode's write: split `srcPath` against the limit and lay the assembly (pieces +
+ *  worldgen JSON + reassembly manifest) in a `<stem>_jigsaw/` folder beside `destPath`. The
+ *  chosen filename's stem names the assembly's namespace/folder. */
+async function exportJigsawAssembly(srcPath: string, destPath: string, nbtLimit: number): Promise<ExportResult> {
+  const raw = await readRaw(srcPath);
+  const limit = nbtLimit > 0 ? nbtLimit : LIMIT_MODERN;
+  const split = splitPlan(raw.size, limit);
+  // The menu gates this on an oversized build; refuse a direct within-limit call
+  // (a single-piece "assembly" would just be a worse plain .nbt).
+  if (!split.oversized) return { ok: false, error: mt('dialog.jigsawFits', { limit }) };
+  if (!(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
+  const stem = sanitizeResourceName(path.basename(destPath).replace(/\.nbt$/i, ''));
+  const folder = path.join(path.dirname(destPath), `${stem}_jigsaw`);
+  const { files, warnings } = buildJigsawAssembly(raw, stem, split);
+  await writeSplitFiles(files, folder);
+  await writeManifest(folder, stem, raw.size, limit);
+  await showSplitNotice(folder, split.pieceCount, warnings);
+  return { ok: true, path: folder, splitPieces: split.pieceCount };
 }
 
 /** Tell the user a loose `.nbt` export was split into a jigsaw assembly — it needs a datapack's

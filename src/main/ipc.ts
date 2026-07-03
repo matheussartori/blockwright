@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, ExportMode, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -358,7 +358,7 @@ export function registerIpc(): void {
     saveChat(key, record),
   );
 
-  ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean) => setFileOpen(open));
+  ipcMain.handle(IPC_CHANNELS.setFileOpen, async (_e, open: boolean, oversized: boolean) => setFileOpen(open, oversized));
   ipcMain.handle(IPC_CHANNELS.setProjectOpen, async (_e, open: boolean) => setProjectOpen(open));
 
   ipcMain.handle(IPC_CHANNELS.projectRename, async (_e, currentFile: string, newName: string, sessionId?: string) => {
@@ -368,8 +368,8 @@ export function registerIpc(): void {
     return result;
   });
 
-  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
-    exportStructure(srcPath, suggestedName, nbtLimit),
+  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode) =>
+    exportStructure(srcPath, suggestedName, nbtLimit, mode ?? 'nbt'),
   );
 
   ipcMain.handle(IPC_CHANNELS.exportWorld, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>

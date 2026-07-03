@@ -3,10 +3,16 @@
 // registry surfaced to the composer's preset picker.
 import type { FurnishingPreset } from '../domain/furnishing';
 
+/** Which "Export As" flavour the user picked: `nbt` writes ONE pure file — never
+ *  split, whatever the size (mods load arbitrary sizes); `jigsaw` cuts the build
+ *  into a jigsaw assembly folder (only offered when the structure exceeds the
+ *  configured Structure Block size limit). */
+export type ExportMode = 'nbt' | 'jigsaw';
+
 /** Result of exporting (copying) the current build's `.nbt` to a user-chosen
  *  location via the native Save dialog. `splitPieces` is set when the structure
- *  exceeded the size limit and was cut into a jigsaw assembly folder instead of a
- *  single file (`path` is that folder). */
+ *  was cut into a jigsaw assembly folder instead of a single file (`path` is
+ *  that folder). */
 export type ExportResult =
   | { ok: true; path: string; splitPieces?: number }
   | { ok: false; canceled?: boolean; error?: string };

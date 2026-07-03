@@ -3,7 +3,7 @@
 import { app, BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
-import type { UpdateInfo } from '@/shared/types';
+import type { ExportMode, UpdateInfo } from '@/shared/types';
 import type { LanguageInfo } from '@/shared/i18n';
 import { IPC_EVENTS } from '@/shared/ipc';
 import { mt } from './language';
@@ -83,9 +83,10 @@ export function notifyRecentWorlds(): void {
   mainWindow?.webContents.send(IPC_EVENTS.recentWorldsChanged, getRecentWorlds());
 }
 
-/** Ask the renderer to export the current build (it picks the source + name). */
-export function notifyExportFile(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.exportFile);
+/** Ask the renderer to export the current build (it picks the source + name).
+ *  `mode` picks the flavour: a pure single `.nbt` or the jigsaw assembly. */
+export function notifyExportFile(mode: ExportMode): void {
+  mainWindow?.webContents.send(IPC_EVENTS.exportFile, mode);
 }
 
 /** Ask the renderer to export the current build into a Minecraft world save. */

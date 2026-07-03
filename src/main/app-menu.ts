@@ -44,6 +44,11 @@ const isMac = process.platform === 'darwin';
 // renderer over IPC) — drives the enabled state of the Close File menu item.
 let fileOpen = false;
 
+// Whether that structure exceeds the configured Structure Block size limit
+// (mirrored alongside fileOpen) — drives Export as Jigsaw's enabled state
+// (a within-limit build has nothing to split; Export as NBT covers it).
+let fileOversized = false;
+
 // Whether the active doc is a renamable generated project (its own library folder).
 // Mirrored from the renderer; drives the File ▸ Rename Project… enabled state.
 let projectOpen = false;
@@ -61,10 +66,11 @@ let windowsState: WindowsReport = {
   project: { visible: true, available: true },
 };
 
-/** Update the open-file flag and rebuild the menu if it changed. */
-export function setFileOpen(open: boolean): void {
-  if (open === fileOpen) return;
+/** Update the open-file + oversized flags and rebuild the menu if either changed. */
+export function setFileOpen(open: boolean, oversized = false): void {
+  if (open === fileOpen && oversized === fileOversized) return;
   fileOpen = open;
+  fileOversized = oversized;
   buildAppMenu();
 }
 
@@ -364,10 +370,19 @@ function fileMenu(): MenuItemConstructorOptions {
         click: () => notifyRenameProject(),
       },
       {
-        label: mt('menu.exportFile'),
+        // Pure single-file export — ALWAYS available with a file open, whatever
+        // the size (mods load arbitrary .nbt sizes; only Structure Blocks cap).
+        label: mt('menu.exportNbt'),
         accelerator: 'CmdOrCtrl+Shift+S',
         enabled: fileOpen,
-        click: () => notifyExportFile(),
+        click: () => notifyExportFile('nbt'),
+      },
+      {
+        // Jigsaw-assembly export — only meaningful past the size limit, so it
+        // stays disabled for a build that fits one Structure Block.
+        label: mt('menu.exportJigsaw'),
+        enabled: fileOpen && fileOversized,
+        click: () => notifyExportFile('jigsaw'),
       },
       {
         label: mt('menu.exportToWorld'),
