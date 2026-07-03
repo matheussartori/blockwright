@@ -2,8 +2,10 @@
 // live, edited blocks; here we re-encode them straight to a `vN.nbt` — bypassing the
 // AI-repair passes (preserveShell/rebuildStairwells/…) so the user's edits are written
 // EXACTLY as made — and re-attach block-entity NBT + entities + the DataVersion from the
-// source file, so chests/signs/jigsaws an edit didn't move survive. The version lands in
-// the same session scratch dir + library folder as AI versions, so it shows up as the
+// source file. NBT re-attaches by each block's ORIGIN cell (`nbtPos`, stamped at load and
+// preserved by the editor ops), so a chest/sign/jigsaw/data-marker structure block keeps
+// its NBT even after being MOVED — a pure position lookup would drop it. The version lands
+// in the same session scratch dir + library folder as AI versions, so it shows up as the
 // next version chip.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -26,7 +28,7 @@ export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVe
   const nbtPath = path.join(session.dir, `v${version}.nbt`);
 
   // Inherit DataVersion + entities + block-entity NBT from the source file, re-attaching
-  // the NBT to any block still at its original position.
+  // each block's NBT via its origin cell (`nbtPos`) so moved blocks keep it.
   let dataVersion = DEFAULT_DATA_VERSION;
   let entities: AuthoringEntity[] = [];
   const nbtByPos = new Map<string, Record<string, unknown>>();
@@ -41,8 +43,16 @@ export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVe
     }
   }
 
+  // Attach ONLY via the origin cell: a block without `nbtPos` never had NBT, and a fresh
+  // block painted over a cell that USED to hold a chest must not inherit the stale NBT.
+  // An edited data-marker string (`dataMeta`) overrides the source NBT's `metadata`; for a
+  // marker painted fresh in the editor (no source NBT) it mints a minimal DATA block entity
+  // — vanilla fills the other structure-block fields with defaults on load.
   const blocks: AuthoringBlock[] = req.blocks.map((b) => {
-    const nbt = nbtByPos.get(posKey(b.pos));
+    const src = b.nbtPos ? nbtByPos.get(posKey(b.nbtPos)) : undefined;
+    const nbt = b.dataMeta != null && (src || b.dataMeta !== '')
+      ? { ...(src ?? { mode: 'DATA' }), metadata: b.dataMeta }
+      : src;
     return nbt ? { state: b.state, pos: b.pos, nbt } : { state: b.state, pos: b.pos };
   });
 

@@ -11,6 +11,7 @@ import { Segmented } from '../ui/Segmented';
 import { Tooltip } from '../ui/Tooltip';
 import { ToolRail } from './ToolRail';
 import { ToolControls } from './ToolControls';
+import { DataMetaEditor } from './DataMetaEditor';
 
 export function EditorPanel() {
   const t = useT();
@@ -158,6 +159,10 @@ export function EditorPanel() {
           t('editor.selNone')
         )}
       </div>
+
+      {/* Selection-driven: when the selection holds data-mode structure blocks, edit the
+          metadata string a mod reads — pairs with Move (nudge a marker, retype its string). */}
+      {structure && hasSel && <DataMetaEditor structure={structure} selection={selection} t={t} />}
 
       <footer className="editor-foot">
         <Tooltip placement="right" label={t('editor.undo')} description={t('editor.undoDesc')}>

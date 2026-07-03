@@ -137,6 +137,54 @@ describe('planTransform', () => {
   });
 });
 
+describe('block-entity NBT link (nbtPos)', () => {
+  // A data-mode structure block's NBT (mode/metadata) is re-attached on save via the
+  // block's ORIGIN cell — every op that keeps or copies a block must carry `nbtPos`,
+  // or a moved marker exports as a bare, non-functional structure block.
+  const marked = (): EditData => {
+    const d = data();
+    d.blocks[0] = { ...d.blocks[0], nbtPos: [0, 0, 0] };
+    return d;
+  };
+
+  it('moveSelection carries nbtPos to the new cell', () => {
+    const r = moveSelection(marked(), ['0,0,0'], [0, 1, 0]);
+    expect(r.blocks.find((b) => cellKey(b.pos) === '0,1,0')?.nbtPos).toEqual([0, 0, 0]);
+  });
+
+  it('extrudeSelection copies inherit nbtPos', () => {
+    const r = extrudeSelection(marked(), ['0,0,0'], 'y', 1);
+    expect(r.blocks.find((b) => cellKey(b.pos) === '0,1,0')?.nbtPos).toEqual([0, 0, 0]);
+  });
+
+  it('replaceSelection keeps nbtPos on the in-place swap', () => {
+    const r = replaceSelection(marked(), ['0,0,0'], entry('minecraft:oak_planks'));
+    expect(r.blocks.find((b) => cellKey(b.pos) === '0,0,0')?.nbtPos).toEqual([0, 0, 0]);
+  });
+
+  it('planTransform placements carry nbtPos through a mirror', () => {
+    const d = marked();
+    const out = planTransform(d, ['0,0,0', '1,0,0'], { kind: 'mirror', axis: 'x' });
+    const moved = out.find((p) => cellKey(p.pos) === '1,0,0'); // (0,0,0) reflected to x=1
+    expect(moved?.nbtPos).toEqual([0, 0, 0]);
+    expect(out.find((p) => cellKey(p.pos) === '0,0,0')?.nbtPos).toBeUndefined();
+  });
+
+  it('a fresh painted block has no nbtPos (stale NBT must not re-attach)', () => {
+    const r = placeBlock(marked(), [0, 0, 0], entry('minecraft:glass'));
+    expect(r.blocks.find((b) => cellKey(b.pos) === '0,0,0')?.nbtPos).toBeUndefined();
+  });
+
+  it('an edited data-marker string (dataMeta) rides through move and transform', () => {
+    const d = data();
+    d.blocks[0] = { ...d.blocks[0], nbtPos: [0, 0, 0], dataMeta: 'arena_spawner' };
+    const moved = moveSelection(d, ['0,0,0'], [0, 1, 0]);
+    expect(moved.blocks.find((b) => cellKey(b.pos) === '0,1,0')?.dataMeta).toBe('arena_spawner');
+    const out = planTransform(d, ['0,0,0', '1,0,0'], { kind: 'mirror', axis: 'x' });
+    expect(out.find((p) => cellKey(p.pos) === '1,0,0')?.dataMeta).toBe('arena_spawner');
+  });
+});
+
 describe('mirrorCell', () => {
   it('reflects a cell across the structure centre on X / Z', () => {
     expect(mirrorCell([0, 0, 0], 'x', [5, 1, 5])).toEqual([4, 0, 0]);

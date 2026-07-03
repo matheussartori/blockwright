@@ -91,7 +91,8 @@ export function moveSelection(d: EditData, selection: string[], delta: Cell): Op
   const moving = selection.map((k) => occ.get(k)).filter((i): i is number => i != null).map((i) => d.blocks[i]);
   const targets = new Set(moving.map((b) => cellKey(offset(b.pos, delta))));
   const kept = d.blocks.filter((b) => !sel.has(cellKey(b.pos)) && !targets.has(cellKey(b.pos)));
-  const moved = moving.map((b) => ({ state: b.state, pos: offset(b.pos, delta) }));
+  // Spread keeps `nbtPos` (the block-entity NBT link) riding along with the moved block.
+  const moved = moving.map((b) => ({ ...b, pos: offset(b.pos, delta) }));
   return { blocks: [...kept, ...moved], palette: d.palette, selection: moved.map((b) => cellKey(b.pos)) };
 }
 
@@ -112,7 +113,7 @@ export function extrudeSelection(d: EditData, selection: string[], axis: Axis, c
     for (const b of seeds) {
       const pos = [...b.pos] as Cell;
       pos[ai] += n * dir * span;
-      added.push({ state: b.state, pos });
+      added.push({ ...b, pos }); // copies inherit `nbtPos` — a duplicated chest keeps its contents
       targets.add(cellKey(pos));
     }
   const kept = d.blocks.filter((b) => !targets.has(cellKey(b.pos)));
@@ -130,7 +131,7 @@ export function replaceSelection(d: EditData, selection: string[], entry: Palett
   const { palette, index } = internEntry(d.palette, entry);
   const sel = new Set(selection);
   const blocks = d.blocks.map((b) =>
-    sel.has(cellKey(b.pos)) && !d.palette[b.state]?.air ? { state: index, pos: b.pos } : b,
+    sel.has(cellKey(b.pos)) && !d.palette[b.state]?.air ? { ...b, state: index } : b,
   );
   return { blocks, palette, selection };
 }
@@ -141,6 +142,10 @@ export interface Placement {
   pos: Cell;
   name: string;
   props: Record<string, string>;
+  /** Carried from the source block so its block-entity NBT survives the transform. */
+  nbtPos?: [number, number, number];
+  /** Carried from the source block so an edited data-marker string survives too. */
+  dataMeta?: string;
 }
 
 const bbox = (cells: StructureBlock[]) => {
@@ -182,6 +187,8 @@ export function planTransform(d: EditData, selection: string[], xform: PropXform
       pos: placePos([...b.pos] as Cell),
       name: entry.name,
       props: (transformProps(entry.properties, xform) ?? {}) as Record<string, string>,
+      ...(b.nbtPos ? { nbtPos: b.nbtPos } : {}),
+      ...(b.dataMeta != null ? { dataMeta: b.dataMeta } : {}),
     };
   });
 }
@@ -310,7 +317,7 @@ export function recolorCell(d: EditData, cell: Cell, entry: PaletteEntry): OpRes
   const existing = d.blocks.find((b) => cellKey(b.pos) === k);
   if (!existing || d.palette[existing.state]?.air) return null;
   const { palette, index } = internEntry(d.palette, entry);
-  return { blocks: d.blocks.map((b) => (cellKey(b.pos) === k ? { state: index, pos: b.pos } : b)), palette, selection: [] };
+  return { blocks: d.blocks.map((b) => (cellKey(b.pos) === k ? { ...b, state: index } : b)), palette, selection: [] };
 }
 
 /** Set a cell to explicit air or structure_void — the Void tool. This NEVER overwrites a solid
@@ -359,7 +366,7 @@ export function floodFill(d: EditData, start: Cell, entry: PaletteEntry, cap = 8
   }
   if (!region.size) return null;
   const { palette, index } = internEntry(d.palette, entry);
-  const blocks = d.blocks.map((b) => (region.has(cellKey(b.pos)) ? { state: index, pos: b.pos } : b));
+  const blocks = d.blocks.map((b) => (region.has(cellKey(b.pos)) ? { ...b, state: index } : b));
   return { blocks, palette, selection: [...region] };
 }
 

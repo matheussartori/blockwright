@@ -60,9 +60,14 @@ export function buildStructureData(
     return { name: raw.Name, properties, models, color: fallbackColor(raw.Name), air };
   });
 
+  // A block with block-entity NBT is stamped with its origin cell (`nbtPos`), so the block
+  // editor can move it and the save still re-attaches the right NBT (see save-version.ts).
   const blocks = rawBlocks
     .filter((b) => b.pos && typeof b.state === 'number')
-    .map((b) => ({ state: b.state, pos: b.pos as [number, number, number] }));
+    .map((b) => {
+      const pos = b.pos as [number, number, number];
+      return b.nbt ? { state: b.state, pos, nbtPos: pos } : { state: b.state, pos };
+    });
 
   const textureSet = new Set<string>();
   for (const entry of palette) collectTextures(entry.models, textureSet);

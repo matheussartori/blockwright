@@ -5,12 +5,13 @@ import type { PaletteEntry, StructureBlock } from './structure';
 
 /** Save the edited blocks as a new version. The renderer holds the live, edited
  *  StructureData; main re-encodes it to a `vN.nbt` (bypassing the AI-repair passes so
- *  edits are written faithfully), re-attaching block-entity NBT by position. */
+ *  edits are written faithfully), re-attaching block-entity NBT via each block's
+ *  origin cell (`nbtPos`) — so a moved chest/jigsaw/data-marker keeps its NBT. */
 export interface SaveVersionRequest {
   sessionId: string;
   /** The `.nbt` currently shown — inherits its DataVersion, entities, and block-entity
-   *  NBT (re-attached by position) so chests/signs/jigsaws survive the edit. Null for a
-   *  from-scratch doc with no file yet. */
+   *  NBT (re-attached via each block's `nbtPos` origin cell) so chests/signs/jigsaws
+   *  survive the edit even when moved. Null for a from-scratch doc with no file yet. */
   sourcePath: string | null;
   size: [number, number, number];
   /** Slim palette (the renderer's models aren't needed to encode). */

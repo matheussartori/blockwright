@@ -121,6 +121,9 @@ export interface EditorState {
   move: (delta: Cell) => void;
   extrude: (axis: Axis, dir: 1 | -1) => void;
   transform: (xform: PropXform) => Promise<void>;
+  /** Rewrite the data-marker string of the data-mode structure blocks at `keys` (one undo
+   *  step). Rides on the block as `dataMeta`; save merges it into the block-entity NBT. */
+  setDataMeta: (keys: string[], value: string) => void;
   /** Begin a paint/void stroke: resolve the brush block once (so each painted cell is a
    *  synchronous edit) and arm the one-undo-step coalescing. */
   strokeBegin: () => Promise<void>;
@@ -317,8 +320,20 @@ export const editorStore = createStore<EditorState>((set, get) => {
       const sel = new Set(get().selection);
       const targets = new Set(placements.map((pl) => cellKey(pl.pos)));
       const kept = struct.blocks.filter((b) => !sel.has(cellKey(b.pos)) && !targets.has(cellKey(b.pos)));
-      const placed = placements.map((pl) => ({ state: indexByCombo.get(combo(pl.name, pl.props))!, pos: pl.pos }));
+      const placed = placements.map((pl) => ({
+        state: indexByCombo.get(combo(pl.name, pl.props))!,
+        pos: pl.pos,
+        ...(pl.nbtPos ? { nbtPos: pl.nbtPos } : {}),
+        ...(pl.dataMeta != null ? { dataMeta: pl.dataMeta } : {}),
+      }));
       commit({ blocks: [...kept, ...placed], palette, selection: placed.map((p) => cellKey(p.pos)) }, extraTextures);
+    },
+    setDataMeta: (keys, value) => {
+      const doc = activeDocument(documentsStore.getState());
+      if (!doc?.structure || !keys.length) return;
+      const sel = new Set(keys);
+      const blocks = doc.structure.blocks.map((b) => (sel.has(cellKey(b.pos)) ? { ...b, dataMeta: value } : b));
+      commit({ blocks, palette: doc.structure.palette, selection: get().selection });
     },
     strokeBegin: async () => {
       strokeSnapped = false;
@@ -440,7 +455,15 @@ export const editorStore = createStore<EditorState>((set, get) => {
         sourcePath: currentBasePath(doc),
         size: doc.structure.size,
         palette: doc.structure.palette.map((p) => ({ name: p.name, properties: p.properties })),
-        blocks: doc.structure.blocks.map((b) => ({ state: b.state, pos: b.pos })),
+        // `nbtPos` (the origin cell of a block's block-entity NBT) rides along so a
+        // MOVED chest/jigsaw/data-marker re-attaches its NBT on the main side, and
+        // `dataMeta` carries an edited data-marker string into that NBT.
+        blocks: doc.structure.blocks.map((b) => ({
+          state: b.state,
+          pos: b.pos,
+          ...(b.nbtPos ? { nbtPos: b.nbtPos } : {}),
+          ...(b.dataMeta != null ? { dataMeta: b.dataMeta } : {}),
+        })),
         slug,
       });
       set({ saving: false });

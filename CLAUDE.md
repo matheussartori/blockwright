@@ -278,9 +278,11 @@ src/
                             `generation.log` (the AI/fix play-by-play, see gen-log.ts `RunLog`)
       save-version.ts       Persist a MANUALLY-edited structure (the block editor) as a new `vN.nbt`:
                             re-encode the edited blocks straight via `encodeStructure` — BYPASSING the
-                            AI-repair passes so edits are faithful — re-attaching block-entity NBT +
-                            entities + DataVersion by position from the source file, then mirror to the
-                            same session scratch + library as AI versions. See "Block editor" below.
+                            AI-repair passes so edits are faithful — re-attaching block-entity NBT via
+                            each block's `nbtPos` ORIGIN cell (stamped at load, preserved by the editor
+                            ops — so a MOVED chest/jigsaw/data-marker keeps its NBT) + entities +
+                            DataVersion from the source file, then mirror to the same session scratch +
+                            library as AI versions. See "Block editor" below.
       providers/            One Driver per backend (claude-sdk, codex — the only two) +
                             index.ts (lazy dispatch) + types.ts (the Driver contract)
       knowledge.ts          Load the knowledge/nbt guides as the generator's system prompt in THREE
@@ -425,7 +427,9 @@ src/
     components/editor/    The block editor's UI: EditorPanel (orchestrator — the FAB / tool rail / selection
                           readout / Save·Undo·Redo), ToolRail (the tool icons), ToolControls (the active
                           tool's controls — a focused branch per tool), AxisPad (the ± move/extrude pad),
-                          BlockField (block-id autocomplete), EditorLayer (the imperative viewer bridge:
+                          BlockField (block-id autocomplete), DataMetaEditor (the selection-driven
+                          "Structure data" field — edit a data-mode structure block's metadata string;
+                          see "Block editor"), EditorLayer (the imperative viewer bridge:
                           click-picks a block, keyboard nudge/delete/undo, selection overlay, re-show on
                           edit), useBlockIds (catalog ids for autocomplete). See "Block editor" below.
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Switch
@@ -1275,9 +1279,23 @@ corrupted on transform, capped/corrupting undo).
   textures, then re-shows.
 - **Save = a new version, never fatal:** IPC `structure:save-version` (`ai/save-version.ts`) re-encodes
   the edited blocks straight via `encodeStructure` — BYPASSING the AI-repair passes so edits are faithful
-  — re-attaching block-entity NBT/entities/DataVersion by position from the source `.nbt`, lands as
+  — re-attaching block-entity NBT via each block's **`nbtPos` origin cell** (`StructureBlock.nbtPos`,
+  stamped at load for NBT-carrying blocks and preserved by every op that keeps/copies a block —
+  move/extrude/replace/recolor/fill/transform — so a MOVED chest/jigsaw/data-mode structure block keeps
+  its NBT; a block without `nbtPos` never attaches, so a fresh block painted over an old chest cell
+  can't inherit stale NBT) + entities/DataVersion from the source `.nbt`, lands as
   `vN.nbt` in the session scratch + library, recorded via `commitManualVersion` (generation.ts) like an
   AI version. Plus full undo/redo. Edit mode auto-exits on tab change (App effect on `activeDoc.id`).
+- **Structure data (data markers) is editable in place** (`DataMetaEditor`): when the selection holds
+  data-mode structure blocks (`minecraft:structure_block` with `mode=data` — a MISSING `mode` counts
+  as data, vanilla's default state, so a freshly painted structure block qualifies), the panel shows a
+  "Structure data" field under the selection readout — the write-side of the Inspector's data-marker
+  rows, in the same dialect (mono string + the `data` chip). Enter/blur applies (ONE undo step via
+  `setDataMeta`), Escape reverts; a multi-selection sharing one string edits all at once, mixed strings
+  start empty with a "typing replaces all" placeholder (an untouched blur never blanks them). The edit
+  rides on the block as `StructureBlock.dataMeta` (preserved by every op, like `nbtPos`); save merges
+  it into the source NBT (`{...src, metadata}`) or MINTS a minimal `{mode:'DATA', metadata}` block
+  entity for a marker painted fresh — so new markers can be authored entirely in-app.
 - **Add a tool:** a pure op in `ops.ts` (+ test) + a store action + a `ToolControls` branch + a
   `ToolRail` entry + its `editor.*` i18n labels.
 

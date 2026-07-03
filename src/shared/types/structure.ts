@@ -56,6 +56,15 @@ export interface PaletteEntry {
 export interface StructureBlock {
   state: number;
   pos: [number, number, number];
+  /** The source-file cell whose block-entity NBT (chest contents, a structure block's
+   *  mode/metadata, jigsaw data) belongs to this block. Stamped at load for blocks that
+   *  carry NBT and preserved by the editor ops, so a MOVED block keeps its NBT when the
+   *  edit is saved — save re-attaches by this origin cell, not the block's current pos. */
+  nbtPos?: [number, number, number];
+  /** An EDITED data-marker metadata string (the block editor's "Structure data" field,
+   *  data-mode structure blocks only). Overrides the source NBT's `metadata` on save;
+   *  for a marker painted fresh in the editor it mints a minimal DATA block entity. */
+  dataMeta?: string;
 }
 
 /** Per-bone Euler rotation (degrees, Minecraft model frame) from an armor stand's `Pose`

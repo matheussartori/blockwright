@@ -4,6 +4,31 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-07-03
+
+### Added
+
+- Structure block data — data-mode structure blocks now surface their metadata
+  string. The Inspector lists it (grouped by string, with a `data` chip, a copy
+  button and a focus jump), and the block editor can edit it in place through a
+  new "Structure data" field: type a marker string, and a freshly painted
+  structure block gets a minimal data block entity minted for it. The edit rides
+  along through every editing op and is merged back into the file on save, so
+  data markers — a mod's spawn/trigger hooks — can now be authored entirely in
+  Blockwright.
+- Export as NBT and Export as Jigsaw are now separate File-menu actions. Export
+  as NBT… saves a single file at any size (mods load arbitrary sizes, so it is
+  never split), while Export as Jigsaw… — enabled only once a build exceeds the
+  size limit — cuts an oversized structure into a jigsaw assembly that snaps back
+  together voxel-perfect in-world.
+
+### Changed
+
+- Reworked welcome screen.
+- Updated the in-app guide — the Export section now covers the split NBT / Jigsaw
+  actions and the supported formats.
+- Dependency upgrades.
+
 ## [2.0.1] - 2026-07-02
 
 ### Added
