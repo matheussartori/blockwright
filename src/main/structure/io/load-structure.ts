@@ -9,6 +9,7 @@ import { isAir, resolveBlock } from '../assets/blockstate-resolver';
 import { fallbackColor } from '../assets/fallback-color';
 import { resolveEntities } from '../assets/entity';
 import { extractJigsaws } from '../jigsaw/jigsaw';
+import { extractDataMarkers } from './data-markers';
 import { decodeSchem } from './schematic';
 import { decodeLitematic } from './litematica';
 
@@ -81,6 +82,7 @@ export function buildStructureData(
     hasContent: withContent,
     blockCount: blocks.filter((b) => !palette[b.state]?.air).length,
     jigsaws: extractJigsaws(rawPalette, rawBlocks),
+    dataMarkers: extractDataMarkers(rawPalette, rawBlocks),
     entities,
   };
 }

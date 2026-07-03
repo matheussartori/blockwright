@@ -568,6 +568,9 @@ export const ptBR: Messages = {
   'inspector.focusEntity': 'Focar esta entidade',
   'inspector.flat': 'chapado',
   'inspector.focusBlock': 'Focar este bloco',
+  'inspector.dataMarkers': 'Marcadores de dados',
+  'inspector.dataChip': 'dados',
+  'inspector.copyData': 'Copiar texto do marcador',
 
   // Jigsaw panel.
   'jigsaw.unsupportedPre': 'A prévia de jigsaw ainda não é suportada para ',

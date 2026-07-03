@@ -62,6 +62,10 @@ src/
                             whose `final_state` restores the seam, partitions block entities + entities per piece,
                             and asserts the geometry round-trips through `solveAttachment`. See "Oversized
                             structures → jigsaw split".
+        data-markers.ts     `extractDataMarkers`: data-MODE structure blocks → {pos, metadata string}
+                            on `StructureData.dataMarkers` (a mod's spawn/trigger hooks — the one other
+                            block-entity NBT read besides jigsaws). The Inspector lists them first,
+                            grouped BY STRING (mono + "data" chip + copy button + focus jump).
         nbt-tags.ts         Shared NBT tag builders (int/str/compound/compoundList/longArray/xyz/longFromMs…)
                             + `createPaletteInterner` — the helpers the `.schem`/`.litematic` encoders had
                             copy-pasted verbatim, now declared once.

@@ -1924,6 +1924,51 @@ body.row-resizing {
   border-radius: 4px;
   padding: 1px 4px;
 }
+/* Data markers (data-mode structure blocks): the row splits into an expand button
+   plus a copy action, so the container carries the row look (padding/hover) and the
+   two inner buttons stay chromeless — a button can't nest a button. */
+.data-marker-row {
+  padding: 2px 4px 2px 8px;
+}
+.data-marker-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.data-marker-string {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.data-marker-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.data-marker-copy:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+.data-marker-copy.done {
+  color: var(--accent);
+}
 
 /* --- Versions panel -------------------------------------------------------- */
 

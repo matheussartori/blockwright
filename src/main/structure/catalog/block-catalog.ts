@@ -139,6 +139,7 @@ export function previewBlock(id: string): StructureData {
     hasContent: hasContent(),
     blockCount: air ? 0 : 1,
     jigsaws: [],
+    dataMarkers: [],
     entities: [],
   };
 }

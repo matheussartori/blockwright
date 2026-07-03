@@ -122,6 +122,16 @@ export interface JigsawConnector {
   placementPriority: number;
 }
 
+/** A data-mode structure block — a modder's invisible hook whose whole payload is one
+ *  string (the block entity's `metadata`, e.g. "tpb:spawn/watcher_stare"). Extracted on
+ *  load (like jigsaws) so the inspector can show + copy the string. */
+export interface DataMarker {
+  /** Block position within the structure's local coordinate space. */
+  pos: [number, number, number];
+  /** The `metadata` string the mod reads when the structure is placed. */
+  data: string;
+}
+
 export interface StructureData {
   name: string;
   path: string;
@@ -136,6 +146,8 @@ export interface StructureData {
   blockCount: number;
   /** Jigsaw connection points found in this structure (empty when none). */
   jigsaws: JigsawConnector[];
+  /** Data-mode structure blocks and their metadata strings (empty when none). */
+  dataMarkers: DataMarker[];
   /** Structure entities (armor stands, item frames, mobs) to draw. Empty when none —
    *  these have no palette block, so the renderer builds their meshes from this list. */
   entities: StructureEntity[];

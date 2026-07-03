@@ -566,6 +566,9 @@ export const en = {
   'inspector.focusEntity': 'Focus this entity',
   'inspector.flat': 'flat',
   'inspector.focusBlock': 'Focus this block',
+  'inspector.dataMarkers': 'Data markers',
+  'inspector.dataChip': 'data',
+  'inspector.copyData': 'Copy data string',
 
   // Jigsaw panel.
   'jigsaw.unsupportedPre': "Jigsaw preview isn't supported for ",

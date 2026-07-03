@@ -6,6 +6,7 @@
 // every occurrence in the .nbt. Clicking an occurrence focuses the camera on that
 // block and flashes it (see Viewer.focusBlock) — handy in dense builds.
 import { useMemo, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import type { StructureData, PaletteEntry } from '@/shared/types';
 import { api } from '../api';
 import { useActiveDoc, useSettings, useT } from '../hooks/useStores';
@@ -97,6 +98,27 @@ function groupEntities(data: StructureData): EntityGroup[] {
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+interface DataMarkerGroup {
+  /** The metadata string — the marker's identity (several blocks often share one). */
+  data: string;
+  positions: [number, number, number][];
+}
+
+/** Group data-mode structure blocks by their metadata string. The string is the payload
+ *  a mod reads (spawn/trigger hooks), so it headlines the row — not the block name. */
+function groupDataMarkers(data: StructureData): DataMarkerGroup[] {
+  const groups = new Map<string, DataMarkerGroup>();
+  for (const m of data.dataMarkers ?? []) {
+    let g = groups.get(m.data);
+    if (!g) {
+      g = { data: m.data, positions: [] };
+      groups.set(m.data, g);
+    }
+    g.positions.push(m.pos);
+  }
+  return [...groups.values()].sort((a, b) => a.data.localeCompare(b.data));
+}
+
 function rgb(color: [number, number, number]): string {
   return `rgb(${color.map((c) => Math.round(c * 255)).join(',')})`;
 }
@@ -108,10 +130,18 @@ export function InspectorContent() {
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
   const entityGroups = useMemo(() => (structure ? groupEntities(structure) : []), [structure]);
+  const markerGroups = useMemo(() => (structure ? groupDataMarkers(structure) : []), [structure]);
+  // The data markers' swatch reuses the structure block's own palette entry (texture or
+  // fallback color), so the row keeps the list's visual language.
+  const markerSwatch = useMemo(() => {
+    const entry = structure?.palette.find((p) => p.name === 'minecraft:structure_block');
+    return entry ? { texture: representativeTexture(entry), color: entry.color } : null;
+  }, [structure]);
   // The file's full palette size (air-like entries included — they're real palette entries).
   const paletteCount = structure?.palette.length ?? 0;
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [copiedData, setCopiedData] = useState<string | null>(null);
 
   if (!structure) return null;
 
@@ -120,6 +150,12 @@ export function InspectorContent() {
     void navigator.clipboard?.writeText(structure.path);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
+  };
+
+  const copyData = (data: string) => {
+    void navigator.clipboard?.writeText(data);
+    setCopiedData(data);
+    setTimeout(() => setCopiedData(null), 1200);
   };
 
   const toggle = (name: string) =>
@@ -169,9 +205,67 @@ export function InspectorContent() {
               <dd>{structure.entities.length}</dd>
             </div>
           )}
+          {(structure.dataMarkers?.length ?? 0) > 0 && (
+            <div>
+              <dt>{t('inspector.dataMarkers')}</dt>
+              <dd>{structure.dataMarkers.length}</dd>
+            </div>
+          )}
         </dl>
       </div>
       <div className="palette-list">
+        {markerGroups.map((g) => {
+          const key = `data:${g.data}`;
+          const open = expanded.has(key);
+          const justCopied = copiedData === g.data;
+          return (
+            <div className="palette-group" key={key}>
+              <div className="palette-row data-marker-row">
+                <button
+                  type="button"
+                  className="data-marker-main"
+                  aria-expanded={open}
+                  onClick={() => toggle(key)}
+                >
+                  <span className={`bw-caret${open ? ' open' : ''}`}>▸</span>
+                  {textureIcons && markerSwatch?.texture ? (
+                    <img className="swatch swatch-tex" src={api.textureUrl(markerSwatch.texture)} alt="" draggable={false} />
+                  ) : (
+                    <span className="swatch" style={{ background: rgb(markerSwatch?.color ?? [0.55, 0.45, 0.55]) }} />
+                  )}
+                  <span className="block-name data-marker-string" title={g.data}>{g.data}</span>
+                  <span className="chip">{t('inspector.dataChip')}</span>
+                  <span className="block-count">({g.positions.length})</span>
+                </button>
+                <button
+                  type="button"
+                  className={`data-marker-copy${justCopied ? ' done' : ''}`}
+                  aria-label={t('inspector.copyData')}
+                  onClick={() => copyData(g.data)}
+                >
+                  {justCopied ? <Check size={13} /> : <Copy size={13} />}
+                </button>
+              </div>
+              {open && (
+                <ul className="block-instances">
+                  {g.positions.map((pos, i) => (
+                    <li key={i}>
+                      <button
+                        type="button"
+                        className="instance-row"
+                        title={t('inspector.focusBlock')}
+                        onClick={() => viewer?.focusBlock(pos)}
+                      >
+                        <span className="instance-idx">{i + 1}</span>
+                        <span className="instance-pos">{pos.join(', ')}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
         {groups.map((g) => {
           const open = expanded.has(g.name);
           return (
