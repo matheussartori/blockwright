@@ -1,7 +1,7 @@
 {
   "name": "blockwright",
   "productName": "Blockwright",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Desktop app for viewing, browsing, and AI-generating Minecraft .nbt structures in 3D.",
   "main": ".vite/build/main.js",
   "private": true,
