@@ -244,7 +244,8 @@ src/
                             tags, pack.mcmeta staleness, wrong structure folder, oversized `.nbt`s — into a
                             WorkspaceDoctorReport of coded findings the renderer localizes with fix-its.
                             One `check*` function per RULE over a shared DoctorRun ctx; adding a rule = a
-                            check fn + `doctor.issue.<code>` strings + a doctor.test.ts case.
+                            check fn + its code in the typed `DOCTOR_CODES` list + `doctor.issue.<code>`
+                            strings + a doctor.test.ts case (an i18n guard test fails a code with no string).
                             `doctorWorkspace(ws)` is the testable core (export/__tests__/doctor.test.ts).
     structure/catalog/retheme-map.ts  The one-click decoration re-theme's mapping: block name → role
                             (dictionary annotation first, then guessRole) → the target decoration's block.

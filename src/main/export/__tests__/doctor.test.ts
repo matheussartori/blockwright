@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Workspace } from '@/shared/types';
-import { doctorWorkspace } from '../doctor';
+import { en } from '@/shared/i18n/en';
+import { doctorWorkspace, DOCTOR_CODES } from '../doctor';
 
 let root: string;
 const NS = 'mymod';
@@ -56,8 +57,10 @@ describe('doctorWorkspace', () => {
     // structure path so the existence check passes (content isn't decoded for pools).
     write(`data/${NS}/structure/tower.nbt`, 'placeholder');
     const report = await doctorWorkspace(ws());
-    // The placeholder isn't a real NBT, so the size check flags it — but no worldgen errors.
-    expect(codes(report.findings)).toEqual(['invalid_nbt']);
+    // The placeholder isn't a real NBT (the size check flags that separately) — the
+    // point here is that NO worldgen rule fires on a complete def.
+    const worldgen = report.findings.filter((f) => f.code !== 'invalid_nbt');
+    expect(worldgen).toEqual([]);
   });
 
   it('catches terrain-adaptation distance past the 116 cap', async () => {
@@ -101,5 +104,13 @@ describe('doctorWorkspace', () => {
     const report = await doctorWorkspace(ws());
     expect(codes(report.findings)).toEqual(['stale_format']);
     expect(report.findings[0].level).toBe('warning');
+  });
+
+  it('every doctor code has a localized fix-it explanation', () => {
+    // A code without its `doctor.issue.<code>` string would surface as a raw key in the
+    // dialog (pt-BR parity is enforced separately by the i18n coverage test).
+    for (const code of DOCTOR_CODES) {
+      expect((en as Record<string, string>)[`doctor.issue.${code}`], `doctor.issue.${code}`).toBeTruthy();
+    }
   });
 });

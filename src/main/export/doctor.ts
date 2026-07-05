@@ -16,6 +16,29 @@ import type { Workspace, WorkspaceDoctorReport, DoctorFinding } from '@/shared/t
 import { getActiveWorkspace } from '../structure/assets/content-pack';
 import { readAuthoring } from '../structure/authoring';
 
+/** Every finding code the doctor can emit — TYPED, so a new rule must add its code here,
+ *  and the i18n guard in doctor.test.ts then requires its `doctor.issue.<code>` string
+ *  (the pt-BR side follows via the i18n coverage test). Keeps a typo'd/forgotten code
+ *  from surfacing as a raw key in the dialog. */
+export const DOCTOR_CODES = [
+  'wrong_folder',
+  'invalid_json',
+  'invalid_nbt',
+  'missing_spawn_overrides',
+  'missing_pool',
+  'distance_cap',
+  'biomes_empty',
+  'empty_set',
+  'missing_structure_def',
+  'separation_ge_spacing',
+  'pool_empty',
+  'missing_structure_file',
+  'biome_tag_empty',
+  'stale_format',
+  'nbt_oversized',
+] as const;
+export type DoctorCode = (typeof DOCTOR_CODES)[number];
+
 /** The shared state a run's rule functions read and report into. */
 interface DoctorRun {
   ws: Workspace;
@@ -52,7 +75,7 @@ function readJson(file: string): Record<string, unknown> | null {
   }
 }
 
-function report(run: DoctorRun, level: DoctorFinding['level'], code: string, file: string, detail?: string): void {
+function report(run: DoctorRun, level: DoctorFinding['level'], code: DoctorCode, file: string, detail?: string): void {
   run.findings.push({ level, code, file: path.relative(run.ws.root, file), ...(detail ? { detail } : {}) });
 }
 

@@ -35,7 +35,7 @@ const entry = (name: string, air = false, properties: Record<string, string> = {
 });
 const block = (state: number, pos: [number, number, number]): StructureBlock => ({ state, pos });
 
-/** A 2×1×1 wall of stone with an air palette entry at index 1. */
+/** A 3×3×3 box holding two stone blocks along x, with an air palette entry at index 1. */
 const data = (): EditData => ({
   size: [3, 3, 3],
   palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
@@ -393,14 +393,16 @@ describe('voidMarkers', () => {
     };
     expect(voidMarkers(d)).toEqual([]);
   });
-  it('reveals bulk air when editing (revealAir), still boundary-only', () => {
+  /** One solid at the origin + a 300-cell run of explicit air (bulk — past the overlay
+   *  cap); only [1,0,0] touches the solid. The fog-risk fixture the bulk-air rules use. */
+  const bulkAirData = (): EditData => {
     const blocks: StructureBlock[] = [block(0, [0, 0, 0])];
-    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // 300 air, only [1,0,0] touches the solid
-    const d: EditData = {
-      size: [2, 1, 301],
-      palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
-      blocks,
-    };
+    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i]));
+    return { size: [2, 1, 301], palette: [entry('minecraft:stone'), entry('minecraft:air', true)], blocks };
+  };
+
+  it('reveals bulk air when editing (revealAir), still boundary-only', () => {
+    const d = bulkAirData();
     expect(voidMarkers(d).length).toBe(0); // capped off by default
     const revealed = voidMarkers(d, true);
     expect(revealed.map((v) => v.key)).toEqual(['1,0,0']); // shown, but only the boundary cell
@@ -446,20 +448,12 @@ describe('voidMarkers', () => {
         .sort(),
     ).toEqual(['1,0,0', '2,0,0']);
 
-    const blocks: StructureBlock[] = [block(0, [0, 0, 0])];
-    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // bulk air
-    const bulk: EditData = { size: [2, 1, 301], palette: [entry('minecraft:stone'), entry('minecraft:air', true)], blocks };
-    expect(voidMarkers(bulk, true, true).map((v) => v.key)).toEqual(['1,0,0']); // interior stays hidden
+    expect(voidMarkers(bulkAirData(), true, true).map((v) => v.key)).toEqual(['1,0,0']); // interior stays hidden
   });
   it('drops bulk air (a captured .nbt) but keeps structure_void', () => {
-    const blocks: StructureBlock[] = [block(0, [0, 0, 0])]; // one solid
-    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // 300 air cells — bulk
-    blocks.push(block(2, [1, 0, 0])); // a structure_void next to the solid
-    const d: EditData = {
-      size: [2, 1, 301],
-      palette: [entry('minecraft:stone'), entry('minecraft:air', true), entry('minecraft:structure_void', true)],
-      blocks,
-    };
+    const d = bulkAirData();
+    d.palette.push(entry('minecraft:structure_void', true));
+    d.blocks.push(block(2, [1, 0, 0])); // a structure_void next to the solid
     const kinds = voidMarkers(d).map((v) => v.kind);
     expect(kinds).not.toContain('air'); // bulk air suppressed (no fog)
     expect(kinds).toContain('void'); // structure_void still shown

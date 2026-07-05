@@ -67,7 +67,8 @@ describe('diffStructures', () => {
   it('applies the anchor offset to B', () => {
     const a = struct([entry('minecraft:stone')], [block(0, [5, 0, 5])]);
     const b = struct([entry('minecraft:stone')], [block(0, [0, 0, 0])]);
-    expect(diffStructures(a, b).added + diffStructures(a, b).removed).toBe(2); // misaligned
+    const misaligned = diffStructures(a, b);
+    expect(misaligned.added + misaligned.removed).toBe(2);
     const aligned = diffStructures(a, b, [5, 0, 5]);
     expect(aligned.same).toBe(1);
     expect(aligned.cells).toHaveLength(0);
