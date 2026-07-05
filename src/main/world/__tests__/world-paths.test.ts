@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { availableDimensions, regionDir, regionForChunk } from '../anvil/world-paths';
+import { availableDimensions, listRegions, regionDirs, regionForChunk } from '../anvil/world-paths';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bw-world-'));
 afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
@@ -20,14 +20,23 @@ function makeWorld(name: string, regionDirs: string[]): string {
   return root;
 }
 
-describe('regionDir', () => {
-  it('maps vanilla ids to classic folders and mod ids under dimensions/', () => {
-    expect(regionDir('/w', 'minecraft:overworld')).toBe(path.join('/w', 'region'));
-    expect(regionDir('/w', 'minecraft:the_nether')).toBe(path.join('/w', 'DIM-1', 'region'));
-    expect(regionDir('/w', 'minecraft:the_end')).toBe(path.join('/w', 'DIM1', 'region'));
-    expect(regionDir('/w', 'theplacebeyond:bleak_db599711')).toBe(
+describe('regionDirs', () => {
+  it('maps vanilla ids to the 26.x dimensions/ layout + the classic folder, mod ids to dimensions/ only', () => {
+    expect(regionDirs('/w', 'minecraft:overworld')).toEqual([
+      path.join('/w', 'dimensions', 'minecraft', 'overworld', 'region'),
+      path.join('/w', 'region'),
+    ]);
+    expect(regionDirs('/w', 'minecraft:the_nether')).toEqual([
+      path.join('/w', 'dimensions', 'minecraft', 'the_nether', 'region'),
+      path.join('/w', 'DIM-1', 'region'),
+    ]);
+    expect(regionDirs('/w', 'minecraft:the_end')).toEqual([
+      path.join('/w', 'dimensions', 'minecraft', 'the_end', 'region'),
+      path.join('/w', 'DIM1', 'region'),
+    ]);
+    expect(regionDirs('/w', 'theplacebeyond:bleak_db599711')).toEqual([
       path.join('/w', 'dimensions', 'theplacebeyond', 'bleak_db599711', 'region'),
-    );
+    ]);
   });
 });
 
@@ -60,5 +69,17 @@ describe('availableDimensions', () => {
     const root = makeWorld('full', ['region', 'DIM-1/region', 'DIM1/region']);
     const ids = (await availableDimensions(root)).map((d) => d.id);
     expect(ids).toEqual(['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end']);
+  });
+
+  it('resolves the 26.x layout (vanilla dims under dimensions/minecraft/) without double-listing', async () => {
+    const root = makeWorld('modern', [
+      'dimensions/minecraft/overworld/region',
+      'dimensions/minecraft/the_nether/region',
+    ]);
+    const ids = (await availableDimensions(root)).map((d) => d.id);
+    expect(ids).toEqual(['minecraft:overworld', 'minecraft:the_nether']);
+    // listRegions finds the modern folder through the vanilla id.
+    expect(await listRegions(root, 'minecraft:overworld')).toEqual([{ rx: 0, rz: 0 }]);
+    expect(await listRegions(root, 'minecraft:the_end')).toEqual([]);
   });
 });

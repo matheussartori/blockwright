@@ -1,6 +1,9 @@
 // World folder layout + coordinate math. A save is a valid world iff it holds `level.dat`. Region
-// data lives per dimension: the overworld = `region/`, nether = `DIM-1/region/`, end = `DIM1/region/`,
-// and MOD dimensions under `dimensions/<namespace>/<path>/region/`. A dimension is only offered if its
+// data lives per dimension. CLASSIC layout (through 1.21): the overworld = `region/`, nether =
+// `DIM-1/region/`, end = `DIM1/region/`, MOD dimensions under `dimensions/<namespace>/<path>/region/`.
+// Since the 26.x saves the VANILLA dimensions moved under `dimensions/minecraft/<path>/` too
+// (`dimensions/minecraft/overworld/region/`, …), so every vanilla dim resolves through BOTH layouts
+// (modern first — an upgraded save's authoritative data is there). A dimension is only offered if its
 // `region/` actually holds `.mca` (an ungenerated nether/end you never visited isn't listed).
 // A region file `r.<rx>.<rz>.mca` covers 32×32 chunks; `rx = chunkX >> 5`, `lx = chunkX & 31`.
 import { promises as fs } from 'node:fs';
@@ -11,36 +14,38 @@ export const OVERWORLD = 'minecraft:overworld';
 export const NETHER = 'minecraft:the_nether';
 export const END = 'minecraft:the_end';
 
-/** A dimension's data sub-folder (`region`, `entities`, …) relative to the world root. Vanilla ids
- *  map to the classic folders; any other `ns:path` id resolves under `dimensions/ns/path/<sub>`. */
-function dimSubdir(root: string, dim: DimensionId, sub: string): string {
-  if (dim === NETHER) return path.join(root, 'DIM-1', sub);
-  if (dim === END) return path.join(root, 'DIM1', sub);
-  if (dim === OVERWORLD) return path.join(root, sub);
+/** Candidate data sub-folders (`region`, `entities`, …) for a dimension id, MOST authoritative
+ *  first. Every id resolves under the 26.x `dimensions/<ns>/<path>/<sub>` layout; the vanilla three
+ *  ALSO resolve to their classic pre-26 folder, so both save generations open. */
+function dimSubdirs(root: string, dim: DimensionId, sub: string): string[] {
   const [ns, ...rest] = dim.split(':');
-  return path.join(root, 'dimensions', ns, rest.join(':'), sub);
+  const modern = path.join(root, 'dimensions', ns, rest.join(':'), sub);
+  if (dim === NETHER) return [modern, path.join(root, 'DIM-1', sub)];
+  if (dim === END) return [modern, path.join(root, 'DIM1', sub)];
+  if (dim === OVERWORLD) return [modern, path.join(root, sub)];
+  return [modern];
 }
 
-/** Block-region sub-folder for a dimension id. */
-export function regionDir(root: string, dim: DimensionId): string {
-  return dimSubdir(root, dim, 'region');
+/** Candidate block-region folders for a dimension id (modern layout first). */
+export function regionDirs(root: string, dim: DimensionId): string[] {
+  return dimSubdirs(root, dim, 'region');
 }
 
-/** Entity sub-folder for a dimension id. Since Minecraft 1.17 entities live in their OWN region set
- *  (`entities/r.<rx>.<rz>.mca`), separate from the block `region/` files (older worlds stored them
- *  inside the chunk itself). */
-export function entitiesDir(root: string, dim: DimensionId): string {
-  return dimSubdir(root, dim, 'entities');
+/** Candidate entity folders for a dimension id. Since Minecraft 1.17 entities live in their OWN
+ *  region set (`entities/r.<rx>.<rz>.mca`), separate from the block `region/` files (older worlds
+ *  stored them inside the chunk itself). */
+export function entitiesDirs(root: string, dim: DimensionId): string[] {
+  return dimSubdirs(root, dim, 'entities');
 }
 
-/** Absolute path to one block-region file. */
-export function regionFilePath(root: string, dim: DimensionId, rx: number, rz: number): string {
-  return path.join(regionDir(root, dim), `r.${rx}.${rz}.mca`);
+/** Candidate absolute paths to one block-region file (only one layout exists on disk). */
+export function regionFilePaths(root: string, dim: DimensionId, rx: number, rz: number): string[] {
+  return regionDirs(root, dim).map((d) => path.join(d, `r.${rx}.${rz}.mca`));
 }
 
-/** Absolute path to one entity-region file (1.17+ `entities/` set). */
-export function entitiesFilePath(root: string, dim: DimensionId, rx: number, rz: number): string {
-  return path.join(entitiesDir(root, dim), `r.${rx}.${rz}.mca`);
+/** Candidate absolute paths to one entity-region file (1.17+ `entities/` set). */
+export function entitiesFilePaths(root: string, dim: DimensionId, rx: number, rz: number): string[] {
+  return entitiesDirs(root, dim).map((d) => path.join(d, `r.${rx}.${rz}.mca`));
 }
 
 /** Split a chunk coordinate into its region + local (in-region) coordinates. */
@@ -58,9 +63,21 @@ export async function isWorldDir(root: string): Promise<boolean> {
   }
 }
 
-/** Region coordinates present in a dimension's region folder (empty if the folder is absent). */
+/** Region coordinates present in a dimension's region folder(s) — the union over both layout
+ *  candidates, deduped (in practice only one exists on disk). Empty if neither folder is present. */
 export async function listRegions(root: string, dim: DimensionId): Promise<RegionRef[]> {
-  return listRegionDir(regionDir(root, dim));
+  const seen = new Set<string>();
+  const out: RegionRef[] = [];
+  for (const dir of regionDirs(root, dim)) {
+    for (const ref of await listRegionDir(dir)) {
+      const key = `${ref.rx},${ref.rz}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(ref);
+      }
+    }
+  }
+  return out;
 }
 
 async function listRegionDir(dir: string): Promise<RegionRef[]> {
@@ -91,14 +108,19 @@ function dimensionLabel(id: DimensionId): string {
  *  under `dimensions/<ns>/<path>/region`. The overworld is always offered (a fresh world has it). */
 export async function availableDimensions(root: string): Promise<WorldDimension[]> {
   const found: WorldDimension[] = [];
-  const add = async (id: DimensionId, always = false) => {
-    if (always || (await listRegions(root, id)).length > 0) found.push({ id, label: dimensionLabel(id) });
+  const have = new Set<DimensionId>();
+  const add = (id: DimensionId) => {
+    if (!have.has(id)) {
+      have.add(id);
+      found.push({ id, label: dimensionLabel(id) });
+    }
   };
-  await add(OVERWORLD, true);
-  await add(NETHER);
-  await add(END);
+  add(OVERWORLD);
+  if ((await listRegions(root, NETHER)).length > 0) add(NETHER);
+  if ((await listRegions(root, END)).length > 0) add(END);
 
-  // Mod dimensions: dimensions/<namespace>/<path>/region/*.mca
+  // Mod dimensions: dimensions/<namespace>/<path>/region/*.mca. On a 26.x save the VANILLA dims
+  // live here too (dimensions/minecraft/overworld/…) — `have` keeps them from double-listing.
   const modRoot = path.join(root, 'dimensions');
   let namespaces: string[];
   try {
@@ -114,9 +136,9 @@ export async function availableDimensions(root: string): Promise<WorldDimension[
       continue;
     }
     for (const p of paths) {
-      if ((await listRegionDir(path.join(modRoot, ns, p, 'region'))).length > 0) {
-        const id = `${ns}:${p}`;
-        found.push({ id, label: dimensionLabel(id) });
+      const id: DimensionId = `${ns}:${p}`;
+      if (!have.has(id) && (await listRegionDir(path.join(modRoot, ns, p, 'region'))).length > 0) {
+        add(id);
       }
     }
   }

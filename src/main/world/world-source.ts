@@ -6,7 +6,7 @@ import type { DimensionId, RegionRef, StructureLocation, WorldMeta } from '@/sha
 import { RegionFile } from './anvil/region-file';
 import { decodeChunk, decodeEntities, type ColumnData } from './anvil/chunk-decode';
 import { readLevelDat } from './anvil/level-dat';
-import { availableDimensions, entitiesFilePath, isWorldDir, listRegions as listRegionsOnDisk, regionFilePath, regionForChunk } from './anvil/world-paths';
+import { availableDimensions, entitiesFilePaths, isWorldDir, listRegions as listRegionsOnDisk, regionFilePaths, regionForChunk } from './anvil/world-paths';
 
 /** First DataVersion with a PALETTED section format the decoder understands (Minecraft 1.13 = 1519).
  *  1.13–1.17 nest sections under `Level.Sections` (spanning before 1.16); 1.18+ use root `sections`.
@@ -28,6 +28,18 @@ function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
   map.delete(key);
   map.set(key, v);
   return v;
+}
+
+/** Open the first region file that exists among the layout candidates (classic vs 26.x folders). */
+async function openFirstRegion(paths: string[]): Promise<RegionFile | null> {
+  for (const p of paths) {
+    try {
+      return await RegionFile.open(p);
+    } catch {
+      /* absent under this layout — try the next candidate */
+    }
+  }
+  return null;
 }
 
 export class WorldSource {
@@ -64,12 +76,8 @@ export class WorldSource {
     const key = `${dim}:${rx}:${rz}`;
     const cached = lruGet(this.regionCache, key);
     if (cached !== undefined) return cached;
-    let region: RegionFile | null;
-    try {
-      region = await RegionFile.open(regionFilePath(this.root, dim, rx, rz));
-    } catch {
-      region = null; // absent region file — cache the miss
-    }
+    // Absent region file (both layouts) → null, cached as a miss.
+    const region = await openFirstRegion(regionFilePaths(this.root, dim, rx, rz));
     lruSet(this.regionCache, key, region, REGION_CACHE_MAX);
     return region;
   }
@@ -80,12 +88,8 @@ export class WorldSource {
     const key = `${dim}:${rx}:${rz}`;
     const cached = lruGet(this.entityRegionCache, key);
     if (cached !== undefined) return cached;
-    let region: RegionFile | null;
-    try {
-      region = await RegionFile.open(entitiesFilePath(this.root, dim, rx, rz));
-    } catch {
-      region = null; // no entities file (pre-1.17, or ungenerated) — cache the miss
-    }
+    // No entities file (pre-1.17, or ungenerated) → null, cached as a miss.
+    const region = await openFirstRegion(entitiesFilePaths(this.root, dim, rx, rz));
     lruSet(this.entityRegionCache, key, region, REGION_CACHE_MAX);
     return region;
   }
@@ -146,12 +150,8 @@ export class WorldSource {
     const regions = await this.listRegions(dim);
     let scanned = 0;
     outer: for (const { rx, rz } of regions) {
-      let region: RegionFile | null;
-      try {
-        region = await RegionFile.open(regionFilePath(this.root, dim, rx, rz));
-      } catch {
-        continue;
-      }
+      const region = await openFirstRegion(regionFilePaths(this.root, dim, rx, rz));
+      if (!region) continue;
       for (const { lx, lz } of region.listPresent()) {
         if (scanned++ > STRUCTURE_SCAN_CAP) break outer;
         let nbt: Record<string, unknown> | null;
