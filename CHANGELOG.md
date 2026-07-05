@@ -4,6 +4,24 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-07-05
+
+Opens worlds saved by the newest Minecraft.
+
+### Fixed
+
+- Minecraft 26.x worlds now open — the 26.x saves moved the vanilla dimensions
+  under `dimensions/minecraft/<path>/region/` (the overworld, nether and end no
+  longer live in `region/`, `DIM-1/` and `DIM1/`). Every vanilla dimension now
+  resolves through both the modern and the classic layout, so a save from either
+  Minecraft generation streams its chunks — and an upgraded world reads its
+  authoritative modern data first, without double-listing dimensions.
+- The fly-through camera starts at the right place in a 26.x world — those saves
+  moved the spawn into a `spawn` compound (`spawn.pos`) and the last player out
+  to `players/data/<uuid>.dat` (named by `singleplayer_uuid`). Blockwright reads
+  both the new and the classic `level.dat` shapes, falling back to spawn when the
+  player file is absent.
+
 ## [2.1.0] - 2026-07-05
 
 Compare, restyle, and showcase any build — current with Minecraft 26.2.
