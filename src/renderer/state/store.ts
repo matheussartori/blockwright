@@ -7,6 +7,19 @@
 // `useStore`.
 import { createStore } from 'zustand/vanilla';
 import type { UpdateInfo, Workspace, WorldRef } from '@/shared/types';
+import type { StructureDiff } from '../diff/diff';
+
+/** An active structure comparison: what the active doc is being diffed against +
+ *  the computed result (the viewer overlay + the DiffPanel both read it). */
+export interface DiffView {
+  /** Display name of the compared structure/version. */
+  otherName: string;
+  /** Path of the compared file (for reveal/open affordances). */
+  otherPath: string;
+  /** The doc id the diff was computed against — a tab switch invalidates it. */
+  docId: string;
+  result: StructureDiff;
+}
 
 export type NavMode = 'orbit' | 'fly';
 
@@ -67,6 +80,14 @@ export interface AppState {
   /** The structure being exported to a mod workspace (its `.nbt` path + a suggested
    *  resource name), or null when the export dialog is closed. */
   exportTarget: { path: string; name: string } | null;
+  /** The active structure comparison (viewer overlay + DiffPanel), or null. */
+  diff: DiffView | null;
+  /** Whether the Re-theme dialog is open (File ▸ Re-theme Structure…). */
+  rethemeOpen: boolean;
+  /** Whether the Beauty Render dialog is open (File ▸ Render Image…). */
+  renderOpen: boolean;
+  /** Whether the Worldgen Doctor is open (File ▸ Workspace Check-Up…). */
+  doctorOpen: boolean;
 
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
@@ -88,6 +109,10 @@ export interface AppState {
   setVersionPromptName: (name: string | null) => void;
   setImagePreview: (src: string | null) => void;
   setExportTarget: (target: { path: string; name: string } | null) => void;
+  setDiff: (diff: DiffView | null) => void;
+  setRethemeOpen: (open: boolean) => void;
+  setRenderOpen: (open: boolean) => void;
+  setDoctorOpen: (open: boolean) => void;
 }
 
 /** Fallback content-pack version until main reports the real one (its
@@ -115,6 +140,10 @@ export const store = createStore<AppState>((set) => ({
   versionPromptName: null,
   imagePreview: null,
   exportTarget: null,
+  diff: null,
+  rethemeOpen: false,
+  renderOpen: false,
+  doctorOpen: false,
 
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
@@ -136,6 +165,10 @@ export const store = createStore<AppState>((set) => ({
   setVersionPromptName: (versionPromptName) => set({ versionPromptName }),
   setImagePreview: (imagePreview) => set({ imagePreview }),
   setExportTarget: (exportTarget) => set({ exportTarget }),
+  setDiff: (diff) => set({ diff }),
+  setRethemeOpen: (rethemeOpen) => set({ rethemeOpen }),
+  setRenderOpen: (renderOpen) => set({ renderOpen }),
+  setDoctorOpen: (doctorOpen) => set({ doctorOpen }),
 }));
 
 /** Subscribe to one derived slice, invoking `run` immediately and on change.

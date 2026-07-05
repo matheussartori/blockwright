@@ -9,6 +9,7 @@ import {
   cuboidCells,
   deleteSelection,
   extrudeSelection,
+  fillVoidBox,
   floodFill,
   internEntry,
   mirrorCell,
@@ -19,6 +20,7 @@ import {
   planTransform,
   recolorCell,
   replaceSelection,
+  rethemeBlocks,
   selectBox,
   setVoidCell,
   type EditData,
@@ -266,6 +268,72 @@ describe('setVoidCell', () => {
   });
 });
 
+describe('rethemeBlocks', () => {
+  it('remaps every block of a palette entry, keeping position / nbtPos / dataMeta', () => {
+    const d: EditData = {
+      size: [3, 1, 1],
+      palette: [entry('minecraft:oak_stairs', false, { facing: 'east' }), entry('minecraft:dirt')],
+      blocks: [
+        { state: 0, pos: [0, 0, 0], nbtPos: [0, 0, 0], dataMeta: 'spawn' },
+        { state: 0, pos: [1, 0, 0] },
+        { state: 1, pos: [2, 0, 0] },
+      ],
+    };
+    // The resolved replacement carries the SOURCE's properties (the caller resolves it so).
+    const target = entry('minecraft:spruce_stairs', false, { facing: 'east' });
+    const r = rethemeBlocks(d, new Map([[0, target]]))!;
+    const spruce = r.palette.findIndex((p) => p.name === 'minecraft:spruce_stairs');
+    expect(spruce).toBeGreaterThanOrEqual(0);
+    expect(r.palette[spruce].properties).toEqual({ facing: 'east' });
+    const swapped = r.blocks.filter((b) => b.state === spruce);
+    expect(swapped).toHaveLength(2);
+    const withNbt = swapped.find((b) => b.pos[0] === 0)!;
+    expect(withNbt.nbtPos).toEqual([0, 0, 0]);
+    expect(withNbt.dataMeta).toBe('spawn');
+    expect(r.blocks.find((b) => b.pos[0] === 2)?.state).toBe(1); // dirt untouched
+  });
+
+  it('is a no-op for an empty mapping', () => {
+    expect(rethemeBlocks(data(), new Map())).toBeNull();
+  });
+});
+
+describe('fillVoidBox', () => {
+  /** A 3×3×3 box with solid corners at (0,0,0) and (2,2,2) plus one air marker inside. */
+  const boxData = (): EditData => ({
+    size: [3, 3, 3],
+    palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
+    blocks: [block(0, [0, 0, 0]), block(0, [2, 2, 2]), block(1, [1, 1, 1])],
+  });
+
+  it('fills every non-solid cell of the selection bounding box in one step', () => {
+    const r = fillVoidBox(boxData(), ['0,0,0', '2,2,2'], 'void');
+    const voidIdx = r!.palette.findIndex((p) => p.name === 'minecraft:structure_void');
+    const voids = r!.blocks.filter((b) => b.state === voidIdx);
+    expect(voids).toHaveLength(27 - 2); // the whole box minus the two solids
+    // Solids preserved, existing air converted, selection kept.
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '0,0,0')?.state).toBe(0);
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '2,2,2')?.state).toBe(0);
+    expect(r!.blocks.find((b) => cellKey(b.pos) === '1,1,1')?.state).toBe(voidIdx);
+    expect(r!.selection).toEqual(['0,0,0', '2,2,2']);
+  });
+
+  it('fills with air when asked', () => {
+    const r = fillVoidBox(boxData(), ['0,0,0', '2,2,2'], 'air');
+    const airIdx = r!.palette.findIndex((p) => p.name === 'minecraft:air');
+    expect(r!.blocks.filter((b) => b.state === airIdx)).toHaveLength(25);
+  });
+
+  it('is a no-op without a selection', () => {
+    expect(fillVoidBox(boxData(), [], 'void')).toBeNull();
+  });
+
+  it('clamps the box to the NBT volume', () => {
+    // A single-cell selection at the corner — box is that one (solid) cell → nothing to write.
+    expect(fillVoidBox(boxData(), ['0,0,0'], 'void')).toBeNull();
+  });
+});
+
 describe('floodFill', () => {
   it('fills the connected region of the same block', () => {
     const d: EditData = {
@@ -336,6 +404,52 @@ describe('voidMarkers', () => {
     expect(voidMarkers(d).length).toBe(0); // capped off by default
     const revealed = voidMarkers(d, true);
     expect(revealed.map((v) => v.key)).toEqual(['1,0,0']); // shown, but only the boundary cell
+  });
+  it('shows EVERY layer of a stacked structure_void region, interior cells tagged deep', () => {
+    // One solid + a 5-cell void run behind it — the "only the first layer shows" defect.
+    const d: EditData = {
+      size: [7, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:structure_void', true)],
+      blocks: [block(0, [0, 0, 0]), ...[1, 2, 3, 4, 5].map((x) => block(1, [x, 0, 0]))],
+    };
+    const m = voidMarkers(d);
+    expect(m.map((v) => v.key).sort()).toEqual(['1,0,0', '2,0,0', '3,0,0', '4,0,0', '5,0,0']);
+    const byKey = new Map(m.map((v) => [v.key, v.deep ?? false]));
+    expect(byKey.get('1,0,0')).toBe(false); // touches the solid → full marker
+    expect(byKey.get('2,0,0')).toBe(true); // interior layers → dimmed (deep)
+    expect(byKey.get('5,0,0')).toBe(true);
+  });
+  it('reveals the interior of an omitted-dense void region only with revealAll', () => {
+    const d: EditData = {
+      size: [1, 1, 5],
+      palette: [entry('minecraft:stone')],
+      blocks: [block(0, [0, 0, 0]), block(0, [0, 0, 1]), block(0, [0, 0, 2])], // 3/5 dense; [0,0,3-4] omitted
+    };
+    expect(voidMarkers(d).map((v) => v.key)).toEqual(['0,0,3']); // boundary layer only
+    const all = voidMarkers(d, false, true);
+    const byKey = new Map(all.map((v) => [v.key, v.deep ?? false]));
+    expect([...byKey.keys()].sort()).toEqual(['0,0,3', '0,0,4']);
+    expect(byKey.get('0,0,3')).toBe(false);
+    expect(byKey.get('0,0,4')).toBe(true);
+  });
+  it('reveals interior SPARSE air with revealAll, but never bulk air interiors', () => {
+    // 3 listed cells in an 8-cell box → sparse (the dense-omitted rule stays out of play).
+    const sparse: EditData = {
+      size: [8, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
+      blocks: [block(0, [0, 0, 0]), block(1, [1, 0, 0]), block(1, [2, 0, 0])],
+    };
+    expect(voidMarkers(sparse, true).map((v) => v.key)).toEqual(['1,0,0']); // boundary only
+    expect(
+      voidMarkers(sparse, true, true)
+        .map((v) => v.key)
+        .sort(),
+    ).toEqual(['1,0,0', '2,0,0']);
+
+    const blocks: StructureBlock[] = [block(0, [0, 0, 0])];
+    for (let i = 0; i < 300; i++) blocks.push(block(1, [1, 0, i])); // bulk air
+    const bulk: EditData = { size: [2, 1, 301], palette: [entry('minecraft:stone'), entry('minecraft:air', true)], blocks };
+    expect(voidMarkers(bulk, true, true).map((v) => v.key)).toEqual(['1,0,0']); // interior stays hidden
   });
   it('drops bulk air (a captured .nbt) but keeps structure_void', () => {
     const blocks: StructureBlock[] = [block(0, [0, 0, 0])]; // one solid

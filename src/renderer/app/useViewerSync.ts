@@ -5,6 +5,8 @@
 import { useEffect } from 'react';
 import { settingsStore } from '../state/settings';
 import { documentsStore, activeDocument } from '../state/documents';
+import { editorStore } from '../state/editor';
+import { store } from '../state/store';
 import { api } from '../api';
 import type { Viewer } from '../viewer/viewer';
 
@@ -62,5 +64,35 @@ export function useViewerSync(viewer: Viewer | null): void {
     apply();
     const unsub = documentsStore.subscribe(apply);
     return () => unsub();
+  }, [viewer]);
+
+  // Mirror the structure-diff marks into the viewer, and INVALIDATE the diff when it no
+  // longer describes what's on screen: the active tab changed, or the block editor went
+  // live (each edit would silently drift the marks away from reality).
+  useEffect(() => {
+    if (!viewer) return;
+    const apply = () => {
+      const diff = store.getState().diff;
+      const doc = activeDocument(documentsStore.getState());
+      if (diff && doc?.id !== diff.docId) {
+        store.getState().setDiff(null); // stale — computed against another tab
+        return; // the store change re-invokes apply via subscribe
+      }
+      viewer.setDiff(diff ? diff.result.cells : []);
+    };
+    apply();
+    const unsubStore = store.subscribe((s, prev) => {
+      if (s.diff !== prev.diff) apply();
+    });
+    const unsubDocs = documentsStore.subscribe(apply);
+    const unsubEditor = editorStore.subscribe((s, prev) => {
+      if (s.active && !prev.active && store.getState().diff) store.getState().setDiff(null);
+    });
+    return () => {
+      unsubStore();
+      unsubDocs();
+      unsubEditor();
+      viewer.setDiff([]);
+    };
   }, [viewer]);
 }

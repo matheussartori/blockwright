@@ -9,6 +9,9 @@ import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
+import { editorStore } from '../state/editor';
+import { loadDoc } from '../state/doc-loader';
+import { compareActiveWith } from '../state/diff';
 import type { DocumentFlow } from './useDocumentFlow';
 
 /** The document handlers the IPC listeners dispatch to. */
@@ -45,6 +48,25 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
     api.onRenameProject(() => st.setRenameOpen(true));
     api.onOpenAssembly(() => void openAssembly());
     api.onReimportWorld(() => void reimportWorld());
+    api.onCompareFile(() => {
+      // Pick the other file via the native dialog, then diff it against the active doc.
+      void api.openDialog().then((p) => (p ? compareActiveWith(p) : undefined));
+    });
+    api.onRetheme(() => st.setRethemeOpen(true));
+    api.onRenderImage(() => st.setRenderOpen(true));
+    api.onOpenDoctor(() => st.setDoctorOpen(true));
+    // Watch mode: an external edit to the on-screen file hot-reloads it in place —
+    // unless a run is in flight or the block editor holds unsaved edits (never clobber).
+    api.onFileChanged((p) => {
+      const doc = documentsStore.getState().documents.find((d) => d.path === p);
+      if (!doc || doc.busy) return;
+      const ed = editorStore.getState();
+      if (ed.active && ed.dirty) return;
+      void loadDoc(doc.id, p, { preserveCamera: true });
+    });
+    api.onWorkspaceStructuresChanged(() => {
+      void api.listWorkspaceStructures().then((paths) => st.setWorkspaceStructures(paths));
+    });
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
     api.onOpenGuide(() => st.setGuideOpen(true));
@@ -79,6 +101,21 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
       if (pending) st.setUpdate(pending);
     })();
   }, [openFile, openWorld, openAssembly, reimportWorld, close, newDoc, onWorkspaceChanged, exportActive, exportToWorldActive, exportToWorkspaceActive]);
+
+  // Watch mode registration: main watches whichever structure file is on screen, so an
+  // external edit (VS Code, an Axiom export, a build script) hot-reloads the viewer.
+  useEffect(() => {
+    let last: string | null | undefined;
+    const send = () => {
+      const doc = activeDocument(documentsStore.getState());
+      const p = doc && doc.kind !== 'world' ? (doc.path ?? null) : null;
+      if (p === last) return;
+      last = p;
+      void api.watchFile(p);
+    };
+    send();
+    return documentsStore.subscribe(send);
+  }, []);
 
   // Mirror file-open + window state to main (drives Close File, the export items'
   // enabled state, and the View menu). Only re-sends when the *reported* shape changes.

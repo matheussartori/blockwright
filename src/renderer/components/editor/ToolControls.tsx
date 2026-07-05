@@ -33,6 +33,7 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
   const paintBlock = useEditor((s) => s.paintBlock);
   const paintMode = useEditor((s) => s.paintMode);
   const voidKind = useEditor((s) => s.voidKind);
+  const paintDepth = useEditor((s) => s.paintDepth);
   const eyedropper = useEditor((s) => s.eyedropper);
   const blockIds = useBlockIds();
   const stairIds = useMemo(() => blockIds.filter((id) => id.endsWith('_stairs')), [blockIds]);
@@ -126,6 +127,15 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
             options={VOID_KINDS.map((k) => ({ value: k, label: t(`editor.void.${k}` as MessageKey) }))}
           />
           <p className="editor-hint">{t(`editor.voidHint.${voidKind}` as MessageKey)}</p>
+          <label className="editor-field">
+            <span className="editor-label">{t('editor.voidDepth')}</span>
+            <Stepper value={paintDepth} min={0} max={64} onChange={(n) => ed().setPaintDepth(n)} ariaLabel={t('editor.voidDepth')} />
+          </label>
+          <p className="editor-hint editor-note">{t('editor.voidDepthHint')}</p>
+          <button className="btn primary sm editor-apply" disabled={!hasSel} onClick={() => ed().fillVoid()}>
+            {t('editor.fillVoid')}
+          </button>
+          <p className="editor-hint editor-note">{hasSel ? t('editor.fillVoidHint') : t('editor.fillVoidNoSel')}</p>
           <p className="editor-hint editor-note">{t('editor.voidSafe')}</p>
         </>
       );

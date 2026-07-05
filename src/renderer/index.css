@@ -6794,6 +6794,302 @@ body.row-resizing {
   color: var(--accent);
 }
 
+/* Missing-texture diagnostics line in the Inspector header. */
+.inspector-missing {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--warn);
+  cursor: help;
+}
+
+/* The Worldgen Doctor: summary line + a findings list with per-level hues. */
+.doctor-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+}
+.doctor-summary > svg {
+  color: var(--accent);
+}
+.doctor-clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 4px;
+  font-size: 12.5px;
+  color: var(--ok);
+}
+.doctor-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.doctor-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.doctor-item.error > svg { color: var(--danger); flex: none; margin-top: 1px; }
+.doctor-item.warning > svg { color: var(--warn); flex: none; margin-top: 1px; }
+.doctor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.doctor-file {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.doctor-text {
+  font-size: 12px;
+}
+
+/* The Beauty Render dialog: a small options grid; the render itself runs on the stage. */
+.render-modal .render-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+}
+.render-saved {
+  margin-right: auto;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The Re-theme dialog: one row per distinct block (swatch + count → target field). */
+.retheme-modal .retheme-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.retheme-deco {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.retheme-deco > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.retheme-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.retheme-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.retheme-src {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.retheme-srcmeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.retheme-srcname {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.retheme-srccount {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.retheme-arrow {
+  color: var(--text-muted);
+}
+.retheme-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.retheme-target .editor-field {
+  flex: 1;
+  min-width: 0;
+}
+.retheme-count {
+  margin-right: auto;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* The structure-diff summary card (top-right of the stage while a comparison is open).
+   The count/legend hues mirror the viewer overlay's DIFF_* colors (overlay-colors.ts). */
+.diff-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 58;
+  width: 252px;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.diff-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 9px 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.diff-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+}
+.diff-title > svg {
+  color: var(--accent);
+}
+.diff-other {
+  padding: 8px 12px 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-counts {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 12px 8px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.diff-count.add { color: var(--ok); }
+.diff-count.remove { color: var(--danger); }
+.diff-count.change { color: var(--warn); }
+.diff-count.same {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.diff-empty {
+  margin: 0;
+  padding: 4px 12px 10px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.diff-blocks {
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+.diff-blockrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 11.5px;
+}
+.diff-blockname {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diff-blockdelta {
+  display: inline-flex;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.diff-blockdelta em { font-style: normal; }
+.diff-blockdelta .add { color: var(--ok); }
+.diff-blockdelta .remove { color: var(--danger); }
+.diff-blockdelta .change { color: var(--warn); }
+.diff-more {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.diff-legend {
+  margin: 0;
+  padding: 7px 12px 9px;
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* The on-canvas hint chip: the active tool + its live modifier keys, bottom-centred over
+   the stage while edit mode is on. Pointer-events off — it narrates, never intercepts. */
+.editor-canvas-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  max-width: min(85%, 640px);
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--elevated) 88%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.editor-canvas-tool {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.editor-canvas-keys {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
 .editor-panel {
   position: absolute;
   top: 12px;

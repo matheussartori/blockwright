@@ -47,6 +47,7 @@ export function buildStructureData(
   rawPalette: RawPaletteEntry[],
   rawBlocks: RawBlock[],
   rawEntities: RawEntity[] = [],
+  dataVersion?: number,
 ): StructureData {
   const withContent = hasContent();
   // Resolve models if the vanilla pack is present or a mod workspace is open
@@ -89,6 +90,7 @@ export function buildStructureData(
     jigsaws: extractJigsaws(rawPalette, rawBlocks),
     dataMarkers: extractDataMarkers(rawPalette, rawBlocks),
     entities,
+    ...(dataVersion !== undefined ? { dataVersion } : {}),
   };
 }
 
@@ -108,9 +110,17 @@ export async function loadStructure(filePath: string): Promise<StructureData> {
     palette?: RawPaletteEntry[];
     blocks?: RawBlock[];
     entities?: RawEntityNbt[];
+    DataVersion?: number;
   };
   const size = (root.size ?? [0, 0, 0]) as [number, number, number];
-  return buildStructureData(filePath, size, root.palette ?? [], root.blocks ?? [], toRawEntities(root.entities));
+  return buildStructureData(
+    filePath,
+    size,
+    root.palette ?? [],
+    root.blocks ?? [],
+    toRawEntities(root.entities),
+    typeof root.DataVersion === 'number' ? root.DataVersion : undefined,
+  );
 }
 
 /** The `.nbt` `entities` list shape (before projection). */

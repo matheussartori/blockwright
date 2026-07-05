@@ -109,6 +109,26 @@ export function notifyOpenAssembly(): void {
   mainWindow?.webContents.send(IPC_EVENTS.openAssembly);
 }
 
+/** Ask the renderer to run the Compare-with-File flow (File ▸ Compare with File…). */
+export function notifyCompareFile(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.compareFile);
+}
+
+/** Ask the renderer to open the Re-theme dialog (File ▸ Re-theme Structure…). */
+export function notifyRetheme(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.retheme);
+}
+
+/** Ask the renderer to open the Beauty Render dialog (File ▸ Render Image…). */
+export function notifyRenderImage(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.renderImage);
+}
+
+/** Ask the renderer to open the Worldgen Doctor (File ▸ Workspace Check-Up…). */
+export function notifyOpenDoctor(): void {
+  mainWindow?.webContents.send(IPC_EVENTS.openDoctor);
+}
+
 /** Ask the renderer to run the Reimport from World flow (File ▸ Reimport from World…). */
 export function notifyReimportWorld(): void {
   mainWindow?.webContents.send(IPC_EVENTS.reimportWorld);

@@ -219,9 +219,36 @@ src/
         rng.ts             shared seeded PRNG (mulberry32/seed3)
         footprint.ts       seeded non-rectangular footprints (rect/L/T/U/plus) so a basement isn't always
                            a square box (param `shape`, default `auto`). Tests in domain/__tests__/.
-    mc-version-detect.ts   Detect a mod's target Minecraft version from its project files
-    structure/mc-data-version.ts  The single DEFAULT_DATA_VERSION (3955 = MC 1.21.1) every codec/compiler/
-                            AI-schema stamps, so a version bump is one edit (was ~10 scattered literals)
+    mc-version-detect.ts   Detect a mod's target Minecraft version from its project files (classic 1.x +
+                            year-numbered 26.x strings; pack.mcmeta classic `pack_format` AND the 26.x
+                            `min_format`/`max_format` range — number, fractional 107.1, or [maj,min] pair —
+                            resolved via nearest-known-format-below)
+    structure/mc-data-version.ts  The DataVersion REGISTRY: `DATA_VERSIONS` (1.18.2…26.2=4903) +
+                            `dataVersionFor(version)` (exact hit, else NEAREST OLDER — never over-stamp) +
+                            DEFAULT_DATA_VERSION (3955 = 1.21.1, the AI path's deliberate pin: its knowledge
+                            base targets 1.21.1 and newer games upgrade on load). The ordering + the
+                            nearest-older lookup live ONCE in shared/mc-version.ts (`mcVersionRank` — year
+                            majors 26+ outrank every 1.x — and `nearestVersionValue`, shared with
+                            worldgen.ts `datapackFormatFor`).
+    structure/data-version.ts  `activeTargetVersion()`/`activeDataVersion()` — the ACTIVE context's target
+                            (workspace → content pack → default); export/convert/save paths stamp through it.
+                            Export-to-World is even more precise: it reads the target save's own level.dat.
+    file-watch.ts           Watch mode (the worldgen dev-loop): fs.watch the OPEN FILE (renderer registers it
+                            via `watch:file`; a change pushes `file-changed` → hot-reload in place, skipped
+                            while a run is in flight or the editor holds unsaved edits) + the active
+                            workspace's STRUCTURE FOLDER (→ `workspace-structures-changed` refreshes the
+                            Project panel). Debounced; best-effort (a watch failure = just no live reload).
+    export/doctor.ts        The Worldgen Doctor (File ▸ Workspace Check-Up…): scans the WHOLE workspace data
+                            pack — structure defs (spawn_overrides/start-pool/biomes/distance-cap), sets
+                            (spacing/separation/dangling refs), pools (empty/dead structure files), biome
+                            tags, pack.mcmeta staleness, wrong structure folder, oversized `.nbt`s — into a
+                            WorkspaceDoctorReport of coded findings the renderer localizes with fix-its.
+                            One `check*` function per RULE over a shared DoctorRun ctx; adding a rule = a
+                            check fn + `doctor.issue.<code>` strings + a doctor.test.ts case.
+                            `doctorWorkspace(ws)` is the testable core (export/__tests__/doctor.test.ts).
+    structure/catalog/retheme-map.ts  The one-click decoration re-theme's mapping: block name → role
+                            (dictionary annotation first, then guessRole) → the target decoration's block.
+                            Pure name→name; the renderer carries the blockstate props through the swap.
     world/                  The World Viewer's MAIN side: read a Minecraft save + resolve chunks to
                             render payloads. See "World viewer" below.
       active-world.ts       The single open-world singleton (mirrors content-pack's active-workspace):
@@ -425,13 +452,15 @@ src/
                           (the file tree + the checks footer), ExportFileRow (one filename+folder row,
                           shared), ExportStates (the empty + success states). See "Export to mod workspace".
     components/editor/    The block editor's UI: EditorPanel (orchestrator — the FAB / tool rail / selection
-                          readout / Save·Undo·Redo), ToolRail (the tool icons), ToolControls (the active
-                          tool's controls — a focused branch per tool), AxisPad (the ± move/extrude pad),
-                          BlockField (block-id autocomplete), DataMetaEditor (the selection-driven
-                          "Structure data" field — edit a data-mode structure block's metadata string;
-                          see "Block editor"), EditorLayer (the imperative viewer bridge:
-                          click-picks a block, keyboard nudge/delete/undo, selection overlay, re-show on
-                          edit), useBlockIds (catalog ids for autocomplete). See "Block editor" below.
+                          readout / Save·Undo·Redo), ToolRail (the tool icons, ordered by TOOL_ORDER so the
+                          1–9 shortcuts match), ToolControls (the active tool's controls — a focused branch
+                          per tool), EditorCanvasHint (the on-canvas tool + modifier-keys chip), AxisPad
+                          (the ± move/extrude pad), BlockField (block-id autocomplete), DataMetaEditor
+                          (the selection-driven "Structure data" field — edit a data-mode structure block's
+                          metadata string; see "Block editor"), EditorLayer (the imperative viewer bridge:
+                          click-picks a block, paint/void strokes + plane lock + depth wheel, keyboard
+                          shortcuts, selection overlay, re-show on edit), useBlockIds (catalog ids for
+                          autocomplete). See "Block editor" below.
     components/ui/        Reusable primitives: Modal (overlay+panel shell), Segmented (toggle), Switch
                           (on/off pill toggle), Select
                           (the themed single-select dropdown — portal-rendered in `position:fixed` so it's
@@ -477,7 +506,18 @@ src/
                           a block's `state`); mirror/rotate rewrite the directional blockstate via the shared
                           `structure/orientation.ts` (`transformProps`) — the transform WorldEdit never fixed.
                           See "Block editor" below.
-    windows/              InspectorWindow / JigsawWindow / VersionsWindow — the three floating windows
+    diff/                 The pure structure-diff core: diff.ts `diffStructures(a, b, offset?)` — cell-by-cell
+                          added/removed/changed/same + a per-block rollup (air-like entries read as EMPTY;
+                          property ORDER can't fake a change), unit-tested in diff/__tests__/. Consumed by
+                          state/diff.ts (`compareActiveWith(path,label?)` → store.diff), the viewer's
+                          DiffOverlay (mirrored by useViewerSync, auto-invalidated on tab switch / editor
+                          activation) and components/DiffPanel (the floating summary card).
+    windows/              InspectorWindow / JigsawWindow / VersionsWindow — the three floating windows.
+                          Inspector also carries the missing-texture diagnostics line (block types that fell
+                          back to flat colors, hover for the list — only when a content pack resolves at
+                          all); Jigsaw lists the PLACED PIECES of an assembly (click → open that piece's
+                          file in a new tab); Versions has a per-version COMPARE action (diff vs the shown
+                          build — "what did this run change?" in one click).
     hooks/useStores.ts    useApp / useSettings / useWindows / useLogs (React bindings over the vanilla stores)
     state/                store.ts (main-mirrored + view state), settings.ts (prefs, incl. theme),
                           windows.ts (floating-window layout + the Console dock visibility/height,
@@ -493,7 +533,10 @@ src/
                           registers — both extracted so versions.ts and generation.ts don't cycle),
                           editor.ts (the block editor: mode/tool/selection/anchor/tool-params + an
                           undo/redo snapshot stack; ops patch the active doc's StructureData; save
-                          re-encodes via IPC → a new version)
+                          re-encodes via IPC → a new version; TOOL_ORDER = the rail layout AND the 1–9
+                          number-key shortcuts; `retheme(mapping)` = the whole-build palette swap,
+                          resolving each target WITH the source entry's blockstate props),
+                          diff.ts (compareActiveWith/closeDiff — the compare flow, see diff/ above)
     ui/path.ts            basename/dirname helpers (no Node path across the bridge)
     ui/hash.ts            the renderer's deterministic string hashes, declared once: hashString31
                           (catalog swatch hue) + hashFnv1a (the size-preview's seeded-RNG seed)
@@ -1298,6 +1341,47 @@ corrupted on transform, capped/corrupting undo).
   entity for a marker painted fresh — so new markers can be authored entirely in-app.
 - **Add a tool:** a pure op in `ops.ts` (+ test) + a store action + a `ToolControls` branch + a
   `ToolRail` entry + its `editor.*` i18n labels.
+
+### v2.1 studio tools (Diff / Re-theme / Render / Doctor / watch mode)
+
+Four File-menu tools over any open build (imported `.schem`/`.litematic` included) plus an
+always-on dev loop — the v2.1 whitespace features:
+
+- **Structure Diff** (File ▸ Compare with File…, or the Versions panel's compare action): the pure
+  core is `renderer/diff/diff.ts` (see the tree); `state/diff.ts compareActiveWith` publishes a
+  `DiffView` into `store.diff`, `useViewerSync` mirrors the marks into the viewer's `DiffOverlay`
+  (green added / red removed / yellow changed — added/changed are OVERSIZED shells around the block,
+  removed is an inset ghost; marks persist across rebuilds like the floor bands) and `DiffPanel`
+  shows the counts + per-block rollup. The diff is auto-invalidated when the tab changes or the
+  block editor goes live (edits would silently drift the marks).
+- **Re-theme** (File ▸ Re-theme Structure…, `RethemeModal`): whole-build palette swap with the
+  blockstate CARRIED (the store's `retheme` resolves each target with the SOURCE entry's props, so
+  a stair keeps facing/half/shape — the thing naive find&replace breaks; pure op `rethemeBlocks`
+  keeps position/nbtPos/dataMeta). "Suggest from decoration" asks main (`structure:retheme-map`,
+  `catalog/retheme-map.ts`) to role-classify the palette (dictionary note → guessRole) against a
+  registered decoration. Applying is ONE undo step and lands in edit mode so Save-as-version is
+  one click.
+- **Beauty Render** (File ▸ Render Image…, `RenderModal` + `viewer/beauty-render.ts`): high-res PNG
+  stills (preset angles current/hero/iso/front/top/cross-section; transparent or themed background —
+  the GL canvas is already alpha, the fill happens on the 2D composite) and a one-orbit turntable
+  WebM via `canvas.captureStream` + MediaRecorder. Both save/restore every renderer/camera state
+  they touch (the capture.ts discipline); bytes go to main's save dialog over `render:save`.
+- **Worldgen Doctor** (File ▸ Workspace Check-Up…, `DoctorModal` ← `workspace:doctor` ←
+  `export/doctor.ts`): the whole-workspace audit — see the tree entry for the rule list. Findings
+  are `{level, code, file, detail?}`; every code has a `doctor.issue.<code>` fix-it string (en+pt).
+- **Watch mode** (`main/file-watch.ts`, always on): the on-screen file hot-reloads on external
+  edits (registered by `useAppIpc` over `watch:file`; skipped while a run is in flight or the
+  editor is dirty), and the workspace's structure folder keeps the Project panel list live.
+- **Editor v2.1 UX**: 1–9 number keys switch tools (TOOL_ORDER; tooltips show the number), Esc
+  walks back eyedropper → Select tool → clear selection, Alt+click samples from any block-field
+  tool (paint/replace/stairs), a paint/void stroke is PLANE-LOCKED to the face it started on
+  (`viewer.pickOnPlane`; bridges gaps, never jumps depth mid-drag), and an on-canvas hint chip
+  names the active tool + its live modifiers. Air/void is fully multi-layer: `voidMarkers`
+  reveals interior cells (dimmed `deep` markers, bounded by DEEP_OVERLAY_CAP; bulk-air interiors
+  never revealed), Alt+scroll steps the Void tool's target deeper along the aim ray
+  (`pickPlacementAt`, walked cell-by-cell so any camera angle steps exactly one cell), and
+  "Fill selection box" (`fillVoidBox`) writes a whole multi-layer air/void region in one undo step
+  (solids always preserved).
 
 ### Versions
 

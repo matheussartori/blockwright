@@ -5,7 +5,7 @@
 // presets the export UI offers and the PURE helpers (resource-name + folder convention +
 // non-fs validation) that main and the renderer must agree on, so the preview the user
 // sees and the files main writes can't drift.
-import { minorOf } from '../mc-version';
+import { mcVersionAtLeast, nearestVersionValue } from '../mc-version';
 import {
   edgePoolLeaf,
   MAX_JIGSAW_DEPTH,
@@ -119,12 +119,32 @@ export function isValidResourceName(raw: string): boolean {
 
 /** The structure folder Minecraft reads for this version. Renamed `structures` →
  *  `structure` (singular) in 1.21 — using the wrong one is the #1 silent breakage when a
- *  pack moves between versions, so we pick it from the workspace's detected version. */
+ *  pack moves between versions, so we pick it from the workspace's detected version.
+ *  Year-numbered releases (26.x) rank above 1.21, so they resolve modern. */
 export function structureFolder(version: string | null | undefined): 'structure' | 'structures' {
-  const minor = minorOf(version);
-  if (!minor) return 'structure'; // unknown → assume modern
-  const [major, min] = minor.split('.').map(Number);
-  return major * 100 + min >= 121 ? 'structure' : 'structures';
+  // Unknown → assume modern.
+  return mcVersionAtLeast(version, '1.21') ? 'structure' : 'structures';
+}
+
+/** Known release → data-pack `pack_format` pairs. The format number churns every drop
+ *  (48 in 1.21.1 → 107 in 26.2); stamping a stale one makes the pack load with an
+ *  "incompatible" warning — or, on strict readers, not at all. */
+export const DATA_PACK_FORMATS: Record<string, number> = {
+  '1.20.2': 18,
+  '1.20.4': 26,
+  '1.20.6': 41,
+  '1.21.1': 48,
+  '1.21.3': 57,
+  '1.21.4': 61,
+  '1.21.5': 71,
+  '26.2': 107,
+};
+
+/** The data-pack `pack_format` to stamp for a target version: exact match, else the
+ *  nearest OLDER known release's, else the 1.21.1 baseline (48). Pure, shared so the
+ *  export writers and any preview agree. */
+export function datapackFormatFor(version: string | null | undefined): number {
+  return nearestVersionValue(DATA_PACK_FORMATS, version) ?? DATA_PACK_FORMATS['1.21.1'];
 }
 
 export type FileKind = 'nbt' | 'structure' | 'template_pool' | 'structure_set' | 'biome_tag' | 'piece';

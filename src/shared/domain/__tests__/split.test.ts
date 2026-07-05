@@ -12,6 +12,7 @@ describe('effectiveNbtLimit', () => {
     expect(effectiveNbtLimit('auto', '1.15.2')).toBe(32);
     expect(effectiveNbtLimit('auto', '1.12.2')).toBe(32);
     expect(effectiveNbtLimit('auto', null)).toBe(48); // unknown → modern
+    expect(effectiveNbtLimit('auto', '26.2')).toBe(48); // year-numbered → modern
   });
 });
 

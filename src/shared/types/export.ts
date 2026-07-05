@@ -42,3 +42,21 @@ export interface WorkspaceExportResult {
   /** Raw detail for diagnostics. */
   detail?: string;
 }
+
+/** One Worldgen Doctor finding: a stable `code` the renderer localizes (with a fix-it
+ *  explanation), the workspace-relative file it concerns, and optional raw detail. */
+export interface DoctorFinding {
+  level: 'error' | 'warning';
+  code: string;
+  file: string;
+  detail?: string;
+}
+
+/** The Worldgen Doctor's whole-workspace check-up result. */
+export interface WorkspaceDoctorReport {
+  /** The scanned workspace's name, or null when none is active. */
+  workspace: string | null;
+  /** How many files were scanned (for the "all clear" summary). */
+  checkedFiles: number;
+  findings: DoctorFinding[];
+}

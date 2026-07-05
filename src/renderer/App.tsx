@@ -26,6 +26,9 @@ import { UpdateBanner } from './components/UpdateBanner';
 import { SettingsModal } from './components/SettingsModal';
 import { CatalogModal } from './components/CatalogModal';
 import { ModulesModal } from './components/ModulesModal';
+import { RethemeModal } from './components/RethemeModal';
+import { RenderModal } from './components/RenderModal';
+import { DoctorModal } from './components/DoctorModal';
 import { VersionSelectModal } from './components/VersionSelectModal';
 import { RenameProjectModal } from './components/RenameProjectModal';
 import { ImagePreview } from './components/ImagePreview';
@@ -39,6 +42,8 @@ import { GuideModal } from './components/GuideModal';
 import { ExportModal } from './components/export/ExportModal';
 import { EditorPanel } from './components/editor/EditorPanel';
 import { EditorLayer } from './components/editor/EditorLayer';
+import { EditorCanvasHint } from './components/editor/EditorCanvasHint';
+import { DiffPanel } from './components/DiffPanel';
 import { editorStore } from './state/editor';
 import { WorldHud } from './world/components/WorldHud';
 
@@ -128,6 +133,8 @@ function Shell() {
               <FloatingPanels availability={availability} />
               {fileOpen && <EditorLayer />}
               {fileOpen && <EditorPanel />}
+              {fileOpen && <EditorCanvasHint />}
+              {fileOpen && <DiffPanel />}
               <WorkspaceSuggest
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}
@@ -147,6 +154,9 @@ function Shell() {
       <SettingsModal />
       <CatalogModal />
       <ModulesModal />
+      <RethemeModal />
+      <RenderModal />
+      <DoctorModal />
       <VersionSelectModal />
       <RenameProjectModal />
       <GuideModal />

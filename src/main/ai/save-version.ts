@@ -15,11 +15,10 @@ import type { AuthoringBlock, AuthoringEntity } from '../structure/authoring/typ
 import { encodeStructure } from '../structure/authoring/nbt-encode';
 import { readAuthoring } from '../structure/authoring/nbt-decode';
 import { isAir } from '../structure/authoring/palette';
-import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
+import { activeDataVersion } from '../structure/data-version';
 import { getSession } from './session';
 import { mirrorToLibrary } from './output-dir';
 
-/** The structure DataVersion to stamp when the source file has none (1.21.1). */
 const posKey = (p: readonly number[]): string => `${p[0]},${p[1]},${p[2]}`;
 
 export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVersionResult> {
@@ -29,7 +28,8 @@ export async function saveEditedVersion(req: SaveVersionRequest): Promise<SaveVe
 
   // Inherit DataVersion + entities + block-entity NBT from the source file, re-attaching
   // each block's NBT via its origin cell (`nbtPos`) so moved blocks keep it.
-  let dataVersion = DEFAULT_DATA_VERSION;
+  // The active context's target is the fallback when the source file has none.
+  let dataVersion = activeDataVersion();
   let entities: AuthoringEntity[] = [];
   const nbtByPos = new Map<string, Record<string, unknown>>();
   if (req.sourcePath && fs.existsSync(req.sourcePath)) {

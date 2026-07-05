@@ -19,8 +19,12 @@ import {
   notifyExportFile,
   notifyExportToWorld,
   notifyExportToWorkspace,
+  notifyCompareFile,
   notifyOpenAssembly,
+  notifyOpenDoctor,
   notifyReimportWorld,
+  notifyRenderImage,
+  notifyRetheme,
   notifyRenameProject,
   notifyOpenCatalog,
   notifyOpenGuide,
@@ -365,6 +369,19 @@ function fileMenu(): MenuItemConstructorOptions {
       { label: mt('menu.reimportWorld'), click: () => notifyReimportWorld() },
       { type: 'separator' },
       {
+        // Visual structure diff: compare the open build against another file.
+        label: mt('menu.compareFile'),
+        enabled: fileOpen,
+        click: () => notifyCompareFile(),
+      },
+      {
+        // Blockstate-aware palette swap over the whole build (undoable, saves a version).
+        label: mt('menu.retheme'),
+        enabled: fileOpen,
+        click: () => notifyRetheme(),
+      },
+      { type: 'separator' },
+      {
         label: mt('menu.renameProject'),
         enabled: projectOpen,
         click: () => notifyRenameProject(),
@@ -394,6 +411,12 @@ function fileMenu(): MenuItemConstructorOptions {
         enabled: fileOpen,
         click: () => notifyExportToWorkspace(),
       },
+      {
+        // Beauty Render: a high-res showcase PNG / turntable WebM of the open build.
+        label: mt('menu.renderImage'),
+        enabled: fileOpen,
+        click: () => notifyRenderImage(),
+      },
       { label: mt('menu.closeFile'), enabled: fileOpen, click: () => notifyClose() },
       { type: 'separator' },
       {
@@ -415,6 +438,13 @@ function fileMenu(): MenuItemConstructorOptions {
           pinActiveWorkspace(item.checked);
           buildAppMenu();
         },
+      },
+      {
+        // Worldgen Doctor: scan the whole workspace's data pack for the silent-failure
+        // class (wrong folder, missing spawn_overrides, empty biome tags, dead pools).
+        label: mt('menu.doctor'),
+        enabled: getActiveWorkspace() !== null,
+        click: () => notifyOpenDoctor(),
       },
       {
         label: mt('menu.closeWorkspace'),

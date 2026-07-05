@@ -62,6 +62,17 @@ export const IPC_CHANNELS = {
   /** Resolve a block (name + properties) into renderable models + texture keys, so the
    *  editor can intern a newly-picked block into the live structure → ResolveBlockResult. */
   resolveBlock: 'structure:resolve-block',
+  /** Role-classify a build's block names and map them to a decoration's blocks (the
+   *  one-click re-theme) → Record<sourceName, targetName>. */
+  rethemeMap: 'structure:retheme-map',
+  /** Save a rendered showcase image/video: (bytes, suggestedName, kind png|webm) →
+   *  the written path, or null when the user cancels the save dialog. */
+  saveRender: 'render:save',
+  /** Watch mode: tell main which structure file is on screen (null = none), so an
+   *  external edit can hot-reload the viewer (`file-changed`). */
+  watchFile: 'watch:file',
+  /** Run the Worldgen Doctor over the active workspace → WorkspaceDoctorReport. */
+  workspaceDoctor: 'workspace:doctor',
   /** Save the edited structure as a new version (payload: SaveVersionRequest) → SaveVersionResult. */
   saveVersion: 'structure:save-version',
   /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */
@@ -211,6 +222,18 @@ export const IPC_EVENTS = {
   openAssembly: 'open-assembly',
   /** Ask the renderer to run the Reimport from World flow (File ▸ Reimport from World…). */
   reimportWorld: 'reimport-world',
+  /** Ask the renderer to run the Compare-with-File flow (File ▸ Compare with File…). */
+  compareFile: 'compare-file',
+  /** Ask the renderer to open the Re-theme dialog (File ▸ Re-theme Structure…). */
+  retheme: 'retheme',
+  /** Ask the renderer to open the Beauty Render dialog (File ▸ Render Image…). */
+  renderImage: 'render-image',
+  /** Watch mode: the on-screen structure file changed on disk (payload: its path). */
+  fileChanged: 'file-changed',
+  /** Watch mode: the active workspace's structure folder changed on disk. */
+  workspaceStructuresChanged: 'workspace-structures-changed',
+  /** Ask the renderer to open the Worldgen Doctor (File ▸ Workspace Check-Up…). */
+  openDoctor: 'open-doctor',
   /** Live progress for an in-flight generation (payload: GenerateProgress). */
   aiProgress: 'ai-progress',
   /** Ask the renderer to load a just-generated `.nbt` into the viewer and return

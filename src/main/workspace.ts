@@ -14,6 +14,7 @@ import { clearChunkResolveCache } from './world/chunk-resolve';
 import { addRecentWorkspace, removeRecentWorkspace } from './recent-workspaces';
 import { getPinnedWorkspace, setPinnedWorkspace } from './pinned-workspace';
 import { notifyPinnedWorkspace, notifyRecentWorkspaces, notifyWorkspace, openDirectoryDialog } from './window';
+import { watchWorkspaceStructures } from './file-watch';
 import { detectMcVersion } from './mc-version-detect';
 import { readAuthoring } from './structure/authoring';
 
@@ -43,6 +44,9 @@ export function applyWorkspace(ws: Workspace | null): void {
   clearModelCache();
   clearDictionaryCache();
   clearChunkResolveCache();
+  // Watch mode: keep the Project panel's structure list live while external tools
+  // (a datapack build, an Axiom export) write into the workspace.
+  watchWorkspaceStructures(ws);
   if (ws) {
     addRecentWorkspace(ws);
     notifyRecentWorkspaces();

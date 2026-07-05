@@ -11,6 +11,9 @@ import { api } from '../api';
 import { useViewer } from '../viewer/ViewerProvider';
 import { useApp, useSettings, useActiveDoc, useT } from '../hooks/useStores';
 import { settingsStore } from '../state/settings';
+import { documentsStore } from '../state/documents';
+import { loadDoc } from '../state/doc-loader';
+import { basename } from '../ui/path';
 import type { AssemblyPiece } from '../viewer/viewer';
 
 const DEFAULT_DEPTH = 4;
@@ -43,6 +46,7 @@ export function JigsawContent() {
   const [advanced, setAdvanced] = useState(false);
   const [warnings, setWarnings] = useState<JigsawWarning[]>([]);
   const [pieceCount, setPieceCount] = useState(1);
+  const [placed, setPlaced] = useState<PlacedPiece[]>([]);
 
   // A run-scoped cache so re-rolls and repeated pieces don't reload the same file.
   const cache = useRef<Map<string, Promise<StructureData>>>(new Map());
@@ -54,6 +58,7 @@ export function JigsawContent() {
     setSeed(randomSeed());
     setWarnings([]);
     setPieceCount(1);
+    setPlaced([]);
   }, [structure?.path]);
 
   // Dev-only (BW_ASSEMBLE): once the structure + viewer are ready, auto-run a
@@ -112,6 +117,7 @@ export function JigsawContent() {
       await viewer.showAssembly(await loadPieces(plan.pieces));
       setWarnings(plan.warnings);
       setPieceCount(plan.pieces.length);
+      setPlaced(plan.pieces);
     } finally {
       setBusy(false);
     }
@@ -128,6 +134,13 @@ export function JigsawContent() {
     await viewer.show(structure);
     setWarnings([]);
     setPieceCount(1);
+    setPlaced([]);
+  };
+
+  // Pool-author iteration: click a placed piece to open ITS file in a new tab.
+  const openPiece = (path: string) => {
+    const id = documentsStore.getState().openDoc(path);
+    void loadDoc(id, path);
   };
 
   const count = structure.jigsaws.length;
@@ -227,6 +240,24 @@ export function JigsawContent() {
         />
         <span>{t('jigsaw.hideShell')}</span>
       </label>
+
+      {placed.length > 1 && (
+        <>
+          <div className="bw-section">
+            {t('jigsaw.pieces')} <span className="bw-count">{placed.length}</span>
+          </div>
+          <ul className="bw-rows">
+            {placed.map((p, i) => (
+              <li key={i} className="bw-row" title={t('jigsaw.openPiece')} onClick={() => openPiece(p.structurePath)}>
+                <span className="bw-row-name">{basename(p.structurePath).replace(/\.nbt$/i, '')}</span>
+                <span className="bw-row-tag">
+                  {p.offset[0]},{p.offset[1]},{p.offset[2]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <div className="bw-section">
         {t('jigsaw.connectors')} <span className="bw-count">{count}</span>

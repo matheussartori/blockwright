@@ -14,6 +14,7 @@ import { clearJsonCache } from './structure/assets/content-pack';
 import { clearModelCache } from './structure/assets/model-loader';
 import { assembleJigsaw, jigsawCandidates } from './structure/jigsaw/jigsaw-assembler';
 import { listCatalog, previewBlock, resolveBlockEntry } from './structure/catalog/block-catalog';
+import { rethemeMap } from './structure/catalog/retheme-map';
 import { saveEditedVersion } from './ai/save-version';
 import { getDictionary, setBlockNote, setScope } from './structure/assets/block-dictionary';
 import { previewModule } from './structure/catalog/module-preview';
@@ -45,7 +46,9 @@ import {
 } from './workspace';
 import { getPinnedWorkspace } from './pinned-workspace';
 import { planExport, runExport } from './export';
-import { notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
+import { runWorkspaceDoctor } from './export/doctor';
+import { watchOpenFile } from './file-watch';
+import { getMainWindow, notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
 import { reassembleAssemblyDialog, reimportWorldDialog } from './export/reassemble';
 import { renameProject } from './ai/rename-project';
@@ -243,6 +246,25 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.resolveBlock, async (_e, name: string, properties?: Record<string, string>) =>
     resolveBlockEntry(name, properties ?? {}),
   );
+  ipcMain.handle(IPC_CHANNELS.rethemeMap, (_e, blocks: string[], decorationId: string) => rethemeMap(blocks, decorationId));
+
+  // Watch mode: the renderer reports which structure file is on screen.
+  ipcMain.handle(IPC_CHANNELS.watchFile, (_e, filePath: string | null) => watchOpenFile(filePath));
+  ipcMain.handle(IPC_CHANNELS.workspaceDoctor, async () => runWorkspaceDoctor());
+
+  // Save a Beauty Render (PNG still / WebM turntable) via the native save dialog.
+  ipcMain.handle(IPC_CHANNELS.saveRender, async (_e, data: ArrayBuffer, suggestedName: string, kind: 'png' | 'webm') => {
+    const win = getMainWindow();
+    const options = {
+      title: mt('dialog.renderTitle'),
+      defaultPath: `${suggestedName}.${kind}`,
+      filters: [kind === 'png' ? { name: 'PNG', extensions: ['png'] } : { name: 'WebM', extensions: ['webm'] }],
+    };
+    const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return null;
+    await fs.promises.writeFile(result.filePath, Buffer.from(data));
+    return result.filePath;
+  });
   ipcMain.handle(IPC_CHANNELS.saveVersion, async (_e, req: SaveVersionRequest) => saveEditedVersion(req));
 
   ipcMain.handle(IPC_CHANNELS.jigsawAssemble, async (_e, filePath: string, options: AssembleOptions) =>

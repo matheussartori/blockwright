@@ -9,13 +9,14 @@ import {
   MousePointer2, Move3D, Eye, Layers, PencilLine, SlidersHorizontal, History,
   Boxes, ArrowUpFromLine, TrendingUp, Replace, Save, Upload, FlipHorizontal2,
   Columns2, FileDown, Globe, Package, Brush, SquareDashed, CircleHelp, Search, Map, RefreshCcw,
+  Camera, GitCompareArrows, Paintbrush, Stethoscope,
 } from 'lucide-react';
 import { store } from '../state/store';
 import { useApp, useT } from '../hooks/useStores';
 import { Modal } from './ui/Modal';
 import type { MessageKey, TFunction } from '@/shared/i18n';
 
-type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'world' | 'export' | 'workspaces';
+type SectionId = 'overview' | 'generate' | 'viewer' | 'details' | 'edit' | 'blocks' | 'tools' | 'world' | 'export' | 'workspaces';
 
 const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'overview', icon: Compass, label: 'guide.navOverview' },
@@ -24,6 +25,7 @@ const SECTIONS: { id: SectionId; icon: typeof Compass; label: MessageKey }[] = [
   { id: 'details', icon: Blocks, label: 'guide.navDetails' },
   { id: 'edit', icon: MessagesSquare, label: 'guide.navEdit' },
   { id: 'blocks', icon: Boxes, label: 'guide.navBlocks' },
+  { id: 'tools', icon: GitCompareArrows, label: 'guide.navTools' },
   { id: 'world', icon: Globe, label: 'guide.navWorld' },
   { id: 'export', icon: Upload, label: 'guide.navExport' },
   { id: 'workspaces', icon: FolderTree, label: 'guide.navWorkspaces' },
@@ -68,6 +70,7 @@ export function GuideModal() {
         {section === 'details' && <Details t={t} />}
         {section === 'edit' && <Edit t={t} />}
         {section === 'blocks' && <BlockTools t={t} />}
+        {section === 'tools' && <StudioTools t={t} />}
         {section === 'world' && <World t={t} />}
         {section === 'export' && <Export t={t} />}
         {section === 'workspaces' && <Workspaces t={t} />}
@@ -210,6 +213,21 @@ function Export({ t }: { t: TFunction }) {
         <li><Globe size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.export.worldT')}</b> {t('guide.export.world')}</span></li>
       </ul>
       <p className="guide-tip"><Boxes size={14} strokeWidth={1.9} aria-hidden />{t('guide.export.tip')}</p>
+    </Block>
+  );
+}
+
+function StudioTools({ t }: { t: TFunction }) {
+  return (
+    <Block icon={<GitCompareArrows size={18} strokeWidth={1.8} />} title={t('guide.tools.title')}>
+      <p className="guide-lead">{t('guide.tools.lead')}</p>
+      <ul className="guide-list">
+        <li><GitCompareArrows size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.tools.diffT')}</b> {t('guide.tools.diff')}</span></li>
+        <li><Paintbrush size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.tools.rethemeT')}</b> {t('guide.tools.retheme')}</span></li>
+        <li><Camera size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.tools.renderT')}</b> {t('guide.tools.render')}</span></li>
+        <li><Stethoscope size={15} strokeWidth={1.8} aria-hidden /><span><b>{t('guide.tools.doctorT')}</b> {t('guide.tools.doctor')}</span></li>
+      </ul>
+      <p className="guide-tip"><RefreshCcw size={14} strokeWidth={1.9} aria-hidden />{t('guide.tools.watch')}</p>
     </Block>
   );
 }

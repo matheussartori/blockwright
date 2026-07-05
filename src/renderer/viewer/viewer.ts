@@ -10,6 +10,7 @@ import { CameraController, type NavMode } from './camera-controller';
 import { WorldMode } from './world-mode';
 import { disposeObject } from './dispose';
 import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REVIEW_SNAP, type SnapOpts } from './capture';
+import { renderStill, renderTurntable, type StillOpts, type TurntableOpts } from './beauty-render';
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
@@ -18,6 +19,8 @@ import { SelectionOverlay } from './selection-overlay';
 import { SymmetryOverlay } from './symmetry-overlay';
 import { HoverOverlay } from './hover-overlay';
 import { VoidOverlay, type VoidCell } from './void-overlay';
+import { DiffOverlay } from './diff-overlay';
+import type { DiffCellMark } from '../diff/diff';
 import { TextureLoader } from './texture-loader';
 
 export type { FloorRegion } from './floor-regions';
@@ -51,6 +54,9 @@ export class Viewer {
 
   /** A single preview cube at the cell the next paint/place would land on. */
   private hoverOverlay = new HoverOverlay(this.scene);
+
+  /** Structure-diff marks (added/removed/changed cells), persisted across builds. */
+  private diffOverlay = new DiffOverlay(this.scene);
 
   private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
@@ -191,8 +197,9 @@ export class Viewer {
     const box = new THREE.Box3().setFromObject(parent);
     this.addGrid(box);
     // Re-apply the floor-plan bands against the new footprint (clear() dropped the
-    // meshes but kept the desired regions).
+    // meshes but kept the desired regions). Diff marks persist the same way.
     this.floors.reapply(this.current);
+    this.diffOverlay.reapply();
     if (preserveCamera) this.nav.controls.update();
     else this.nav.frame(box);
   }
@@ -285,18 +292,23 @@ export class Viewer {
     return this.renderer.domElement;
   }
 
-  /** Raycast a screen point against the structure and return the cell `step` units along
-   *  the ray from the hit (positive = into the surface, negative = back into the empty cell
-   *  in front of it). Using the ray (not the face normal) is robust: a merged face whose
-   *  normal points the wrong way would otherwise pick the wrong side. Null on a miss. */
-  private rayCell(clientX: number, clientY: number, step: number): [number, number, number] | null {
-    if (!this.current) return null;
+  /** Aim `this.raycaster` from the camera through a screen point (shared by every pick). */
+  private aimRay(clientX: number, clientY: number): void {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
       -((clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.raycaster.setFromCamera(ndc, this.nav.camera);
+  }
+
+  /** Raycast a screen point against the structure and return the cell `step` units along
+   *  the ray from the hit (positive = into the surface, negative = back into the empty cell
+   *  in front of it). Using the ray (not the face normal) is robust: a merged face whose
+   *  normal points the wrong way would otherwise pick the wrong side. Null on a miss. */
+  private rayCell(clientX: number, clientY: number, step: number): [number, number, number] | null {
+    if (!this.current) return null;
+    this.aimRay(clientX, clientY);
     const hits = this.raycaster.intersectObject(this.current, true);
     if (!hits.length) return null;
     const p = hits[0].point.clone().addScaledVector(this.raycaster.ray.direction, step);
@@ -314,18 +326,60 @@ export class Viewer {
     return this.rayCell(clientX, clientY, -0.05);
   }
 
+  /** The placement cell pushed `depth` cells DEEPER along the aim ray — the Void tool's
+   *  depth stepping (reach the layers behind the first surface). `depth` 0 is exactly
+   *  `pickPlacement`; each step walks the ray to the next DISTINCT cell, so it works at
+   *  any camera angle (a diagonal ray still advances one cell per step). Null on a miss. */
+  pickPlacementAt(clientX: number, clientY: number, depth: number): [number, number, number] | null {
+    if (depth <= 0) return this.pickPlacement(clientX, clientY);
+    if (!this.current) return null;
+    this.aimRay(clientX, clientY);
+    const hits = this.raycaster.intersectObject(this.current, true);
+    if (!hits.length) return null;
+    const dir = this.raycaster.ray.direction;
+    // Start just in front of the surface (the depth-0 cell), then micro-step the ray,
+    // counting each NEW cell crossed until `depth` more have passed.
+    const p = hits[0].point.clone().addScaledVector(dir, -0.05);
+    let cell: [number, number, number] = [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+    let remaining = depth;
+    const STEP = 0.05;
+    for (let i = 0; i < depth * 40 + 200 && remaining > 0; i++) {
+      p.addScaledVector(dir, STEP);
+      const next: [number, number, number] = [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+      if (next[0] !== cell[0] || next[1] !== cell[1] || next[2] !== cell[2]) {
+        cell = next;
+        remaining--;
+      }
+    }
+    return remaining === 0 ? cell : null;
+  }
+
+  /** The cell where the cursor's ray crosses the axis-aligned CELL LAYER `coord` on `axis`
+   *  (0=x, 1=y, 2=z) — a paint stroke locked to the plane it started on (the MagicaVoxel /
+   *  Axiom convention) aims here instead of re-picking the surface, so a drag never jumps
+   *  depth mid-stroke and can bridge gaps in the surface. Null when the ray runs parallel
+   *  to the plane or the plane is behind the camera. */
+  pickOnPlane(clientX: number, clientY: number, axis: 0 | 1 | 2, coord: number): [number, number, number] | null {
+    this.aimRay(clientX, clientY);
+    const origin = this.raycaster.ray.origin;
+    const dir = this.raycaster.ray.direction;
+    const comp = (v: THREE.Vector3): number => (axis === 0 ? v.x : axis === 1 ? v.y : v.z);
+    if (Math.abs(comp(dir)) < 1e-6) return null;
+    const t = (coord + 0.5 - comp(origin)) / comp(dir);
+    if (!Number.isFinite(t) || t <= 0) return null;
+    const p = origin.clone().addScaledVector(dir, t);
+    const cell: [number, number, number] = [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+    cell[axis] = coord; // pin exactly to the locked layer (floating-point drift can't leak off it)
+    return cell;
+  }
+
   /** The cell directly under the cursor — whatever is nearest there: a solid block OR a void
    *  marker (so the cursor readout can name air/structure_void cells too). Null on a miss.
    *  Unlike `pickBlock`/`pickPlacement` this returns the cell you're POINTING AT, not the one
    *  an edit would target. */
   identifyCell(clientX: number, clientY: number): [number, number, number] | null {
     if (!this.current) return null;
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    const ndc = new THREE.Vector2(
-      ((clientX - rect.left) / rect.width) * 2 - 1,
-      -((clientY - rect.top) / rect.height) * 2 + 1,
-    );
-    this.raycaster.setFromCamera(ndc, this.nav.camera);
+    this.aimRay(clientX, clientY);
     const solid = this.raycaster.intersectObject(this.current, true)[0] ?? null;
     const voids = this.voidOverlay.object;
     const ghost = voids ? this.raycaster.intersectObject(voids, true)[0] ?? null : null;
@@ -351,6 +405,12 @@ export class Viewer {
     this.voidOverlay.set(cells);
   }
 
+  /** Show the structure-diff marks (added/removed/changed cells; empty = hidden). The
+   *  desired cells persist across rebuilds, like the floor bands. */
+  setDiff(cells: DiffCellMark[]): void {
+    this.diffOverlay.set(cells);
+  }
+
   /** Preview the cell the next paint/place would affect, in `color` (null = hide). */
   setHover(cell: [number, number, number] | null, color?: number): void {
     this.hoverOverlay.set(cell, color);
@@ -370,9 +430,10 @@ export class Viewer {
     this.symmetryOverlay.clear();
     this.voidOverlay.clear();
     this.hoverOverlay.clear();
-    // Drop the live band meshes but keep the desired regions so the next build
-    // re-renders the same plan (re-applied at the end of showAssembly).
+    // Drop the live band/diff meshes but keep the desired regions/marks so the next
+    // build re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();
+    this.diffOverlay.clearMeshes();
     this.nav.setMode('orbit'); // never leave a stale pointer lock when unloading
     if (this.current) {
       this.scene.remove(this.current);
@@ -417,6 +478,22 @@ export class Viewer {
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
     return captureOrbit(this.captureContext(), angles, opts);
+  }
+
+  /** One high-resolution showcase still (Export ▸ Render Image…) as a PNG data URL. */
+  renderStill(opts: StillOpts): string | null {
+    if (!this.current) return null;
+    if (this.nav.isFly()) this.nav.setMode('orbit');
+    this.highlight.clear();
+    return renderStill(this.captureContext(), opts);
+  }
+
+  /** Record a full-orbit turntable WebM of the loaded build (Export ▸ Render Image…). */
+  renderTurntable(opts: TurntableOpts): Promise<Blob> | null {
+    if (!this.current) return null;
+    if (this.nav.isFly()) this.nav.setMode('orbit');
+    this.highlight.clear();
+    return renderTurntable(this.captureContext(), opts);
   }
 
   /** Top-down floor-plan cutaways (interior layout) for the AI review. */

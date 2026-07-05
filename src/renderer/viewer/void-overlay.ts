@@ -9,18 +9,23 @@ import { SceneOverlay } from './scene-overlay';
 import { parseCell } from '../editor/cell-key';
 import { AIR_MARK, VOID_MARK } from './overlay-colors';
 
-/** One void cell to draw: its "x,y,z" key and which kind of emptiness it is. */
+/** One void cell to draw: its "x,y,z" key, which kind of emptiness it is, and whether it's
+ *  a DEEP (interior, no solid neighbour) cell of a stacked region — drawn dimmed + smaller
+ *  so a multi-layer void slab reads as layers, not fog. */
 export interface VoidCell {
   key: string;
   kind: 'air' | 'void';
+  deep?: boolean;
 }
 
 export class VoidOverlay extends SceneOverlay {
   // A small inset cube reads as a marker in the pocket, not a full block; reused geometry/
   // materials back every marker (cheap), and outlive any single `set`, so the base `clear()`
-  // (which doesn't dispose) is correct.
+  // (which doesn't dispose) is correct. Deep markers reuse a smaller cube + dimmer materials.
   private cube = new THREE.BoxGeometry(0.7, 0.7, 0.7);
   private edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.72, 0.72, 0.72));
+  private deepCube = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+  private deepEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(0.42, 0.42, 0.42));
   private fill = {
     air: new THREE.MeshBasicMaterial({ color: AIR_MARK, transparent: true, opacity: 0.12, depthWrite: false }),
     void: new THREE.MeshBasicMaterial({ color: VOID_MARK, transparent: true, opacity: 0.12, depthWrite: false }),
@@ -29,17 +34,25 @@ export class VoidOverlay extends SceneOverlay {
     air: new THREE.LineBasicMaterial({ color: AIR_MARK, transparent: true, opacity: 0.85 }),
     void: new THREE.LineBasicMaterial({ color: VOID_MARK, transparent: true, opacity: 0.85 }),
   };
+  private deepFill = {
+    air: new THREE.MeshBasicMaterial({ color: AIR_MARK, transparent: true, opacity: 0.05, depthWrite: false }),
+    void: new THREE.MeshBasicMaterial({ color: VOID_MARK, transparent: true, opacity: 0.05, depthWrite: false }),
+  };
+  private deepLine = {
+    air: new THREE.LineBasicMaterial({ color: AIR_MARK, transparent: true, opacity: 0.3 }),
+    void: new THREE.LineBasicMaterial({ color: VOID_MARK, transparent: true, opacity: 0.3 }),
+  };
 
   set(cells: VoidCell[]): void {
     this.clear();
     if (!cells.length) return;
     const group = new THREE.Group();
-    for (const { key, kind } of cells) {
+    for (const { key, kind, deep } of cells) {
       const [x, y, z] = parseCell(key);
-      const wire = new THREE.LineSegments(this.edges, this.line[kind]);
+      const wire = new THREE.LineSegments(deep ? this.deepEdges : this.edges, (deep ? this.deepLine : this.line)[kind]);
       wire.position.set(x + 0.5, y + 0.5, z + 0.5);
       group.add(wire);
-      const mesh = new THREE.Mesh(this.cube, this.fill[kind]);
+      const mesh = new THREE.Mesh(deep ? this.deepCube : this.cube, (deep ? this.deepFill : this.fill)[kind]);
       mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
       group.add(mesh);
     }

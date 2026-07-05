@@ -8,7 +8,7 @@
 // decides the grid, the connection tree, and the canonical file/connector names. Both the
 // renderer's export preview and main's writer derive from it, so they can't drift.
 import type { Direction } from '../jigsaw';
-import { minorOf } from '../mc-version';
+import { mcVersionAtLeast } from '../mc-version';
 
 /** The user's NBT size-limit preference (Settings). `auto` derives it from the workspace's
  *  Minecraft version (≥1.16 → 48, older → 32); the explicit values pin it. */
@@ -23,10 +23,8 @@ export const LIMIT_LEGACY = 32;
 export function effectiveNbtLimit(pref: NbtSizePref, version: string | null | undefined): number {
   if (pref === '48') return LIMIT_MODERN;
   if (pref === '32') return LIMIT_LEGACY;
-  const minor = minorOf(version);
-  if (!minor) return LIMIT_MODERN; // unknown → assume modern
-  const [major, min] = minor.split('.').map(Number);
-  return major * 100 + min >= 116 ? LIMIT_MODERN : LIMIT_LEGACY;
+  // Unknown → assume modern; year-numbered releases (26.x) rank above 1.16.
+  return mcVersionAtLeast(version, '1.16') ? LIMIT_MODERN : LIMIT_LEGACY;
 }
 
 export type Vec3 = [number, number, number];
@@ -78,6 +76,12 @@ export const MAX_JIGSAW_DEPTH = 20;
  *  reachable half-extent is ~116 blocks, so a structure wider than ~232 may not fully
  *  reassemble as one feature. Used only to warn. */
 export const MAX_RECONSTRUCT_SPAN = 232;
+
+/** The largest `max_distance_from_center` that always loads: vanilla adds +12 for any
+ *  terrain adaptation other than `none` and rejects the structure def past 128, so a
+ *  def combining adaptation with a distance above this silently fails. Shared by the
+ *  splitter (its cap) and the Worldgen Doctor (its check). */
+export const MAX_JIGSAW_ADAPTED_DISTANCE = 116;
 
 /** Divide a length into balanced contiguous segments, each ≤ limit (the first `rem` get +1). */
 export function splitAxis(len: number, limit: number): { start: number; len: number }[] {

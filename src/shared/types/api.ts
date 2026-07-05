@@ -18,7 +18,7 @@ import type {
   FloorDef,
 } from './generation';
 import type { BlockDictionary, BlockNote, ExportMode, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
-import type { WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
+import type { WorkspaceDoctorReport, WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
 export interface BlockwrightApi {
@@ -104,6 +104,22 @@ export interface BlockwrightApi {
   /** Resolve a block (name + properties) into renderable models + texture keys, so the
    *  editor can intern a newly-picked block (Replace / Stairs) into the live structure. */
   resolveBlock: (name: string, properties?: Record<string, string>) => Promise<ResolveBlockResult>;
+  /** Role-classify block names and map them to a decoration's blocks (the one-click
+   *  re-theme): source name → target name, only for blocks the decoration re-maps. */
+  rethemeMap: (blocks: string[], decorationId: string) => Promise<Record<string, string>>;
+  /** Save a Beauty Render (PNG still / WebM turntable) via the native save dialog;
+   *  resolves with the written path, or null when cancelled. */
+  saveRender: (data: ArrayBuffer, suggestedName: string, kind: 'png' | 'webm') => Promise<string | null>;
+  /** Watch mode: report the on-screen structure file (null = none) so main can watch it. */
+  watchFile: (filePath: string | null) => Promise<void>;
+  /** Run the Worldgen Doctor over the active workspace. */
+  workspaceDoctor: () => Promise<WorkspaceDoctorReport>;
+  /** Watch mode: the on-screen structure file changed on disk (hot-reload it). */
+  onFileChanged: (cb: (path: string) => void) => void;
+  /** Watch mode: the active workspace's structure folder changed on disk. */
+  onWorkspaceStructuresChanged: (cb: () => void) => void;
+  /** Notified when File ▸ Workspace Check-Up… is chosen; the handler opens the Doctor. */
+  onOpenDoctor: (cb: () => void) => void;
   /** Save the edited structure as a new version (`vN.nbt`), like an AI build version. */
   saveVersion: (req: SaveVersionRequest) => Promise<SaveVersionResult>;
   /** Plan a full jigsaw assembly starting from a structure file. */
@@ -268,6 +284,13 @@ export interface BlockwrightApi {
   onOpenAssembly: (cb: () => void) => void;
   /** Notified when File ▸ Reimport from World… is chosen; the handler runs the reassembly. */
   onReimportWorld: (cb: () => void) => void;
+  /** Notified when File ▸ Compare with File… is chosen; the handler picks a file and
+   *  opens the structure-diff view against the active document. */
+  onCompareFile: (cb: () => void) => void;
+  /** Notified when File ▸ Re-theme Structure… is chosen; the handler opens the dialog. */
+  onRetheme: (cb: () => void) => void;
+  /** Notified when File ▸ Render Image… is chosen; the handler opens the Beauty Render dialog. */
+  onRenderImage: (cb: () => void) => void;
   /** The main-process log backlog buffered before the renderer mounted, so the
    *  Console dock starts with the full session history. */
   getLogBacklog: () => Promise<LogEntry[]>;

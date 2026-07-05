@@ -19,10 +19,13 @@ interface Resolved {
 }
 
 const memo = new Map<string, Resolved>();
+/** Block ids already reported as fallback-coloured (warn ONCE per id, not per state). */
+const reportedMisses = new Set<string>();
 
 /** Drop the resolution memo (on workspace/content switch). */
 export function clearChunkResolveCache(): void {
   memo.clear();
+  reportedMisses.clear();
 }
 
 const normalizeProps = (props?: Record<string, string | number>): Record<string, string> =>
@@ -34,6 +37,13 @@ function resolveEntry(raw: RawPaletteEntry): Resolved {
   if (hit) return hit;
   const resolved = resolveBlockEntry(raw.Name, normalizeProps(raw.Properties));
   memo.set(key, resolved);
+  // Missing-texture diagnostics: a solid block whose model didn't resolve renders as a
+  // flat colour. Surface each id once in the console (→ the Console dock), so modded
+  // worlds don't silently miss — the complaint BlueMap gets.
+  if (!resolved.entry.air && resolved.entry.models.length === 0 && !reportedMisses.has(raw.Name)) {
+    reportedMisses.add(raw.Name);
+    console.warn(`[world] no model/texture for ${key} — rendering as a flat colour`);
+  }
   return resolved;
 }
 

@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { useViewer } from '../../viewer/ViewerProvider';
 import { useEditor } from '../../hooks/useStores';
-import { editorStore, type EditorState, type PickMode } from '../../state/editor';
+import { editorStore, TOOL_ORDER, type EditorState, type PickMode } from '../../state/editor';
 import { cellKey, describeCell, inBounds, voidMarkers } from '../../editor/ops';
 import { documentsStore, activeDocument } from '../../state/documents';
 import { ACCENT, FOCUS, AIR_MARK, VOID_MARK } from '../../viewer/overlay-colors';
@@ -28,6 +28,10 @@ const NUDGE: Record<string, [number, number, number]> = {
 const isStrokeTool = (s: EditorState): boolean =>
   s.tool === 'void' || (s.tool === 'paint' && s.paintMode !== 'fill');
 
+/** Tools with a block field an Alt+click can sample into (the always-available eyedropper). */
+const isPaintFamily = (s: EditorState): boolean =>
+  s.tool === 'paint' || s.tool === 'replace' || s.tool === 'stairs';
+
 export function EditorLayer() {
   const viewer = useViewer();
   const active = useEditor((s) => s.active);
@@ -41,15 +45,21 @@ export function EditorLayer() {
     // brush/void cell can fall OUTSIDE the structure (clicking a side face aims into the empty
     // space beside it) — editing is locked to the NBT's volume, so reject it here too, so no
     // ghost preview promises a placement the file can't hold.
-    const target = (s: EditorState, x: number, y: number): [number, number, number] | null => {
-      const cell =
-        s.tool === 'void' || (s.tool === 'paint' && s.paintMode === 'brush')
-          ? viewer.pickPlacement(x, y)
-          : viewer.pickBlock(x, y);
+    // Reject a cell outside the NBT's volume (editing is locked to `size`).
+    const inVolume = (cell: [number, number, number] | null): [number, number, number] | null => {
       if (!cell) return null;
       const size = activeDocument(documentsStore.getState())?.structure?.size;
       return size && !inBounds(cell, size) ? null : cell;
     };
+
+    const target = (s: EditorState, x: number, y: number): [number, number, number] | null =>
+      inVolume(
+        s.tool === 'void'
+          ? viewer.pickPlacementAt(x, y, s.paintDepth)
+          : s.tool === 'paint' && s.paintMode === 'brush'
+            ? viewer.pickPlacement(x, y)
+            : viewer.pickBlock(x, y),
+      );
 
     // The hover-preview hue: what the next edit will do at the cursor.
     const hue = (s: EditorState): number => {
@@ -66,10 +76,14 @@ export function EditorLayer() {
     let beginPending = false;
     let lastPaint: string | null = null;
     let lastHover: string | null = null; // throttle the cursor readout to cell changes
+    let lastPos: { x: number; y: number } | null = null; // for re-aiming after a depth step
 
     // Identify the cell under the cursor and feed the panel readout (what's actually there).
+    // With the Void tool aimed DEEPER than the surface, the readout describes the depth-stepped
+    // TARGET cell (the one an edit would hit), not the surface under the cursor.
     const reportHover = (x: number, y: number) => {
-      const id = viewer.identifyCell(x, y);
+      const s = editorStore.getState();
+      const id = s.tool === 'void' && s.paintDepth > 0 ? target(s, x, y) : viewer.identifyCell(x, y);
       const key = id ? cellKey(id) : null;
       if (key === lastHover) return;
       lastHover = key;
@@ -81,16 +95,37 @@ export function EditorLayer() {
       editorStore.getState().setHoverInfo(null);
     };
 
+    // The plane a stroke is LOCKED to (the MagicaVoxel/Axiom convention): set from the
+    // clicked face's normal at stroke start, cleared on release. While locked, the drag aims
+    // at ray∩plane instead of re-picking the surface — no mid-stroke depth jumps, and the
+    // stroke can bridge gaps (extend a wall across a window hole).
+    let strokePlane: { axis: 0 | 1 | 2; coord: number } | null = null;
+
+    /** The locked plane for a stroke starting at `cell`: the axis where the placement cell
+     *  and the solid cell under the same point differ is the clicked face's normal. */
+    const planeFor = (s: EditorState, cell: [number, number, number], x: number, y: number): { axis: 0 | 1 | 2; coord: number } | null => {
+      const solidCell = viewer.pickBlock(x, y);
+      const frontCell = viewer.pickPlacement(x, y);
+      if (!solidCell || !frontCell) return null;
+      for (const axis of [0, 1, 2] as const) {
+        if (solidCell[axis] !== frontCell[axis]) return { axis, coord: cell[axis] };
+      }
+      return null;
+    };
+
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       const s = editorStore.getState();
-      if (isStrokeTool(s) && !s.eyedropper) {
+      // Alt+click = sample (the always-available eyedropper), even on a stroke tool — it
+      // must not start a stroke, so route it through the click path.
+      if (isStrokeTool(s) && !s.eyedropper && !e.altKey) {
         painting = true;
         beginPending = true;
         lastPaint = null;
         clearHover(); // the preview/readout belongs to hovering, not an active stroke
         canvas.setPointerCapture(e.pointerId);
         const cell = target(s, e.clientX, e.clientY);
+        strokePlane = cell ? planeFor(s, cell, e.clientX, e.clientY) : null;
         // strokeBegin resets the undo-coalescing synchronously and resolves the brush block
         // (Void resolves immediately). Paint the first cell once it's ready, regardless of
         // whether the pointer is still down — then finalize if the click already ended.
@@ -109,8 +144,13 @@ export function EditorLayer() {
 
     const onMove = (e: PointerEvent) => {
       const s = editorStore.getState();
+      lastPos = { x: e.clientX, y: e.clientY };
       if (painting) {
-        const cell = target(s, e.clientX, e.clientY);
+        // A locked stroke follows its start plane; otherwise re-pick the surface. Either
+        // way editing stays inside the NBT volume.
+        const cell = strokePlane
+          ? inVolume(viewer.pickOnPlane(e.clientX, e.clientY, strokePlane.axis, strokePlane.coord))
+          : target(s, e.clientX, e.clientY);
         if (cell && cellKey(cell) !== lastPaint) {
           s.strokePaint(cell);
           lastPaint = cellKey(cell);
@@ -133,6 +173,7 @@ export function EditorLayer() {
       if (painting) {
         painting = false;
         lastPaint = null;
+        strokePlane = null;
         if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
         // If the resolve is still pending, its callback paints the first cell and ends the
         // stroke (ending here would null the stroke before that paint lands).
@@ -144,8 +185,9 @@ export function EditorLayer() {
       down = null;
       if (moved > CLICK_SLOP) return; // a drag orbited
       const s = editorStore.getState();
-      // Eyedropper: the next click samples the block's type instead of acting.
-      if (s.eyedropper) {
+      // Eyedropper: the next click samples the block's type instead of acting. Alt+click is
+      // the modifier form — always live on the tools with a block field (paint/replace/stairs).
+      if (s.eyedropper || (e.altKey && isPaintFamily(s))) {
         const cell = viewer.pickBlock(e.clientX, e.clientY);
         if (cell) s.sample(cell);
         return;
@@ -168,10 +210,27 @@ export function EditorLayer() {
       }
     };
 
+    // Alt+scroll steps the Void tool's target DEEPER along the aim ray (plain scroll keeps
+    // zooming the camera). Capture-phase so OrbitControls never sees the depth scroll.
+    const onWheel = (e: WheelEvent) => {
+      const s = editorStore.getState();
+      if (!e.altKey || s.tool !== 'void') return;
+      e.preventDefault();
+      e.stopPropagation();
+      s.setPaintDepth(s.paintDepth + (e.deltaY > 0 ? 1 : -1));
+      if (lastPos) {
+        const next = editorStore.getState();
+        viewer.setHover(target(next, lastPos.x, lastPos.y), hue(next));
+        lastHover = null; // force the readout to refresh for the new depth
+        reportHover(lastPos.x, lastPos.y);
+      }
+    };
+
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('pointerleave', onLeave);
+    canvas.addEventListener('wheel', onWheel, { capture: true, passive: false });
 
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -188,9 +247,22 @@ export function EditorLayer() {
         s.redo();
         return;
       }
+      // Escape walks back one layer at a time: cancel the eyedropper → return to Select →
+      // clear the selection. Esc "always gets you back to a neutral state".
       if (e.key === 'Escape') {
-        s.clearSelection();
+        if (s.eyedropper) s.setEyedropper(false);
+        else if (s.tool !== 'select') s.setTool('select');
+        else s.clearSelection();
         return;
+      }
+      // Number keys switch tools, matching the rail's order (1 = Select … 9 = Delete).
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+        const next = TOOL_ORDER[Number(e.key) - 1];
+        if (next) {
+          e.preventDefault();
+          s.setTool(next);
+          return;
+        }
       }
       if (!s.selection.length) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -212,14 +284,15 @@ export function EditorLayer() {
       const struct = activeDocument(documentsStore.getState())?.structure;
       viewer.setSymmetryPlane(sym === 'none' || !struct ? null : sym, struct?.size ?? [0, 0, 0]);
     };
-    // Mirror the explicit air/void boundary cells into the viewer when "show voids" is on.
+    // Mirror the explicit air/void cells into the viewer when "show voids" is on.
     // The eye explicitly promises "air / void", so turning it on reveals ALL boundary air too
-    // (not just void) — regardless of the active tool. With it off, no overlay; with it on and
-    // a bulk-air capture, the user opted into seeing it (toggle it back off to drop the fog).
+    // (not just void) — regardless of the active tool — AND the interior layers of stacked
+    // regions (`revealAll`, drawn dimmed), so a multi-layer void slab shows every layer. With
+    // it off, no overlay; with it on and a bulk-air capture, the user opted in.
     const applyVoids = () => {
       const s = editorStore.getState();
       const struct = activeDocument(documentsStore.getState())?.structure ?? null;
-      viewer.setVoids(s.showVoids && struct ? voidMarkers(struct, s.showVoids) : []);
+      viewer.setVoids(s.showVoids && struct ? voidMarkers(struct, s.showVoids, s.showVoids) : []);
     };
     // Hand the LEFT button to painting while a Paint/Void tool is active (orbit → RIGHT button).
     const applyPaintNav = () => {
@@ -275,6 +348,7 @@ export function EditorLayer() {
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointerleave', onLeave);
+      canvas.removeEventListener('wheel', onWheel, { capture: true });
       window.removeEventListener('keydown', onKey);
       if (raf) cancelAnimationFrame(raf);
       unsubSel();

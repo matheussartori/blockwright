@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  DATA_PACK_FORMATS,
+  datapackFormatFor,
   DEFAULT_WORLDGEN,
   isValidResourceName,
   plannedFiles,
@@ -46,6 +48,27 @@ describe('structureFolder', () => {
   });
   it('assumes modern when the version is unknown', () => {
     expect(structureFolder(null)).toBe('structure');
+  });
+  it('uses the singular folder for year-numbered releases (26.x)', () => {
+    expect(structureFolder('26.1')).toBe('structure');
+    expect(structureFolder('26.2')).toBe('structure');
+  });
+});
+
+describe('datapackFormatFor', () => {
+  it('resolves exact known versions', () => {
+    expect(datapackFormatFor('1.21.1')).toBe(48);
+    expect(datapackFormatFor('1.21.4')).toBe(61);
+    expect(datapackFormatFor('26.2')).toBe(107);
+  });
+  it('falls back to the nearest OLDER known release', () => {
+    expect(datapackFormatFor('1.21.2')).toBe(48);
+    expect(datapackFormatFor('26.1')).toBe(DATA_PACK_FORMATS['1.21.5']);
+    expect(datapackFormatFor('27.1')).toBe(107);
+  });
+  it('uses the 1.21.1 baseline when unknown', () => {
+    expect(datapackFormatFor(null)).toBe(48);
+    expect(datapackFormatFor('1.12')).toBe(48);
   });
 });
 

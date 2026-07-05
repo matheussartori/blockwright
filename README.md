@@ -5,7 +5,7 @@
 <h1 align="center">Blockwright</h1>
 
 <p align="center">
-  A desktop app for viewing, browsing, and AI-generating Minecraft <code>.nbt</code> structures in 3D.
+  A desktop app for viewing, editing, comparing, and AI-generating Minecraft structures in 3D.
 </p>
 
 <p align="center">
@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <a href="#overview">Overview</a> ·
   <a href="#features">Features</a> ·
+  <a href="#getting-started">Getting Started</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#mod-workspaces">Mod Workspaces</a> ·
   <a href="#development">Development</a> ·
@@ -34,295 +34,121 @@
   <img src=".github/assets/screenshot-build-planner.png" alt="Blockwright's build planner with a live 3D wireframe of a two-floor house and controls for roof, basement, floors and size" width="900" />
 </p>
 
-## Overview
-
-Blockwright is an Electron desktop app that loads Minecraft `.nbt` structure files and renders
-them as interactive 3D scenes. Block models and textures are read from an extracted Minecraft
-"content pack" on disk, so structures appear with their real in-game look — including support for
-modded blocks via [mod workspaces](#mod-workspaces).
-
-Blockwright can also **AI-generate** structures: describe a build in a prompt (optionally with a
-reference image) and the model emits a structure, which the app compiles to `.nbt`, renders, and
-refines through an emit → render → review loop — previewed live in the viewer as it evolves.
+Blockwright loads Minecraft `.nbt` structures (plus WorldEdit `.schem` and Litematica
+`.litematic` schematics) and renders them as interactive 3D scenes with the real block models and
+textures from your own Minecraft content pack — modded blocks included. It can also **AI-generate**
+structures from a prompt, refining them through a visual emit → render → review loop, and gives you
+the studio tools around them: an in-viewer block editor, a visual diff, one-click re-theming,
+showcase renders, and a full mod-workspace export pipeline.
 
 ## Features
 
-- **Real-time 3D rendering** of `.nbt` structures with [Three.js](https://threejs.org), using the
-  real block models and textures from your own Minecraft content pack
-- **AI structure generation** from a prompt or reference image, refined live through an
-  emit → render → review loop — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT Plus/Pro)
-  subscription, no API credits, with cost presets (Saver / Balanced / Thorough) to trade quality for spend
-- **Composable build planner** — steer a generation by picking a structure type (a **House**, a
-  **Tower**, or a **Church**, each with a code-built shell the AI furnishes), a decoration, roof, basement, attic,
-  surrounding yard and per-floor interior rooms, with live 3D previews of every part in the Module Gallery
-- **In-app block editor** — select, move, mirror/rotate, extrude, paint, replace and delete blocks
-  directly in the viewer, with live symmetry, undo/redo, and orientation that stays correct on every
-  transform; each save writes a new `.nbt` version so a mistake is never fatal
-- **World viewer** — open a whole Minecraft save and fly through it view-only. Chunks stream in
-  around the camera with level-of-detail (full block geometry near, a cheaper heightmap surface far)
-  and unload behind you, so an entire world explores without loading it all at once. Reads Anvil
-  `region/*.mca` directly (1.13+), meshes off the main thread in a worker pool, and reuses the same
-  geometry core as the structure renderer — plus a top-down minimap, day/night, a dimension switcher,
-  and a find-structures search that jumps you to any village, stronghold or mod structure
-- **Schematic interop** — open and export **WorldEdit `.schem`** and **Litematica `.litematic`**
-  schematics alongside native `.nbt`, preserving block entities (chest contents, sign text) on conversion
-- **Mod workspace support** — render modded structures with their own textures, and **export** a
-  structure into a workspace as a version-correct `.nbt` plus the worldgen JSON (jigsaw structure /
-  template pool / structure set / biome tag) that makes it spawn in-world
-- **Oversized structures auto-split to jigsaw** — a build bigger than the Structure Block limit (48³,
-  or 32³ pre-1.16) is cut into a jigsaw assembly that reassembles voxel-perfectly in-world, so it loads
-  despite the limit. **Export to World** drops a ready-to-run datapack straight into a save and hands you
-  the `/place` command
-- **Round-trip in-game editing** — export a build into a world, edit it there with vanilla Structure
-  Blocks, then **Reimport from World** stitches the edits back in as a new version of the same project
-- **Structure library** — every generated build is saved to its own folder (latest `.nbt`, kept
-  versions, and a generation log), revealed from the chat's build card
-- **Floor-plan editing** — define named vertical levels, highlighted as bands in the viewer, that ride
-  along as context on every generation prompt
-- Jigsaw assembly preview, a Block Catalog browser with live 3D previews, block-entity rendering
-  (chests, beds, banners, skulls, decorated pots), entity rendering (armor stands as their real
-  vanilla model with pose and display flags) and animated fluids
-- An IDE-style workbench — activity bar, project explorer, console dock and floating tool windows —
-  with a **theme gallery** (light, dark and Minecraft-skinned themes) and an interface in **English
-  and Português (Brasil)**, following your OS by default
+- **Real-time 3D rendering** of `.nbt`, `.schem` and `.litematic` structures, with block entities
+  (chests, beds, banners…), entities (armor stands with their real pose), animated fluids, and a
+  Block Catalog with live 3D previews
+- **AI structure generation** from a prompt or reference image, refined through an
+  emit → render → review loop — on your existing **Claude** (Pro/Max) or **Codex** (ChatGPT
+  Plus/Pro) subscription, no API credits, with Saver/Balanced/Thorough cost presets
+- **Composable build planner** — pick a structure type (House / Tower / Church families, each with
+  a guaranteed code-built shell), decoration, roof, basement, attic, yard and per-floor rooms, with
+  live 3D previews in the Module Gallery
+- **In-app block editor** — select, move, mirror/rotate, extrude, paint, replace, delete and edit
+  air/void directly in the viewer: live symmetry, plane-locked strokes, depth targeting for
+  multi-layer void regions, number-key tool shortcuts, undo/redo, and orientation that stays
+  correct on every transform; each save is a new version
+- **Structure Diff** — compare the open build with any file or any of its versions: added, removed
+  and changed cells marked in the viewer with a per-block summary. "What did this AI run change?"
+  is one click
+- **Re-theme** — swap blocks across the whole build with blockstates carried over (stairs keep
+  their facing), by hand or from any registered decoration — "download any build, make it yours"
+- **Beauty Render** — export a high-resolution PNG (transparent or themed background, preset
+  angles including a cross-section) or a turntable WebM, straight from the viewer
+- **World viewer** — fly through a whole Minecraft save, view-only: streamed chunks with
+  level-of-detail, minimap, day/night, dimension switcher, and a find-structures search (1.13+)
+- **Mod workspace pipeline** — render modded structures with their own textures, generate with the
+  mod's own blocks, and export version-correct `.nbt`s plus the worldgen JSON that makes them
+  spawn in-world. The **Worldgen Doctor** audits the whole data pack for silent failures (missing
+  `spawn_overrides`, empty biome tags, dead pools…), and **watch mode** hot-reloads the viewer when
+  external tools edit your files
+- **Oversized builds auto-split to jigsaw** — anything past the Structure Block limit is cut into a
+  jigsaw assembly that reassembles voxel-perfectly in-world; **Export to World** installs a
+  ready-to-run datapack and hands you the `/place` command
+- **Round-trip in-game editing** — export into a world, edit with vanilla Structure Blocks, then
+  **Reimport from World** stitches the result back as a new version
+- An IDE-style workbench with a theme gallery, versions panel, floor-plan bands, structure library,
+  and an interface in **English and Português (Brasil)**
+- **Current with Minecraft's release cadence, through 26.2** — year-numbered versions detect,
+  26.x worlds open, and exports stamp the DataVersion / pack format your mod (or the target
+  world's `level.dat`) actually targets
+
+## Getting Started
+
+**Downloads** — installers for macOS, Windows and Linux are attached to each
+[GitHub Release](https://github.com/matheussartori/blockwright/releases). Builds are ad-hoc
+signed (no paid certs yet), so the first launch shows an OS warning:
+
+- **macOS** — right-click ▸ **Open**. If it says the app *"is damaged"*, clear the quarantine
+  flag: `xattr -dr com.apple.quarantine /Applications/Blockwright.app`
+- **Windows** — **More info ▸ Run anyway**. The Squirrel installer installs per-user silently and
+  auto-updates from new releases.
+- **Linux** — install the `.deb`/`.rpm`, or the `.flatpak` bundle (add the Flathub remote once so
+  its runtime resolves, then `flatpak install --user io.github.matheussartori.Blockwright_*.flatpak`).
+
+**Content pack** — Blockwright renders with the textures/models of a Minecraft content pack it
+does **not** bundle (Mojang's assets can't be redistributed). Extract a version's `assets` and
+`data` folders (from the `.jar` in `.minecraft/versions/<version>/`) into one folder and pick it in
+**Settings ▸ Viewer ▸ Content pack**. Without one, blocks render as flat colors — everything else
+still works.
 
 ## Usage
 
-> **Downloads** — packaged installers (macOS `.dmg`/`.zip`, Windows `.exe`, Linux
-> `.deb`/`.rpm`/`.flatpak`) are attached to each
-> [GitHub Release](https://github.com/matheussartori/blockwright/releases).
-> Builds are **ad-hoc signed, not notarized** (no paid Apple Developer cert yet), so the first
-> launch shows an OS warning:
->
-> - **macOS** — right-click the app ▸ **Open**, then **Open** in the dialog (or System Settings ▸
->   Privacy & Security ▸ *Open Anyway*). If macOS instead says the app **"is damaged and can't be
->   opened"**, Gatekeeper is blocking the quarantined download — clear the quarantine flag and open
->   it normally:
->   ```bash
->   xattr -dr com.apple.quarantine /Applications/Blockwright.app
->   ```
-> - **Windows** — **More info ▸ Run anyway**. `Blockwright-Setup.exe` is a Squirrel
->   installer: it installs **per-user, silently** (no wizard or location prompt), then
->   launches the app right away. It lands in `%LocalAppData%\blockwright`, adds Start
->   Menu + Desktop shortcuts and an Add/Remove Programs entry, and auto-updates itself
->   from new releases — so "it just opened without installing" means it *did* install.
-> - **Linux** — install the `.deb`/`.rpm` with your package manager, or use the
->   **`.flatpak`** bundle (works on any distro). The bundle needs the Flathub remote
->   added once so its shared runtime resolves automatically:
->   ```bash
->   # one-time: add the Flathub remote (skip if you already have it)
->   flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
->   # install the downloaded bundle — pulls the org.freedesktop.Platform runtime from Flathub
->   flatpak install --user io.github.matheussartori.Blockwright_*.flatpak
->   # run it
->   flatpak run io.github.matheussartori.Blockwright
->   ```
->   > If you hit `requires the runtime org.freedesktop.Platform/<arch>/<ver> which was not
->   > found`, the Flathub remote isn't configured — run the `remote-add` line above and retry.
->
-> You can also run from source — see [Development](#development).
-
-### Content pack
-
-Blockwright renders blocks using the textures and models from a Minecraft **content pack**, which it
-does **not** bundle (those assets belong to Mojang and can't be redistributed). Point it at your own:
-
-1. Extract a Minecraft version's `assets` and `data` folders (e.g. from the version `.jar` in
-   `.minecraft/versions/<version>/`) into a single folder.
-2. In Blockwright, open **Settings ▸ Viewer ▸ Content pack** (or click **Choose folder…** on the
-   welcome screen) and select that folder.
-
-Without a content pack, structures still load but blocks render as flat deterministic colors. The
-`BW_CONTENT` environment variable overrides the configured folder.
-
-### Opening a structure
-
-1. Launch the app (see [Development](#development) below).
-2. Use **File ▸ Open…** (or the welcome screen) and pick a `.nbt` structure, a WorldEdit `.schem`, or a
-   Litematica `.litematic` schematic.
-3. The structure renders in 3D — orbit, zoom and inspect it in the viewer. **Export As…** (Cmd/Ctrl+Shift+S)
-   writes it back out as `.nbt`, `.schem`, or `.litematic`.
-
-Recently opened files are remembered and listed under **File ▸ Open Recent** and on the welcome
-screen.
-
-### Exploring a world
-
-**File ▸ Open World…** (Cmd/Ctrl+Shift+W, or the welcome screen) opens a Minecraft save folder — the
-directory holding `level.dat` and `region/` — and drops you into a view-only fly-through of the actual
-world. Press **F** to fly, **WASD** to move. Chunks stream in around the camera and unload behind you,
-so an entire world stays explorable without loading it all at once:
-
-- **Level of detail** — nearby chunks render as full block geometry (caves, overhangs and interiors
-  visible from any angle); distant ones fall back to a cheaper heightmap surface, widening the view
-  without the cost. The **Render distance** control trades reach for performance.
-- **Navigation** — jump to **spawn**, the last **player** position, an explicit **X/Y/Z** coordinate,
-  or any **generated structure** (a village, stronghold, or mod structure) via the find-structures
-  search. A top-down **minimap** fills in with real terrain colours as you explore.
-- **Dimensions & mood** — switch between the Overworld, Nether, End, and any mod dimensions present on
-  disk, and toggle **day/night** lighting.
-
-Worlds from **Minecraft 1.13+** are supported (the paletted chunk format); recently opened worlds are
-remembered under **File ▸ Open Recent World** and on the welcome screen. The world is never modified —
-it's a read-only viewer.
-
-### Generating a structure
-
-**File ▸ New Structure** opens the full-stage **Build Planner**, where you describe the build
-(optionally attaching a reference image) and pick a structure type, decoration, roof, basement,
-in-roof attic and surroundings (a yard wrapping the house — a fenced cottage garden, a modern
-pool terrace or a graveyard, whose size you set by hand on each axis; the W×D you set is the building shell, and
-the compiled box grows around it by the chosen yard margins) to steer it — and, for a multi-storey
-house, assign up to two interior rooms to each floor (e.g. _Floor 1: living room + kitchen, Floor 2:
-bedrooms + library_) and set a height per floor (optionally linked so the whole stack moves
-together) — alongside a live 3D preview of the build volume, where the storeys rise from the ground,
-a basement drops below it, and the yard ring shows at ground level around the house.
-A picked structure type starts from its code-built shell (the exterior is guaranteed and kept;
-the AI furnishes the interior and layers on detail), while a build with no structure selected is
-designed free-form from the prompt. Blockwright compiles the result to `.nbt` and renders it in
-the viewer, iterating through a visual review loop; follow-up edits continue in the chat, where **Build options** reopens
-the planner and your picks are shown back as a tidy build card. Browse every module with live 3D
-previews in the **Module Gallery**, and use **▦ Floors** to sketch the vertical levels. Pick an AI
-provider and model in **Settings ▸ AI** first.
-
-Every finished build is saved to a browsable library — one folder per build, holding the latest clean
-`.nbt`, every kept version, and a `generation.log` of how it was made. A from-scratch build's tab
-becomes that saved project, so the chat's build card has a **Reveal** action (show the folder in your
-file manager); the library root is configurable in **Settings ▸ AI**.
-
-### Editing a structure
-
-With a structure open, click **Edit** on the stage (top-left) to open the block editor and tweak it
-directly in the 3D view:
-
-- **Select** — click a block; **Shift-click** a second to select the whole box between them; **⌘/Ctrl-click**
-  toggles one. The selection is outlined live, and the panel shows its size + the block name(s).
-- **Move** — nudge the selection one block along any axis (buttons or arrow keys).
-- **Mirror / rotate** — flip the selection across X or Z, or rotate it 90° — directional blockstates
-  (stairs/logs/doors) stay correct, and it pivots around the selection's own centre.
-- **Extrude / array** — duplicate the selection along an axis: spacing 1 raises a floor outline into
-  walls or stacks a column; spacing > 1 makes a repeating array.
-- **Stairs** — pick a start block, a direction and a length to lay an ascending stair run with every
-  stair facing the right way.
-- **Paint** — the fast way to place blocks. **Brush** clicks or drags over surfaces to add blocks (a
-  drag paints a continuous stroke); **Recolor** drags across existing blocks to repaint them in place;
-  **Fill** flood-fills a block's whole connected region. Pick the block from the catalog (with a 3D
-  swatch) or **eyedrop** one from the build, and a hover ghost previews the target cell. In paint mode
-  the left button paints and the right button orbits, so a stroke never fights the camera.
-- **Replace / Delete** — swap the selected blocks for another, or carve them away.
-- **Air / void** — toggle the **eye** (Show air / void cells) in the panel header to surface the
-  otherwise-invisible markers, colored like Minecraft's "show invisible blocks": **air is blue** (clears
-  the cell when pasted), **void is red** (leaves the terrain untouched, for non-cuboid footprints). "Void"
-  covers both `minecraft:structure_void` and cells simply omitted from the structure — so a region you
-  carved out as structure void in-world shows up even though Minecraft saved it as omitted blocks. Then use
-  the **Air / void** tool to paint air or void; it only ever touches empty cells, so your solid blocks are
-  never overwritten. While that tool is active the markers are always on (the eye is locked); switch away
-  and the overlay returns to whatever you had it set to before.
-- **Live symmetry** — turn on an X or Z mirror and a translucent plane in the viewer shows where it is;
-  your paint + delete edits are mirrored across the build's centre as you work, with correct blockstates.
-
-Every tool button — and the header's eye / close controls — has a **hover tooltip** with its name and a
-one-line note on what it does. Edits keep block orientation correct, support **undo/redo** (no small cap),
-and **Save version** writes the result as a new `.nbt` version in the same version chain as AI builds — so
-an edit is never fatal.
-
-### Versions
-
-Every build a tab produces — each AI run and each manual save — lands in its **Versions** panel, with its
-creation date. A whole generation run refines a build in place and commits a **single** version (not one
-per pass); a new prompt adds the next. Click a version to preview it, **Set as Current** to make it the
-base your next export, manual save and AI edit build from (promoting an older one branches a new build off
-it), or **delete** an old one (with a confirmation — the Current and latest versions are kept as the live
-base). Block editing is locked while the AI is building.
+- **Open a structure** — **File ▸ Open…** with a `.nbt`, `.schem` or `.litematic`; orbit and
+  inspect it in 3D. **Export As…** converts between the three formats.
+- **Explore a world** — **File ▸ Open World…** on a save folder; **F** to fly, **WASD** to move.
+  Chunks stream with LOD; jump to spawn, coordinates, or any generated structure. Read-only.
+- **Generate** — **File ▸ New Structure** opens the Build Planner: describe the build, pick the
+  modules (structure/decoration/roof/basement/attic/yard/per-floor rooms + per-floor heights), and
+  watch it evolve live. Follow-up edits continue in the chat; every build lands in a browsable
+  library folder with its versions and a generation log. Pick a provider in **Settings ▸ AI** first.
+- **Edit** — click **Edit** on the stage. Tools live on a rail (keys 1–9), every control has a
+  tooltip, and an on-canvas hint shows what a click will do. Paint with brush/recolor/fill and an
+  eyedropper (Alt+click), mirror with live symmetry, reveal and edit air/void layers (Alt+scroll
+  aims deeper), and save as a new version — undo has your back throughout.
+- **Compare** — **File ▸ Compare with File…**, or the compare action on any entry in the Versions
+  panel. Green = added, red = removed, yellow = changed block/state.
+- **Re-theme** — **File ▸ Re-theme Structure…**: map blocks by hand (with occurrence counts) or
+  apply a decoration's whole palette; blockstates are preserved. Undoable, saved as a version.
+- **Render** — **File ▸ Render Image…** for a high-res PNG or a turntable WebM.
+- **Versions** — each AI run and manual save is one version. Preview any, **Set as Current** to
+  branch from it, compare, or delete old ones.
 
 ## Mod Workspaces
 
-Modded structures reference blocks and textures that don't exist in the vanilla content pack.
-A **mod workspace** points Blockwright at a mod project folder so those assets resolve correctly.
+A **mod workspace** points Blockwright at a mod project so its assets resolve: **File ▸ Open Mod
+Workspace…**, and the mod's structures render with their custom textures (pin the workspace to
+auto-activate it at launch). Opening a loose `.nbt` that lives inside a mod offers to activate it.
 
-- **File ▸ Open Mod Workspace…** (or the welcome button) picks a mod project folder.
-- Blockwright locates its resources root and the mod's namespace under `assets/`, then registers
-  it as an extra asset source. The statusbar's workspace segment shows the active workspace (and
-  opens the picker); **pin** it there (or File ▸ Pin Workspace) to have it auto-activate at launch.
-- The mod's structures (`data/<namespace>/structure/*.nbt`) are listed on the welcome screen and
-  render with their custom textures.
-- Opening a loose `.nbt` that lives inside a mod prompts you to activate that mod's workspace.
-
-Opened workspaces are remembered under **File ▸ Open Recent Workspace**.
-
-### Building with the mod's own blocks
-
-AI generation can build with a mod's blocks, not just vanilla. In the **Block Catalog** you describe the
-blocks worth building with (a one-time annotation, optionally tagging a block's role — wall, roof, floor —
-that travels with the mod). The **Build Planner** then shows a **Mod blocks** control that sets how
-generation uses them: **Off** (vanilla only), **Mix** (offer them alongside vanilla), or **Prefer** (build
-the structure's main materials — walls, floors, roof, trim — from the mod's blocks, dropping to vanilla
-only for what the mod lacks, like windows). Under **Prefer** the code-built shell itself is compiled in the
-mod's blocks, with their custom blockstate properties, so the whole exterior comes out modded.
-
-### Exporting into a workspace
-
-With a workspace open, **Export to Mod Workspace…** (the build card's button, or **File ▸ Export to Mod
-Workspace…** for any open `.nbt`) writes the structure into the mod's data pack — the `.nbt` in the
-version-correct structure folder (the 1.21 `structures/` → `structure/` rename is handled for you). Turn
-on **Generate worldgen files** to also write the four JSON files that make Minecraft spawn it: a jigsaw
-**structure** definition, a **template pool**, a **structure set**, and a biome tag. Pick how it sits on
-the terrain, how often it spawns, and which biomes (the dialog reads your mod's own biomes), then see
-every file — and any problems (an empty biome list, `separation ≥ spacing`, overwrites) — before writing.
-
-If a structure is larger than the Structure Block size limit (48³, or 32³ before 1.16 — configurable in
-**Settings ▸ Viewer ▸ Structures**), it can't load as one file, so every export instead cuts it into a
-**jigsaw assembly**: a grid of pieces (each within the limit) plus the worldgen JSON that reassembles them
-voxel-perfectly in-world. The export dialog shows the piece count up front.
-
-### Exporting into a world
-
-**File ▸ Export to World…** installs the build straight into a Minecraft save as a ready-to-run datapack
-(`<save>/datapacks/<name>/`) and shows you the exact command to spawn it (`/place jigsaw …` for a split
-build, `/place template …` for a single one), with a one-click copy. Run `/reload` in the world and paste
-it — no manual file shuffling.
-
-### Editing in-game and reimporting
-
-An export isn't a one-way trip — you can polish a build with Minecraft's own tools and bring the
-result back:
-
-1. **Export to World** the build, place it in your world, and edit it freely in-game. Vanilla
-   **Structure Blocks** are enough: a single structure loads/saves under its exported name, and a
-   split build's pieces each appear inside an outlined box with their own SAVE structure block.
-2. Save the structure block(s), then use **File ▸ Reimport from World…** in Blockwright — it reads
-   the edited pieces back and stitches them into a single structure, committed as a **new version**
-   of the same project.
-
-**File ▸ Open Jigsaw Assembly…** reopens a previously exported split-assembly folder as one
-structure, and **File ▸ Rename Project…** renames a generated project's library folder.
+- **Generate with the mod's blocks** — annotate the useful blocks in the **Block Catalog** (the
+  dictionary travels with the mod), then set the planner's **Mod blocks** control to Off / Mix /
+  **Prefer** (the code-built shell itself compiles in the mod's materials).
+- **Export to Mod Workspace…** writes the `.nbt` into the version-correct structure folder and,
+  optionally, the four worldgen JSON files that make it spawn (structure def, template pool,
+  structure set, biome tag) — with every file and problem previewed before writing. Oversized
+  builds are split into a jigsaw assembly automatically.
+- **Export to World…** installs a ready-to-run datapack into a save and shows the `/place`
+  command; edit in-game with Structure Blocks and **Reimport from World** to round-trip.
+- **Workspace Check-Up…** (the Worldgen Doctor) scans the whole data pack and explains every
+  silent failure it finds — before you launch the game. Watch mode keeps the viewer and the
+  project panel in sync with external edits (a datapack build, an Axiom export, VS Code).
 
 ## Development
-
-> This section is for contributors who want to run or modify Blockwright from source.
-
-**1. Clone the repository**
 
 ```bash
 git clone https://github.com/matheussartori/blockwright.git
 cd blockwright
-```
-
-**2. Install dependencies**
-
-```bash
 npm install
+npm start   # Vite dev server + Electron, with HMR
 ```
-
-**3. Start the app in development**
-
-```bash
-npm start
-```
-
-This launches the Vite dev server and Electron together, with hot-module reloading.
-
-**Other useful commands**
 
 | Command             | Description                                       |
 | ------------------- | ------------------------------------------------- |
@@ -332,96 +158,57 @@ This launches the Vite dev server and Electron together, with hot-module reloadi
 | `npm run package`   | Package the app via Electron Forge                |
 | `npm run make`      | Build distributable installers via Electron Forge |
 
-### Packaging & releases
+**Packaging notes** — releases are built in CI (`.github/workflows/release.yml`, on a `v*` tag).
+Locally: use **Node 22** (Forge's packaging silently breaks on 26); macOS is ad-hoc signed unless
+you set `APPLE_SIGNING_IDENTITY` (+ `APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` to notarize); the
+Flatpak maker needs `flatpak`, `flatpak-builder` and the pinned **24.08** freedesktop/Electron
+runtimes (see `forge.config.ts`).
 
-Releases are built in CI (`.github/workflows/release.yml`, on a `v*` tag) and the installers are
-attached to the [GitHub Release](https://github.com/matheussartori/blockwright/releases). A few
-notes if you package locally:
+**Updates** — auto-install via update.electronjs.org where Squirrel can (Windows, signed macOS),
+plus a notify-only GitHub-release check everywhere else. `BW_FORCE_UPDATE_CHECK=9.9.9` fakes a
+newer release for testing.
 
-- **Use Node 22.** Forge's packaging step silently breaks on Node 26 (it dies mid Electron-zip
-  extraction with no `out/`), so `npm run package` / `npm run make` must run on Node 22 — CI uses 22.
-- **macOS signing** is gated on env vars in `forge.config.ts`:
-  - _No vars (default)_ — the app is **ad-hoc signed** (`identity: '-'`, with `identityValidation:
-    false` + `hardenedRuntime: false`). This is required for the app to launch at all on Apple
-    Silicon and swaps the scary _"app is damaged"_ error for the normal _"unidentified developer"_
-    prompt, but it does **not** remove the Gatekeeper warning (see [Usage](#usage)).
-  - _With a real Developer ID cert_ — set `APPLE_SIGNING_IDENTITY` (and `APPLE_ID`,
-    `APPLE_PASSWORD`, `APPLE_TEAM_ID` to also notarize) to ship a clean, no-warning install.
-- **Windows** uses a branded Squirrel installer (`Blockwright-Setup.exe`) that installs per-user and
-  auto-updates. It is **not** code-signed, so SmartScreen still shows an _unknown publisher_ warning.
-- **Linux Flatpak** (the `.flatpak` maker) only runs on Linux and needs `flatpak` + `flatpak-builder`
-  (and `elfutils`) on the build host, plus the `org.freedesktop.Sdk`/`Platform` and
-  `org.electronjs.Electron2.BaseApp` **24.08** runtimes installed (`flatpak install flathub
-  org.freedesktop.Sdk//24.08 org.electronjs.Electron2.BaseApp//24.08`). The runtime/base version is
-  pinned in `forge.config.ts` — the installer's default (`19.08`) is long gone from Flathub and is why
-  an unpinned bundle fails to install. To bump it, change `runtimeVersion`/`baseVersion` together
-  (they must match). `.deb`/`.rpm` need no extra tooling.
+**Headless screenshots** — the app can capture itself for visual verification:
 
-### Updates
-
-Two layers, wired at launch in `src/main/updater.ts`:
-
-- **Auto-install** (`update-electron-app` → update.electronjs.org, reads the latest GitHub Release):
-  installs updates in place where Squirrel can — **Windows**, and a signed + notarized macOS build.
-- **Notify-only** (`src/main/update-check.ts`): on the platforms the auto-installer can't serve (the
-  ad-hoc-signed macOS build and Linux), the app polls the GitHub Releases API, compares versions, and
-  surfaces a newer release without installing it — a dismissible banner, a status card in
-  Settings ▸ About, and Help ▸ Check for Updates…, each linking to the download page.
-
-For development, set `BW_FORCE_UPDATE_CHECK` to run the notify check unpackaged; give it a version
-like `9.9.9` to force a synthetic "newer release" so the UI can be tested without a real one.
-
-### Visual testing
-
-Blockwright can screenshot itself headlessly — useful for verifying renders without granting
-screen-recording permission. Set these env vars when launching:
-
-| Variable       | Description                                            |
-| -------------- | ------------------------------------------------------ |
-| `BW_OPEN`         | Path to a `.nbt` file to open on startup                  |
-| `BW_CAPTURE`      | Path to write a PNG to, then quit (~2.5s after render)    |
-| `BW_CAPTURE_DELAY`| Override the capture delay in ms (raise it on cold starts) |
-| `BW_CONTENT`      | Override the content-pack location                        |
-| `BW_WORKSPACE`    | Activate a mod workspace on startup                       |
-| `BW_OPEN_WORLD`   | Path to a Minecraft world folder to open on startup       |
-| `BW_WORLD_CAM`    | Override the world fly-through's initial camera position (`x,y,z`) |
-| `BW_WORLD_LOOK`   | Aim the initial world camera at an explicit target (`x,y,z`) |
-| `BW_FORCE_UPDATE_CHECK` | Run the update check in dev; a version (e.g. `9.9.9`) forces a synthetic newer release |
+| Variable                | Description                                                        |
+| ----------------------- | ------------------------------------------------------------------ |
+| `BW_OPEN` / `BW_OPEN_WORLD` | Open a structure file / world folder on startup                |
+| `BW_CAPTURE`            | Write a PNG after rendering, then quit                             |
+| `BW_CAPTURE_DELAY`      | Capture delay in ms (raise on cold starts)                         |
+| `BW_CONTENT` / `BW_WORKSPACE` | Override the content pack / activate a workspace             |
+| `BW_WORLD_CAM` / `BW_WORLD_LOOK` | Initial world camera position / look target (`x,y,z`)     |
 
 ## Architecture
 
-Blockwright builds three Vite bundles, one per Electron context, with a strict process boundary —
-**no Node / `fs` / `electron` imports in the renderer**; everything crosses via IPC.
+Three Vite bundles, one per Electron context, with a strict process boundary — **no Node / `fs` /
+`electron` imports in the renderer**; everything crosses via IPC.
 
 ```
 src/
   main.ts        Main entry: app lifecycle, open-file, scheme/protocol/IPC wiring
   preload.ts     Exposes window.blockwright (contextBridge) — the only renderer→main bridge
-  main/          Window, IPC handlers, native menu, recents, workspaces, structure loading,
-                 the authoring/NBT compiler, the composable generation domain, AI generation,
-                 and the Anvil world reader (region files → resolved chunk render payloads)
-  renderer/      React UI shell (Vite + React), the imperative Three.js viewer, and the streamed
-                 world view (chunk mesh worker pool + LOD)
-  shared/        IPC channel names and type-only contracts shared by both bundles
+  main/          Window, IPC handlers, native menu, workspaces, structure loading, the
+                 authoring/NBT compiler, the generation domain, AI generation, exports
+                 (workspace/world/jigsaw split), the Worldgen Doctor, watch mode, and the
+                 Anvil world reader
+  renderer/      React UI shell, the imperative Three.js viewer (+ overlays: diff, voids,
+                 symmetry), the pure diff/editing ops, and the streamed world view
+  shared/        IPC channel names, type-only contracts, and pure domain logic shared by both
 knowledge/       AI knowledge base (NBT authoring guides), shipped as an extraResource
-content/         A user-supplied Minecraft content pack (configured at runtime, not bundled;
-                 in dev, a local content/ folder here is picked up automatically)
+content/         A user-supplied Minecraft content pack (dev-only auto-pickup; not bundled)
 ```
 
-- **IPC** — `shared/ipc.ts` is the single source of truth for channel/event names; handlers live
-  in `main/ipc.ts` and methods are exposed on `BlockwrightApi` (`shared/types/`).
-- **Content pack** — asset resolution is namespace-aware (`namespace:path`); the vanilla pack
-  serves `minecraft`, the active mod workspace serves its own namespace.
-- **Textures** — served only through the privileged `bw-texture://` scheme (never `file://`).
-- **Renderer state** — held in a vanilla [Zustand](https://github.com/pmndrs/zustand) store.
+- **IPC** — `shared/ipc.ts` is the single source of truth for channel/event names.
+- **Content pack** — asset resolution is namespace-aware; textures are served only through the
+  privileged `bw-texture://` scheme.
+- **Renderer state** — vanilla [Zustand](https://github.com/pmndrs/zustand) stores.
 
 Built with **Electron Forge + Vite + TypeScript + React + Three.js**.
 
 ## Support
 
-Blockwright is a solo, open-source project. If it's useful to you and you'd like to help fund
-its continued development (including the AI structure generation), consider buying me a coffee —
-every bit is genuinely appreciated. ☕
+Blockwright is a solo, open-source project. If it's useful to you and you'd like to help fund its
+continued development, consider buying me a coffee — every bit is genuinely appreciated. ☕
 
 <p align="center">
   <a href="https://buymeacoffee.com/mattsartori">

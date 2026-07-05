@@ -39,6 +39,9 @@ export interface StructureMetadata {
   palette: { name: string; count: number }[];
   /** The recognised storeys (auto-detected, possibly user-corrected). */
   floors: FloorDef[];
+  /** The source `.nbt`'s DataVersion (which Minecraft data format wrote it) — the
+   *  groundwork for a future "upgrade with a loss report". Absent when unknown. */
+  dataVersion?: number;
 }
 
 /** How many palette entries to keep in the snapshot (the long tail isn't useful
@@ -58,6 +61,8 @@ export interface MetadataInput {
   /** Explicit storeys (e.g. the user's corrected plan); auto-detected from `solids`
    *  when omitted. */
   floors?: FloorDef[];
+  /** The source's NBT DataVersion, when known. */
+  dataVersion?: number;
 }
 
 /** Assemble a {@link StructureMetadata} snapshot. Pure (no IO): floors are taken as
@@ -77,6 +82,7 @@ export function buildMetadata(input: MetadataInput): StructureMetadata {
     blockCount: input.solids.length,
     palette,
     floors,
+    ...(input.dataVersion !== undefined ? { dataVersion: input.dataVersion } : {}),
   };
 }
 
@@ -98,6 +104,7 @@ export function metadataFromStructure(data: StructureData, floors?: FloorDef[]):
     solids,
     paletteCounts: counts,
     floors,
+    dataVersion: data.dataVersion,
   });
 }
 

@@ -5,9 +5,10 @@
 // to the base every export, manual save and AI edit builds on (the "Current" chip), and
 // Delete removes it (refused for the Current version, with a confirmation). Rendered as
 // a tab in the docked sidebar, or inside a FloatingWindow when torn off.
-import { Star, Trash2 } from 'lucide-react';
+import { GitCompareArrows, Star, Trash2 } from 'lucide-react';
 import { useActiveDoc, useLocale, useT } from '../hooks/useStores';
 import { viewVersion, setCurrentVersion, deleteVersionEntry } from '../state/versions';
+import { compareActiveWith } from '../state/diff';
 
 export function VersionsContent() {
   const t = useT();
@@ -76,9 +77,21 @@ export function VersionsContent() {
                   {isOriginal && <span className="chip">{t('versions.source')}</span>}
                   {isShown && <span className="version-shown">{t('versions.viewing')}</span>}
                 </button>
-                {!isOriginal && (
+                {(!isOriginal || !isShown) && (
                   <div className="version-actions">
-                    {!isCurrent && (
+                    {/* "What did this run change?" — diff the on-screen build against this
+                        version, one click from the chain (available for v0 too). */}
+                    {!isShown && (
+                      <button
+                        type="button"
+                        className="version-act"
+                        title={t('versions.compare', { label: label(v.version) })}
+                        onClick={() => void compareActiveWith(v.path, label(v.version))}
+                      >
+                        <GitCompareArrows size={13} strokeWidth={1.9} aria-hidden />
+                      </button>
+                    )}
+                    {!isOriginal && !isCurrent && (
                       <button
                         type="button"
                         className="version-act"
@@ -91,7 +104,7 @@ export function VersionsContent() {
                     )}
                     {/* The latest/HEAD and the Current version are the seed + edit base, so they
                         can't be deleted (set another version Current first to free this one). */}
-                    {!isCurrent && !isLatest && (
+                    {!isOriginal && !isCurrent && !isLatest && (
                       <button
                         type="button"
                         className="version-act version-del"

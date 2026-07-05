@@ -12,6 +12,7 @@ import {
   edgePoolLeaf,
   faceAxes,
   inConnectorName,
+  MAX_JIGSAW_ADAPTED_DISTANCE,
   MAX_JIGSAW_DEPTH,
   outConnectorName,
   parentSeamCell,
@@ -33,7 +34,7 @@ const JIGSAW_BLOCK = 'minecraft:jigsaw';
 /** Far pieces are culled beyond this. The vanilla JigsawStructure codec rejects the def when
  *  `max_distance_from_center` + a terrain-adaptation margin exceeds 128 (the margin is 12 for
  *  any adaptation other than `none`), so we cap at 116 — the largest value that always loads. */
-const SPLIT_MAX_DISTANCE = 116;
+const SPLIT_MAX_DISTANCE = MAX_JIGSAW_ADAPTED_DISTANCE;
 
 const posKey = (x: number, y: number, z: number): string => `${x},${y},${z}`;
 

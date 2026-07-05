@@ -7,7 +7,7 @@ import { decodeSchem, encodeSchem } from './schematic';
 import { decodeLitematic, encodeLitematic } from './litematica';
 import { readAuthoring } from '../authoring/nbt-decode';
 import { encodeStructure } from '../authoring/nbt-encode';
-import { DEFAULT_DATA_VERSION } from '../mc-data-version';
+import { activeDataVersion } from '../data-version';
 
 type Format = 'nbt' | 'schem' | 'litematic';
 const formatOf = (p: string): Format => {
@@ -63,7 +63,7 @@ export async function convertStructure(srcPath: string, destPath: string): Promi
   await fs.writeFile(
     destPath,
     encodeStructure({
-      dataVersion: DEFAULT_DATA_VERSION,
+      dataVersion: activeDataVersion(),
       size: raw.size,
       palette: raw.palette.map((p) => ({ Name: p.Name, Properties: p.Properties })),
       blocks: raw.blocks.map((b) => {

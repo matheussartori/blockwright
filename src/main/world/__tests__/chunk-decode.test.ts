@@ -73,6 +73,34 @@ describe('decodeChunk (1.18+ paletted, non-spanning)', () => {
     expect(decodeChunk({ DataVersion: 100, Level: {} } as never)).toBeNull();
   });
 
+  it('decodes a year-numbered 26.2 chunk (DataVersion 4903, root sections, non-spanning)', () => {
+    // Regression guard for the current release cadence: a 26.x save keeps the 1.18+
+    // layout (root `sections`, non-spanning packing) and must decode unchanged.
+    const cells = new Array(4096).fill(0);
+    cells[yzx(7, 1, 9)] = 1;
+    const nbt = {
+      DataVersion: 4903, // Minecraft 26.2
+      xPos: 3,
+      zPos: 4,
+      sections: [
+        {
+          Y: -1,
+          block_states: {
+            palette: [{ Name: 'minecraft:air' }, { Name: 'minecraft:deepslate' }],
+            data: packSection(cells, 4),
+          },
+        },
+      ],
+    };
+    const col = decodeChunk(nbt as never)!;
+    expect(col).not.toBeNull();
+    expect(col.dataVersion).toBe(4903);
+    expect(col.minSectionY).toBe(-1);
+    const s = col.sections[0];
+    expect(blockIndexAt(s, 7, 1, 9)).toBe(1);
+    expect(s.palette[1].Name).toBe('minecraft:deepslate');
+  });
+
   it('decodes the legacy 1.13–1.15 format (Level.Sections, spanning long array)', () => {
     const cells = new Array(4096).fill(0);
     cells[yzx(2, 4, 6)] = 1; // stone

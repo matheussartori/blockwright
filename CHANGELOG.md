@@ -4,6 +4,94 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-07-05
+
+Compare, restyle, and showcase any build — current with Minecraft 26.2.
+
+### Added
+
+- Minecraft 26.x support — Blockwright now understands Mojang's year-numbered
+  releases (26.1, 26.2, …). Workspace detection reads `26.x` version strings and
+  the new `pack.mcmeta` `min_format`/`max_format` scheme (including fractional
+  formats like `107.1`), jigsaw features and the size-limit `auto` setting resolve
+  for the new line, worlds from a 26.x save open (verified against the 26.2 data
+  format), and 26.2/26.1 join the manual version picker.
+- Version-aware exports — the single `DataVersion` constant became a version
+  registry: an export now stamps the DataVersion and data-pack `pack_format` your
+  mod actually targets (resolved to the nearest known release, never newer), and
+  Export to World reads the target save's own `level.dat` so pieces installed into
+  a world match what that world runs.
+- Structure Diff — the first file-vs-file visual schematic diff. File ▸ Compare
+  with File… (or the new compare action on any entry in the Versions panel) marks
+  every difference in the viewer — green added, red removed, yellow changed
+  block/state — with a summary card of counts and a per-block rollup. "What did
+  this AI run change?" is now one click, and the comparison is blockstate-aware,
+  so a stair that flipped facing counts as changed while property order alone
+  never does.
+- Re-theme — File ▸ Re-theme Structure… swaps blocks across the whole build with
+  the blockstate carried over intelligently (`oak_stairs[facing=east,half=top]` →
+  `spruce_stairs` keeps facing and half — the thing find-and-replace re-themers
+  corrupt). Map blocks by hand with per-block occurrence counts, or classify the
+  palette into semantic roles and apply any registered decoration (cozy → haunted,
+  oak → castle stone) in one click. Applies as a single undoable editor step,
+  saves as a new version, and works on imported `.schem`/`.litematic` builds too.
+- Beauty Render — File ▸ Render Image… exports a high-resolution PNG of the open
+  build (up to 4096 px; transparent or themed background; preset camera angles:
+  current view, hero ¾, isometric, front elevation, top-down and a cross-section)
+  or records a full-orbit turntable WebM — showcase artifacts straight from the
+  viewer, no Blender pipeline.
+- Worldgen Doctor — File ▸ Workspace Check-Up… scans the active workspace's whole
+  data pack (structure defs, template pools, structure sets, biome tags,
+  `pack.mcmeta`, the structure folder itself) and reports every silent failure it
+  finds with a fix-it explanation: missing `spawn_overrides`, dead start pools,
+  empty biome tags, `separation ≥ spacing`, dangling structure references,
+  `.nbt`s in the folder the target version doesn't read, stale pack formats,
+  oversized structures, and more — caught before launching the game.
+- Watch mode — the open structure file is now watched on disk: an external edit
+  (VS Code, an Axiom export, a datapack build script) hot-reloads the viewer in
+  place, and new files appearing in the workspace's structure folder show up in
+  the Project panel by themselves. Reloads never clobber unsaved editor work or an
+  in-flight generation.
+- Deep air/void editing — the Void tool can now reach behind the first surface:
+  Alt+scroll (or a stepper) pushes the target cell deeper along your aim, with the
+  hover ghost and cursor readout following, and a new "Fill selection box" action
+  writes a whole multi-layer air/void region in one undoable step (solid blocks
+  are never overwritten).
+- Editor quality-of-life — number keys 1–9 switch tools (matching the rail order,
+  shown in each tooltip), Esc always walks back to a neutral state (cancel
+  eyedropper → back to Select → clear selection), Alt+click samples a block from
+  any tool with a block field (Paint/Replace/Stairs), a paint or void stroke is
+  locked to the plane it started on so a drag never jumps depth mid-stroke (and
+  can bridge gaps in a wall), and an on-canvas hint chip names the active tool
+  with its live modifier keys.
+- Jigsaw piece list — after generating an assembly, the Jigsaw panel lists every
+  placed piece with its offset; clicking one opens that piece's file in a new tab,
+  so pool authors can iterate on the piece they're looking at.
+- Missing-texture diagnostics — the Inspector now summarizes how many block types
+  fell back to flat colors (hover for the list), and the World Viewer logs each
+  unresolvable block id once to the Console dock instead of silently rendering it
+  flat.
+- Guide section for the new tools — "Compare, re-theme & render" covers Diff,
+  Re-theme, Render, the Worldgen Doctor and watch mode, in English and pt-BR like
+  everything above.
+- Upgrade groundwork — every loaded structure now records its source `DataVersion`
+  into the library's `.bw.json` metadata sidecar, the prerequisite for a future
+  "upgrade with a loss report".
+
+### Fixed
+
+- Stacked air/void layers now all show — a build with several `structure_void`
+  layers used to reveal only the outermost one in the "show voids" overlay.
+  Interior cells now render as dimmed markers, so a multi-layer region reads
+  layer by layer instead of disappearing (bulk captured air stays summarized to
+  avoid fog).
+
+### Changed
+
+- The version picker offers 26.2, 26.1 and 1.21.11 first, and unknown data-pack
+  formats between known releases now detect as the nearest known family instead
+  of failing to a manual prompt.
+
 ## [2.0.2] - 2026-07-03
 
 ### Added
@@ -265,6 +353,8 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[2.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.1.0
+[2.0.2]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.2
 [2.0.1]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.1
 [2.0.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.0
 [1.4.1]: https://github.com/matheussartori/blockwright/releases/tag/v1.4.1

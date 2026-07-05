@@ -164,4 +164,8 @@ export interface StructureData {
    *  longer asks the user to define the floor plan by hand. Seeds the (editable) Floors
    *  panel + the viewer bands; absent for structures with no clear floor plane. */
   floors?: FloorDef[];
+  /** The source file's NBT DataVersion (the Minecraft data format it was written for),
+   *  when the format carries one. Recorded into the library metadata — the groundwork
+   *  for a future "upgrade with a loss report". */
+  dataVersion?: number;
 }

@@ -23,6 +23,7 @@ import type {
   WorkspaceExportRequest,
   WorkspaceExportPlan,
   WorkspaceExportResult,
+  WorkspaceDoctorReport,
   ResolveBlockResult,
   SaveVersionRequest,
   SaveVersionResult,
@@ -124,6 +125,21 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.workspaceExport, req),
   resolveBlock: (name: string, properties?: Record<string, string>): Promise<ResolveBlockResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.resolveBlock, name, properties),
+  rethemeMap: (blocks: string[], decorationId: string): Promise<Record<string, string>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.rethemeMap, blocks, decorationId),
+  saveRender: (data: ArrayBuffer, suggestedName: string, kind: 'png' | 'webm'): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.saveRender, data, suggestedName, kind),
+  watchFile: (filePath: string | null): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.watchFile, filePath),
+  workspaceDoctor: (): Promise<WorkspaceDoctorReport> => ipcRenderer.invoke(IPC_CHANNELS.workspaceDoctor),
+  onFileChanged: (cb: (path: string) => void) => {
+    ipcRenderer.on(IPC_EVENTS.fileChanged, (_e, p: string) => cb(p));
+  },
+  onWorkspaceStructuresChanged: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.workspaceStructuresChanged, () => cb());
+  },
+  onOpenDoctor: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.openDoctor, () => cb());
+  },
   saveVersion: (req: SaveVersionRequest): Promise<SaveVersionResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.saveVersion, req),
   assembleJigsaw: (path: string, options: AssembleOptions): Promise<JigsawPlan> =>
@@ -251,6 +267,15 @@ const api: BlockwrightApi = {
   },
   onReimportWorld: (cb: () => void) => {
     ipcRenderer.on(IPC_EVENTS.reimportWorld, () => cb());
+  },
+  onCompareFile: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.compareFile, () => cb());
+  },
+  onRetheme: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.retheme, () => cb());
+  },
+  onRenderImage: (cb: () => void) => {
+    ipcRenderer.on(IPC_EVENTS.renderImage, () => cb());
   },
   getLogBacklog: () => ipcRenderer.invoke(IPC_CHANNELS.logBacklog),
   onLogEntry: (cb: (entry: LogEntry) => void) => {

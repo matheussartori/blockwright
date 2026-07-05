@@ -17,6 +17,7 @@ import {
   cellKey,
   deleteSelection,
   extrudeSelection,
+  fillVoidBox,
   floodFill,
   HORIZONTALS,
   internEntry,
@@ -27,6 +28,7 @@ import {
   planTransform,
   recolorCell,
   replaceSelection,
+  rethemeBlocks,
   selectBox,
   setVoidCell,
   type Axis,
@@ -39,10 +41,24 @@ import {
 } from '../editor/ops';
 import type { PaletteEntry } from '@/shared/types';
 
+/** The canonical tool order — the rail's layout AND the 1–9 number-key shortcuts, so the
+ *  key you press always matches the button position you see. */
+export const TOOL_ORDER = [
+  'select',
+  'move',
+  'transform',
+  'extrude',
+  'stairs',
+  'paint',
+  'replace',
+  'void',
+  'delete',
+] as const;
+
 /** The live-symmetry plane: none, or a mirror across the structure's centre on X or Z. */
 export type Symmetry = 'none' | 'x' | 'z';
 
-export type Tool = 'select' | 'move' | 'extrude' | 'transform' | 'stairs' | 'paint' | 'replace' | 'void' | 'delete';
+export type Tool = (typeof TOOL_ORDER)[number];
 
 /** Paint sub-mode: add blocks against surfaces (brush), repaint existing ones (recolor),
  *  or flood-fill a connected region (fill). */
@@ -79,6 +95,10 @@ export interface EditorState {
   paintMode: PaintMode;
   /** What the Void tool writes (air = clears terrain / structure void = preserves it). */
   voidKind: VoidKind;
+  /** How many cells DEEPER than the first surface the Void tool targets (Alt+scroll) —
+   *  0 = the cell in front of the aimed face, N = N cells further along the ray, so
+   *  layers behind the first surface are reachable. Resets on tool change. */
+  paintDepth: number;
   /** Show the air + structure-void cells as ghost markers (any tool). */
   showVoids: boolean;
   /** What's under the cursor while painting/editing voids (the readout), or null. */
@@ -107,6 +127,7 @@ export interface EditorState {
   setPaintBlock: (id: string) => void;
   setPaintMode: (mode: PaintMode) => void;
   setVoidKind: (kind: VoidKind) => void;
+  setPaintDepth: (n: number) => void;
   setShowVoids: (on: boolean) => void;
   setHoverInfo: (info: { key: string; content: CellContent } | null) => void;
   setStairsBlock: (id: string) => void;
@@ -133,9 +154,16 @@ export interface EditorState {
   strokeEnd: () => void;
   /** Flood-fill from a cell (Paint's Fill) — its own one-shot undo step. */
   fillAt: (cell: Cell) => Promise<void>;
+  /** Fill the selection's bounding box with the Void tool's air/void kind in one step —
+   *  a multi-layer void region as one operation (and one undo step). Solids are preserved. */
+  fillVoid: () => void;
   remove: () => void;
   replace: () => Promise<void>;
   stairs: () => Promise<void>;
+  /** Re-theme: swap the palette entries at `mapping`'s indices for the named blocks,
+   *  carrying each source entry's blockstate properties over — one undoable step over
+   *  the whole build (the Re-theme dialog's Apply). */
+  retheme: (mapping: Record<number, string>) => Promise<void>;
   undo: () => void;
   redo: () => void;
   save: () => Promise<void>;
@@ -203,6 +231,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
     paintBlock: 'minecraft:stone',
     paintMode: 'brush',
     voidKind: 'air',
+    paintDepth: 0,
     showVoids: false,
     hoverInfo: null,
     stairsBlock: 'minecraft:oak_stairs',
@@ -229,14 +258,17 @@ export const editorStore = createStore<EditorState>((set, get) => {
     // silently flip a preference the user set: hidden → forced on → hidden again; shown → stays shown.
     setTool: (tool) => {
       const cur = get().tool;
+      // Depth targeting is a per-tool aiming aid — a stale depth on the next tool
+      // would silently aim past the surface, so a switch always resets it.
+      const depth = tool === cur ? {} : { paintDepth: 0 };
       if (tool === 'void' && cur !== 'void') {
         voidPrevShowVoids = get().showVoids;
-        set({ tool, showVoids: true });
+        set({ tool, showVoids: true, ...depth });
       } else if (tool !== 'void' && cur === 'void') {
-        set({ tool, showVoids: voidPrevShowVoids ?? get().showVoids });
+        set({ tool, showVoids: voidPrevShowVoids ?? get().showVoids, ...depth });
         voidPrevShowVoids = null;
       } else {
-        set({ tool });
+        set({ tool, ...depth });
       }
     },
     clearSelection: () => set({ selection: [], anchor: null }),
@@ -262,6 +294,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
     setPaintBlock: (paintBlock) => set({ paintBlock }),
     setPaintMode: (paintMode) => set({ paintMode }),
     setVoidKind: (voidKind) => set({ voidKind }),
+    setPaintDepth: (n) => set({ paintDepth: Math.max(0, Math.min(64, Math.round(n))) }),
     setShowVoids: (showVoids) => set({ showVoids }),
     setHoverInfo: (hoverInfo) => set({ hoverInfo }),
     setStairsBlock: (stairsBlock) => set({ stairsBlock }),
@@ -284,7 +317,10 @@ export const editorStore = createStore<EditorState>((set, get) => {
         return;
       }
       // Sample into whichever tool's block field is in play.
-      set(get().tool === 'paint' ? { paintBlock: entry.name, eyedropper: false } : { replaceBlock: entry.name, eyedropper: false });
+      const tool = get().tool;
+      if (tool === 'paint') set({ paintBlock: entry.name, eyedropper: false });
+      else if (tool === 'stairs') set({ stairsBlock: entry.name, eyedropper: false });
+      else set({ replaceBlock: entry.name, eyedropper: false });
     },
 
     move: (delta) => editActive((d, sel) => (sel.length ? moveSelection(d, sel, delta) : null)),
@@ -393,6 +429,30 @@ export const editorStore = createStore<EditorState>((set, get) => {
       if (!cur?.structure) return;
       const result = floodFill(editData(cur.structure), cell, entry);
       if (result) commit(result, textures);
+    },
+    fillVoid: () => editActive((d, sel) => (sel.length ? fillVoidBox(d, sel, get().voidKind) : null)),
+    retheme: async (mapping) => {
+      const doc = activeDocument(documentsStore.getState());
+      if (!doc?.structure) return;
+      const struct = doc.structure;
+      // Only real swaps: a mapping to the same name or from an air entry is a no-op.
+      const swaps = Object.entries(mapping)
+        .map(([idx, name]) => ({ idx: Number(idx), name }))
+        .filter(({ idx, name }) => {
+          const src = struct.palette[idx];
+          return !!src && !src.air && !!name && src.name !== name;
+        });
+      if (!swaps.length) return;
+      // Resolve each target WITH the source entry's blockstate properties — that's the
+      // whole trick: spruce_stairs inherits facing/half/shape from the oak_stairs it replaces.
+      const resolved = await Promise.all(
+        swaps.map(({ idx, name }) => api.resolveBlock(name, (struct.palette[idx].properties ?? {}) as Record<string, string>)),
+      );
+      const cur = activeDocument(documentsStore.getState());
+      if (!cur?.structure || cur.structure.palette !== struct.palette) return; // edited mid-resolve — bail
+      const m = new Map(swaps.map((s, i) => [s.idx, resolved[i].entry]));
+      const result = rethemeBlocks(editData(cur.structure), m);
+      if (result) commit(result, resolved.flatMap((r) => r.textures));
     },
     remove: () => {
       const doc = activeDocument(documentsStore.getState());

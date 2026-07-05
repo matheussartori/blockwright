@@ -24,7 +24,7 @@ import type { WorkspaceExportPlan, WorkspaceExportRequest, WorkspaceExportResult
 import { getActiveWorkspace } from '../structure/assets/content-pack';
 import { readRaw } from '../structure/io/convert';
 import { splitToJigsaw } from '../structure/io/split-structure';
-import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
+import { dataVersionFor } from '../structure/mc-data-version';
 import { jsonFor } from './worldgen-json';
 import { writeSplitFiles } from './write-split';
 
@@ -99,6 +99,6 @@ async function writeSplit(
   split: ReturnType<typeof splitPlan>,
 ): Promise<string[]> {
   const raw = await readRaw(req.sourcePath);
-  const { files } = splitToJigsaw(raw, split, { namespace, base: req.name, version, worldgen: req.worldgen, dataVersion: DEFAULT_DATA_VERSION });
+  const { files } = splitToJigsaw(raw, split, { namespace, base: req.name, version, worldgen: req.worldgen, dataVersion: dataVersionFor(version) });
   return writeSplitFiles(files, root);
 }

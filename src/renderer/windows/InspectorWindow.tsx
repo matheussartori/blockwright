@@ -18,6 +18,9 @@ interface BlockGroup {
   /** A representative texture key (namespace/path) for the icon, or null. */
   texture: string | null;
   resolved: boolean;
+  /** An air-like entry (air / structure_void) — invisible by nature, so it can
+   *  never count as a missing texture. */
+  air: boolean;
   positions: [number, number, number][];
 }
 
@@ -62,6 +65,7 @@ function groupBlocks(data: StructureData): BlockGroup[] {
         color: entry.color,
         texture: representativeTexture(entry),
         resolved: entry.models.length > 0,
+        air: entry.air,
         positions: [],
       };
       groups.set(name, g);
@@ -129,6 +133,13 @@ export function InspectorContent() {
   const textureIcons = useSettings((s) => s.blockTextureIcons);
   const viewer = useViewer();
   const groups = useMemo(() => (structure ? groupBlocks(structure) : []), [structure]);
+  // The missing-texture diagnostics: block ids that fell back to flat colours (a model or
+  // texture the content pack / workspace couldn't resolve). Only meaningful once assets
+  // resolve at all — with no content pack EVERYTHING is flat, which isn't a per-block miss.
+  const missing = useMemo(
+    () => (structure?.hasContent ? groups.filter((g) => !g.resolved && !g.air).map((g) => g.name) : []),
+    [structure, groups],
+  );
   const entityGroups = useMemo(() => (structure ? groupEntities(structure) : []), [structure]);
   const markerGroups = useMemo(() => (structure ? groupDataMarkers(structure) : []), [structure]);
   // The data markers' swatch reuses the structure block's own palette entry (texture or
@@ -212,6 +223,11 @@ export function InspectorContent() {
             </div>
           )}
         </dl>
+        {missing.length > 0 && (
+          <p className="inspector-missing" title={missing.join('\n')}>
+            {t('inspector.missingTex', { n: missing.length })}
+          </p>
+        )}
       </div>
       <div className="palette-list">
         {markerGroups.map((g) => {
@@ -283,7 +299,7 @@ export function InspectorContent() {
                   <span className="swatch" style={{ background: rgb(g.color) }} />
                 )}
                 <span className="block-name">{g.name}</span>
-                {!g.resolved && <span className="chip">{t('inspector.flat')}</span>}
+                {!g.resolved && !g.air && <span className="chip">{t('inspector.flat')}</span>}
                 <span className="block-count">({g.positions.length})</span>
               </button>
               {open && (

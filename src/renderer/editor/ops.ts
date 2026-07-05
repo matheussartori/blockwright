@@ -205,10 +205,13 @@ const NEIGHBORS: Cell[] = [
   [0, 0, 1], [0, 0, -1],
 ];
 
-/** A void cell to surface in the editor's "show voids" overlay: its key + which kind. */
+/** A void cell to surface in the editor's "show voids" overlay: its key + which kind.
+ *  `deep` marks an INTERIOR cell (no solid neighbour) of a stacked air/void region —
+ *  the overlay dims those so a multi-layer region reads as layers, not fog. */
 export interface VoidMarker {
   key: string;
   kind: 'air' | 'void';
+  deep?: boolean;
 }
 
 /** What a single cell currently holds — for the editor's hover readout, so air / structure
@@ -236,6 +239,10 @@ export function describeCell(d: EditData, cell: Cell): CellContent {
  *  so it can't bury the build in fog. Below it, air is sparse enough to be intentional. */
 const AIR_OVERLAY_CAP = 256;
 
+/** Hard bound on the INTERIOR (deep) markers `revealAll` adds — a pathological capture
+ *  (a huge hollow shell) stays boundary-only past it instead of drowning the overlay. */
+const DEEP_OVERLAY_CAP = 4096;
+
 /** The air / "void" (terrain-preserving) cells to show in the overlay, matching Minecraft's
  *  "show invisible blocks" read: explicit `minecraft:air` is one thing (it CLEARS the cell on
  *  paste), and everything that PRESERVES terrain is "void" — both explicit `minecraft:structure_void`
@@ -245,24 +252,43 @@ const AIR_OVERLAY_CAP = 256;
  *  - `structure_void` (explicit): ALWAYS shown — rare + intentional.
  *  - OMITTED cells (in a DENSE capture, i.e. the build lists its air so it fills most of its box →
  *    an omitted cell is an intentional carve-out, not the empty space around a sparse build): shown
- *    as `void`, boundary-only (their visible face), ALWAYS — this is the user's "void region".
+ *    as `void`, ALWAYS — this is the user's "void region".
  *  - `minecraft:air` (explicit): bulk (a captured `.nbt` stores it for the whole volume), the fog
  *    risk — shown only when sparse (≤ {@link AIR_OVERLAY_CAP}) or `revealAir` (the "show air / void"
- *    overlay is explicitly on), and then boundary-only. */
-export function voidMarkers(d: EditData, revealAir = false): VoidMarker[] {
+ *    overlay is explicitly on).
+ *
+ *  Depth: by default only BOUNDARY cells (touching a solid) show — the visible skin. With
+ *  `revealAll` (the overlay explicitly on / the Void tool active) the INTERIOR cells of a
+ *  stacked region show too, tagged `deep` so the overlay dims them — a 5-layer void slab is
+ *  five readable layers instead of one skin. Deep markers stay bounded: bulk air's interior is
+ *  never revealed (only sparse ≤ {@link AIR_OVERLAY_CAP} air), and past {@link DEEP_OVERLAY_CAP}
+ *  interior cells the reveal falls back to boundary-only. */
+export function voidMarkers(d: EditData, revealAir = false, revealAll = false): VoidMarker[] {
   const solid = occupancy(d); // non-air cells
   const hasSolidNeighbor = (p: readonly number[]): boolean =>
     NEIGHBORS.some((n) => solid.has(cellKey([p[0] + n[0], p[1] + n[1], p[2] + n[2]])));
   const airCount = d.blocks.filter((b) => d.palette[b.state]?.name === 'minecraft:air').length;
   const showAir = revealAir || airCount <= AIR_OVERLAY_CAP;
+  const airInterior = revealAll && airCount <= AIR_OVERLAY_CAP; // bulk air interior is never revealed
   const out: VoidMarker[] = [];
+  const deep: VoidMarker[] = [];
+  const add = (key: string, kind: 'air' | 'void', boundary: boolean) => {
+    if (boundary) out.push({ key, kind });
+    else deep.push({ key, kind, deep: true });
+  };
   const present = new Set<string>();
   for (const b of d.blocks) {
     present.add(cellKey(b.pos));
     const entry = d.palette[b.state];
     if (!entry?.air) continue;
-    if (entry.name === 'minecraft:structure_void') out.push({ key: cellKey(b.pos), kind: 'void' });
-    else if (showAir && hasSolidNeighbor(b.pos)) out.push({ key: cellKey(b.pos), kind: 'air' });
+    const boundary = hasSolidNeighbor(b.pos);
+    if (entry.name === 'minecraft:structure_void') {
+      // Explicit structure_void is rare + intentional: every cell always shows,
+      // interior ones dimmed (deep) so a stacked region reads layer by layer.
+      add(cellKey(b.pos), 'void', boundary);
+    } else if (showAir && (boundary || airInterior)) {
+      add(cellKey(b.pos), 'air', boundary);
+    }
   }
   // Omitted cells in a dense capture = an intentional terrain-preserving (structure_void) region.
   const [W, H, D] = d.size;
@@ -272,10 +298,12 @@ export function voidMarkers(d: EditData, revealAir = false): VoidMarker[] {
       for (let y = 0; y < H; y++)
         for (let z = 0; z < D; z++) {
           const k = `${x},${y},${z}`;
-          if (!present.has(k) && hasSolidNeighbor([x, y, z])) out.push({ key: k, kind: 'void' });
+          if (present.has(k)) continue;
+          const boundary = hasSolidNeighbor([x, y, z]);
+          if (boundary || revealAll) add(k, 'void', boundary);
         }
   }
-  return out;
+  return deep.length <= DEEP_OVERLAY_CAP ? [...out, ...deep] : out;
 }
 
 /** A PaletteEntry for an air-like block (`minecraft:air` / `minecraft:structure_void`).
@@ -284,6 +312,10 @@ export function voidMarkers(d: EditData, revealAir = false): VoidMarker[] {
 export function airEntry(name: string): PaletteEntry {
   return { name, properties: {}, models: [], color: [0, 0, 0], air: true };
 }
+
+/** The block id the Void tool writes for a kind (shared by the per-cell + box fills). */
+const voidBlockName = (kind: 'air' | 'void'): string =>
+  kind === 'air' ? 'minecraft:air' : 'minecraft:structure_void';
 
 /** Place several blocks in one edit (one undo step), interning each entry once and
  *  overwriting whatever sat in the target cells. The single primitive every "drop a
@@ -331,9 +363,59 @@ export function setVoidCell(d: EditData, cell: Cell, kind: 'air' | 'void'): OpRe
   const k = cellKey(cell);
   const existing = d.blocks.find((b) => cellKey(b.pos) === k);
   if (existing && !d.palette[existing.state]?.air) return null; // a real block — protect it
-  const entry = airEntry(kind === 'air' ? 'minecraft:air' : 'minecraft:structure_void');
-  const { palette, index } = internEntry(d.palette, entry);
+  const { palette, index } = internEntry(d.palette, airEntry(voidBlockName(kind)));
   return { blocks: [...d.blocks.filter((b) => cellKey(b.pos) !== k), { state: index, pos: cell }], palette, selection: [] };
+}
+
+/** Fill the BOUNDING BOX of a selection with explicit air / structure_void in ONE step —
+ *  the multi-layer counterpart of `setVoidCell` (N strokes of depth-stepped painting become
+ *  one operation). Same guard: only EMPTY or already-air cells are written; every solid in
+ *  the box is preserved. Returns null when there's no selection or nothing to write.
+ *
+ *  @param d The structure being edited.
+ *  @param selection The selected cell keys (their bounding box is the fill region).
+ *  @param kind `air` (clears the world cell on paste) or `void` (preserves terrain).
+ *  @returns The patched blocks/palette (selection preserved), or null for a no-op. */
+export function fillVoidBox(d: EditData, selection: string[], kind: 'air' | 'void'): OpResult | null {
+  if (!selection.length) return null;
+  const cells = selection.map(parseCell);
+  const lo: Cell = [0, 1, 2].map((i) => Math.min(...cells.map((c) => c[i]))) as Cell;
+  const hi: Cell = [0, 1, 2].map((i) => Math.max(...cells.map((c) => c[i]))) as Cell;
+  const solid = occupancy(d);
+  const targets: Cell[] = [];
+  for (let x = lo[0]; x <= hi[0]; x++)
+    for (let y = lo[1]; y <= hi[1]; y++)
+      for (let z = lo[2]; z <= hi[2]; z++) {
+        const c: Cell = [x, y, z];
+        if (inBounds(c, d.size) && !solid.has(cellKey(c))) targets.push(c);
+      }
+  if (!targets.length) return null;
+  const { palette, index } = internEntry(d.palette, airEntry(voidBlockName(kind)));
+  const targetKeys = new Set(targets.map(cellKey));
+  const kept = d.blocks.filter((b) => !targetKeys.has(cellKey(b.pos)));
+  return {
+    blocks: [...kept, ...targets.map((pos) => ({ state: index, pos }))],
+    palette,
+    selection,
+  };
+}
+
+/** Re-theme: swap whole PALETTE ENTRIES across the build in one step (one undo step).
+ *  `mapping` is source palette index → the RESOLVED replacement entry (already carrying
+ *  the source's blockstate properties — a stair that faced east still faces east, the
+ *  thing naive find&replace re-themers corrupt). Every block keeps its position, `nbtPos`
+ *  and `dataMeta`; only its palette index moves. Returns null for an empty mapping. */
+export function rethemeBlocks(d: EditData, mapping: Map<number, PaletteEntry>): OpResult | null {
+  if (!mapping.size) return null;
+  let palette = d.palette;
+  const indexMap = new Map<number, number>();
+  for (const [src, entry] of mapping) {
+    const r = internEntry(palette, entry);
+    palette = r.palette;
+    indexMap.set(src, r.index);
+  }
+  const blocks = d.blocks.map((b) => (indexMap.has(b.state) ? { ...b, state: indexMap.get(b.state)! } : b));
+  return { blocks, palette, selection: [] };
 }
 
 /** Flood-fill the connected region of blocks that share the clicked block's exact palette

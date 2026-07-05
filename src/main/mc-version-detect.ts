@@ -6,7 +6,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseMcVersion } from '@/shared/mc-version';
 
-/** Data-pack `pack_format` → a representative version, used only as a last resort. */
+/** Data-pack `pack_format` → a representative version, used only as a last resort.
+ *  Resolved by NEAREST KNOWN format at or below the declared one, so a format between
+ *  two entries (a drop we haven't tabled yet) still detects the right family. */
 const PACK_FORMAT_VERSION: Record<number, string> = {
   18: '1.20.2',
   26: '1.20.4',
@@ -14,7 +16,27 @@ const PACK_FORMAT_VERSION: Record<number, string> = {
   48: '1.21.1',
   57: '1.21.3',
   61: '1.21.4',
+  71: '1.21.5',
+  107: '26.2',
 };
+
+/** Resolve a declared pack format to a version via the nearest known format ≤ it. */
+function versionForPackFormat(format: number): string | null {
+  let best: number | null = null;
+  for (const key of Object.keys(PACK_FORMAT_VERSION)) {
+    const f = Number(key);
+    if (f <= format && (best === null || f > best)) best = f;
+  }
+  return best !== null ? PACK_FORMAT_VERSION[best] : null;
+}
+
+/** Normalize a `pack.mcmeta` format value: a plain number (48), a fractional one
+ *  (107.1 — the 26.x minor-format scheme), or a `[major, minor]` pair. */
+function packFormatNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.floor(value);
+  if (Array.isArray(value) && typeof value[0] === 'number') return Math.floor(value[0]);
+  return undefined;
+}
 
 function read(file: string): string | null {
   try {
@@ -79,8 +101,15 @@ function fromVersionJson(resourcesRoot: string): string | null {
 function fromPackMeta(resourcesRoot: string): string | null {
   const json = parseJson(path.join(resourcesRoot, 'pack.mcmeta'));
   const pack = json?.pack as Record<string, unknown> | undefined;
-  const format = typeof pack?.pack_format === 'number' ? pack.pack_format : undefined;
-  return format !== undefined ? (PACK_FORMAT_VERSION[format] ?? null) : null;
+  if (!pack) return null;
+  // The year-numbered releases replaced `pack_format` with a `min_format`/`max_format`
+  // range. The classic single-target field wins when present; otherwise `min_format`
+  // ("requires at least") is the conservative target, with `max_format` as a last resort.
+  const format =
+    packFormatNumber(pack.pack_format) ??
+    packFormatNumber(pack.min_format) ??
+    packFormatNumber(pack.max_format);
+  return format !== undefined ? versionForPackFormat(format) : null;
 }
 
 /** Detect the Minecraft version a workspace or content pack targets, or null if

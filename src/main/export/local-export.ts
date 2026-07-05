@@ -9,7 +9,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { ExportMode, ExportResult } from '@/shared/types';
 import type { MessageKey } from '@/shared/i18n';
-import { DEFAULT_WORLDGEN, sanitizeResourceName, validateSplit, type ValidationIssue } from '@/shared/domain/worldgen';
+import { datapackFormatFor, DEFAULT_WORLDGEN, sanitizeResourceName, validateSplit, type ValidationIssue } from '@/shared/domain/worldgen';
 import { LIMIT_MODERN, outConnectorName, splitManifest, splitPlan, SPLIT_MANIFEST_FILE, type SplitPlan } from '@/shared/domain/split';
 import { mt } from '../language';
 import { getMainWindow } from '../window';
@@ -18,7 +18,8 @@ import { splitToJigsaw, type SplitFile } from '../structure/io/split-structure';
 import { sliceCleanPieces } from '../structure/io/slice-structure';
 import { scaffoldFunction } from '@/shared/domain/scaffold';
 import type { RawStructure } from '../structure/io/raw';
-import { DEFAULT_DATA_VERSION } from '../structure/mc-data-version';
+import { activeDataVersion, activeTargetVersion } from '../structure/data-version';
+import { readLevelDat } from '../world/anvil/level-dat';
 import { writeSplitFiles } from './write-split';
 
 /** Run a message box parented to the main window (or standalone in headless tests). */
@@ -43,7 +44,7 @@ function buildJigsawAssembly(raw: RawStructure, stem: string, split: SplitPlan):
     base: stem,
     version: null,
     worldgen: { ...DEFAULT_WORLDGEN, generate: true },
-    dataVersion: DEFAULT_DATA_VERSION,
+    dataVersion: activeDataVersion(),
   });
   const rootEdge = split.edges.find((e) => e.parent === split.root);
   const target = rootEdge ? outConnectorName(rootEdge.edgeId) : 'minecraft:empty';
@@ -67,9 +68,22 @@ async function pickWorldSave(): Promise<{ ok: true; saveRoot: string } | { ok: f
 
 /** Drop the reassembly manifest at the assembly root so Blockwright can later stitch the
  *  pieces back into one structure (Open Jigsaw Assembly / Reimport from World). */
-async function writeManifest(folder: string, stem: string, size: RawStructure['size'], limit: number): Promise<void> {
-  const manifest = splitManifest({ namespace: stem, base: stem, size, limit, dataVersion: DEFAULT_DATA_VERSION });
+async function writeManifest(folder: string, stem: string, size: RawStructure['size'], limit: number, dataVersion: number): Promise<void> {
+  const manifest = splitManifest({ namespace: stem, base: stem, size, limit, dataVersion });
   await fsp.writeFile(path.join(folder, SPLIT_MANIFEST_FILE), JSON.stringify(manifest, null, 2) + '\n');
+}
+
+/** The DataVersion + version name of the TARGET world (its `level.dat` is authoritative —
+ *  a piece written into a save should stamp what that save runs), falling back to the
+ *  active workspace/content-pack target when the read fails. */
+async function worldTarget(saveRoot: string): Promise<{ dataVersion: number; versionName: string | null }> {
+  try {
+    const level = await readLevelDat(saveRoot);
+    if (level.dataVersion > 0) return { dataVersion: level.dataVersion, versionName: level.versionName };
+  } catch {
+    // fall through to the active context
+  }
+  return { dataVersion: activeDataVersion(), versionName: activeTargetVersion() };
 }
 
 /** Refuse a split that exceeds the jigsaw limits (too many pieces / too deep), explaining why.
@@ -137,7 +151,7 @@ async function exportJigsawAssembly(srcPath: string, destPath: string, nbtLimit:
   const folder = path.join(path.dirname(destPath), `${stem}_jigsaw`);
   const { files, warnings } = buildJigsawAssembly(raw, stem, split);
   await writeSplitFiles(files, folder);
-  await writeManifest(folder, stem, raw.size, limit);
+  await writeManifest(folder, stem, raw.size, limit, activeDataVersion());
   await showSplitNotice(folder, split.pieceCount, warnings);
   return { ok: true, path: folder, splitPieces: split.pieceCount };
 }
@@ -174,11 +188,12 @@ export async function exportToWorld(srcPath: string, suggestedName: string, nbtL
     const raw = await readRaw(srcPath);
     const limit = nbtLimit > 0 ? nbtLimit : LIMIT_MODERN;
     const split = splitPlan(raw.size, limit);
+    const target = await worldTarget(pick.saveRoot);
     if (split.oversized) {
       if (!(await passesSplitLimits(split))) return { ok: false, error: 'split limits exceeded' };
-      return await installEditScaffold(pick.saveRoot, stem, raw, split, limit);
+      return await installEditScaffold(pick.saveRoot, stem, raw, split, limit, target);
     }
-    return await installSingleStructure(pick.saveRoot, stem, srcPath, raw.size, limit);
+    return await installSingleStructure(pick.saveRoot, stem, srcPath, raw.size, limit, target.dataVersion);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -188,12 +203,12 @@ export async function exportToWorld(srcPath: string, suggestedName: string, nbtL
  *  block reads/writes saved structures in single-player (`<save>/generated/<ns>/structures/<ns>.nbt`),
  *  so the player LOADs it as `<ns>:<ns>`, edits, and re-SAVEs to the same file. The manifest sits
  *  beside it so Reimport from World reads the re-SAVEd structure straight back. */
-async function installSingleStructure(saveRoot: string, stem: string, srcPath: string, size: RawStructure['size'], limit: number): Promise<ExportResult> {
+async function installSingleStructure(saveRoot: string, stem: string, srcPath: string, size: RawStructure['size'], limit: number, dataVersion: number): Promise<ExportResult> {
   const genDir = path.join(saveRoot, 'generated', stem);
   const dest = path.join(genDir, 'structures', `${stem}.nbt`);
   await fsp.mkdir(path.dirname(dest), { recursive: true });
   await convertStructure(srcPath, dest);
-  await writeManifest(genDir, stem, size, limit);
+  await writeManifest(genDir, stem, size, limit, dataVersion);
   await showWorldStructureNotice(dest, `${stem}:${stem}`);
   return { ok: true, path: dest };
 }
@@ -203,9 +218,9 @@ async function installSingleStructure(saveRoot: string, stem: string, srcPath: s
  *  structure block, so the pieces tile into the whole build. The player edits the assembled build
  *  and clicks SAVE on each piece; a re-SAVE writes the edited region to
  *  `<save>/generated/<ns>/structures/<base>/`, where File ▸ Reimport from World reads it. */
-async function installEditScaffold(saveRoot: string, stem: string, raw: RawStructure, split: SplitPlan, limit: number): Promise<ExportResult> {
+async function installEditScaffold(saveRoot: string, stem: string, raw: RawStructure, split: SplitPlan, limit: number, target: { dataVersion: number; versionName: string | null }): Promise<ExportResult> {
   const packDir = path.join(saveRoot, 'datapacks', `${stem}_edit`);
-  const pieces = sliceCleanPieces(raw, split, DEFAULT_DATA_VERSION);
+  const pieces = sliceCleanPieces(raw, split, target.dataVersion);
   const files: SplitFile[] = pieces.map((p) => ({ rel: path.join('data', stem, 'structure', stem, `${p.name}.nbt`), kind: 'piece', buffer: p.buffer }));
   await fsp.mkdir(packDir, { recursive: true });
   await writeSplitFiles(files, packDir);
@@ -214,17 +229,27 @@ async function installEditScaffold(saveRoot: string, stem: string, raw: RawStruc
   await fsp.mkdir(path.dirname(fnPath), { recursive: true });
   await fsp.writeFile(fnPath, scaffoldFunction(stem, stem, split));
 
-  await writeManifest(packDir, stem, raw.size, limit);
-  await fsp.writeFile(path.join(packDir, 'pack.mcmeta'), JSON.stringify(datapackMeta(), null, 2) + '\n');
+  await writeManifest(packDir, stem, raw.size, limit, target.dataVersion);
+  await fsp.writeFile(path.join(packDir, 'pack.mcmeta'), JSON.stringify(datapackMeta(target.versionName), null, 2) + '\n');
 
   await showScaffoldNotice(packDir, `/function ${stem}:edit`, split.pieceCount);
   return { ok: true, path: packDir, splitPieces: split.pieceCount };
 }
 
-/** A lenient datapack `pack.mcmeta`: a 1.21 `pack_format` plus a wide `supported_formats` range
- *  so the pack loads regardless of the world's exact version (it's a throwaway test pack). */
-function datapackMeta(): unknown {
-  return { pack: { pack_format: 48, supported_formats: { min_inclusive: 4, max_inclusive: 99 }, description: 'Blockwright export' } };
+/** A lenient datapack `pack.mcmeta`: the target version's `pack_format` plus wide range
+ *  declarations in BOTH schemes — `supported_formats` (pre-26.x) and `min_format`/`max_format`
+ *  (the year-numbered releases) — so the pack loads regardless of the world's exact version
+ *  (it's a throwaway test pack). */
+function datapackMeta(versionName: string | null): unknown {
+  return {
+    pack: {
+      pack_format: datapackFormatFor(versionName),
+      supported_formats: { min_inclusive: 4, max_inclusive: 999 },
+      min_format: 4,
+      max_format: 999,
+      description: 'Blockwright export',
+    },
+  };
 }
 
 /** Confirm a single-structure install + TEACH how to LOAD it with one structure block (Copy the
