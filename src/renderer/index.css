@@ -7622,43 +7622,131 @@ body.row-resizing {
 }
 
 /* ── World editing (v2.2): the Save-to-World dialog + panel details ─────────────────── */
-.modal-sm {
-  width: min(460px, 100%);
-}
+/* Write-plan stat tiles (blocks / chunks / region files) — the gen-build-stat language. */
 .worldsave-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  font-size: 13px;
+  gap: 12px;
+  padding: 14px 16px;
 }
-.worldsave-body p {
-  margin: 0;
+.worldsave-stats {
   display: flex;
-  align-items: center;
   gap: 6px;
 }
+.worldsave-stat {
+  flex: 1 1 0;
+  min-width: 74px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 11px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.worldsave-stat-value {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.worldsave-stat-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* What the pipeline guarantees — quiet icon rows, not a bullet wall. */
 .worldsave-notes {
   margin: 0;
-  padding-left: 18px;
-  color: var(--text-muted);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.worldsave-notes > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.worldsave-notes > li > svg {
+  flex: none;
+  margin-top: 1.5px;
+  color: var(--text-muted);
+}
+
+/* Severity callouts (advisory-lock caution, write errors, refused chunks). */
+.worldsave-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.worldsave-callout > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.worldsave-callout.warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+.worldsave-callout.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+/* Post-write success line + the refused-chunk detail list. */
+.worldsave-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ok);
+}
+.worldsave-refused {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
-.worldsave-note {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.worldsave-warn {
-  color: var(--warn, #d9822b);
-  font-size: 12px;
+.worldsave-refused ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
+.worldsave-refused li {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+.worldsave-chunk {
+  font-family: var(--mono);
+  font-size: 11px;
+  flex: none;
+}
+.worldsave-discard {
+  color: var(--danger);
+}
+
 .setting-note-inline {
   color: var(--text-muted);
   font-size: 11px;
-  font-family: var(--sans);
+  font-family: inherit;
 }

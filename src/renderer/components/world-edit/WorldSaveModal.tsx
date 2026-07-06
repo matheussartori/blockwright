@@ -1,10 +1,11 @@
 // The "Save to World" dialog — the preview-then-write discipline, pointed at terrain: BEFORE a
-// byte moves it lists exactly what will happen (blocks / chunks / regions, the enforced backup,
-// the relight note), and AFTER the write it reports what actually happened, including per-chunk
-// refusals (a proto chunk is refused, never "best-effort" written). Exiting with pending edits
-// routes here too, so discarding is always an explicit choice.
+// byte moves it shows the write plan (blocks / chunks / region files as stat tiles), what the
+// pipeline guarantees (enforced backup, game-side relight), and any platform caution; AFTER the
+// write it reports what actually happened, including per-chunk refusals (a proto chunk is
+// refused, never "best-effort" written). Exiting with pending edits routes here too, so
+// discarding is always an explicit choice.
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check } from 'lucide-react';
+import { Archive, CheckCircle2, History, Lightbulb, TriangleAlert } from 'lucide-react';
 import { useSettings, useT, useWorldEdit } from '../../hooks/useStores';
 import { worldEditStore } from '../../state/world-edit';
 import { chunkKeyOf } from '../../world/edit-overlay';
@@ -41,12 +42,23 @@ export function WorldSaveModal() {
 
   if (!open) return null;
 
+  const stats: { value: number; label: string }[] = done
+    ? [
+        { value: report?.changedBlocks ?? 0, label: t('worldEdit.statBlocks') },
+        { value: report?.editedChunks.length ?? 0, label: t('worldEdit.statChunks') },
+        { value: report?.regions.length ?? 0, label: t('worldEdit.statRegions') },
+      ]
+    : [
+        { value: pendingCount, label: t('worldEdit.statBlocks') },
+        { value: plan.chunks, label: t('worldEdit.statChunks') },
+        { value: plan.regions, label: t('worldEdit.statRegions') },
+      ];
+
   return (
     <Modal
       open={open}
       onClose={saving ? () => undefined : close}
       title={t('worldEdit.saveTitle')}
-      className="modal-sm"
       footer={
         done ? (
           <button className="btn primary" onClick={close}>
@@ -56,7 +68,7 @@ export function WorldSaveModal() {
           <>
             {pendingCount > 0 && (
               <button
-                className="btn"
+                className="link worldsave-discard"
                 disabled={saving}
                 onClick={() => {
                   we().discard();
@@ -88,53 +100,85 @@ export function WorldSaveModal() {
         )
       }
     >
-      {!done ? (
-        <div className="worldsave-body">
-          <p>{t('worldEdit.savePlan', { blocks: pendingCount.toLocaleString(), chunks: plan.chunks, regions: plan.regions })}</p>
-          <ul className="worldsave-notes">
-            <li>{t('worldEdit.saveBackupNote')}</li>
-            <li>{t('worldEdit.saveRelightNote')}</li>
-            {retention > 0 && <li>{t('worldEdit.saveRetentionNote', { n: retention })}</li>}
-          </ul>
-          {!lockExclusive && (
-            <p className="worldsave-warn">
-              <AlertTriangle size={14} aria-hidden /> {t('worldEdit.lockCautionDesc')}
-            </p>
-          )}
-          {error && <p className="worldsave-warn">{error}</p>}
-        </div>
-      ) : (
-        <div className="worldsave-body">
-          <p>
-            <Check size={14} aria-hidden />{' '}
-            {t('worldEdit.saveResult', {
-              blocks: (report?.changedBlocks ?? 0).toLocaleString(),
-              chunks: report?.editedChunks.length ?? 0,
-              regions: report?.regions.length ?? 0,
-            })}
-          </p>
-          {report?.backup ? (
-            <p className="worldsave-note">{t('worldEdit.saveBackupTaken', { id: report.backup.id })}</p>
-          ) : (
-            <p className="worldsave-note">{t('worldEdit.saveBackupReused')}</p>
-          )}
-          {report && report.refused.length > 0 && (
-            <div className="worldsave-warn">
-              <p>{t('worldEdit.saveRefused', { n: report.refused.length })}</p>
-              <ul className="worldsave-notes">
-                {report.refused.slice(0, 6).map((r) => (
-                  <li key={`${r.cx},${r.cz}`}>
-                    <span style={{ fontFamily: 'var(--mono)' }}>
-                      {r.cx},{r.cz}
-                    </span>{' '}
-                    — {r.reason}
-                  </li>
-                ))}
-              </ul>
+      <div className="worldsave-body">
+        {done && (
+          <div className="worldsave-success">
+            <CheckCircle2 size={16} strokeWidth={1.9} aria-hidden />
+            {t('worldEdit.saveResultTitle')}
+          </div>
+        )}
+
+        <div className="worldsave-stats">
+          {stats.map((s) => (
+            <div className="worldsave-stat" key={s.label}>
+              <span className="worldsave-stat-value">{s.value.toLocaleString()}</span>
+              <span className="worldsave-stat-label">{s.label}</span>
             </div>
-          )}
+          ))}
         </div>
-      )}
+
+        {!done ? (
+          <>
+            <ul className="worldsave-notes">
+              <li>
+                <Archive size={13} strokeWidth={1.9} aria-hidden />
+                {t('worldEdit.saveBackupNote')}
+              </li>
+              <li>
+                <Lightbulb size={13} strokeWidth={1.9} aria-hidden />
+                {t('worldEdit.saveRelightNote')}
+              </li>
+              {retention > 0 && (
+                <li>
+                  <History size={13} strokeWidth={1.9} aria-hidden />
+                  {t('worldEdit.saveRetentionNote', { n: retention })}
+                </li>
+              )}
+            </ul>
+            {!lockExclusive && (
+              <div className="worldsave-callout warn">
+                <TriangleAlert size={14} strokeWidth={1.9} aria-hidden />
+                <span>{t('worldEdit.lockCautionDesc')}</span>
+              </div>
+            )}
+            {error && (
+              <div className="worldsave-callout error">
+                <TriangleAlert size={14} strokeWidth={1.9} aria-hidden />
+                <span>{error}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <ul className="worldsave-notes">
+              <li>
+                <Archive size={13} strokeWidth={1.9} aria-hidden />
+                {report?.backup
+                  ? t('worldEdit.saveBackupTaken', { id: report.backup.id })
+                  : t('worldEdit.saveBackupReused')}
+              </li>
+            </ul>
+            {report && report.refused.length > 0 && (
+              <div className="worldsave-callout warn">
+                <TriangleAlert size={14} strokeWidth={1.9} aria-hidden />
+                <div className="worldsave-refused">
+                  <span>{t('worldEdit.saveRefused', { n: report.refused.length })}</span>
+                  <ul>
+                    {report.refused.slice(0, 6).map((r) => (
+                      <li key={`${r.cx},${r.cz}`}>
+                        <span className="worldsave-chunk">
+                          {r.cx}, {r.cz}
+                        </span>
+                        {r.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </Modal>
   );
 }

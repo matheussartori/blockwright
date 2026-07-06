@@ -27,6 +27,7 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'world.spawn', 'world.dimNether', 'world.dimEnd', 'world.chunksLoaded',
   'guide.world.hudT', // "HUD." — the same loanword in both languages
   'settingsWorld.backupsGroup', // "Backups" — the same loanword in both languages
+  'worldEdit.statChunks', // "Chunks" — the same loanword in both languages
 ]);
 
 describe('i18n chrome coverage', () => {
