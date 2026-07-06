@@ -5,10 +5,12 @@
 // are their own components (this file just orchestrates + composes them). Glassy panels via the
 // shared tokens.
 import { useEffect, useMemo, useState } from 'react';
-import { Crosshair, Locate, MapPinned, Moon, Sun, UserRound } from 'lucide-react';
+import { Crosshair, Locate, MapPinned, Moon, Pencil, Sun, UserRound } from 'lucide-react';
 import type { DimensionId } from '@/shared/types';
 import { useViewer } from '../../viewer/ViewerProvider';
-import { useActiveDoc, useT } from '../../hooks/useStores';
+import { useActiveDoc, useSettings, useT, useWorldEdit } from '../../hooks/useStores';
+import { store } from '../../state/store';
+import { worldEditStore } from '../../state/world-edit';
 import { Select } from '../../components/ui/Select';
 import { Stepper } from '../../components/ui/Stepper';
 import { Tooltip } from '../../components/ui/Tooltip';
@@ -28,12 +30,17 @@ export function WorldHud() {
   const [gotoOpen, setGotoOpen] = useState(false);
   const [day, setDay] = useState(true);
   const [structOpen, setStructOpen] = useState(false);
+  const worldEditing = useSettings((s) => s.worldEditing);
+  const editActive = useWorldEdit((s) => s.active);
+  const editOpening = useWorldEdit((s) => s.opening);
 
-  // Reset per-world state + close the panels when the tab's world changes.
+  // Reset per-world state + close the panels when the tab's world changes. An edit session on
+  // the previous world must not survive it (pending edits are dropped — the session is per-world).
   useEffect(() => {
     setDim(meta?.dimensions[0]?.id ?? 'minecraft:overworld');
     setGotoOpen(false);
     setStructOpen(false);
+    if (worldEditStore.getState().active) void worldEditStore.getState().exit();
   }, [meta?.root]);
 
   // Poll the camera + streaming stats each frame for the readout.
@@ -69,8 +76,25 @@ export function WorldHud() {
   if (!meta) return null;
 
   const changeDim = (d: DimensionId) => {
+    if (worldEditStore.getState().active) return; // an edit session is per-dimension
     setDim(d);
     viewer?.setWorldDimension(d);
+  };
+  // Entering edit is gated on the Settings ▸ World master switch (worlds are read-only until the
+  // user opts in) — when off, the button deep-links to that settings tab instead.
+  const toggleEdit = () => {
+    const we = worldEditStore.getState();
+    if (we.active) {
+      if (we.pendingCount > 0) we.setSaveOpen(true);
+      else void we.exit();
+      return;
+    }
+    if (!worldEditing) {
+      store.getState().setSettingsSection('world');
+      store.getState().setSettingsOpen(true);
+      return;
+    }
+    void we.enter(dim);
   };
   const changeRender = (n: number) => {
     setRenderDistance(n);
@@ -87,6 +111,17 @@ export function WorldHud() {
           </div>
         )}
         <div className="world-hud-controls">
+          <Tooltip label={t('worldEdit.toggle')} description={worldEditing ? t('worldEdit.toggleDesc') : t('worldEdit.toggleOff')}>
+            <button
+              className={`world-hud-btn${editActive ? ' active' : ''}`}
+              onClick={toggleEdit}
+              disabled={editOpening}
+              aria-label={t('worldEdit.toggle')}
+              aria-pressed={editActive}
+            >
+              <Pencil size={15} />
+            </button>
+          </Tooltip>
           <Tooltip label={t('world.spawn')}>
             <button className="world-hud-btn" onClick={() => jump(meta.spawn)} aria-label={t('world.spawn')}>
               <Locate size={15} />

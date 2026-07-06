@@ -6,7 +6,8 @@
 import { Package, Pin } from 'lucide-react';
 import { api } from '../api';
 import { store } from '../state/store';
-import { useApp, useActiveDoc, useT } from '../hooks/useStores';
+import { useApp, useActiveDoc, useT, useWorldEdit } from '../hooks/useStores';
+import { chunkKeyOf } from '../world/edit-overlay';
 import { Tooltip } from './ui/Tooltip';
 
 function WorkspaceSegment() {
@@ -48,9 +49,33 @@ function WorkspaceSegment() {
   );
 }
 
+/** The world-doc statusbar: the world's name + the pending-edit overlay counter while world-edit
+ *  mode is live ("N blocks across M chunks" — WorldEdit's blind-paste reputation is the foil). */
+function WorldSegment({ name }: { name: string }) {
+  const t = useT();
+  const editActive = useWorldEdit((s) => s.active);
+  const pending = useWorldEdit((s) => s.pending);
+  const pendingCount = useWorldEdit((s) => s.pendingCount);
+  const chunkCount = editActive ? new Set(Object.values(pending).map((e) => chunkKeyOf(e.x, e.z))).size : 0;
+  return (
+    <>
+      <span className="status-name">{name}</span>
+      {editActive && (
+        <>
+          <span className="sep">·</span>
+          <span className="muted">
+            <span className="stat-num">{pendingCount.toLocaleString()}</span> {t('worldEdit.statusPending', { chunks: chunkCount })}
+          </span>
+        </>
+      )}
+    </>
+  );
+}
+
 export function Statusbar() {
   const t = useT();
-  const structure = useActiveDoc()?.structure ?? null;
+  const activeDoc = useActiveDoc();
+  const structure = activeDoc?.structure ?? null;
   const notice = useApp((s) => s.notice);
 
   if (notice) {
@@ -58,6 +83,15 @@ export function Statusbar() {
       <footer className="statusbar">
         <WorkspaceSegment />
         <span className={notice.warn ? 'warn' : 'muted'}>{notice.text}</span>
+      </footer>
+    );
+  }
+
+  if (activeDoc?.kind === 'world' && activeDoc.worldMeta) {
+    return (
+      <footer className="statusbar">
+        <WorkspaceSegment />
+        <WorldSegment name={activeDoc.worldMeta.name} />
       </footer>
     );
   }

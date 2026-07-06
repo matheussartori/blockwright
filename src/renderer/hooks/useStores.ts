@@ -8,6 +8,7 @@ import { i18nStore, type I18nState } from '../state/i18n';
 import { windowsStore, type WindowsStore } from '../state/windows';
 import { plannerStore, type PlannerStore } from '../state/planner';
 import { editorStore, type EditorState } from '../state/editor';
+import { worldEditStore, type WorldEditState } from '../state/world-edit';
 import { logsStore, type LogsState } from '../state/logs';
 import {
   documentsStore,
@@ -47,6 +48,10 @@ export function usePlanner<T>(selector: (s: PlannerStore) => T): T {
 
 export function useEditor<T>(selector: (s: EditorState) => T): T {
   return useStore(editorStore, selector);
+}
+
+export function useWorldEdit<T>(selector: (s: WorldEditState) => T): T {
+  return useStore(worldEditStore, selector);
 }
 
 export function useI18n<T>(selector: (s: I18nState) => T): T {

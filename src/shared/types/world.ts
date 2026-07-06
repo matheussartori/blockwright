@@ -65,6 +65,54 @@ export interface StructureLocation {
   z: number;
 }
 
+// ── World editing (v2.2) ─────────────────────────────────────────────────────────────
+
+/** One pending block edit at an ABSOLUTE world position, as it crosses IPC to the write path.
+ *  `name`/`properties` are the NBT-shaped block state (main maps them to `{Name, Properties}`).
+ *  Air (`minecraft:air`) is an edit like any other. */
+export interface WorldEditBlock {
+  x: number;
+  y: number;
+  z: number;
+  name: string;
+  properties?: Record<string, string>;
+}
+
+/** Result of opening a world-edit session. `lockExclusive` is true only where the OS gave a REAL
+ *  mutual-exclusion guarantee on `session.lock` (Windows); on macOS/Linux the hold is advisory and
+ *  the UI must surface a "make sure Minecraft is closed" caution. */
+export interface WorldEditOpenResult {
+  lockExclusive: boolean;
+}
+
+/** A chunk the write path REFUSED (proto chunk, unknown DataVersion, unreadable) — reported, never
+ *  "best-effort" written. */
+export interface WorldRefusedChunk {
+  cx: number;
+  cz: number;
+  reason: string;
+}
+
+/** One backup set under `<save>/blockwright-backups/` (mirrors main's `BackupSet`). */
+export interface WorldBackupInfo {
+  id: string;
+  createdMs: number;
+  /** Save-root-relative paths of the backed-up files. */
+  files: string[];
+  bytes: number;
+}
+
+/** What a Save-to-World actually did (mirrors main's `WorldEditReport`, serializable). */
+export interface WorldEditApplyResult {
+  changedBlocks: number;
+  editedChunks: { cx: number; cz: number }[];
+  /** Absolute paths of the region files rewritten (block + poi). */
+  regions: string[];
+  /** The backup taken before this save touched new files (null = all already backed up). */
+  backup: WorldBackupInfo | null;
+  refused: WorldRefusedChunk[];
+}
+
 /** One 16×16×16 section of a render payload. `uniform` sections carry no grid — every cell is the
  *  palette index `fill` (a stone/air fill costs nothing over IPC). */
 export interface ChunkSectionPayload {

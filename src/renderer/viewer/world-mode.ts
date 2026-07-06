@@ -77,6 +77,37 @@ export class WorldMode {
     this.world?.refresh();
   }
 
+  // ── World editing delegates (see WorldView's world-editing hooks) ───────────────────
+  /** Set/clear the pending-edits payload compositor. */
+  setEditOverlay(fn: Parameters<WorldView['setOverlay']>[0]): void {
+    this.world?.setOverlay(fn);
+  }
+
+  /** Preload textures for painted blocks so composited edits mesh textured. */
+  async ensureEditTextures(keys: string[]): Promise<void> {
+    await this.world?.ensureTextures(keys);
+  }
+
+  /** Re-mesh chunks from cached payloads (pending-edit change). Keys are `"cx,cz"`. */
+  remeshChunks(keys: string[]): void {
+    this.world?.remesh(keys);
+  }
+
+  /** Re-fetch chunks from main (post-save: the committed state replaces the composite). */
+  invalidateChunks(keys: string[]): void {
+    this.world?.invalidate(keys);
+  }
+
+  /** Resident chunk mesh groups, for world picking. */
+  chunkObjects(): THREE.Object3D[] {
+    return this.world?.chunkObjects() ?? [];
+  }
+
+  /** True when the chunk holding this cell is resident with data (an editable target). */
+  hasChunkPayload(cx: number, cz: number): boolean {
+    return this.world?.hasPayload(cx, cz) ?? false;
+  }
+
   /** Day/night lighting for the world view (a mood toggle — no live sky simulation). */
   setDaylight(day: boolean): void {
     const { hemi, sun, fill } = this.lights;

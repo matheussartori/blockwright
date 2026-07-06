@@ -180,6 +180,20 @@ export const IPC_CHANNELS = {
   worldGetChunks: 'world:get-chunks',
   /** Find generated structures in a dimension (payload: dim) → StructureLocation[] (cached). */
   worldFindStructures: 'world:find-structures',
+  /** Open a WORLD-EDIT session on the active world (payload: dim) → WorldEditOpenResult. Takes the
+   *  session.lock; throws when Minecraft demonstrably holds it (Windows). */
+  worldEditOpen: 'world:edit-open',
+  /** Close the world-edit session and release the session lock (payload: none). */
+  worldEditClose: 'world:edit-close',
+  /** Write a batch of block edits through the safe write path (payload: dim, WorldEditBlock[],
+   *  backup retention) → WorldEditApplyResult. Backs up first, per-chunk refusals reported. */
+  worldEditApply: 'world:edit-apply',
+  /** Backup sets of the active world → WorldBackupInfo[] (newest first). */
+  worldBackupsList: 'world:backups-list',
+  /** Restore one backup set over the active world (payload: id) → WorldBackupInfo. */
+  worldBackupRestore: 'world:backup-restore',
+  /** Delete one backup set (payload: id) → WorldBackupInfo[] (the updated list). */
+  worldBackupDelete: 'world:backup-delete',
   /** The persisted recently-opened worlds → WorldRef[]. */
   recentWorldsList: 'recent-worlds:list',
   /** Clear the recently-opened worlds list → WorldRef[] (empty). */

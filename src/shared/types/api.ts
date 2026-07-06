@@ -4,7 +4,18 @@ import type { AiConfig, AiProviderId, GenerationSettings } from '../ai';
 import type { LanguageInfo, LanguagePref } from '../i18n';
 import type { StructureData } from './structure';
 import type { Workspace } from './workspace';
-import type { ChunkRenderPayload, DimensionId, RegionRef, StructureLocation, WorldMeta, WorldRef } from './world';
+import type {
+  ChunkRenderPayload,
+  DimensionId,
+  RegionRef,
+  StructureLocation,
+  WorldBackupInfo,
+  WorldEditApplyResult,
+  WorldEditBlock,
+  WorldEditOpenResult,
+  WorldMeta,
+  WorldRef,
+} from './world';
 import type { AssembleOptions, JigsawPlan, JigsawCandidate } from './jigsaw';
 import type {
   GenerateImage,
@@ -87,6 +98,20 @@ export interface BlockwrightApi {
   getChunks: (dim: DimensionId, coords: { cx: number; cz: number }[]) => Promise<(ChunkRenderPayload | null)[]>;
   /** Find generated structures in a dimension (cached after the first scan). */
   findWorldStructures: (dim: DimensionId) => Promise<StructureLocation[]>;
+  /** Open a WORLD-EDIT session on the active world (takes session.lock; throws when Minecraft
+   *  demonstrably holds it). */
+  openWorldEdit: (dim: DimensionId) => Promise<WorldEditOpenResult>;
+  /** Close the world-edit session, releasing the session lock. */
+  closeWorldEdit: () => Promise<void>;
+  /** Write block edits through the safe write path (enforced backup, per-chunk refusals reported).
+   *  `retention` prunes backup sets past that count after the save (0 = keep all). */
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number) => Promise<WorldEditApplyResult>;
+  /** Backup sets of the active world (newest first). */
+  listWorldBackups: () => Promise<WorldBackupInfo[]>;
+  /** Restore one backup set over the active world's files. */
+  restoreWorldBackup: (id: string) => Promise<WorldBackupInfo>;
+  /** Delete one backup set → the updated list. */
+  deleteWorldBackup: (id: string) => Promise<WorldBackupInfo[]>;
   /** Recently opened worlds, most-recent first. Both return the updated list. */
   listRecentWorlds: () => Promise<WorldRef[]>;
   clearRecentWorlds: () => Promise<WorldRef[]>;

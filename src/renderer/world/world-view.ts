@@ -100,6 +100,9 @@ export class WorldView {
   private epoch = 0; // bumped on dimension change / dispose to drop stale async results
   renderDistance: number;
   private bands: LodBands = DEFAULT_BANDS;
+  /** World-edit compositor: applied to a chunk's cached payload at MESH time (pending edits are
+   *  overlaid without ever mutating the cached original). Null = no overlay (the common case). */
+  private overlay: ((payload: ChunkRenderPayload) => ChunkRenderPayload) | null = null;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -152,6 +155,75 @@ export class WorldView {
       // the reload swaps in.
     }
     this.centerX = NaN; // force recomputeDesired next frame → re-queues every stale chunk
+  }
+
+  // ── World editing hooks ─────────────────────────────────────────────────────────────
+
+  /** Set (or clear) the pending-edits compositor. Callers follow up with `remesh` for the chunks
+   *  whose composite changed — setting the overlay alone re-meshes nothing. */
+  setOverlay(fn: ((payload: ChunkRenderPayload) => ChunkRenderPayload) | null): void {
+    this.overlay = fn;
+  }
+
+  /** Load + register textures for overlay palette entries (a painted block's textures aren't in
+   *  any streamed chunk's key list), so composited blocks mesh textured instead of flat-colored. */
+  async ensureTextures(keys: string[]): Promise<void> {
+    const missing = keys.filter((k) => !this.texInfo.has(k));
+    if (!missing.length) return;
+    const loaded = await this.textures.load(missing);
+    for (const [tk, lt] of loaded) {
+      this.loaded.set(tk, lt);
+      this.texInfo.set(tk, { frames: lt.frames, translucent: lt.translucent, avgColor: lt.avgColor });
+    }
+  }
+
+  /** Re-mesh specific chunks from their CACHED payloads (no re-fetch) — the overlay compositor
+   *  runs again, so pending-edit changes show. Forces past an identical in-flight LOD build. */
+  remesh(keys: string[]): void {
+    for (const k of keys) {
+      const e = this.chunks.get(k);
+      if (!e || !e.payload) continue;
+      if (e.jobId !== null) this.pool.cancel(e.jobId);
+      e.jobId = null;
+      e.pendingLod = null;
+      this.mesh(e, this.lodFor(e));
+    }
+  }
+
+  /** Drop specific chunks' cached payloads and re-fetch them from main (after a Save-to-World the
+   *  committed state must replace the local composite). Their current meshes stay until the reload
+   *  swaps in. */
+  invalidate(keys: string[]): void {
+    let any = false;
+    for (const k of keys) {
+      const e = this.chunks.get(k);
+      if (!e) continue;
+      if (e.jobId !== null) this.pool.cancel(e.jobId);
+      e.jobId = null;
+      e.stale = true;
+      e.pendingLod = null;
+      e.payload = null;
+      e.tex = null;
+      e.borders = null;
+      e.meshedNeighbors = 0;
+      e.empty = false;
+      e.absent = false;
+      any = true;
+    }
+    if (any) this.centerX = NaN; // force recomputeDesired → re-queues the stale chunks
+  }
+
+  /** The resident chunk mesh groups (for world picking). Border walls + entities inside are marked
+   *  `userData.noPick` at assembly. */
+  chunkObjects(): THREE.Object3D[] {
+    const out: THREE.Object3D[] = [];
+    for (const e of this.chunks.values()) if (e.group) out.push(e.group);
+    return out;
+  }
+
+  /** True when a chunk is resident with a payload (edits target only chunks we actually hold). */
+  hasPayload(cx: number, cz: number): boolean {
+    return !!this.chunks.get(key(cx, cz))?.payload;
   }
 
   /** LOD bands scale with render distance: near/mid keep their defaults but never exceed it. */
@@ -351,6 +423,16 @@ export class WorldView {
     return { borders, mask, edges };
   }
 
+  /** Every payload texture key we have info for, as the worker's tex list. */
+  private texListFor(payload: ChunkRenderPayload): [string, TexInfo][] {
+    const tex: [string, TexInfo][] = [];
+    for (const tk of payload.textureKeys) {
+      const info = this.texInfo.get(tk);
+      if (info) tex.push([tk, info]);
+    }
+    return tex;
+  }
+
   /** Dispatch a mesh build for `entry` at `lod`, swapping the group in when it returns. */
   private mesh(entry: ChunkEntry, lod: LodLevel): void {
     if (!entry.payload || !entry.tex) return;
@@ -359,6 +441,11 @@ export class WorldView {
     entry.pendingLod = lod;
     const epoch = this.epoch;
     const { cx, cz } = entry;
+    // Pending world edits composite over the CACHED payload at mesh time (original untouched). A
+    // composited payload can reference extra textures (the painted block's) — rebuild its tex list.
+    const source = entry.payload;
+    const payload = this.overlay ? this.overlay(source) : source;
+    const tex = payload === source ? entry.tex : this.texListFor(payload);
     // Near builds cull faces against solid neighbours; record which neighbours we had so a late
     // arrival re-meshes the seam. Mid/far (surface LOD) don't need borders.
     let borders: NeighborBorders | undefined;
@@ -369,12 +456,12 @@ export class WorldView {
       edgeSides = nb.edges;
       entry.meshedNeighbors = nb.mask;
     }
-    entry.jobId = this.pool.build(lod, entry.payload, entry.tex, borders, (buffers) => {
+    entry.jobId = this.pool.build(lod, payload, tex, borders, (buffers) => {
       entry.pendingLod = null;
       entry.jobId = null;
       if (epoch !== this.epoch || this.chunks.get(key(cx, cz)) !== entry) return;
       // Entities are drawn only at the near LOD (they're small detail, pointless over a surface mesh).
-      const entities = lod === 'near' ? entry.payload?.entities ?? [] : [];
+      const entities = lod === 'near' ? payload.entities : [];
       const next = this.assemble(buffers, cx, cz, edgeSides, entities);
       const old = entry.group;
       this.scene.add(next);
@@ -409,6 +496,7 @@ export class WorldView {
       // group at the negated origin cancels it out and lands each entity at its true world position.
       const ents = buildEntities(entities, this.loaded);
       ents.position.set(-cx * 16, 0, -cz * 16);
+      ents.traverse((o) => (o.userData.noPick = true)); // world picking targets terrain, not entities
       group.add(ents);
     }
     group.position.set(cx * 16, 0, cz * 16);
@@ -431,7 +519,9 @@ export class WorldView {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
     geo.setIndex([0, 1, 2, 0, 2, 3]);
-    return new THREE.Mesh(geo, this.borderMat);
+    const mesh = new THREE.Mesh(geo, this.borderMat);
+    mesh.userData.noPick = true; // a translucent marker, never a paint/pick target
+    return mesh;
   }
 
   private cull(camera: THREE.Camera): void {

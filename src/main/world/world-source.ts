@@ -169,6 +169,18 @@ export class WorldSource {
     return found;
   }
 
+  /** Targeted eviction after a WORLD EDIT: drop the decoded columns + their region buffers so the
+   *  next `getChunk` re-reads the rewritten files. Structure starts are untouched (edits don't move
+   *  them). */
+  evictChunks(dim: DimensionId, coords: { cx: number; cz: number }[]): void {
+    for (const { cx, cz } of coords) {
+      this.chunkCache.delete(`${dim}:${cx}:${cz}`);
+      const { rx, rz } = regionForChunk(cx, cz);
+      this.regionCache.delete(`${dim}:${rx}:${rz}`);
+      this.entityRegionCache.delete(`${dim}:${rx}:${rz}`);
+    }
+  }
+
   /** Drop cached buffers (on close / workspace change). */
   dispose(): void {
     this.regionCache.clear();

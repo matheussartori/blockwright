@@ -38,6 +38,17 @@ export function entitiesDirs(root: string, dim: DimensionId): string[] {
   return dimSubdirs(root, dim, 'entities');
 }
 
+/** Candidate POI folders for a dimension id (`poi/r.<rx>.<rz>.mca` — villager workstations,
+ *  nether portals, …). Edited terrain sections invalidate their POI counterparts. */
+export function poiDirs(root: string, dim: DimensionId): string[] {
+  return dimSubdirs(root, dim, 'poi');
+}
+
+/** Candidate absolute paths to one POI region file. */
+export function poiFilePaths(root: string, dim: DimensionId, rx: number, rz: number): string[] {
+  return poiDirs(root, dim).map((d) => path.join(d, `r.${rx}.${rz}.mca`));
+}
+
 /** Candidate absolute paths to one block-region file (only one layout exists on disk). */
 export function regionFilePaths(root: string, dim: DimensionId, rx: number, rz: number): string[] {
   return regionDirs(root, dim).map((d) => path.join(d, `r.${rx}.${rz}.mca`));

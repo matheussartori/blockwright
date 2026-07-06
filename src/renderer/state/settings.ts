@@ -31,6 +31,12 @@ export interface Settings {
    *  Above it, export cuts the structure into a jigsaw assembly. `auto` derives the
    *  limit from the workspace's Minecraft version (≥1.16 → 48, older → 32). */
   nbtSizeLimit: NbtSizePref;
+  /** World-editing master switch (Settings ▸ World). OFF by default — worlds open read-only
+   *  until the user opts in; the deliberate safety latch of the v2.2 write path. */
+  worldEditing: boolean;
+  /** Backup sets kept per world (the enforced pre-save backups are NOT optional — only this
+   *  retention is). 0 = keep all. */
+  worldBackupRetention: number;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -42,6 +48,8 @@ export const SETTINGS_DEFAULTS: Settings = {
   hideShell: false,
   blockTextureIcons: true,
   nbtSizeLimit: DEFAULT_NBT_SIZE_PREF,
+  worldEditing: false,
+  worldBackupRetention: 10,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -85,6 +93,8 @@ function snapshot(s: SettingsState): Settings {
     hideShell: s.hideShell,
     blockTextureIcons: s.blockTextureIcons,
     nbtSizeLimit: s.nbtSizeLimit,
+    worldEditing: s.worldEditing,
+    worldBackupRetention: s.worldBackupRetention,
   };
 }
 

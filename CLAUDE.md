@@ -264,7 +264,32 @@ src/
                             pipeline (resolveBlockEntry), memoised by block-state string (a world has
                             millions of blocks but few hundred states); clear the memo on content/workspace switch.
       biome-tint.ts         Per-chunk dominant grass/foliage tint (sRGB) for tintindex faces + the minimap.
-      anvil/                The Anvil disk format (pure, testable):
+      edit-service.ts       The world-EDIT service the IPC handlers delegate to (parallel to
+                            world-service for reads): ONE WorldEditSession at a time on the ACTIVE
+                            world (open/close/apply — apply maps the IPC-shaped edits, evicts the
+                            read caches for edited chunks + neighbors via WorldSource.evictChunks,
+                            prunes backups per retention) + the backup list/restore/delete front.
+                            Channels world:edit-* / world:backup* in shared/ipc.ts.
+      edit/                 The SAFE WRITE path (v2.2 §1) — the only owner of bytes written to a
+                            save. world-edit-session.ts (the orchestrator: session lock → per-chunk
+                            edit gate → surgical patch → ENFORCED region-granular backup → atomic
+                            rewrite → POI invalidation; refused chunks are reported, never
+                            "best-effort" written) + nbt-tree.ts (tag-typed helpers — patches work
+                            on the parsed {type,value} tree so unowned tags survive byte-for-byte)
+                            + section-pack.ts (palette rebuild + non-spanning repack, bits=max(4,…),
+                            single-entry omits data) + chunk-patch.ts (block_states/block_entities
+                            patch; strips section light, deletes Heightmaps, isLightOn=0 — the game
+                            relights/re-primes on load; gate = Status full + 1.18 ≤ DataVersion ≤
+                            newest known, DataVersion never bumped; markLightStale for the 8
+                            neighbors) + region-write.ts (atomic whole-region rewrite: untouched
+                            sectors verbatim, temp+fsync+rename, `.mcc` overflow both directions)
+                            + backup.ts (blockwright-backups/<ts>/ sets + manifest, restore/prune)
+                            + session-lock.ts (session.lock held for the session; Windows =
+                            mandatory ⇒ real mutual exclusion, POSIX = best-effort, surfaced via
+                            `lockExclusive`) + poi-invalidate.ts (poi Sections.<y>.Valid=0). Suite
+                            in edit/__tests__ (golden no-op byte-identical rebuild, round-trips
+                            through the production reader, `.mcc` boundary, synthetic-world
+                            integration incl. backup/restore).
         world-paths.ts       isWorldDir / availableDimensions / listRegions / region+chunk path math
                              (vanilla + mod dimensions under DIM/…/region).
         level-dat.ts         Parse level.dat → name/dataVersion/versionName/spawn/player.
@@ -597,8 +622,27 @@ src/
                           chunk-borders.ts     Per-chunk EDGE occluder planes so a solid-against-solid chunk
                                                seam culls like an interior one (fed to a neighbour's near build).
                           components/          WorldHud (thin orchestrator: top-bar controls + coord/stream
-                                               readout, composes WorldGotoForm + WorldStructureFinder) +
-                                               WorldMinimap (2D top-down canvas map).
+                                               readout, composes WorldGotoForm + WorldStructureFinder; the
+                                               EDIT pencil toggle — gated on Settings ▸ World's master
+                                               switch, deep-links there when off; dim switch locked while
+                                               editing) + WorldMinimap (2D top-down canvas map).
+                          edit-overlay.ts      IN-WORLD EDITING (v2.2 §2), the pure compositor: pending
+                                               edits overlay a CLONE of a chunk's cached payload at mesh
+                                               time (original untouched — discard is just a re-mesh);
+                                               palette/texture-key growth for painted blocks, uniform
+                                               sections expanded, absent sections created. Unit-tested.
+                                               The rest of the loop: state/world-edit.ts (the store —
+                                               pending map keyed "x,y,z", tools paint brush/recolor +
+                                               erase + box select w/ fill/delete (WORLD_SELECTION_CAP),
+                                               undo/redo snapshots, save→api.applyWorldEdits),
+                                               components/world-edit/ (WorldEditLayer = imperative bridge:
+                                               registers the overlay compositor on WorldView, re-meshes
+                                               exactly lastTouched chunks, plane-locked strokes via the
+                                               world picking; WorldEditPanel = tool surface; WorldSaveModal
+                                               = preview-then-write + result incl. refused chunks). Viewer
+                                               world-edit surface: setWorldEditOverlay/remeshWorldChunks/
+                                               invalidateWorldChunks/ensureWorldTextures/pickWorldBlock/
+                                               pickWorldPlacement (border walls + entities are noPick).
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain

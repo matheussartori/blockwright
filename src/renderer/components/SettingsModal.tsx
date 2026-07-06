@@ -13,12 +13,14 @@ import { AppearanceTab } from './settings/AppearanceTab';
 import { ViewerTab } from './settings/ViewerTab';
 import { AiTab } from './settings/AiTab';
 import { LibraryTab } from './settings/LibraryTab';
+import { WorldTab } from './settings/WorldTab';
 import { AboutTab } from './settings/AboutTab';
 
-type TabId = 'appearance' | 'viewer' | 'ai' | 'library' | 'about';
+type TabId = 'appearance' | 'viewer' | 'world' | 'ai' | 'library' | 'about';
 const TABS: { id: TabId; label: MessageKey }[] = [
   { id: 'appearance', label: 'settings.tab.appearance' },
   { id: 'viewer', label: 'settings.tab.viewer' },
+  { id: 'world', label: 'settings.tab.world' },
   { id: 'ai', label: 'settings.tab.ai' },
   { id: 'library', label: 'settings.tab.library' },
   { id: 'about', label: 'settings.tab.about' },
@@ -71,6 +73,7 @@ export function SettingsModal() {
       <div className="settings-pane">
         {tab === 'appearance' && <AppearanceTab />}
         {tab === 'viewer' && <ViewerTab />}
+        {tab === 'world' && <WorldTab />}
         {tab === 'ai' && <AiTab />}
         {tab === 'library' && <LibraryTab />}
         {tab === 'about' && <AboutTab />}

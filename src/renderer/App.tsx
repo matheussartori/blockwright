@@ -46,6 +46,8 @@ import { EditorCanvasHint } from './components/editor/EditorCanvasHint';
 import { DiffPanel } from './components/DiffPanel';
 import { editorStore } from './state/editor';
 import { WorldHud } from './world/components/WorldHud';
+import { WorldEditLayer } from './components/world-edit/WorldEditLayer';
+import { WorldEditPanel } from './components/world-edit/WorldEditPanel';
 
 function Shell() {
   const viewer = useViewer();
@@ -130,6 +132,8 @@ function Shell() {
                 )
               )}
               {isWorld && <WorldHud />}
+              {isWorld && <WorldEditLayer />}
+              {isWorld && <WorldEditPanel />}
               <FloatingPanels availability={availability} />
               {fileOpen && <EditorLayer />}
               {fileOpen && <EditorPanel />}

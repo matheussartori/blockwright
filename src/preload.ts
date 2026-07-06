@@ -16,6 +16,10 @@ import type {
   ExportResult,
   RegionRef,
   StructureLocation,
+  WorldBackupInfo,
+  WorldEditApplyResult,
+  WorldEditBlock,
+  WorldEditOpenResult,
   WorldMeta,
   WorldRef,
   ReassembleResult,
@@ -112,6 +116,16 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.worldGetChunks, dim, coords),
   findWorldStructures: (dim: DimensionId): Promise<StructureLocation[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldFindStructures, dim),
+  openWorldEdit: (dim: DimensionId): Promise<WorldEditOpenResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldEditOpen, dim),
+  closeWorldEdit: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.worldEditClose),
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number): Promise<WorldEditApplyResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, retention),
+  listWorldBackups: (): Promise<WorldBackupInfo[]> => ipcRenderer.invoke(IPC_CHANNELS.worldBackupsList),
+  restoreWorldBackup: (id: string): Promise<WorldBackupInfo> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldBackupRestore, id),
+  deleteWorldBackup: (id: string): Promise<WorldBackupInfo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldBackupDelete, id),
   listRecentWorlds: (): Promise<WorldRef[]> => ipcRenderer.invoke(IPC_CHANNELS.recentWorldsList),
   clearRecentWorlds: (): Promise<WorldRef[]> => ipcRenderer.invoke(IPC_CHANNELS.recentWorldsClear),
   listWorkspaceStructures: (): Promise<string[]> =>

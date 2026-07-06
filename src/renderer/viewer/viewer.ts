@@ -5,7 +5,7 @@
 // floor-plan overlay (floor-regions), the inspector focus box (highlight), and the
 // streamed world-viewer mode (world-mode).
 import * as THREE from 'three';
-import type { BlockwrightApi, DimensionId, StructureData, WorldMeta } from '@/shared/types';
+import type { BlockwrightApi, ChunkRenderPayload, DimensionId, StructureData, WorldMeta } from '@/shared/types';
 import { CameraController, type NavMode } from './camera-controller';
 import { WorldMode } from './world-mode';
 import { disposeObject } from './dispose';
@@ -269,6 +269,56 @@ export class Viewer {
   /** Fly the camera to a world coordinate (go-to-coordinate / jump-to-spawn/player). */
   goToWorldCoord(pos: [number, number, number]): void {
     this.worldMode.goTo(pos);
+  }
+
+  // ── World editing (delegates + world-space picking) ─────────────────────────
+  /** Set/clear the pending-edits compositor applied to streamed chunks at mesh time. */
+  setWorldEditOverlay(fn: ((payload: ChunkRenderPayload) => ChunkRenderPayload) | null): void {
+    this.worldMode.setEditOverlay(fn);
+  }
+
+  /** Preload textures for painted blocks so composited edits mesh textured. */
+  ensureWorldTextures(keys: string[]): Promise<void> {
+    return this.worldMode.ensureEditTextures(keys);
+  }
+
+  /** Re-mesh chunks (keys `"cx,cz"`) from cached payloads — pending edits changed. */
+  remeshWorldChunks(keys: string[]): void {
+    this.worldMode.remeshChunks(keys);
+  }
+
+  /** Re-fetch chunks from main (post-save) so the committed state replaces the composite. */
+  invalidateWorldChunks(keys: string[]): void {
+    this.worldMode.invalidateChunks(keys);
+  }
+
+  /** True when the chunk holding world column (cx,cz) is resident with data (editable). */
+  worldChunkLoaded(cx: number, cz: number): boolean {
+    return this.worldMode.hasChunkPayload(cx, cz);
+  }
+
+  /** Raycast the streamed WORLD chunks and return the cell `step` along the ray from the hit —
+   *  the world-mode counterpart of `rayCell` (world coords ARE scene coords; border walls and
+   *  entities are `noPick`-filtered). Null on a miss or in structure mode. */
+  private worldRayCell(clientX: number, clientY: number, step: number): [number, number, number] | null {
+    const groups = this.worldMode.chunkObjects();
+    if (!groups.length) return null;
+    this.aimRay(clientX, clientY);
+    const hits = this.raycaster.intersectObjects(groups, true);
+    const hit = hits.find((h) => !h.object.userData.noPick);
+    if (!hit) return null;
+    const p = hit.point.clone().addScaledVector(this.raycaster.ray.direction, step);
+    return [Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)];
+  }
+
+  /** The solid WORLD block cell under a screen point (erase/recolor/select). */
+  pickWorldBlock(clientX: number, clientY: number): [number, number, number] | null {
+    return this.worldRayCell(clientX, clientY, 0.05);
+  }
+
+  /** The empty WORLD cell adjacent to the clicked face (paint-brush placement). */
+  pickWorldPlacement(clientX: number, clientY: number): [number, number, number] | null {
+    return this.worldRayCell(clientX, clientY, -0.05);
   }
 
   /** Center the camera on a single block (local coords of the loaded structure)

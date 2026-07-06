@@ -31,6 +31,8 @@ import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { addRecentWorld, clearRecentWorlds, getRecentWorlds } from './recent-worlds';
 import { activeWorldMeta, findWorldStructures, getChunkPayload, getChunksPayload, listWorldRegions, openWorld as openWorldSource } from './world/world-service';
+import { applyWorldEdits, closeWorldEdit, deleteWorldBackup, listWorldBackups, openWorldEdit, restoreWorldBackup } from './world/edit-service';
+import type { WorldEditBlock } from '@/shared/types';
 import { clearChunkResolveCache } from './world/chunk-resolve';
 import { isWorldDir } from './world/anvil/world-paths';
 import {
@@ -200,6 +202,7 @@ export function registerIpc(): void {
       dialog.showErrorBox(mt('dialog.openWorldTitle'), mt('dialog.notAWorld'));
       return null;
     }
+    await closeWorldEdit(); // an edit session on the previous world must not outlive it
     const meta = await openWorldSource(dir);
     // Dev-only: BW_WORLD_CAM="x,y,z" overrides the initial framing spawn, so a headless capture can
     // start the fly-through underground / at a cliff to verify caves, grass sides, bedrock, etc.
@@ -227,6 +230,15 @@ export function registerIpc(): void {
     getChunksPayload(dim, coords),
   );
   ipcMain.handle(IPC_CHANNELS.worldFindStructures, async (_e, dim: DimensionId) => findWorldStructures(dim));
+  // ── World editing (v2.2): the safe write path (main/world/edit/) behind IPC ─────────
+  ipcMain.handle(IPC_CHANNELS.worldEditOpen, async (_e, dim: DimensionId) => openWorldEdit(dim));
+  ipcMain.handle(IPC_CHANNELS.worldEditClose, async () => closeWorldEdit());
+  ipcMain.handle(IPC_CHANNELS.worldEditApply, async (_e, dim: DimensionId, edits: WorldEditBlock[], retention: number) =>
+    applyWorldEdits(dim, edits, retention),
+  );
+  ipcMain.handle(IPC_CHANNELS.worldBackupsList, async () => listWorldBackups());
+  ipcMain.handle(IPC_CHANNELS.worldBackupRestore, async (_e, id: string) => restoreWorldBackup(id));
+  ipcMain.handle(IPC_CHANNELS.worldBackupDelete, async (_e, id: string) => deleteWorldBackup(id));
   ipcMain.handle(IPC_CHANNELS.recentWorldsList, async () => getRecentWorlds());
   ipcMain.handle(IPC_CHANNELS.recentWorldsClear, async () => {
     const list = clearRecentWorlds();

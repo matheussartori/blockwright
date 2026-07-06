@@ -65,9 +65,9 @@ export class RegionFile {
     return out;
   }
 
-  /** Read + decompress + parse + simplify the chunk NBT at local (lx,lz), or null if absent.
-   *  Handles the external `.mcc` overflow file transparently. */
-  async readChunkNBT(lx: number, lz: number): Promise<Record<string, unknown> | null> {
+  /** Read + decompress the raw chunk NBT bytes at local (lx,lz), or null if absent. Handles the
+   *  external `.mcc` overflow file transparently. */
+  async readChunkBytes(lx: number, lz: number): Promise<Buffer | null> {
     const { offsetSectors } = this.location(lx, lz);
     if (offsetSectors < 2) return null;
     const start = offsetSectors * SECTOR;
@@ -85,8 +85,25 @@ export class RegionFile {
       raw = this.buf.subarray(start + 5, start + 5 + (length - 1));
     }
 
-    const decompressed = decompressChunk(type, raw);
+    return decompressChunk(type, raw);
+  }
+
+  /** Read + parse + simplify the chunk NBT at local (lx,lz), or null if absent — the READ path's
+   *  shape (types dropped). The WRITE path uses `readChunkParsed` instead. */
+  async readChunkNBT(lx: number, lz: number): Promise<Record<string, unknown> | null> {
+    const decompressed = await this.readChunkBytes(lx, lz);
+    if (!decompressed) return null;
     const { parsed } = await nbt.parse(decompressed);
     return nbt.simplify(parsed) as Record<string, unknown>;
+  }
+
+  /** Read + parse the chunk NBT at local (lx,lz) keeping the TAG-TYPED tree ({type,value} nodes),
+   *  or null if absent. The write path patches this tree and re-encodes it — types intact, so
+   *  every tag we don't own survives byte-for-byte. */
+  async readChunkParsed(lx: number, lz: number): Promise<nbt.NBT | null> {
+    const decompressed = await this.readChunkBytes(lx, lz);
+    if (!decompressed) return null;
+    const { parsed } = await nbt.parse(decompressed);
+    return parsed;
   }
 }
