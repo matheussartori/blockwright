@@ -190,6 +190,10 @@ export const IPC_CHANNELS = {
   /** Write a batch of block edits through the safe write path (payload: dim, WorldEditBlock[],
    *  backup retention) → WorldEditApplyResult. Backs up first, per-chunk refusals reported. */
   worldEditApply: 'world:edit-apply',
+  /** Extract a box of the active world into a temp `.nbt` structure (payload: dim, WorldExtractBox,
+   *  nbtLimit) → WorldExtractResult. Reads the COMMITTED world; the renderer opens it as a tab or
+   *  routes it through Export As (with jigsaw split when `oversized`). */
+  worldExtract: 'world:extract',
   /** Backup sets of the active world → WorldBackupInfo[] (newest first). */
   worldBackupsList: 'world:backups-list',
   /** Restore one backup set over the active world (payload: id) → WorldBackupInfo. */

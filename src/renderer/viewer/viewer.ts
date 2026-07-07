@@ -16,6 +16,7 @@ import { FocusHighlight } from './highlight';
 import { buildStructure } from './mesh-builder';
 import { buildEntities } from './entity-mesh';
 import { SelectionOverlay } from './selection-overlay';
+import { WorldSelectionOverlay, type HeightHandle, type SelectionPhase } from './region-overlay';
 import { SymmetryOverlay } from './symmetry-overlay';
 import { HoverOverlay } from './hover-overlay';
 import { VoidOverlay, type VoidCell } from './void-overlay';
@@ -48,6 +49,9 @@ export class Viewer {
   private highlight = new FocusHighlight(this.scene);
 
   private selectionOverlay = new SelectionOverlay(this.scene);
+
+  /** The world editor's box-selection region (filled volume + edges + height handles). */
+  private worldSelection = new WorldSelectionOverlay(this.scene);
 
   private symmetryOverlay = new SymmetryOverlay(this.scene);
 
@@ -225,6 +229,7 @@ export class Viewer {
   /** Leave world mode: dispose the streamed scene + workers, back to empty. */
   exitWorldMode(): void {
     this.worldGhost.clear();
+    this.worldSelection.clear();
     this.worldMode.exit();
   }
 
@@ -345,6 +350,54 @@ export class Viewer {
   /** The empty WORLD cell adjacent to the clicked face (paint-brush placement). */
   pickWorldPlacement(clientX: number, clientY: number): [number, number, number] | null {
     return this.worldRayCell(clientX, clientY, -0.05);
+  }
+
+  /** Show (or clear, with null) the world editor's box-selection region overlay. */
+  setWorldSelection(
+    region: { min: [number, number, number]; max: [number, number, number] } | null,
+    phase: SelectionPhase = 'committed',
+  ): void {
+    this.worldSelection.set(region, phase);
+  }
+
+  /** Tint the hovered/dragged selection height handle (null = none). */
+  setWorldSelectionHandleHover(face: HeightHandle | null): void {
+    this.worldSelection.setHandleHover(face);
+  }
+
+  /** The selection height handle under a screen point, if any. */
+  pickWorldSelectionHandle(clientX: number, clientY: number): HeightHandle | null {
+    this.aimRay(clientX, clientY);
+    return this.worldSelection.pickHandle(this.raycaster);
+  }
+
+  /** The world Y where the pick ray passes closest to the vertical line through (x, z) —
+   *  what a height-handle drag reads to move the box's top/bottom face. Null when the ray
+   *  runs (near-)parallel to the line or the closest point is behind the camera. */
+  pickYOnVerticalLine(clientX: number, clientY: number, x: number, z: number): number | null {
+    this.aimRay(clientX, clientY);
+    const O = this.raycaster.ray.origin;
+    const D = this.raycaster.ray.direction;
+    const denom = 1 - D.y * D.y; // 1 − (D·up)², both unit vectors
+    if (denom < 1e-6) return null;
+    const wx = O.x - x;
+    const wy = O.y;
+    const wz = O.z - z;
+    const d = D.x * wx + D.y * wy + D.z * wz; // D·w0
+    const t = (D.y * wy - d) / denom; // ray param of the closest approach
+    if (t <= 0) return null;
+    return wy + t * D.y; // s_c = w0·up − t(D·up) rearranged: closest point's Y on the line
+  }
+
+  /** Whether the camera is in pointer-locked fly mode (world-edit picks aim at screen center). */
+  get flying(): boolean {
+    return this.nav.isFly();
+  }
+
+  /** The build-height range [minY, maxY] of a resident world chunk, or null when it isn't
+   *  streamed in — clamps selection height drags so a fill can't be refused at save time. */
+  worldYRange(cx: number, cz: number): [number, number] | null {
+    return this.worldMode.chunkYRange(cx, cz);
   }
 
   /** Center the camera on a single block (local coords of the loaded structure)
@@ -503,6 +556,7 @@ export class Viewer {
     this.lastPieces = null;
     this.highlight.clear();
     this.selectionOverlay.clear();
+    this.worldSelection.clear();
     this.symmetryOverlay.clear();
     this.voidOverlay.clear();
     this.hoverOverlay.clear();

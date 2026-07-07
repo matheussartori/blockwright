@@ -650,10 +650,22 @@ src/
                                                registers the overlay compositor on WorldView, re-meshes
                                                exactly lastTouched chunks, plane-locked strokes via the
                                                world picking; WorldEditPanel = tool surface; WorldSaveModal
-                                               = preview-then-write + result incl. refused chunks). Viewer
-                                               world-edit surface: setWorldEditOverlay/remeshWorldChunks/
-                                               invalidateWorldChunks/ensureWorldTextures/pickWorldBlock/
-                                               pickWorldPlacement (border walls + entities are noPick).
+                                               = preview-then-write + result incl. refused chunks). Box
+                                               select: two corner clicks span a region (world/selection.ts
+                                               is the pure span/face math, unit-tested) — a live dashed
+                                               rubber band follows the aim between them, and in FLY mode
+                                               every pick targets the screen center behind a crosshair, so
+                                               you can fly between corner picks. The committed region
+                                               renders via viewer/region-overlay.ts (ONE translucent
+                                               volume box — glass + x-ray fill passes, edges, corners —
+                                               never per-cell) with drag handles above/below that adjust
+                                               its Y extent (clamped to the chunk's build range via
+                                               worldYRange; PgUp/PgDn + panel steppers do the same).
+                                               Viewer world-edit surface: setWorldEditOverlay/
+                                               remeshWorldChunks/invalidateWorldChunks/ensureWorldTextures/
+                                               pickWorldBlock/pickWorldPlacement (border walls + entities
+                                               are noPick)/setWorldSelection/pickWorldSelectionHandle/
+                                               pickYOnVerticalLine/flying.
   shared/
     ipc.ts                Single source of truth for IPC channel/event names
     types/                Type-only contracts shared by both bundles, grouped by domain

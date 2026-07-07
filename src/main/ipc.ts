@@ -32,7 +32,8 @@ import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces'
 import { addRecentWorld, clearRecentWorlds, getRecentWorlds } from './recent-worlds';
 import { activeWorldMeta, findWorldStructures, getChunkPayload, getChunksPayload, listWorldRegions, openWorld as openWorldSource } from './world/world-service';
 import { applyWorldEdits, closeWorldEdit, deleteWorldBackup, listWorldBackups, openWorldEdit, restoreWorldBackup } from './world/edit-service';
-import type { WorldEditBlock } from '@/shared/types';
+import { extractWorldRegion } from './world/extract';
+import type { WorldEditBlock, WorldExtractBox } from '@/shared/types';
 import { clearChunkResolveCache } from './world/chunk-resolve';
 import { isWorldDir } from './world/anvil/world-paths';
 import {
@@ -237,6 +238,9 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.worldEditClose, async () => closeWorldEdit());
   ipcMain.handle(IPC_CHANNELS.worldEditApply, async (_e, dim: DimensionId, edits: WorldEditBlock[], retention: number) =>
     applyWorldEdits(dim, edits, retention),
+  );
+  ipcMain.handle(IPC_CHANNELS.worldExtract, async (_e, dim: DimensionId, box: WorldExtractBox, nbtLimit: number) =>
+    extractWorldRegion(dim, box, nbtLimit),
   );
   ipcMain.handle(IPC_CHANNELS.worldBackupsList, async () => listWorldBackups());
   ipcMain.handle(IPC_CHANNELS.worldBackupRestore, async (_e, id: string) => restoreWorldBackup(id));

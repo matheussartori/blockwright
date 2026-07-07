@@ -7523,10 +7523,113 @@ body.row-resizing {
   gap: 7px;
   font-family: var(--font);
 }
-.world-edit-selsize,
 .world-edit-pending {
   color: var(--text-2);
   font-size: 11.5px;
+}
+
+/* Box-selection readout: dimensions + volume on one line, min → max corners under it.
+   Mono throughout — it's coordinate data. The volume flips to the warning colour when
+   the box exceeds the fill/delete cap. */
+.world-sel-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+}
+.world-sel-dims {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.world-sel-size {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.world-sel-volume {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.world-sel-volume.over {
+  color: var(--warn);
+  font-weight: 600;
+}
+.world-sel-coords {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+/* Height steppers reuse the axis-pad chrome; the face label + current Y are fixed-width
+   so the −/+ buttons don't shift as the numbers change. */
+.world-sel-facelabel {
+  width: 40px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.world-sel-facey {
+  min-width: 42px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.world-sel-cap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.world-sel-cap svg {
+  flex: none;
+}
+.world-sel-clear {
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Fly-mode crosshair: marks where a click lands while the pointer is locked (all world-edit
+   tools pick at the screen center in fly mode). Difference blend keeps it visible over any
+   terrain; pointer-events off so it can never eat a click. */
+.world-edit-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 15;
+  mix-blend-mode: difference;
+}
+.world-edit-crosshair::before,
+.world-edit-crosshair::after {
+  content: '';
+  position: absolute;
+  background: #fff;
+}
+.world-edit-crosshair::before {
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+}
+.world-edit-crosshair::after {
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
 }
 .world-edit-caution {
   display: flex;

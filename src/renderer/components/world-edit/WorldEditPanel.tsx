@@ -3,11 +3,16 @@
 // and the Save-to-World / Discard actions. Shown while world-edit mode is active; the mode is
 // toggled from the World HUD's Edit button (gated on the Settings ▸ World master switch).
 import { useMemo } from 'react';
-import { AlertTriangle, Eraser, Globe, PackagePlus, Paintbrush, Redo2, RotateCcw, RotateCw, Save, SquareDashed, Trash2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Download, Eraser, Globe, PackageOpen, PackagePlus, Paintbrush, Redo2, RotateCcw, RotateCw, Save, SquareDashed, Trash2, Undo2, X } from 'lucide-react';
+import { effectiveNbtLimit } from '@/shared/domain/split';
 import { useDocuments, useT, useWorldEdit } from '../../hooks/useStores';
-import { commitPlaceVia, worldEditStore, type WorldPaintMode, type WorldTool } from '../../state/world-edit';
+import { commitPlaceVia, WORLD_SELECTION_CAP, worldEditStore, type WorldPaintMode, type WorldTool } from '../../state/world-edit';
+import { regionVolume } from '../../world/selection';
 import { rotatedSize } from '../../world/place';
 import { useViewer } from '../../viewer/ViewerProvider';
+import { api } from '../../api';
+import { store } from '../../state/store';
+import { settingsStore } from '../../state/settings';
 import { Segmented } from '../ui/Segmented';
 import { Select } from '../ui/Select';
 import { Tooltip } from '../ui/Tooltip';
@@ -16,10 +21,12 @@ import { BlockField } from '../editor/BlockField';
 import { useBlockIds } from '../editor/useBlockIds';
 import { WorldSaveModal } from './WorldSaveModal';
 
-export function WorldEditPanel() {
+/** @param onOpenFile Open an extracted `.nbt` as a new tab (App wires the document-flow's openFile). */
+export function WorldEditPanel({ onOpenFile }: { onOpenFile: (path: string) => void | Promise<void> }) {
   const t = useT();
   const viewer = useViewer();
   const active = useWorldEdit((s) => s.active);
+  const extracting = useWorldEdit((s) => s.extracting);
   const place = useWorldEdit((s) => s.place);
   const documents = useDocuments((s) => s.documents);
   /** Open structure tabs with a loaded build — the Place tool's candidates. */
@@ -32,6 +39,7 @@ export function WorldEditPanel() {
   const paintBlock = useWorldEdit((s) => s.paintBlock);
   const pendingCount = useWorldEdit((s) => s.pendingCount);
   const selection = useWorldEdit((s) => s.selection);
+  const selAnchor = useWorldEdit((s) => s.anchor);
   const canUndo = useWorldEdit((s) => s.past.length > 0);
   const canRedo = useWorldEdit((s) => s.future.length > 0);
   const lockExclusive = useWorldEdit((s) => s.lockExclusive);
@@ -44,6 +52,37 @@ export function WorldEditPanel() {
     const [a, b] = [selection.min, selection.max];
     return `${b[0] - a[0] + 1}×${b[1] - a[1] + 1}×${b[2] - a[2] + 1}`;
   }, [selection]);
+  const selVolume = selection ? regionVolume(selection) : 0;
+  const overCap = selVolume > WORLD_SELECTION_CAP;
+
+  /** Panel steppers for the box's top/bottom face, build-range clamped like the 3D handles. */
+  const nudgeY = (face: 'top' | 'bottom', dir: 1 | -1) => {
+    const sel = we().selection;
+    if (!sel) return;
+    const bounds = viewer?.worldYRange(Math.floor(sel.min[0] / 16), Math.floor(sel.min[2] / 16)) ?? undefined;
+    we().adjustSelectionY(face, (face === 'top' ? sel.max[1] : sel.min[1]) + dir, bounds);
+  };
+
+  /** Extract the selection into a temp `.nbt`; returns the result and reports what was captured. */
+  const extract = async () => {
+    const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
+    const result = await we().extractSelection(nbtLimit);
+    if (result?.ok) {
+      const refused = result.refusedChunks > 0 ? ` — ${t('worldEdit.extractRefused', { n: String(result.refusedChunks) })}` : '';
+      store.getState().setNotice({ text: `${t('worldEdit.extractDone', { blocks: result.blocks.toLocaleString(), name: result.name })}${refused}`, warn: false });
+    }
+    return { result, nbtLimit };
+  };
+
+  const extractOpen = async () => {
+    const { result } = await extract();
+    if (result?.ok) await onOpenFile(result.path);
+  };
+
+  const extractSave = async () => {
+    const { result, nbtLimit } = await extract();
+    if (result?.ok) await api.exportStructure(result.path, `${result.name}.nbt`, nbtLimit, result.oversized ? 'jigsaw' : 'nbt');
+  };
 
   if (!active) return null;
 
@@ -155,23 +194,80 @@ export function WorldEditPanel() {
             <div className="editor-hint">{t('worldEdit.placeNoDocs')}</div>
           ))}
         {tool === 'select' &&
-          (selSize ? (
+          (selection ? (
             <>
-              <BlockField
-                label={t('worldEdit.fillBlock')}
-                value={paintBlock}
-                onChange={(v) => we().setPaintBlock(v)}
-                options={blockIds}
-                listId="world-fill-blocks"
-              />
-              <div className="editor-btngrid">
-                <button className="btn sm" onClick={() => void we().fillSelection()}>
-                  {t('worldEdit.fillSelection')}
-                </button>
-                <button className="btn sm" onClick={() => we().deleteSelection()}>
-                  {t('worldEdit.deleteSelection')}
-                </button>
+              <div className="world-sel-readout">
+                <div className="world-sel-dims">
+                  <span className="world-sel-size">{selSize}</span>
+                  <span className={`world-sel-volume${overCap ? ' over' : ''}`}>
+                    {t('worldEdit.selVolume', { n: selVolume.toLocaleString() })}
+                  </span>
+                </div>
+                <div className="world-sel-coords">
+                  {selection.min.join(' ')} → {selection.max.join(' ')}
+                </div>
               </div>
+              {selAnchor ? (
+                <div className="editor-hint">{t('worldEdit.selectHintAnchor')}</div>
+              ) : (
+                <>
+                  <div className="editor-axispad">
+                    {(['top', 'bottom'] as const).map((face) => {
+                      const label = t(face === 'top' ? 'worldEdit.selTop' : 'worldEdit.selBottom');
+                      return (
+                        <div key={face} className="editor-axisrow">
+                          <span className="world-sel-facelabel">{label}</span>
+                          <button className="editor-axisbtn no-drag" onClick={() => nudgeY(face, -1)} aria-label={`−${label}`}>
+                            −
+                          </button>
+                          <span className="world-sel-facey">{face === 'top' ? selection.max[1] : selection.min[1]}</span>
+                          <button className="editor-axisbtn no-drag" onClick={() => nudgeY(face, 1)} aria-label={`+${label}`}>
+                            +
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="editor-hint">{t('worldEdit.selHeightHint')}</div>
+                  <BlockField
+                    label={t('worldEdit.fillBlock')}
+                    value={paintBlock}
+                    onChange={(v) => we().setPaintBlock(v)}
+                    options={blockIds}
+                    listId="world-fill-blocks"
+                  />
+                  {overCap && (
+                    <div className="world-sel-cap">
+                      <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                      {t('worldEdit.selTooLarge', { cap: WORLD_SELECTION_CAP.toLocaleString() })}
+                    </div>
+                  )}
+                  <div className="editor-btngrid">
+                    <button className="btn sm" disabled={overCap} onClick={() => void we().fillSelection()}>
+                      {t('worldEdit.fillSelection')}
+                    </button>
+                    <button className="btn sm" disabled={overCap} onClick={() => we().deleteSelection()}>
+                      {t('worldEdit.deleteSelection')}
+                    </button>
+                  </div>
+                  <div className="editor-btngrid">
+                    <Tooltip placement="right" label={t('worldEdit.extractOpen')} description={t('worldEdit.extractOpenDesc')}>
+                      <button className="btn sm" disabled={extracting} onClick={() => void extractOpen()}>
+                        <PackageOpen size={13} aria-hidden /> {t('worldEdit.extractOpen')}
+                      </button>
+                    </Tooltip>
+                    <Tooltip placement="right" label={t('worldEdit.extractSave')} description={t('worldEdit.extractSaveDesc')}>
+                      <button className="btn sm" disabled={extracting} onClick={() => void extractSave()}>
+                        <Download size={13} aria-hidden /> {t('worldEdit.extractSave')}
+                      </button>
+                    </Tooltip>
+                  </div>
+                  <div className="editor-hint">{t('worldEdit.extractHint')}</div>
+                  <button className="btn sm world-sel-clear" onClick={() => we().clearSelection()}>
+                    <X size={13} aria-hidden /> {t('worldEdit.selClear')}
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <div className="editor-hint">{t('worldEdit.selectHint')}</div>
@@ -179,11 +275,6 @@ export function WorldEditPanel() {
       </div>
 
       <div className="editor-selinfo world-edit-status">
-        {tool === 'select' && selSize ? (
-          <div className="world-edit-selsize">
-            <span style={{ fontFamily: 'var(--mono)' }}>{selSize}</span> — {t('worldEdit.selection')}
-          </div>
-        ) : null}
         <div className="world-edit-pending">{t('worldEdit.pendingCount', { n: pendingCount.toLocaleString() })}</div>
         {!lockExclusive && (
           <div className="world-edit-caution" title={t('worldEdit.lockCautionDesc')}>

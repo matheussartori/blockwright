@@ -13,6 +13,8 @@ import type {
   WorldEditApplyResult,
   WorldEditBlock,
   WorldEditOpenResult,
+  WorldExtractBox,
+  WorldExtractResult,
   WorldMeta,
   WorldRef,
 } from './world';
@@ -106,6 +108,9 @@ export interface BlockwrightApi {
   /** Write block edits through the safe write path (enforced backup, per-chunk refusals reported).
    *  `retention` prunes backup sets past that count after the save (0 = keep all). */
   applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number) => Promise<WorldEditApplyResult>;
+  /** Extract a box of the active world into a temp `.nbt` structure (committed world, not pending
+   *  edits). `nbtLimit` decides `oversized`. The renderer opens it as a tab or routes it to Export As. */
+  extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number) => Promise<WorldExtractResult>;
   /** Backup sets of the active world (newest first). */
   listWorldBackups: () => Promise<WorldBackupInfo[]>;
   /** Restore one backup set over the active world's files. */

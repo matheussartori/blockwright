@@ -20,6 +20,8 @@ import type {
   WorldEditApplyResult,
   WorldEditBlock,
   WorldEditOpenResult,
+  WorldExtractBox,
+  WorldExtractResult,
   WorldMeta,
   WorldRef,
   ReassembleResult,
@@ -122,6 +124,8 @@ const api: BlockwrightApi = {
   closeWorldEdit: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.worldEditClose),
   applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number): Promise<WorldEditApplyResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, retention),
+  extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number): Promise<WorldExtractResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldExtract, dim, box, nbtLimit),
   listWorldBackups: (): Promise<WorldBackupInfo[]> => ipcRenderer.invoke(IPC_CHANNELS.worldBackupsList),
   restoreWorldBackup: (id: string): Promise<WorldBackupInfo> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldBackupRestore, id),

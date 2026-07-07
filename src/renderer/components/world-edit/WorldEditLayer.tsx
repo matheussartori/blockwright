@@ -1,13 +1,18 @@
-// The imperative bridge between IN-WORLD editing and the Three.js viewer (renders nothing) —
-// the world-mode sibling of editor/EditorLayer. While world-edit mode is on it: registers the
-// pending-edits payload compositor on the streamed WorldView, re-meshes exactly the chunks each
-// mutation touched, turns clicks/drags into paint/erase strokes (plane-locked like the structure
+// The imperative bridge between IN-WORLD editing and the Three.js viewer — the world-mode
+// sibling of editor/EditorLayer. While world-edit mode is on it: registers the pending-edits
+// payload compositor on the streamed WorldView, re-meshes exactly the chunks each mutation
+// touched, turns clicks/drags into paint/erase strokes (plane-locked like the structure
 // editor) or box-select picks, previews the target cell, and runs the keyboard shortcuts.
+// In fly mode every pick aims at the SCREEN CENTER (the pointer is locked, so client
+// coordinates are stale) and a crosshair marks the aim — so you can fly between the two
+// corner picks like placing blocks in the game. A committed selection shows draggable
+// top/bottom height handles.
 import { useEffect } from 'react';
 import { useViewer } from '../../viewer/ViewerProvider';
-import { useWorldEdit } from '../../hooks/useStores';
+import { useApp, useWorldEdit } from '../../hooks/useStores';
 import { commitPlaceVia, worldEditStore, type WorldEditState } from '../../state/world-edit';
 import { chunkKeyOf, compositePayload } from '../../world/edit-overlay';
+import type { HeightHandle } from '../../viewer/region-overlay';
 import { ACCENT, FOCUS, VOID_MARK } from '../../viewer/overlay-colors';
 
 /** Pixels the pointer may travel between down and up and still count as a click. */
@@ -15,25 +20,14 @@ const CLICK_SLOP = 4;
 
 const cellKey = (c: [number, number, number]): string => `${c[0]},${c[1]},${c[2]}`;
 
-/** The cells along the 12 edges of an inclusive box — a wireframe impression for the selection
- *  overlay that stays cheap no matter how big the box is. */
-function edgeCells(min: [number, number, number], max: [number, number, number]): string[] {
-  const out = new Set<string>();
-  const xs = [min[0], max[0]];
-  const ys = [min[1], max[1]];
-  const zs = [min[2], max[2]];
-  for (const y of ys) for (const z of zs) for (let x = min[0]; x <= max[0]; x++) out.add(`${x},${y},${z}`);
-  for (const x of xs) for (const z of zs) for (let y = min[1]; y <= max[1]; y++) out.add(`${x},${y},${z}`);
-  for (const x of xs) for (const y of ys) for (let z = min[2]; z <= max[2]; z++) out.add(`${x},${y},${z}`);
-  return [...out];
-}
-
 export function WorldEditLayer() {
   const viewer = useViewer();
   const active = useWorldEdit((s) => s.active);
   const tool = useWorldEdit((s) => s.tool);
+  const anchor = useWorldEdit((s) => s.anchor);
   const selection = useWorldEdit((s) => s.selection);
   const place = useWorldEdit((s) => s.place);
+  const navMode = useApp((s) => s.navMode);
   const placeData = place?.data ?? null;
 
   // The pending-edit compositor + the per-mutation re-mesh, live for the whole edit session.
@@ -65,8 +59,9 @@ export function WorldEditLayer() {
       for (const e of Object.values(s.pending)) touched.add(chunkKeyOf(e.x, e.z));
       if (touched.size) viewer.remeshWorldChunks([...touched]);
       viewer.setHover(null);
-      viewer.setSelection([]);
+      viewer.setWorldSelection(null);
       viewer.setPaintNav(false);
+      viewer.domElement.style.cursor = '';
     };
   }, [viewer, active]);
 
@@ -77,11 +72,12 @@ export function WorldEditLayer() {
     return () => viewer.setPaintNav(false);
   }, [viewer, active, tool]);
 
-  // Selection wireframe (cheap edge cells — a huge box never floods the overlay).
+  // The selection region overlay: dashed while the second corner is aimed, solid + height
+  // handles once committed. One region box, so size never matters.
   useEffect(() => {
     if (!viewer || !active) return;
-    viewer.setSelection(selection ? edgeCells(selection.min, selection.max) : []);
-  }, [viewer, active, selection]);
+    viewer.setWorldSelection(selection, anchor ? 'preview' : 'committed');
+  }, [viewer, active, selection, anchor]);
 
   // The Place tool's ghost meshes: built once per picked structure, dropped with it.
   useEffect(() => {
@@ -106,6 +102,14 @@ export function WorldEditLayer() {
     const canvas = viewer.domElement;
     const st = worldEditStore.getState;
 
+    /** Where a pick aims: the pointer in orbit mode, the locked crosshair (screen center)
+     *  in fly mode — pointer-locked client coordinates are frozen at the lock point. */
+    const aimPoint = (e?: { clientX: number; clientY: number }): [number, number] => {
+      if (!viewer.flying && e) return [e.clientX, e.clientY];
+      const rect = canvas.getBoundingClientRect();
+      return [rect.left + rect.width / 2, rect.top + rect.height / 2];
+    };
+
     /** The cell the current tool would affect at a screen point (world coords). */
     const target = (s: WorldEditState, x: number, y: number): [number, number, number] | null => {
       const cell =
@@ -117,10 +121,21 @@ export function WorldEditLayer() {
 
     const hue = (s: WorldEditState): number => (s.tool === 'erase' ? VOID_MARK : s.paintMode === 'brush' ? ACCENT : FOCUS);
 
+    /** Build-range clamp for height adjustments (from the chunk holding the box's min corner). */
+    const yBounds = (): [number, number] | undefined => {
+      const sel = st().selection;
+      if (!sel) return undefined;
+      return viewer.worldYRange(Math.floor(sel.min[0] / 16), Math.floor(sel.min[2] / 16)) ?? undefined;
+    };
+
     let down: { x: number; y: number } | null = null;
     let painting = false;
     let lastPaint: string | null = null;
     let strokePlane: { axis: 0 | 1 | 2; coord: number } | null = null;
+    /** Height-handle drag: which face, the box's center column, and the grab offset so the
+     *  face follows the cursor without jumping by the handle's stand-off distance. */
+    let heightDrag: { face: HeightHandle; x: number; z: number; offset: number } | null = null;
+    let hoverHandle: HeightHandle | null = null;
 
     /** Plane lock from the clicked face (axis where solid + placement cells differ). */
     const planeFor = (cell: [number, number, number], x: number, y: number): { axis: 0 | 1 | 2; coord: number } | null => {
@@ -139,18 +154,70 @@ export function WorldEditLayer() {
       lastPaint = cellKey(cell);
     };
 
+    const setHandleHover = (face: HeightHandle | null): void => {
+      if (face === hoverHandle) return;
+      hoverHandle = face;
+      viewer.setWorldSelectionHandleHover(face);
+      canvas.style.cursor = face ? 'ns-resize' : '';
+      // Steal the left button from orbit while over a handle, so the grab can't rotate.
+      if (st().tool === 'select') viewer.setPaintNav(face !== null);
+    };
+
+    /** One aim update — hover preview, select rubber band, place ghost follow. Runs on
+     *  pointermove (orbit) and every frame in fly mode (the camera moves without events). */
+    const updateAim = (x: number, y: number): void => {
+      const s = st();
+      if (s.tool !== 'select') setHandleHover(null); // no stale resize cursor across tool switches
+      if (s.tool === 'place') {
+        // The ghost IS the preview: follow the aim until a click pins the anchor.
+        if (s.place && !s.place.locked) {
+          const cell = viewer.pickWorldPlacement(x, y);
+          if (cell) s.aimPlace(cell, false);
+        }
+        return;
+      }
+      if (s.tool === 'select') {
+        // Height handles are grabbable only with a free cursor (orbit mode).
+        if (!viewer.flying && s.selection && !s.anchor) {
+          setHandleHover(viewer.pickWorldSelectionHandle(x, y));
+          if (hoverHandle) {
+            viewer.setHover(null);
+            return;
+          }
+        } else {
+          setHandleHover(null);
+        }
+        const cell = viewer.pickWorldBlock(x, y);
+        if (s.anchor && cell) s.previewSelect(cell); // live rubber band to the aimed cell
+        viewer.setHover(cell, FOCUS);
+        return;
+      }
+      viewer.setHover(target(s, x, y), hue(s));
+    };
+
     /** Commit the Place ghost with the viewer's chunk/texture services. */
     const commitPlace = () => void commitPlaceVia(viewer);
 
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       const s = st();
+      if (s.tool === 'select' && hoverHandle && s.selection) {
+        const sel = s.selection;
+        const centerX = sel.min[0] + (sel.max[0] - sel.min[0] + 1) / 2;
+        const centerZ = sel.min[2] + (sel.max[2] - sel.min[2] + 1) / 2;
+        const grabY = viewer.pickYOnVerticalLine(e.clientX, e.clientY, centerX, centerZ);
+        const planeY = hoverHandle === 'top' ? sel.max[1] + 1 : sel.min[1];
+        heightDrag = { face: hoverHandle, x: centerX, z: centerZ, offset: grabY === null ? 0 : planeY - grabY };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
       if (s.tool === 'paint' || s.tool === 'erase') {
-        const cell = target(s, e.clientX, e.clientY);
+        const [x, y] = aimPoint(e);
+        const cell = target(s, x, y);
         painting = true;
         lastPaint = null;
         canvas.setPointerCapture(e.pointerId);
-        strokePlane = cell ? planeFor(cell, e.clientX, e.clientY) : null;
+        strokePlane = cell ? planeFor(cell, x, y) : null;
         s.strokeBegin();
         if (s.tool === 'paint') {
           // Resolve the brush block once per stroke; textures preload so the composite is textured.
@@ -169,27 +236,35 @@ export function WorldEditLayer() {
 
     const onMove = (e: PointerEvent) => {
       const s = st();
-      if (painting) {
-        const cell = strokePlane
-          ? viewer.pickOnPlane(e.clientX, e.clientY, strokePlane.axis, strokePlane.coord)
-          : target(s, e.clientX, e.clientY);
-        if (cell && cellKey(cell) !== lastPaint) paintAt(s, cell);
-        return;
-      }
-      if (s.tool === 'place') {
-        // The ghost IS the preview: follow the cursor until a click pins the anchor.
-        if (s.place && !s.place.locked) {
-          const cell = viewer.pickWorldPlacement(e.clientX, e.clientY);
-          if (cell) s.aimPlace(cell, false);
+      if (heightDrag) {
+        const y = viewer.pickYOnVerticalLine(e.clientX, e.clientY, heightDrag.x, heightDrag.z);
+        if (y !== null) {
+          const plane = y + heightDrag.offset;
+          // The top face sits at maxY+1, the bottom at minY — map the plane back to the cell.
+          s.adjustSelectionY(heightDrag.face, heightDrag.face === 'top' ? Math.round(plane) - 1 : Math.round(plane), yBounds());
         }
         return;
       }
-      if (s.tool === 'paint' || s.tool === 'erase') viewer.setHover(target(s, e.clientX, e.clientY), hue(s));
-      else viewer.setHover(viewer.pickWorldBlock(e.clientX, e.clientY), FOCUS);
+      if (painting) {
+        const [x, y] = aimPoint(e);
+        const cell = strokePlane
+          ? viewer.pickOnPlane(x, y, strokePlane.axis, strokePlane.coord)
+          : target(s, x, y);
+        if (cell && cellKey(cell) !== lastPaint) paintAt(s, cell);
+        return;
+      }
+      const [x, y] = aimPoint(e);
+      updateAim(x, y);
     };
 
     const onUp = (e: PointerEvent) => {
       if (e.button !== 0) return;
+      if (heightDrag) {
+        heightDrag = null;
+        if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+        updateAim(...aimPoint(e)); // re-pick the handle under the released cursor
+        return;
+      }
       if (painting) {
         painting = false;
         lastPaint = null;
@@ -202,17 +277,31 @@ export function WorldEditLayer() {
       down = null;
       if (moved > CLICK_SLOP) return; // a drag orbited
       const s = st();
+      const [x, y] = aimPoint(e);
       if (s.tool === 'select') {
-        const cell = viewer.pickWorldBlock(e.clientX, e.clientY);
+        const cell = viewer.pickWorldBlock(x, y);
         if (cell) s.pickSelect(cell);
       }
       if (s.tool === 'place' && s.place) {
-        const cell = viewer.pickWorldPlacement(e.clientX, e.clientY);
+        const cell = viewer.pickWorldPlacement(x, y);
         if (cell) s.aimPlace(cell, true); // a click pins (or re-pins) the anchor
       }
     };
 
-    const onLeave = () => viewer.setHover(null);
+    const onLeave = () => {
+      viewer.setHover(null);
+      setHandleHover(null);
+    };
+
+    // Fly mode has no cursor events for camera motion (WASD / mouse-look), so the aim —
+    // hover cube, rubber band, ghost follow — tracks the crosshair every frame instead.
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      if (!viewer.flying || painting) return;
+      updateAim(...aimPoint());
+    };
+    raf = requestAnimationFrame(tick);
 
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
@@ -254,6 +343,15 @@ export function WorldEditLayer() {
           return;
         }
       }
+      // Height nudges for a committed selection: PgUp/PgDn move the top, Shift moves the bottom.
+      if (s.tool === 'select' && s.selection && !s.anchor && (e.key === 'PageUp' || e.key === 'PageDown')) {
+        e.preventDefault();
+        const dir = e.key === 'PageUp' ? 1 : -1;
+        const face: HeightHandle = e.shiftKey ? 'bottom' : 'top';
+        const current = face === 'top' ? s.selection.max[1] : s.selection.min[1];
+        s.adjustSelectionY(face, current + dir, yBounds());
+        return;
+      }
       if (e.key === 'Escape') {
         if (s.anchor || s.selection) s.clearSelection();
         return;
@@ -270,13 +368,17 @@ export function WorldEditLayer() {
     canvas.addEventListener('pointerleave', onLeave);
     window.addEventListener('keydown', onKey);
     return () => {
+      cancelAnimationFrame(raf);
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointerleave', onLeave);
       window.removeEventListener('keydown', onKey);
+      canvas.style.cursor = '';
     };
   }, [viewer, active]);
 
-  return null;
+  // The fly-mode crosshair: marks where a click will land while the pointer is locked.
+  if (!active || navMode !== 'fly') return null;
+  return <div className="world-edit-crosshair" aria-hidden />;
 }

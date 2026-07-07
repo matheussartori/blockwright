@@ -108,6 +108,11 @@ export class WorldMode {
     return this.world?.hasPayload(cx, cz) ?? false;
   }
 
+  /** The build-height range [minY, maxY] of a resident chunk, or null. */
+  chunkYRange(cx: number, cz: number): [number, number] | null {
+    return this.world?.yRangeOf(cx, cz) ?? null;
+  }
+
   /** Day/night lighting for the world view (a mood toggle — no live sky simulation). */
   setDaylight(day: boolean): void {
     const { hemi, sun, fill } = this.lights;

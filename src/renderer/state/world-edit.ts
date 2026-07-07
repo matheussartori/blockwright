@@ -4,7 +4,7 @@
 // structure block editor) but deliberately its own store: edits here are per-cell records over
 // an unbounded streamed world, not ops over a bounded StructureData.
 import { createStore } from 'zustand/vanilla';
-import type { DimensionId, StructureData, WorldEditApplyResult } from '@/shared/types';
+import type { DimensionId, StructureData, WorldEditApplyResult, WorldExtractResult } from '@/shared/types';
 import { api } from '../api';
 import {
   AIR,
@@ -14,6 +14,7 @@ import {
   type PendingWorldEdit,
   type ResolvedWorldBlock,
 } from '../world/edit-overlay';
+import { adjustFaceY, spanRegion } from '../world/selection';
 import { planPlacement, rotatedSize, type PlaceTurns } from '../world/place';
 
 export type WorldTool = 'paint' | 'erase' | 'select' | 'place';
@@ -97,11 +98,21 @@ export interface WorldEditState {
   eraseCell(cell: [number, number, number]): void;
   /** Box-select: first pick anchors, second commits the box, a third re-anchors. */
   pickSelect(cell: [number, number, number]): void;
+  /** Live rubber band: while the first corner is anchored, stretch the box to the aimed
+   *  cell so the region is visible BEFORE the second click. No-op once committed. */
+  previewSelect(cell: [number, number, number]): void;
+  /** Move the committed box's top/bottom face to world Y `y` (drag handles / steppers),
+   *  clamped so the box never inverts nor leaves `bounds` (the build range) when given. */
+  adjustSelectionY(face: 'top' | 'bottom', y: number, bounds?: [number, number]): void;
   clearSelection(): void;
   /** Fill the committed selection with the paint block (volume-capped). */
   fillSelection(): Promise<void>;
   /** Fill the committed selection with air. */
   deleteSelection(): void;
+  /** Extract the committed selection into a temp `.nbt` structure (committed world, not pending
+   *  edits). Returns the result so the caller can open it as a tab or route it to Export As;
+   *  null when there's no selection. `nbtLimit` decides `oversized`. */
+  extractSelection(nbtLimit: number): Promise<WorldExtractResult | null>;
   /** Start placing an open structure: switches to the Place tool with a fresh ghost. */
   beginPlace(docId: string, label: string, data: StructureData): void;
   /** Center the ghost's rotated footprint on a world cell. `lock` pins it (a click);
@@ -125,6 +136,8 @@ export interface WorldEditState {
   /** Commit the pending edits through the safe write path. Returns the report (also stored). */
   save(retention: number): Promise<WorldEditApplyResult | null>;
   clearError(): void;
+  /** Extraction (Save selection as… / Open as tab) in flight — the buttons show a busy state. */
+  extracting: boolean;
 }
 
 /** All chunk keys covered by a set of cell keys. */
@@ -205,6 +218,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     saveOpen: false,
     lastReport: null,
     error: null,
+    extracting: false,
 
     enter: async (dim) => {
       if (get().active || get().opening) return get().active;
@@ -279,21 +293,24 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     pickSelect: (cell) => {
       const { anchor } = get();
       if (!anchor) {
-        const single: [number, number, number] = [cell[0], cell[1], cell[2]];
-        set({ anchor: cell, selection: { min: single, max: [cell[0], cell[1], cell[2]] } });
+        set({ anchor: cell, selection: spanRegion(cell, cell) });
         return;
       }
-      const min: [number, number, number] = [
-        Math.min(anchor[0], cell[0]),
-        Math.min(anchor[1], cell[1]),
-        Math.min(anchor[2], cell[2]),
-      ];
-      const max: [number, number, number] = [
-        Math.max(anchor[0], cell[0]),
-        Math.max(anchor[1], cell[1]),
-        Math.max(anchor[2], cell[2]),
-      ];
-      set({ selection: { min, max }, anchor: null });
+      set({ selection: spanRegion(anchor, cell), anchor: null });
+    },
+
+    previewSelect: (cell) => {
+      const { anchor } = get();
+      if (!anchor) return;
+      set({ selection: spanRegion(anchor, cell) });
+    },
+
+    adjustSelectionY: (face, y, bounds) => {
+      const { selection } = get();
+      if (!selection) return;
+      const next = adjustFaceY(selection, face, y, bounds);
+      if (next.min[1] === selection.min[1] && next.max[1] === selection.max[1]) return;
+      set({ selection: next });
     },
 
     clearSelection: () => set({ anchor: null, selection: null }),
@@ -310,6 +327,22 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
 
     deleteSelection: () => {
       fillBox(AIR);
+    },
+
+    extractSelection: async (nbtLimit) => {
+      const s = get();
+      if (!s.selection || !s.dim || s.extracting) return null;
+      set({ extracting: true, error: null });
+      try {
+        const result = await api.extractFromWorld(s.dim, { min: s.selection.min, max: s.selection.max }, nbtLimit);
+        if (!result.ok) set({ error: result.error });
+        return result;
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return null;
+      } finally {
+        set({ extracting: false });
+      }
     },
 
     beginPlace: (docId, label, data) =>

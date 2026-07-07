@@ -113,6 +113,30 @@ export interface WorldEditApplyResult {
   refused: WorldRefusedChunk[];
 }
 
+/** An inclusive world-cell box to extract into a structure (v2.2 §4). */
+export interface WorldExtractBox {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
+/** Result of extracting a world region into a structure. On success `path` is a freshly written
+ *  temp `.nbt` the renderer either opens as a tab or feeds to the Export As / jigsaw-split flow;
+ *  `oversized` means the region exceeds a Structure-Block axis limit (offer jigsaw on save);
+ *  `refusedChunks` counts columns in the box that couldn't be read (proto/pre-1.13), skipped. */
+export type WorldExtractResult =
+  | {
+      ok: true;
+      path: string;
+      name: string;
+      size: [number, number, number];
+      oversized: boolean;
+      blocks: number;
+      blockEntities: number;
+      entities: number;
+      refusedChunks: number;
+    }
+  | { ok: false; error: string };
+
 /** One 16×16×16 section of a render payload. `uniform` sections carry no grid — every cell is the
  *  palette index `fill` (a stone/air fill costs nothing over IPC). */
 export interface ChunkSectionPayload {

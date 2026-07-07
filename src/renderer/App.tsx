@@ -133,7 +133,7 @@ function Shell() {
               )}
               {isWorld && <WorldHud />}
               {isWorld && <WorldEditLayer />}
-              {isWorld && <WorldEditPanel />}
+              {isWorld && <WorldEditPanel onOpenFile={(p) => void flow.openFile(p)} />}
               <FloatingPanels availability={availability} />
               {fileOpen && <EditorLayer />}
               {fileOpen && <EditorPanel />}

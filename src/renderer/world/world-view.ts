@@ -226,6 +226,21 @@ export class WorldView {
     return !!this.chunks.get(key(cx, cz))?.payload;
   }
 
+  /** The world-Y block range spanned by a resident chunk's sections — the same range the
+   *  save gate accepts edits in (decoded sections include the uniform-air ones), so the
+   *  selection height handles clamp to it. Null when the chunk isn't resident. */
+  yRangeOf(cx: number, cz: number): [number, number] | null {
+    const payload = this.chunks.get(key(cx, cz))?.payload;
+    if (!payload?.sections.length) return null;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const s of payload.sections) {
+      lo = Math.min(lo, s.sectionY);
+      hi = Math.max(hi, s.sectionY);
+    }
+    return [lo * 16, hi * 16 + 15];
+  }
+
   /** LOD bands scale with render distance: near/mid keep their defaults but never exceed it. */
   private applyBands(): void {
     const rd = this.renderDistance;

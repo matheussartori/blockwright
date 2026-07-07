@@ -41,6 +41,31 @@ export async function readRaw(filePath: string): Promise<RawStructure> {
   };
 }
 
+/** Encode an in-memory `RawStructure` to a buffer for the given destination extension. `now` seeds
+ *  the `.litematic` timestamp (pass a real time; `Date.now()` is banned in pure/test contexts). */
+export function encodeRaw(raw: RawStructure, destPath: string, now: number): Buffer {
+  const dest = formatOf(destPath);
+  if (dest === 'schem') return encodeSchem(raw);
+  if (dest === 'litematic') return encodeLitematic(raw, now);
+  // any → .nbt — re-attach block entities to their block by position.
+  const beByPos = new Map((raw.blockEntities ?? []).map((be) => [be.pos.join(','), be]));
+  return encodeStructure({
+    dataVersion: activeDataVersion(),
+    size: raw.size,
+    palette: raw.palette.map((p) => ({ Name: p.Name, Properties: p.Properties })),
+    blocks: raw.blocks.map((b) => {
+      const be = beByPos.get(b.pos.join(','));
+      return be ? { state: b.state, pos: b.pos, nbt: { id: be.id, ...be.nbt } } : { state: b.state, pos: b.pos };
+    }),
+    entities: (raw.entities ?? []).map((e) => ({ pos: e.pos, blockPos: e.blockPos, ...(Object.keys(e.nbt).length ? { nbt: e.nbt } : {}) })),
+  });
+}
+
+/** Write an in-memory `RawStructure` to `destPath`, choosing the encoding from its extension. */
+export async function writeRaw(raw: RawStructure, destPath: string): Promise<void> {
+  await fs.writeFile(destPath, encodeRaw(raw, destPath, Date.now()));
+}
+
 /** Write `src` to `dest`, choosing the encoding from the destination's extension. */
 export async function convertStructure(srcPath: string, destPath: string): Promise<void> {
   const dest = formatOf(destPath);
@@ -49,28 +74,5 @@ export async function convertStructure(srcPath: string, destPath: string): Promi
     await fs.copyFile(srcPath, destPath);
     return;
   }
-  const raw = await readRaw(srcPath);
-  if (dest === 'schem') {
-    await fs.writeFile(destPath, encodeSchem(raw));
-    return;
-  }
-  if (dest === 'litematic') {
-    await fs.writeFile(destPath, encodeLitematic(raw, Date.now()));
-    return;
-  }
-  // any → .nbt — re-attach block entities to their block by position.
-  const beByPos = new Map((raw.blockEntities ?? []).map((be) => [be.pos.join(','), be]));
-  await fs.writeFile(
-    destPath,
-    encodeStructure({
-      dataVersion: activeDataVersion(),
-      size: raw.size,
-      palette: raw.palette.map((p) => ({ Name: p.Name, Properties: p.Properties })),
-      blocks: raw.blocks.map((b) => {
-        const be = beByPos.get(b.pos.join(','));
-        return be ? { state: b.state, pos: b.pos, nbt: { id: be.id, ...be.nbt } } : { state: b.state, pos: b.pos };
-      }),
-      entities: (raw.entities ?? []).map((e) => ({ pos: e.pos, blockPos: e.blockPos, ...(Object.keys(e.nbt).length ? { nbt: e.nbt } : {}) })),
-    }),
-  );
+  await writeRaw(await readRaw(srcPath), destPath);
 }
