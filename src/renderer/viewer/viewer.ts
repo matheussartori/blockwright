@@ -6,7 +6,7 @@
 // streamed world-viewer mode (world-mode).
 import * as THREE from 'three';
 import type { BlockwrightApi, ChunkRenderPayload, DimensionId, StructureData, WorldMeta } from '@/shared/types';
-import { CameraController, type NavMode } from './camera-controller';
+import { CameraController, type CameraSnapshot, type NavMode } from './camera-controller';
 import { WorldMode } from './world-mode';
 import { disposeObject } from './dispose';
 import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REVIEW_SNAP, type SnapOpts } from './capture';
@@ -26,7 +26,7 @@ import { WorldGhost } from './world-ghost';
 import type { PlaceTurns } from '../world/place';
 
 export type { FloorRegion } from './floor-regions';
-export type { NavMode } from './camera-controller';
+export type { NavMode, CameraSnapshot } from './camera-controller';
 
 /** One structure placed in the scene: its data plus a rigid transform. Rotation
  *  is quarter-turns about +Y, offset is the position of its local origin — the
@@ -265,6 +265,16 @@ export class Viewer {
   cameraYaw(): number {
     const d = this.nav.camera.getWorldDirection(new THREE.Vector3());
     return Math.atan2(d.x, -d.z);
+  }
+
+  /** Snapshot the current viewpoint (position + look direction) for per-tab persistence. */
+  getCameraState(): CameraSnapshot {
+    return this.nav.snapshot();
+  }
+
+  /** Restore a viewpoint captured by `getCameraState` (e.g. returning to a tab). */
+  applyCameraState(state: CameraSnapshot): void {
+    this.nav.restore(state);
   }
 
   /** Minimap cells (per-chunk top-down colours) for the world map overlay. */

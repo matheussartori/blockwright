@@ -8,7 +8,7 @@ import { documentsStore, activeDocument } from '../state/documents';
 import { editorStore } from '../state/editor';
 import { store } from '../state/store';
 import { api } from '../api';
-import type { Viewer } from '../viewer/viewer';
+import type { CameraSnapshot, Viewer } from '../viewer/viewer';
 
 export function useViewerSync(viewer: Viewer | null): void {
   // The on-screen viewer follows the active tab: when the focused tab changes, show
@@ -16,21 +16,40 @@ export function useViewerSync(viewer: Viewer | null): void {
   // tab (loads, new versions) are shown by `load` itself, so this only reacts to the
   // active tab *identity* changing. Also runs once the viewer is ready, to flush a
   // file opened before mount (e.g. BW_OPEN at startup).
+  //
+  // To make tab switching feel continuous, the outgoing tab's camera (position + look
+  // direction) is snapshotted on switch-away and restored on switch-back — for both
+  // worlds and structures — instead of always re-framing from scratch. The snapshots
+  // live for the app's lifetime (this effect runs once, the viewer is a singleton) and
+  // are pruned when their tab closes.
   useEffect(() => {
     if (!viewer) return;
     let lastId: string | null = null;
+    const cameras = new Map<string, CameraSnapshot>();
     const sync = () => {
       const doc = activeDocument(documentsStore.getState());
       const id = doc?.id ?? null;
       if (id === lastId) return;
+      // Snapshot the outgoing tab's live camera before we move to the new one.
+      if (lastId) cameras.set(lastId, viewer.getCameraState());
+      // Drop snapshots for tabs that have since been closed.
+      const open = new Set(documentsStore.getState().documents.map((d) => d.id));
+      for (const key of cameras.keys()) if (!open.has(key)) cameras.delete(key);
       lastId = id;
+      const saved = id ? cameras.get(id) : undefined;
       if (doc?.kind === 'world' && doc.worldMeta) {
         viewer.enterWorldMode(doc.worldMeta, api); // streams the world around the camera
+        if (saved) viewer.applyCameraState(saved); // restore where we last were, over the spawn frame
         return;
       }
       if (viewer.worldActive) viewer.exitWorldMode();
-      if (doc?.structure) void viewer.show(doc.structure);
-      else viewer.clear();
+      if (doc?.structure) {
+        // `show` is async (clears + re-frames); restore after it resolves, and only if
+        // this is still the active tab (guards a rapid A→B→A switch).
+        void viewer.show(doc.structure).then(() => {
+          if (saved && lastId === id) viewer.applyCameraState(saved);
+        });
+      } else viewer.clear();
     };
     sync();
     return documentsStore.subscribe(sync);

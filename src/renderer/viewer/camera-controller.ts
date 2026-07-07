@@ -10,6 +10,15 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 
 export type NavMode = 'orbit' | 'fly';
 
+/** A serializable snapshot of the current viewpoint — position + look direction +
+ *  the orbit-pivot distance — used to preserve the camera across tab switches. */
+export interface CameraSnapshot {
+  position: [number, number, number];
+  quaternion: [number, number, number, number];
+  /** Camera→orbit-pivot distance, to reconstruct the pivot on restore. */
+  distance: number;
+}
+
 /** Keys that drive fly movement — captured (preventDefault) only while flying. */
 const MOVE_CODES = new Set([
   'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight',
@@ -147,6 +156,39 @@ export class CameraController {
     const dist = THREE.MathUtils.clamp(curDist, 3, 8);
     this.controls.target.copy(center);
     this.camera.position.copy(center).addScaledVector(dir, dist);
+    this.controls.update();
+  }
+
+  /** Capture the current viewpoint so it can be restored later (per-tab persistence).
+   *  In fly mode the orbit target is stale, so a comfortable default pivot distance is
+   *  used instead of the meaningless camera→target span. */
+  snapshot(): CameraSnapshot {
+    const p = this.camera.position;
+    const q = this.camera.quaternion;
+    const distance =
+      this.mode === 'fly' ? 16 : this.camera.position.distanceTo(this.controls.target) || 16;
+    return {
+      position: [p.x, p.y, p.z],
+      quaternion: [q.x, q.y, q.z, q.w],
+      distance,
+    };
+  }
+
+  /** Restore a saved viewpoint (position + look direction). Always lands in orbit mode
+   *  — re-acquiring the pointer lock for fly needs a fresh user gesture — with the orbit
+   *  pivot placed along the restored look direction so orbiting resumes naturally. */
+  restore(s: CameraSnapshot): void {
+    if (this.mode === 'fly') {
+      if (this.fly.isLocked) this.fly.unlock();
+      this.keys.clear();
+      this.mode = 'orbit';
+      this.onModeChange?.('orbit');
+    }
+    this.camera.position.set(s.position[0], s.position[1], s.position[2]);
+    this.camera.quaternion.set(s.quaternion[0], s.quaternion[1], s.quaternion[2], s.quaternion[3]);
+    this.camera.getWorldDirection(this.dir);
+    this.controls.target.copy(this.camera.position).addScaledVector(this.dir, s.distance);
+    this.controls.enabled = true;
     this.controls.update();
   }
 
