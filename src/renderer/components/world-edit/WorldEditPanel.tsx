@@ -48,7 +48,7 @@ export function WorldEditPanel() {
   if (!active) return null;
 
   return (
-    <div className="editor-panel no-drag">
+    <div className="editor-panel world-edit-panel no-drag">
       <header className="editor-head">
         <span className="editor-title">
           <Globe size={15} strokeWidth={1.9} aria-hidden />
@@ -71,17 +71,19 @@ export function WorldEditPanel() {
         </span>
       </header>
 
-      <Segmented<WorldTool>
-        value={tool}
-        onChange={(v) => we().setTool(v)}
-        ariaLabel={t('worldEdit.tools')}
-        options={[
-          { value: 'paint', label: (<><Paintbrush size={13} aria-hidden /> {t('worldEdit.tool.paint')}</>) },
-          { value: 'erase', label: (<><Eraser size={13} aria-hidden /> {t('worldEdit.tool.erase')}</>) },
-          { value: 'select', label: (<><SquareDashed size={13} aria-hidden /> {t('worldEdit.tool.select')}</>) },
-          { value: 'place', label: (<><PackagePlus size={13} aria-hidden /> {t('worldEdit.tool.place')}</>) },
-        ]}
-      />
+      <div className="world-tool-rail">
+        <Segmented<WorldTool>
+          value={tool}
+          onChange={(v) => we().setTool(v)}
+          ariaLabel={t('worldEdit.tools')}
+          options={[
+            { value: 'paint', label: (<><Paintbrush size={13} aria-hidden /> {t('worldEdit.tool.paint')}</>) },
+            { value: 'erase', label: (<><Eraser size={13} aria-hidden /> {t('worldEdit.tool.erase')}</>) },
+            { value: 'select', label: (<><SquareDashed size={13} aria-hidden /> {t('worldEdit.tool.select')}</>) },
+            { value: 'place', label: (<><PackagePlus size={13} aria-hidden /> {t('worldEdit.tool.place')}</>) },
+          ]}
+        />
+      </div>
 
       <div className="editor-context">
         {tool === 'paint' && (
@@ -176,22 +178,22 @@ export function WorldEditPanel() {
           ))}
       </div>
 
-      <div className="editor-selinfo">
+      <div className="editor-selinfo world-edit-status">
         {tool === 'select' && selSize ? (
-          <div>
+          <div className="world-edit-selsize">
             <span style={{ fontFamily: 'var(--mono)' }}>{selSize}</span> — {t('worldEdit.selection')}
           </div>
         ) : null}
-        <div>{t('worldEdit.pendingCount', { n: pendingCount.toLocaleString() })}</div>
+        <div className="world-edit-pending">{t('worldEdit.pendingCount', { n: pendingCount.toLocaleString() })}</div>
         {!lockExclusive && (
-          <div className="editor-selname" title={t('worldEdit.lockCautionDesc')}>
-            <AlertTriangle size={12} strokeWidth={2} aria-hidden /> {t('worldEdit.lockCaution')}
+          <div className="world-edit-caution" title={t('worldEdit.lockCautionDesc')}>
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden /> {t('worldEdit.lockCaution')}
           </div>
         )}
         {error && (
-          <div className="editor-selname" onClick={() => we().clearError()} title={error}>
+          <button type="button" className="world-edit-error" onClick={() => we().clearError()} title={error}>
             {error}
-          </div>
+          </button>
         )}
       </div>
 

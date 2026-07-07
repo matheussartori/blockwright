@@ -7486,6 +7486,78 @@ body.row-resizing {
   gap: 6px;
 }
 
+/* ── World editor panel ───────────────────────────────────────────────────── */
+/* The world-mode editor reuses the .editor-panel chrome, but its tool picker is a
+   full-width Segmented (four icon+label tools) rather than the block editor's icon
+   grid. A touch wider so the four labels sit comfortably and never burst the pill. */
+.editor-panel.world-edit-panel {
+  width: 288px;
+}
+.world-tool-rail {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+}
+/* Stretch the tool pill to the panel and let the four tools share the width evenly. */
+.world-tool-rail .segmented {
+  display: flex;
+  width: 100%;
+  gap: 3px;
+}
+.world-tool-rail .segmented-option {
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 5px;
+  padding: 6px 4px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.world-tool-rail .segmented-option svg {
+  flex: none;
+}
+
+/* Status strip: pending-edit count + the "close the game first" caution + errors.
+   Reset the inherited mono/accent so each line reads by its own severity. */
+.world-edit-status {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-family: var(--font);
+}
+.world-edit-selsize,
+.world-edit-pending {
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.world-edit-caution {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.world-edit-caution svg {
+  flex: none;
+}
+.world-edit-error {
+  -webkit-app-region: no-drag;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  word-break: break-word;
+}
+.world-edit-error:hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
 /* ── World viewer HUD ─────────────────────────────────────────────────────── */
 /* Floating overlay on the world-mode viewport: live coordinates + streaming state.
    Glassy panels using the shared tokens; sits clear of the traffic-light region. */
