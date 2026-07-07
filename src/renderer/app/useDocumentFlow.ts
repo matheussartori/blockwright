@@ -318,6 +318,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     const st = store.getState();
     st.setWorkspace(ws);
     st.setWorkspaceStructures(await api.listWorkspaceStructures());
+    st.setWorkspaceJigsaws(await api.listWorkspaceJigsaws());
     st.setSuggest(null);
     // If a world is open, soft-refresh its streamed chunks so the workspace's blocks — which the app
     // didn't know before — pick up their textures, without moving the camera. (A structure re-renders

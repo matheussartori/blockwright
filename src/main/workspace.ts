@@ -2,7 +2,7 @@
 // chosen folder, and applying it as an extra asset source for resolution.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Workspace } from '@/shared/types';
+import type { Workspace, WorkspaceJigsawPool } from '@/shared/types';
 import {
   clearJsonCache,
   getActiveWorkspace,
@@ -17,6 +17,7 @@ import { notifyPinnedWorkspace, notifyRecentWorkspaces, notifyWorkspace, openDir
 import { watchWorkspaceStructures } from './file-watch';
 import { detectMcVersion } from './mc-version-detect';
 import { readAuthoring } from './structure/authoring';
+import { resolvePool } from './structure/jigsaw/template-pool';
 
 // A picked folder may be the project root (Gradle layout) or the resources dir.
 const RESOURCE_CANDIDATES = ['src/main/resources', ''];
@@ -186,6 +187,49 @@ export async function listWorkspaceStructures(ws: Workspace | null): Promise<str
     }),
   );
   return kept.filter((p): p is string => p !== null).sort((a, b) => a.localeCompare(b));
+}
+
+/** List the jigsaw TEMPLATE POOLS a workspace defines under
+ *  `data/<namespace>/worldgen/template_pool/**`, each resolved to its placeable
+ *  template pieces (via the same `resolvePool` the assembler uses, so a missing
+ *  `.nbt` surfaces as a dead reference here too). Sorted by folder (the pool
+ *  FAMILY the Project panel groups by), then by pool name. Empty when there's
+ *  no workspace/folder. */
+export function listWorkspaceJigsaws(ws: Workspace | null): WorkspaceJigsawPool[] {
+  if (!ws) return [];
+  const root = path.join(ws.root, 'data', ws.namespace, 'worldgen', 'template_pool');
+  const out: WorkspaceJigsawPool[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        walk(full, childRel);
+      } else if (e.isFile() && e.name.endsWith('.json')) {
+        const poolRel = childRel.slice(0, -5);
+        const resolved = resolvePool(`${ws.namespace}:${poolRel}`);
+        const slash = poolRel.lastIndexOf('/');
+        out.push({
+          id: resolved.id,
+          name: slash >= 0 ? poolRel.slice(slash + 1) : poolRel,
+          folder: slash >= 0 ? poolRel.slice(0, slash) : '',
+          path: full,
+          pieces: resolved.elements
+            .filter((el) => !el.empty)
+            .map((el) => ({ structureId: el.structureId, structurePath: el.structurePath, weight: el.weight })),
+          emptyOutcomes: resolved.elements.filter((el) => el.empty).length,
+        });
+      }
+    }
+  };
+  walk(root, '');
+  return out.sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name));
 }
 
 /** List the custom biome ids a workspace defines under

@@ -2,9 +2,9 @@
 // reachable only from the welcome screen lives here permanently: the active mod
 // workspace and its structures (searchable), plus recent files, workspaces and
 // worlds. Toggled from the activity rail; width is resizable + persisted.
-import { useMemo, useState } from 'react';
-import { FileBox, FolderOpen, Globe, Package, Pin } from 'lucide-react';
-import type { Workspace } from '@/shared/types';
+import { Fragment, useMemo, useState } from 'react';
+import { ChevronRight, FileBox, FolderOpen, Globe, Package, Pin, Puzzle, TriangleAlert } from 'lucide-react';
+import type { Workspace, WorkspaceJigsawPool } from '@/shared/types';
 import { api } from '../api';
 import { basename, dirname } from '../ui/path';
 import { startColDrag } from '../ui/resize';
@@ -48,6 +48,13 @@ function Row({
   );
 }
 
+/** The display name of a pool piece: the last path segment of its template id. */
+function pieceName(structureId: string): string {
+  const rel = structureId.slice(structureId.indexOf(':') + 1);
+  const slash = rel.lastIndexOf('/');
+  return slash >= 0 ? rel.slice(slash + 1) : rel;
+}
+
 /** Passive "this one is pinned" glyph (the CONTROL lives in the statusbar/menu). */
 function PinMark({ label }: { label: string }) {
   return (
@@ -67,7 +74,24 @@ export function ProjectPanel({ onLoad, onActivateWorkspace, onOpenWorld, onOpen 
   const recents = useApp((s) => s.recents);
   const recentWorkspaces = useApp((s) => s.recentWorkspaces);
   const recentWorlds = useApp((s) => s.recentWorlds);
+  const jigsaws = useApp((s) => s.workspaceJigsaws);
   const [query, setQuery] = useState('');
+  /** Pool ids currently expanded to their pieces. */
+  const [openPools, setOpenPools] = useState<string[]>([]);
+
+  /** Pools grouped by their folder — the pool FAMILY that assembles together. */
+  const jigsawGroups = useMemo(() => {
+    const groups = new Map<string, WorkspaceJigsawPool[]>();
+    for (const pool of jigsaws) {
+      const list = groups.get(pool.folder);
+      if (list) list.push(pool);
+      else groups.set(pool.folder, [pool]);
+    }
+    return [...groups.entries()];
+  }, [jigsaws]);
+
+  const togglePool = (id: string) =>
+    setOpenPools((open) => (open.includes(id) ? open.filter((p) => p !== id) : [...open, id]));
 
   const structures = useMemo(
     () => [...workspaceStructures].sort((a, b) => basename(a).localeCompare(basename(b))),
@@ -159,6 +183,72 @@ export function ProjectPanel({ onLoad, onActivateWorkspace, onOpenWorld, onOpen 
                   />
                 ))
               )}
+            </ul>
+          </section>
+        )}
+
+        {jigsaws.length > 0 && (
+          <section className="proj-section">
+            <div className="proj-section-head">
+              <span>{t('project.jigsaws')}</span>
+              <span className="proj-count">{jigsaws.length}</span>
+            </div>
+            <ul className="proj-list">
+              {jigsawGroups.map(([folder, pools]) => (
+                <Fragment key={folder || ':root'}>
+                  <li className="proj-jig-folder" title={`${workspace?.namespace ?? ''}:${folder || '/'}`}>
+                    <Puzzle size={12} strokeWidth={1.8} aria-hidden />
+                    <span>{folder || (workspace?.namespace ?? '/')}</span>
+                  </li>
+                  {pools.map((pool) => {
+                    const open = openPools.includes(pool.id);
+                    const dead = pool.pieces.some((p) => !p.structurePath);
+                    return (
+                      <Fragment key={pool.id}>
+                        <li
+                          className="proj-row proj-jig-pool"
+                          title={dead ? t('project.jigsawDeadRef') : pool.id}
+                          onClick={() => togglePool(pool.id)}
+                        >
+                          <span className={`proj-jig-chev${open ? ' open' : ''}`}>
+                            <ChevronRight size={13} strokeWidth={2} aria-hidden />
+                          </span>
+                          <span className="proj-row-name">{pool.name}</span>
+                          {dead && <TriangleAlert className="proj-jig-warn" size={12} strokeWidth={2} aria-hidden />}
+                          <span className="proj-jig-count">{pool.pieces.length}</span>
+                        </li>
+                        {open &&
+                          pool.pieces.map((piece, i) => (
+                            <li
+                              key={`${pool.id}#${i}`}
+                              className={`proj-row proj-jig-piece${piece.structurePath ? '' : ' missing'}`}
+                              title={
+                                piece.structurePath ?? t('project.jigsawMissing', { id: piece.structureId })
+                              }
+                              onClick={() => piece.structurePath && onLoad(piece.structurePath)}
+                            >
+                              <span className="proj-row-ic">
+                                <FileBox size={13} strokeWidth={1.7} aria-hidden />
+                              </span>
+                              <span className="proj-row-name">{pieceName(piece.structureId)}</span>
+                              {piece.weight !== 1 && (
+                                <span className="proj-jig-count" title={t('project.jigsawWeight')}>
+                                  ×{piece.weight}
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        {open && pool.pieces.length === 0 && (
+                          <li className="proj-jig-note">{t('project.jigsawNoPieces')}</li>
+                        )}
+                        {open && pool.emptyOutcomes > 0 && (
+                          <li className="proj-jig-note">{t('project.jigsawEmpty', { n: pool.emptyOutcomes })}</li>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </ul>
           </section>
         )}

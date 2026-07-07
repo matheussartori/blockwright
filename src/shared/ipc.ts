@@ -16,6 +16,8 @@ export const IPC_CHANNELS = {
   workspaceClose: 'workspace:close',
   workspaceGet: 'workspace:get',
   workspaceStructures: 'workspace:structures',
+  /** The active workspace's jigsaw template pools, resolved to their pieces. */
+  workspaceJigsaws: 'workspace:jigsaws',
   /** The Minecraft version of the active content pack (from its version.json). */
   contentVersion: 'content:version',
   /** The configured content-pack folder, or null if none is set. */

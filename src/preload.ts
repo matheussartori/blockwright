@@ -26,6 +26,7 @@ import type {
   RenameProjectResult,
   WorkspaceExportRequest,
   WorkspaceExportPlan,
+  WorkspaceJigsawPool,
   WorkspaceExportResult,
   WorkspaceDoctorReport,
   ResolveBlockResult,
@@ -130,6 +131,8 @@ const api: BlockwrightApi = {
   clearRecentWorlds: (): Promise<WorldRef[]> => ipcRenderer.invoke(IPC_CHANNELS.recentWorldsClear),
   listWorkspaceStructures: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceStructures),
+  listWorkspaceJigsaws: (): Promise<WorkspaceJigsawPool[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceJigsaws),
   setWorkspaceVersion: (version: string): Promise<Workspace | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceSetVersion, version),
   listWorkspaceBiomes: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.workspaceBiomes),

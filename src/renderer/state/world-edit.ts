@@ -4,7 +4,7 @@
 // structure block editor) but deliberately its own store: edits here are per-cell records over
 // an unbounded streamed world, not ops over a bounded StructureData.
 import { createStore } from 'zustand/vanilla';
-import type { DimensionId, WorldEditApplyResult } from '@/shared/types';
+import type { DimensionId, StructureData, WorldEditApplyResult } from '@/shared/types';
 import { api } from '../api';
 import {
   AIR,
@@ -14,9 +14,33 @@ import {
   type PendingWorldEdit,
   type ResolvedWorldBlock,
 } from '../world/edit-overlay';
+import { planPlacement, rotatedSize, type PlaceTurns } from '../world/place';
 
-export type WorldTool = 'paint' | 'erase' | 'select';
+export type WorldTool = 'paint' | 'erase' | 'select' | 'place';
 export type WorldPaintMode = 'brush' | 'recolor';
+
+/** The live Place-tool ghost: the source structure plus where it currently sits. */
+export interface PlaceGhostState {
+  /** Source document id (the panel's picker highlights it). */
+  docId: string;
+  /** Human label (the tab title) shown in the panel readout. */
+  label: string;
+  data: StructureData;
+  /** Min corner of the ROTATED bounding box (world cells); null until aimed. */
+  anchor: [number, number, number] | null;
+  /** True once a click pinned the anchor (hover stops following the cursor). */
+  locked: boolean;
+  /** CW quarter-turns about +Y (the `transformProps` convention). */
+  turns: PlaceTurns;
+}
+
+/** What `commitPlace` needs from the viewer (kept as callbacks so the store stays pure). */
+export interface CommitPlaceHost {
+  /** Whether the chunk holding world column (cx,cz) is streamed in (editable). */
+  chunkLoaded(cx: number, cz: number): boolean;
+  /** Preload textures so the composited placement meshes textured. */
+  loadTextures(keys: string[]): Promise<void>;
+}
 
 /** Hard cap on a box-selection's volume — a runaway fill would freeze the mesher and produce a
  *  save nobody wants (65 536 = a 64×16×64 slab). */
@@ -47,6 +71,8 @@ export interface WorldEditState {
   /** Box-select state: the first corner, and the committed box (both inclusive). */
   anchor: [number, number, number] | null;
   selection: { min: [number, number, number]; max: [number, number, number] } | null;
+  /** The Place tool's ghost (a structure being positioned), or null. */
+  place: PlaceGhostState | null;
   /** Chunk keys whose composite changed in the LAST mutation — the layer re-meshes exactly these. */
   lastTouched: string[];
   past: PendingMap[];
@@ -76,6 +102,21 @@ export interface WorldEditState {
   fillSelection(): Promise<void>;
   /** Fill the committed selection with air. */
   deleteSelection(): void;
+  /** Start placing an open structure: switches to the Place tool with a fresh ghost. */
+  beginPlace(docId: string, label: string, data: StructureData): void;
+  /** Center the ghost's rotated footprint on a world cell. `lock` pins it (a click);
+   *  unlocked aims (hover-follow) are ignored once the anchor is pinned. */
+  aimPlace(cell: [number, number, number], lock: boolean): void;
+  /** Nudge the pinned/aimed ghost one cell along an axis. */
+  nudgePlace(axis: 'x' | 'y' | 'z', dir: 1 | -1): void;
+  /** Rotate the ghost 90° (dir 1 = CW), keeping its footprint center fixed. */
+  rotatePlace(dir: 1 | -1): void;
+  /** Drop the ghost (nothing was committed). */
+  cancelPlace(): void;
+  /** Turn the ghost into pending edits (ONE undo step). The ghost stays for repeat
+   *  placement. Returns false (with `error` set) when the placement is too large or
+   *  covers chunks that aren't streamed in. */
+  commitPlace(host: CommitPlaceHost): Promise<boolean>;
   undo(): void;
   redo(): void;
   /** Drop every pending edit (and its history). */
@@ -156,6 +197,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     resolved: {},
     anchor: null,
     selection: null,
+    place: null,
     lastTouched: [],
     past: [],
     future: [],
@@ -191,6 +233,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
         pendingCount: 0,
         anchor: null,
         selection: null,
+        place: null,
         past: [],
         future: [],
         saveOpen: false,
@@ -198,7 +241,8 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       });
     },
 
-    setTool: (tool) => set({ tool, anchor: null }),
+    // Leaving the Place tool drops its ghost — the ghost's lifecycle IS the tool's.
+    setTool: (tool) => set({ tool, anchor: null, ...(tool !== 'place' ? { place: null } : {}) }),
     setPaintMode: (paintMode) => set({ paintMode }),
     setPaintBlock: (paintBlock) => set({ paintBlock }),
 
@@ -268,6 +312,107 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       fillBox(AIR);
     },
 
+    beginPlace: (docId, label, data) =>
+      set({ tool: 'place', anchor: null, place: { docId, label, data, anchor: null, locked: false, turns: 0 } }),
+
+    aimPlace: (cell, lock) => {
+      const g = get().place;
+      if (!g || (g.locked && !lock)) return; // hover stops following once pinned
+      const [w, , d] = rotatedSize(g.data.size, g.turns);
+      const anchor: [number, number, number] = [
+        cell[0] - Math.floor(w / 2),
+        cell[1],
+        cell[2] - Math.floor(d / 2),
+      ];
+      set({ place: { ...g, anchor, locked: g.locked || lock } });
+    },
+
+    nudgePlace: (axis, dir) => {
+      const g = get().place;
+      if (!g?.anchor) return;
+      const anchor = [...g.anchor] as [number, number, number];
+      anchor[axis === 'x' ? 0 : axis === 'y' ? 1 : 2] += dir;
+      set({ place: { ...g, anchor, locked: true } });
+    },
+
+    rotatePlace: (dir) => {
+      const g = get().place;
+      if (!g) return;
+      const turns = ((g.turns + (dir === 1 ? 1 : 3)) % 4) as PlaceTurns;
+      if (!g.anchor) {
+        set({ place: { ...g, turns } });
+        return;
+      }
+      // Keep the footprint CENTER fixed: re-derive the min corner for the new footprint.
+      const [w0, , d0] = rotatedSize(g.data.size, g.turns);
+      const [w1, , d1] = rotatedSize(g.data.size, turns);
+      const anchor: [number, number, number] = [
+        g.anchor[0] + Math.floor(w0 / 2) - Math.floor(w1 / 2),
+        g.anchor[1],
+        g.anchor[2] + Math.floor(d0 / 2) - Math.floor(d1 / 2),
+      ];
+      set({ place: { ...g, anchor, turns } });
+    },
+
+    cancelPlace: () => set({ place: null }),
+
+    commitPlace: async (host) => {
+      const s = get();
+      const g = s.place;
+      if (!g?.anchor) return false;
+      const plan = planPlacement(g.data, g.anchor, g.turns);
+      if (!plan.edits.length) return false;
+      if (plan.edits.length > WORLD_SELECTION_CAP) {
+        set({ error: `placement too large (${plan.edits.length.toLocaleString()} blocks — cap ${WORLD_SELECTION_CAP.toLocaleString()})` });
+        return false;
+      }
+      // The §2 rule holds for placements too: edits only land on streamed-in chunks.
+      const missing = new Set<string>();
+      for (const e of plan.edits) {
+        const cx = Math.floor(e.x / 16);
+        const cz = Math.floor(e.z / 16);
+        if (!host.chunkLoaded(cx, cz)) missing.add(`${cx},${cz}`);
+      }
+      if (missing.size) {
+        set({ error: `${missing.size} target chunks are not loaded yet — move closer so the whole footprint streams in` });
+        return false;
+      }
+      // Resolve every unique solid state (rotation makes NEW states — a rotated stair
+      // meshes differently). A failed resolution falls back to the SOURCE palette entry
+      // with the rewritten props: the saved state is still correct, only the preview
+      // geometry keeps the unrotated model.
+      const resolved = { ...get().resolved };
+      const textures = new Set<string>();
+      for (const [key, st] of plan.states) {
+        if (!resolved[key]) {
+          try {
+            const r = await api.resolveBlock(st.name, st.properties ?? {});
+            resolved[key] = { entry: r.entry, textures: r.textures };
+          } catch {
+            const src = g.data.palette[st.sourceState];
+            resolved[key] = { entry: { ...src, properties: st.properties }, textures: [] };
+          }
+        }
+        for (const t of resolved[key].textures) textures.add(t);
+      }
+      await host.loadTextures([...textures]);
+      s.strokeBegin();
+      const pending = get().pending;
+      const touched = new Set<string>();
+      for (const e of plan.edits) {
+        pending[cellKeyOf(e.x, e.y, e.z)] = e;
+        touched.add(chunkKeyOf(e.x, e.z));
+      }
+      set({
+        resolved,
+        pendingCount: Object.keys(pending).length,
+        lastTouched: [...touched],
+        future: [],
+        error: null,
+      });
+      return true;
+    },
+
     undo: () => {
       const s = get();
       const prev = s.past[s.past.length - 1];
@@ -329,3 +474,15 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
 });
 
 export type { PendingWorldEdit, ResolvedWorldBlock } from '../world/edit-overlay';
+
+/** Commit the Place ghost through a Viewer's world surface — the one adapter the
+ *  panel's button and the layer's Enter key share. */
+export function commitPlaceVia(viewer: {
+  worldChunkLoaded(cx: number, cz: number): boolean;
+  ensureWorldTextures(keys: string[]): Promise<void>;
+}): Promise<boolean> {
+  return worldEditStore.getState().commitPlace({
+    chunkLoaded: (cx, cz) => viewer.worldChunkLoaded(cx, cz),
+    loadTextures: (keys) => viewer.ensureWorldTextures(keys),
+  });
+}

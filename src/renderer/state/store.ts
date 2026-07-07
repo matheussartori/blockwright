@@ -6,7 +6,7 @@
 // Uses Zustand's framework-agnostic vanilla store, consumed in components via
 // `useStore`.
 import { createStore } from 'zustand/vanilla';
-import type { UpdateInfo, Workspace, WorldRef } from '@/shared/types';
+import type { UpdateInfo, Workspace, WorkspaceJigsawPool, WorldRef } from '@/shared/types';
 import type { StructureDiff } from '../diff/diff';
 
 /** An active structure comparison: what the active doc is being diffed against +
@@ -50,6 +50,8 @@ export interface AppState {
   recentWorlds: WorldRef[];
   /** Absolute paths of the active workspace's `.nbt` structures. */
   workspaceStructures: string[];
+  /** The active workspace's jigsaw template pools (Project panel's Jigsaws section). */
+  workspaceJigsaws: WorkspaceJigsawPool[];
   /** Live viewer navigation mode, reflected by the Controls window. */
   navMode: NavMode;
   /** Minecraft version of the active content pack (from its version.json). */
@@ -95,6 +97,7 @@ export interface AppState {
   setPinnedWorkspaceRoot: (root: string | null) => void;
   setRecentWorlds: (worlds: WorldRef[]) => void;
   setWorkspaceStructures: (paths: string[]) => void;
+  setWorkspaceJigsaws: (pools: WorkspaceJigsawPool[]) => void;
   setNavMode: (mode: NavMode) => void;
   setContentVersion: (version: string | null) => void;
   setNotice: (notice: Notice | null) => void;
@@ -126,6 +129,7 @@ export const store = createStore<AppState>((set) => ({
   pinnedWorkspaceRoot: null,
   recentWorlds: [],
   workspaceStructures: [],
+  workspaceJigsaws: [],
   navMode: 'orbit',
   contentVersion: FALLBACK_CONTENT_VERSION,
   notice: null,
@@ -151,6 +155,7 @@ export const store = createStore<AppState>((set) => ({
   setPinnedWorkspaceRoot: (pinnedWorkspaceRoot) => set({ pinnedWorkspaceRoot }),
   setRecentWorlds: (recentWorlds) => set({ recentWorlds }),
   setWorkspaceStructures: (workspaceStructures) => set({ workspaceStructures }),
+  setWorkspaceJigsaws: (workspaceJigsaws) => set({ workspaceJigsaws }),
   setNavMode: (navMode) => set({ navMode }),
   setContentVersion: (contentVersion) => set({ contentVersion }),
   setNotice: (notice) => set({ notice }),

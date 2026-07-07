@@ -634,6 +634,76 @@ body {
   font-size: 11.5px;
   color: var(--text-muted);
 }
+/* Jigsaws: pool FAMILIES (folders) as quiet mono sub-headers, pools expandable to
+   their template pieces. The indent guide under an open pool encodes "these pieces
+   assemble together"; a dead reference gets the warn tint (the Doctor's concern,
+   surfaced where the modder browses). */
+.proj-jig-folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  min-width: 0;
+}
+.proj-jig-folder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proj-jig-chev {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: transform 120ms ease;
+}
+.proj-jig-chev.open {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .proj-jig-chev {
+    transition: none;
+  }
+}
+.proj-row:hover .proj-jig-chev {
+  color: var(--accent);
+}
+.proj-jig-count {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.proj-jig-warn {
+  flex: none;
+  color: var(--warn);
+}
+.proj-jig-piece {
+  margin-left: 12px;
+  padding-left: 13px;
+  border-left: 1px solid var(--border);
+  border-radius: 0 6px 6px 0;
+}
+.proj-jig-piece.missing {
+  color: var(--text-muted);
+  cursor: default;
+}
+.proj-jig-piece.missing .proj-row-ic,
+.proj-jig-piece.missing:hover .proj-row-ic {
+  color: var(--warn);
+}
+.proj-jig-note {
+  margin-left: 12px;
+  padding: 2px 6px 4px 13px;
+  border-left: 1px solid var(--border);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
 
 /* --- Column resize handles (project panel / inspector dock) ----------------- */
 

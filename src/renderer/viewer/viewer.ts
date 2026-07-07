@@ -22,6 +22,8 @@ import { VoidOverlay, type VoidCell } from './void-overlay';
 import { DiffOverlay } from './diff-overlay';
 import type { DiffCellMark } from '../diff/diff';
 import { TextureLoader } from './texture-loader';
+import { WorldGhost } from './world-ghost';
+import type { PlaceTurns } from '../world/place';
 
 export type { FloorRegion } from './floor-regions';
 export type { NavMode } from './camera-controller';
@@ -57,6 +59,9 @@ export class Viewer {
 
   /** Structure-diff marks (added/removed/changed cells), persisted across builds. */
   private diffOverlay = new DiffOverlay(this.scene);
+
+  /** The translucent place-into-world preview (world-edit's Place tool). */
+  private worldGhost = new WorldGhost(this.scene, this.textures);
 
   private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
@@ -219,6 +224,7 @@ export class Viewer {
 
   /** Leave world mode: dispose the streamed scene + workers, back to empty. */
   exitWorldMode(): void {
+    this.worldGhost.clear();
     this.worldMode.exit();
   }
 
@@ -295,6 +301,16 @@ export class Viewer {
   /** True when the chunk holding world column (cx,cz) is resident with data (editable). */
   worldChunkLoaded(cx: number, cz: number): boolean {
     return this.worldMode.hasChunkPayload(cx, cz);
+  }
+
+  /** Build (or clear, with null) the translucent place-into-world ghost preview. */
+  setWorldGhost(data: StructureData | null): Promise<void> {
+    return this.worldGhost.show(data);
+  }
+
+  /** Position the ghost: its ROTATED min corner at `anchor` (world cells), `turns` CW. */
+  placeWorldGhost(anchor: [number, number, number], turns: PlaceTurns): void {
+    this.worldGhost.place(anchor, turns);
   }
 
   /** Raycast the streamed WORLD chunks and return the cell `step` along the ray from the hit —

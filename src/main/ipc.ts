@@ -41,6 +41,7 @@ import {
   detectWorkspaceForFile,
   detectWorkspaceForWorld,
   listWorkspaceBiomes,
+  listWorkspaceJigsaws,
   listWorkspaceStructures,
   pinActiveWorkspace,
   promptOpenWorkspace,
@@ -165,6 +166,7 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.workspaceStructures, async () =>
     listWorkspaceStructures(getActiveWorkspace()),
   );
+  ipcMain.handle(IPC_CHANNELS.workspaceJigsaws, () => listWorkspaceJigsaws(getActiveWorkspace()));
   ipcMain.handle(IPC_CHANNELS.workspaceActivate, async (_e, ws: Workspace) => {
     const active = activateWorkspace(ws);
     buildAppMenu();

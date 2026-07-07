@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { useViewer } from '../../viewer/ViewerProvider';
 import { useWorldEdit } from '../../hooks/useStores';
-import { worldEditStore, type WorldEditState } from '../../state/world-edit';
+import { commitPlaceVia, worldEditStore, type WorldEditState } from '../../state/world-edit';
 import { chunkKeyOf, compositePayload } from '../../world/edit-overlay';
 import { ACCENT, FOCUS, VOID_MARK } from '../../viewer/overlay-colors';
 
@@ -33,6 +33,8 @@ export function WorldEditLayer() {
   const active = useWorldEdit((s) => s.active);
   const tool = useWorldEdit((s) => s.tool);
   const selection = useWorldEdit((s) => s.selection);
+  const place = useWorldEdit((s) => s.place);
+  const placeData = place?.data ?? null;
 
   // The pending-edit compositor + the per-mutation re-mesh, live for the whole edit session.
   useEffect(() => {
@@ -81,6 +83,23 @@ export function WorldEditLayer() {
     viewer.setSelection(selection ? edgeCells(selection.min, selection.max) : []);
   }, [viewer, active, selection]);
 
+  // The Place tool's ghost meshes: built once per picked structure, dropped with it.
+  useEffect(() => {
+    if (!viewer || !active) return;
+    // Re-position once the async build lands (the anchor may already be aimed).
+    void viewer.setWorldGhost(placeData).then(() => {
+      const g = worldEditStore.getState().place;
+      if (placeData && g?.anchor) viewer.placeWorldGhost(g.anchor, g.turns);
+    });
+    return () => void viewer.setWorldGhost(null);
+  }, [viewer, active, placeData]);
+
+  // Ghost transform follows every aim/nudge/rotate (cheap — no mesh rebuild).
+  useEffect(() => {
+    if (!viewer || !active || !place?.anchor) return;
+    viewer.placeWorldGhost(place.anchor, place.turns);
+  }, [viewer, active, place]);
+
   // Pointer + keyboard wiring.
   useEffect(() => {
     if (!viewer || !active) return;
@@ -120,6 +139,9 @@ export function WorldEditLayer() {
       lastPaint = cellKey(cell);
     };
 
+    /** Commit the Place ghost with the viewer's chunk/texture services. */
+    const commitPlace = () => void commitPlaceVia(viewer);
+
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       const s = st();
@@ -154,6 +176,14 @@ export function WorldEditLayer() {
         if (cell && cellKey(cell) !== lastPaint) paintAt(s, cell);
         return;
       }
+      if (s.tool === 'place') {
+        // The ghost IS the preview: follow the cursor until a click pins the anchor.
+        if (s.place && !s.place.locked) {
+          const cell = viewer.pickWorldPlacement(e.clientX, e.clientY);
+          if (cell) s.aimPlace(cell, false);
+        }
+        return;
+      }
       if (s.tool === 'paint' || s.tool === 'erase') viewer.setHover(target(s, e.clientX, e.clientY), hue(s));
       else viewer.setHover(viewer.pickWorldBlock(e.clientX, e.clientY), FOCUS);
     };
@@ -176,6 +206,10 @@ export function WorldEditLayer() {
         const cell = viewer.pickWorldBlock(e.clientX, e.clientY);
         if (cell) s.pickSelect(cell);
       }
+      if (s.tool === 'place' && s.place) {
+        const cell = viewer.pickWorldPlacement(e.clientX, e.clientY);
+        if (cell) s.aimPlace(cell, true); // a click pins (or re-pins) the anchor
+      }
     };
 
     const onLeave = () => viewer.setHover(null);
@@ -189,6 +223,36 @@ export function WorldEditLayer() {
         if (e.shiftKey) s.redo();
         else s.undo();
         return;
+      }
+      if (s.tool === 'place' && s.place) {
+        const nudges: Record<string, ['x' | 'y' | 'z', 1 | -1]> = {
+          ArrowLeft: ['x', -1],
+          ArrowRight: ['x', 1],
+          ArrowUp: ['z', -1],
+          ArrowDown: ['z', 1],
+          PageUp: ['y', 1],
+          PageDown: ['y', -1],
+        };
+        const nudge = nudges[e.key];
+        if (nudge) {
+          e.preventDefault();
+          s.nudgePlace(nudge[0], nudge[1]);
+          return;
+        }
+        if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault();
+          s.rotatePlace(e.shiftKey ? -1 : 1);
+          return;
+        }
+        if (e.key === 'Enter' && s.place.anchor) {
+          e.preventDefault();
+          commitPlace();
+          return;
+        }
+        if (e.key === 'Escape') {
+          s.cancelPlace();
+          return;
+        }
       }
       if (e.key === 'Escape') {
         if (s.anchor || s.selection) s.clearSelection();

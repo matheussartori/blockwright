@@ -3,18 +3,30 @@
 // and the Save-to-World / Discard actions. Shown while world-edit mode is active; the mode is
 // toggled from the World HUD's Edit button (gated on the Settings ▸ World master switch).
 import { useMemo } from 'react';
-import { AlertTriangle, Eraser, Globe, Paintbrush, Redo2, Save, SquareDashed, Trash2, Undo2, X } from 'lucide-react';
-import { useT, useWorldEdit } from '../../hooks/useStores';
-import { worldEditStore, type WorldPaintMode, type WorldTool } from '../../state/world-edit';
+import { AlertTriangle, Eraser, Globe, PackagePlus, Paintbrush, Redo2, RotateCcw, RotateCw, Save, SquareDashed, Trash2, Undo2, X } from 'lucide-react';
+import { useDocuments, useT, useWorldEdit } from '../../hooks/useStores';
+import { commitPlaceVia, worldEditStore, type WorldPaintMode, type WorldTool } from '../../state/world-edit';
+import { rotatedSize } from '../../world/place';
+import { useViewer } from '../../viewer/ViewerProvider';
 import { Segmented } from '../ui/Segmented';
+import { Select } from '../ui/Select';
 import { Tooltip } from '../ui/Tooltip';
+import { AxisPad } from '../editor/AxisPad';
 import { BlockField } from '../editor/BlockField';
 import { useBlockIds } from '../editor/useBlockIds';
 import { WorldSaveModal } from './WorldSaveModal';
 
 export function WorldEditPanel() {
   const t = useT();
+  const viewer = useViewer();
   const active = useWorldEdit((s) => s.active);
+  const place = useWorldEdit((s) => s.place);
+  const documents = useDocuments((s) => s.documents);
+  /** Open structure tabs with a loaded build — the Place tool's candidates. */
+  const placeDocs = useMemo(
+    () => documents.filter((d) => d.kind === 'structure' && d.structure && d.structure.blockCount > 0),
+    [documents],
+  );
   const tool = useWorldEdit((s) => s.tool);
   const paintMode = useWorldEdit((s) => s.paintMode);
   const paintBlock = useWorldEdit((s) => s.paintBlock);
@@ -67,6 +79,7 @@ export function WorldEditPanel() {
           { value: 'paint', label: (<><Paintbrush size={13} aria-hidden /> {t('worldEdit.tool.paint')}</>) },
           { value: 'erase', label: (<><Eraser size={13} aria-hidden /> {t('worldEdit.tool.erase')}</>) },
           { value: 'select', label: (<><SquareDashed size={13} aria-hidden /> {t('worldEdit.tool.select')}</>) },
+          { value: 'place', label: (<><PackagePlus size={13} aria-hidden /> {t('worldEdit.tool.place')}</>) },
         ]}
       />
 
@@ -92,6 +105,53 @@ export function WorldEditPanel() {
           </>
         )}
         {tool === 'erase' && <div className="editor-hint">{t('worldEdit.eraseHint')}</div>}
+        {tool === 'place' &&
+          (place ? (
+            <>
+              <div className="editor-selname" title={place.label}>
+                {place.label} — <span style={{ fontFamily: 'var(--mono)' }}>{rotatedSize(place.data.size, place.turns).join('×')}</span>
+              </div>
+              <div className="editor-hint">{t('worldEdit.placeHint')}</div>
+              <div className="editor-btngrid">
+                <button className="btn sm" onClick={() => we().rotatePlace(-1)}>
+                  <RotateCcw size={13} aria-hidden /> {t('worldEdit.placeRotateL')}
+                </button>
+                <button className="btn sm" onClick={() => we().rotatePlace(1)}>
+                  <RotateCw size={13} aria-hidden /> {t('worldEdit.placeRotateR')}
+                </button>
+              </div>
+              <AxisPad t={t} onAxis={(axis, dir) => we().nudgePlace(axis, dir)} />
+              <div className="editor-btngrid">
+                <button
+                  className="btn primary sm"
+                  disabled={!place.anchor}
+                  onClick={() => void (viewer && commitPlaceVia(viewer))}
+                >
+                  {t('worldEdit.placeCommit')}
+                </button>
+                <button className="btn sm" onClick={() => we().cancelPlace()}>
+                  {t('worldEdit.placeCancel')}
+                </button>
+              </div>
+            </>
+          ) : placeDocs.length ? (
+            <Select
+              value=""
+              placeholder={t('worldEdit.placePick')}
+              ariaLabel={t('worldEdit.placePickLabel')}
+              options={placeDocs.map((d) => ({
+                value: d.id,
+                label: d.title,
+                description: d.structure ? d.structure.size.join('×') : undefined,
+              }))}
+              onChange={(id) => {
+                const doc = placeDocs.find((d) => d.id === id);
+                if (doc?.structure) we().beginPlace(doc.id, doc.title, doc.structure);
+              }}
+            />
+          ) : (
+            <div className="editor-hint">{t('worldEdit.placeNoDocs')}</div>
+          ))}
         {tool === 'select' &&
           (selSize ? (
             <>

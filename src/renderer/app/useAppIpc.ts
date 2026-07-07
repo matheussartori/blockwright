@@ -66,6 +66,8 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
     });
     api.onWorkspaceStructuresChanged(() => {
       void api.listWorkspaceStructures().then((paths) => st.setWorkspaceStructures(paths));
+      // Pool pieces reference those structures — refresh their dead-ref state too.
+      void api.listWorkspaceJigsaws().then((pools) => st.setWorkspaceJigsaws(pools));
     });
     api.onOpenCatalog(() => st.setCatalogOpen(true));
     api.onOpenModules(() => st.setModulesOpen(true));
@@ -91,6 +93,7 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
       st.setRecents(await api.listRecents());
       st.setWorkspace(await api.getWorkspace());
       st.setWorkspaceStructures(await api.listWorkspaceStructures());
+      st.setWorkspaceJigsaws(await api.listWorkspaceJigsaws());
       st.setRecentWorkspaces(await api.listRecentWorkspaces());
       st.setPinnedWorkspaceRoot(await api.getPinnedWorkspace());
       st.setRecentWorlds(await api.listRecentWorlds());

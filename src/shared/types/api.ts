@@ -3,7 +3,7 @@
 import type { AiConfig, AiProviderId, GenerationSettings } from '../ai';
 import type { LanguageInfo, LanguagePref } from '../i18n';
 import type { StructureData } from './structure';
-import type { Workspace } from './workspace';
+import type { Workspace, WorkspaceJigsawPool } from './workspace';
 import type {
   ChunkRenderPayload,
   DimensionId,
@@ -117,6 +117,8 @@ export interface BlockwrightApi {
   clearRecentWorlds: () => Promise<WorldRef[]>;
   /** Absolute paths of the active workspace's `.nbt` structures (empty when none). */
   listWorkspaceStructures: () => Promise<string[]>;
+  /** The active workspace's jigsaw template pools (pieces resolved), by folder. */
+  listWorkspaceJigsaws: () => Promise<WorkspaceJigsawPool[]>;
   /** Persist a user-chosen Minecraft version for the active workspace; returns it. */
   setWorkspaceVersion: (version: string) => Promise<Workspace | null>;
   /** Custom biome ids the active workspace defines (`worldgen/biome/**`), `ns:path`. */
