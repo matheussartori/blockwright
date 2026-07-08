@@ -4,6 +4,119 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-07-08
+
+Edit your world like you edit a build — place blocks, paste whole structures
+previewed and orientation-correct, and cut regions back out as schematics, with
+enforced backups, session-lock safety and atomic writes. Plus the exploration
+pack (Y-slice, waypoints, block search, material lists) and a datapack upgrader
+that tells you exactly what changed.
+
+### Added
+
+- World editing — the world viewer became a world *editor*. Enter Edit on an
+  open world and the block-editor tools work on real terrain: paint
+  (brush/recolor), erase, and box select with fill/delete, with undo/redo, a
+  hover ghost and plane-locked strokes. Edits stay local until **Save to
+  World**, whose dialog previews exactly what will be written — the blocks, the
+  chunks, the backup about to be taken — before a byte moves.
+- A safe write path no other world editor ships, on by design and not
+  optional: the `session.lock` is held so Minecraft and Blockwright can't
+  fight over the save, every touched region file is backed up before the first
+  write (with a Restore/Delete manager in Settings ▸ World), chunk NBT is
+  surgically patched (never re-serialized from the render model, so mod data
+  and untouched tags survive byte-for-byte), regions are rewritten atomically,
+  lighting/heightmaps are handed back to the game to recompute, POI records are
+  invalidated, and a chunk that fails any gate is refused — never "best effort"
+  written. Worlds open read-only until the master switch in Settings ▸ World is
+  turned on.
+- Place structure into world — drop any open build (`.nbt`, `.schem`,
+  `.litematic`, an AI version) into the open world as a translucent ghost,
+  nudge it with arrows/PgUp/PgDn, rotate with R (stairs, doors and rails land
+  facing right — orientation-correct, the transform WorldEdit still corrupts),
+  and commit through the same safe write path. `structure_void` and omitted
+  cells leave terrain untouched; `minecraft:air` clears, exactly like an
+  in-game paste.
+- Extract from world — the inverse, closing the loop: box-select a region and
+  **Open as tab** (edit, re-theme, diff, place it back) or **Save as…**
+  (`.nbt`/`.schem`/`.litematic`, block entities and entities carried, oversized
+  regions auto-split into a jigsaw assembly). Capturing from a world no longer
+  needs in-game structure blocks at all.
+- Y-slice / underground mode — cut everything above a chosen Y away (HUD panel
+  with a slider, `[` / `]` to nudge, Shift for ×8) and browse caves, dungeons
+  and basements like a doll's house. Structures get the counterpart: storey
+  isolation — click a storey in the new bottom-left chip and the view clips to
+  that floor band. Both levels are remembered per world/structure (Settings ▸
+  Viewer).
+- Waypoints — bookmark the camera anywhere in a world (name + position +
+  dimension, saved per world), jump back from the HUD list; jumping to a
+  waypoint in another dimension switches there first. Spawn and last-player
+  jumps sit beside it.
+- Cursor readout — the block under the crosshair, named: position, block id
+  and biome, resolved live from the streamed chunks (the F3 essentials without
+  the game). Verbosity is configurable (coords / +block / +biome).
+- Find blocks — search a block id across the loaded area ("where are my
+  diamond ore / spawners / chests"), results nearest-first as a jump list plus
+  amber markers visible through terrain.
+- Chunk grid + slime chunks — chunk-boundary lines around the camera (region
+  corners highlighted) as a HUD toggle, and the minimap gained region-boundary
+  lines plus a seed-derived slime-chunk overlay (exact Java `Random` math, so
+  it matches the game).
+- Server saves — Bukkit/Spigot/Paper worlds now open whole: the sibling
+  `<world>_nether/` and `<world>_the_end/` folders are discovered from the main
+  world folder, so all three dimensions list and stream.
+- Material list — a Materials panel (View ▸ Materials, Cmd+4, or "Materials…"
+  on the build card) rolls any open structure up into gatherable items with
+  stack and shulker-box math: all states of a block as one row, doors and beds
+  counted once, double slabs twice, candles/sea pickles/turtle eggs/snow layers
+  by their live amount, source water/lava as buckets, and entities included.
+  Exports machine-readable CSV or JSON.
+- Orthographic plan views + measure — Top/Front/Side presets for layout work
+  (near-orthographic, so plans read as plans) and a two-point measure tool:
+  click two blocks, read the X×Y×Z span and straight-line distance.
+- Datapack upgrader with a loss report — one action in the Worldgen Doctor
+  upgrades the active workspace to its target Minecraft version: structure
+  `.nbt`s re-stamped to the target `DataVersion` (surgically, on the NBT tag
+  tree — and never downgraded: a file newer than the target is reported, not
+  touched), the `structures/` → `structure/` folder rename applied,
+  `pack.mcmeta` re-stamped in both the classic `pack_format` and the 26.x
+  `min_format`/`max_format` schemes, and block ids that don't resolve at the
+  target flagged. Every change and everything it could not map is listed —
+  nothing is silently dropped.
+- Doctor fix-its — the check-up's safe findings grew one-click **Fix it**
+  buttons: move `.nbt`s to the folder the target version reads, inject the
+  required `spawn_overrides: {}`, re-stamp a stale pack format. The report
+  re-scans after each fix.
+- `/place` everywhere — the copyable test command now also appears in the
+  workspace-export success screen (`/place structure` with worldgen files,
+  `/place template` without) and in the Jigsaw panel, so "did it assemble?" is
+  always one paste away.
+- Missing-texture diagnostics for worlds — the 2.1 structures feature extended:
+  the world HUD counts block types rendering as flat colors in streamed chunks
+  (hover for the list), only when a content pack is configured.
+- Settings, one page of new knobs, each tied to a shipped behavior:
+  **World** — default render distance, chunk memory cap (the "never OOM,
+  degrade to LOD" budget), mesh worker threads (auto = scales with your CPU),
+  default dimension on open (last used per world / always overworld), and a
+  total size cap for backups alongside retention. **Viewer** — a
+  colorblind-safe overlay palette (Okabe–Ito) for diff/void/selection marks,
+  Y-slice memory, cursor readout verbosity. **Editor** — default tool on
+  entering edit, plane-lock default, symmetry that persists across sessions,
+  undo depth, and an unsaved-edit guard on tab close (warn / auto-save as a
+  version / discard). **AI** — review screenshot size (the token/quality lever
+  of the self-review loop) and library retention (keep the last N versions per
+  build; generated libraries no longer grow unbounded). **Files** — default
+  "Export As…" format, material-list export format, and reopen last session on
+  launch (tabs + world).
+- macOS file associations — `.nbt`, `.schem` and `.litematic` register with the
+  OS, so double-click / Open With reaches Blockwright.
+
+### Changed
+
+- The backup retention setting now pairs with the new total-size cap: past
+  either limit the oldest backup sets are pruned, and the newest set always
+  survives whatever the cap says.
+
 ## [2.1.1] - 2026-07-05
 
 Opens worlds saved by the newest Minecraft.
@@ -371,6 +484,8 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[2.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.2.0
+[2.1.1]: https://github.com/matheussartori/blockwright/releases/tag/v2.1.1
 [2.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.1.0
 [2.0.2]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.2
 [2.0.1]: https://github.com/matheussartori/blockwright/releases/tag/v2.0.1
