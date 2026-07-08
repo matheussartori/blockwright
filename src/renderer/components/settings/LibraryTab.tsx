@@ -21,7 +21,7 @@ export function LibraryTab() {
 
   return (
     <section className="settings-group">
-      <span className="settings-group-name">{t('library.folder')}</span>
+      <div className="settings-group-name">{t('library.folder')}</div>
       <p className="setting-note">
         {t('library.notePre')}<code>cozy-cottage.nbt</code>{t('library.notePost')}
       </p>

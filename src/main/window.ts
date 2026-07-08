@@ -264,6 +264,11 @@ function onDidFinishLoad() {
     mainWindow?.webContents.send(IPC_EVENTS.openWorld, initialWorld);
     pendingOpenWorld = null;
   }
+  // Dev-only: open Settings on a given tab (e.g. BW_OPEN_SETTINGS=viewer) so
+  // BW_CAPTURE can screenshot the dialog in automated visual checks.
+  if (process.env.BW_OPEN_SETTINGS) {
+    notifyOpenSettings(process.env.BW_OPEN_SETTINGS);
+  }
   // Dev-only: render to a PNG and exit (used for automated visual checks).
   if (process.env.BW_CAPTURE) {
     const out = process.env.BW_CAPTURE;

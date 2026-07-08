@@ -9,6 +9,7 @@ import { useSettings, useT } from '../../hooks/useStores';
 import { settingsStore, type CursorReadout, type ExportFormatPref, type OverlayScheme, type UnsavedEditGuard } from '../../state/settings';
 import { Select, type SelectOption } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
+import { SettingRow, ToggleRow } from './rows';
 import type { MaterialsFormat } from '@/shared/types';
 import type { NbtSizePref } from '@/shared/domain/split';
 
@@ -59,32 +60,29 @@ export function ViewerTab() {
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.scene')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.showGrid')}</span>
-          <input type="checkbox" checked={settings.showGrid} onChange={(e) => set('showGrid', e.target.checked)} />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.blockTextures')}</span>
-          <input
-            type="checkbox"
-            checked={settings.blockTextureIcons}
-            onChange={(e) => set('blockTextureIcons', e.target.checked)}
-          />
-        </label>
+        <ToggleRow label={t('viewer.showGrid')} checked={settings.showGrid} onChange={(v) => set('showGrid', v)} />
+        <ToggleRow
+          label={t('viewer.blockTextures')}
+          checked={settings.blockTextureIcons}
+          onChange={(v) => set('blockTextureIcons', v)}
+        />
         <p className="setting-note">{t('viewer.blockTexturesNote')}</p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.structures')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.nbtLimit')}</span>
-          <Select value={settings.nbtSizeLimit} options={nbtLimitOptions} onChange={(v) => set('nbtSizeLimit', v as NbtSizePref)} />
-        </label>
+        <SettingRow label={t('viewer.nbtLimit')}>
+          <Select
+            value={settings.nbtSizeLimit}
+            options={nbtLimitOptions}
+            onChange={(v) => set('nbtSizeLimit', v as NbtSizePref)}
+            ariaLabel={t('viewer.nbtLimit')}
+          />
+        </SettingRow>
         <p className="setting-note">{t('viewer.nbtLimitNote')}</p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.overlays')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.overlayScheme')}</span>
+        <SettingRow label={t('viewer.overlayScheme')}>
           <Select
             value={settings.overlayScheme}
             options={[
@@ -94,18 +92,14 @@ export function ViewerTab() {
             onChange={(v) => set('overlayScheme', v as OverlayScheme)}
             ariaLabel={t('viewer.overlayScheme')}
           />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.ySliceRemember')}</span>
-          <input
-            type="checkbox"
-            checked={settings.ySliceRemember}
-            onChange={(e) => set('ySliceRemember', e.target.checked)}
-          />
-        </label>
+        </SettingRow>
+        <ToggleRow
+          label={t('viewer.ySliceRemember')}
+          checked={settings.ySliceRemember}
+          onChange={(v) => set('ySliceRemember', v)}
+        />
         <p className="setting-note">{t('viewer.ySliceRememberNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.cursorReadout')}</span>
+        <SettingRow label={t('viewer.cursorReadout')}>
           <Select
             value={settings.cursorReadout}
             options={[
@@ -116,12 +110,11 @@ export function ViewerTab() {
             onChange={(v) => set('cursorReadout', v as CursorReadout)}
             ariaLabel={t('viewer.cursorReadout')}
           />
-        </label>
+        </SettingRow>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('settingsEditor.group')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsEditor.defaultTool')}</span>
+        <SettingRow label={t('settingsEditor.defaultTool')}>
           <Select
             value={settings.editorDefaultTool}
             options={[
@@ -131,26 +124,19 @@ export function ViewerTab() {
             onChange={(v) => set('editorDefaultTool', v as 'select' | 'paint')}
             ariaLabel={t('settingsEditor.defaultTool')}
           />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsEditor.planeLock')}</span>
-          <input
-            type="checkbox"
-            checked={settings.editorPlaneLock}
-            onChange={(e) => set('editorPlaneLock', e.target.checked)}
-          />
-        </label>
+        </SettingRow>
+        <ToggleRow
+          label={t('settingsEditor.planeLock')}
+          checked={settings.editorPlaneLock}
+          onChange={(v) => set('editorPlaneLock', v)}
+        />
         <p className="setting-note">{t('settingsEditor.planeLockNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsEditor.symmetryPersist')}</span>
-          <input
-            type="checkbox"
-            checked={settings.editorSymmetryPersist}
-            onChange={(e) => set('editorSymmetryPersist', e.target.checked)}
-          />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsEditor.undoDepth')}</span>
+        <ToggleRow
+          label={t('settingsEditor.symmetryPersist')}
+          checked={settings.editorSymmetryPersist}
+          onChange={(v) => set('editorSymmetryPersist', v)}
+        />
+        <SettingRow label={t('settingsEditor.undoDepth')}>
           <Stepper
             value={settings.editorUndoDepth}
             onChange={(v) => set('editorUndoDepth', Math.min(500, Math.max(10, Math.round(v))))}
@@ -158,11 +144,11 @@ export function ViewerTab() {
             max={500}
             step={10}
             size="sm"
+            ariaLabel={t('settingsEditor.undoDepth')}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('settingsEditor.undoDepthNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsEditor.unsavedGuard')}</span>
+        <SettingRow label={t('settingsEditor.unsavedGuard')}>
           <Select
             value={settings.editorUnsavedGuard}
             options={[
@@ -173,12 +159,11 @@ export function ViewerTab() {
             onChange={(v) => set('editorUnsavedGuard', v as UnsavedEditGuard)}
             ariaLabel={t('settingsEditor.unsavedGuard')}
           />
-        </label>
+        </SettingRow>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('settingsFiles.group')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsFiles.exportFormat')}</span>
+        <SettingRow label={t('settingsFiles.exportFormat')}>
           <Select
             value={settings.defaultExportFormat}
             options={[
@@ -189,9 +174,8 @@ export function ViewerTab() {
             onChange={(v) => set('defaultExportFormat', v as ExportFormatPref)}
             ariaLabel={t('settingsFiles.exportFormat')}
           />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsFiles.materialsFormat')}</span>
+        </SettingRow>
+        <SettingRow label={t('settingsFiles.materialsFormat')}>
           <Select
             value={settings.materialsFormat}
             options={[
@@ -201,35 +185,29 @@ export function ViewerTab() {
             onChange={(v) => set('materialsFormat', v as MaterialsFormat)}
             ariaLabel={t('settingsFiles.materialsFormat')}
           />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsFiles.reopenSession')}</span>
-          <input
-            type="checkbox"
-            checked={settings.reopenSession}
-            onChange={(e) => set('reopenSession', e.target.checked)}
-          />
-        </label>
+        </SettingRow>
+        <ToggleRow
+          label={t('settingsFiles.reopenSession')}
+          checked={settings.reopenSession}
+          onChange={(v) => set('reopenSession', v)}
+        />
         <p className="setting-note">{t('settingsFiles.reopenSessionNote')}</p>
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('viewer.flyMode')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.mouseSensitivity')}</span>
+        <SettingRow label={t('viewer.mouseSensitivity')}>
           <input
             type="range"
             min={0.2}
             max={3}
             step={0.05}
             value={settings.lookSensitivity}
+            aria-label={t('viewer.mouseSensitivity')}
             onChange={(e) => set('lookSensitivity', Number(e.target.value))}
           />
           <span className="setting-value">{settings.lookSensitivity.toFixed(2)}×</span>
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('viewer.invertY')}</span>
-          <input type="checkbox" checked={settings.invertY} onChange={(e) => set('invertY', e.target.checked)} />
-        </label>
+        </SettingRow>
+        <ToggleRow label={t('viewer.invertY')} checked={settings.invertY} onChange={(v) => set('invertY', v)} />
       </section>
     </>
   );

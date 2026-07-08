@@ -9,6 +9,7 @@ import { useSettings, useT, useLocale } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
 import { Select } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
+import { SettingRow, ToggleRow } from './rows';
 import type { MessageKey } from '@/shared/i18n';
 import { localizeData, aiProviderKey, aiPresetKey } from '@/shared/i18n/registry';
 import {
@@ -111,8 +112,7 @@ function ReviewLibraryCard({
   return (
     <section className="settings-group">
       <div className="settings-group-name">{t('ai.reviewGroup')}</div>
-      <label className="setting-row">
-        <span className="setting-label">{t('ai.reviewSize')}</span>
+      <SettingRow label={t('ai.reviewSize')}>
         <Select
           value={String(reviewSize)}
           options={[
@@ -123,10 +123,9 @@ function ReviewLibraryCard({
           onChange={(v) => settingsStore.getState().set('aiReviewImageSize', Number(v))}
           ariaLabel={t('ai.reviewSize')}
         />
-      </label>
+      </SettingRow>
       <p className="setting-note">{t('ai.reviewSizeNote')}</p>
-      <label className="setting-row">
-        <span className="setting-label">{t('ai.libraryRetention')}</span>
+      <SettingRow label={t('ai.libraryRetention')}>
         <Stepper
           value={libraryRetention}
           onChange={(v) => void api.aiSetLibraryRetention(Math.max(0, Math.round(v))).then(onChange)}
@@ -134,8 +133,9 @@ function ReviewLibraryCard({
           max={100}
           step={1}
           size="sm"
+          ariaLabel={t('ai.libraryRetention')}
         />
-      </label>
+      </SettingRow>
       <p className="setting-note">{t('ai.libraryRetentionNote')}</p>
     </section>
   );
@@ -208,51 +208,33 @@ function GenerationCard({
 
       {advanced && (
         <>
-          <label className="setting-row">
-            <span className="setting-label">{t('ai.genRounds')}</span>
-            <input
-              className="input setting-select"
-              type="number"
-              min={0}
-              max={GENERATION_LIMITS.maxRounds}
-              placeholder={t('ai.genRoundsAuto')}
-              value={g.maxRounds === 0 ? '' : g.maxRounds}
-              onChange={(e) => {
-                const raw = e.target.value.trim();
-                if (raw === '') return void set({ maxRounds: 0 });
-                const n = Math.trunc(Number(raw));
-                if (!Number.isFinite(n)) return;
-                set({ maxRounds: n <= 0 ? 0 : Math.max(GENERATION_LIMITS.minRounds, Math.min(GENERATION_LIMITS.maxRounds, n)) });
-              }}
+          <SettingRow label={t('ai.genRounds')}>
+            <Select
+              value={String(g.maxRounds)}
+              options={[
+                { value: '0', label: t('ai.genRoundsAuto') },
+                ...Array.from({ length: GENERATION_LIMITS.maxRounds - GENERATION_LIMITS.minRounds + 1 }, (_, i) => {
+                  const n = GENERATION_LIMITS.minRounds + i;
+                  return { value: String(n), label: String(n) };
+                }),
+              ]}
+              onChange={(v) => set({ maxRounds: Number(v) })}
+              ariaLabel={t('ai.genRounds')}
             />
-          </label>
+          </SettingRow>
           <p className="setting-note">{t('ai.genRoundsNote')}</p>
 
-          <label className="setting-row">
-            <span className="setting-label">{t('ai.genThinking')}</span>
-            <select
-              className="input setting-select"
+          <SettingRow label={t('ai.genThinking')}>
+            <Select
               value={g.thinkingEffort}
-              onChange={(e) => set({ thinkingEffort: e.target.value as ThinkingEffort })}
-            >
-              {THINKING_OPTS.map((o) => (
-                <option key={o.effort} value={o.effort}>{t(o.key)}</option>
-              ))}
-            </select>
-          </label>
+              options={THINKING_OPTS.map((o) => ({ value: o.effort, label: t(o.key) }))}
+              onChange={(v) => set({ thinkingEffort: v as ThinkingEffort })}
+              ariaLabel={t('ai.genThinking')}
+            />
+          </SettingRow>
           <p className="setting-note">{t('ai.genThinkingNote')}</p>
 
-          <label className="setting-row">
-            <span className="setting-label">{t('ai.genCritic')}</span>
-            <select
-              className="input setting-select"
-              value={g.critic ? 'on' : 'off'}
-              onChange={(e) => set({ critic: e.target.value === 'on' })}
-            >
-              <option value="off">{t('ai.off')}</option>
-              <option value="on">{t('ai.on')}</option>
-            </select>
-          </label>
+          <ToggleRow label={t('ai.genCritic')} checked={g.critic} onChange={(v) => set({ critic: v })} />
           <p className="setting-note">{t('ai.genCriticNote')}</p>
         </>
       )}
@@ -323,20 +305,14 @@ function ProviderCard({
       </div>
       <p className="setting-note">{localizeData(locale, aiProviderKey(meta.id).blurb, meta.blurb)}</p>
 
-      <label className="setting-row">
-        <span className="setting-label">{t('ai.model')}</span>
-        <select
-          className="input setting-select"
+      <SettingRow label={t('ai.model')}>
+        <Select
           value={state.model}
-          onChange={(e) => void api.aiSetModel(meta.id, e.target.value).then(onChange)}
-        >
-          {meta.models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          options={meta.models.map((m) => ({ value: m.id, label: m.label }))}
+          onChange={(v) => void api.aiSetModel(meta.id, v).then(onChange)}
+          ariaLabel={t('ai.model')}
+        />
+      </SettingRow>
 
       {state.fromEnv ? (
         <p className="setting-note">

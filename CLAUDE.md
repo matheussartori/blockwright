@@ -132,4 +132,5 @@ channel in `shared/ipc.ts` → handler in `main/ipc.ts` → method on `Blockwrig
 Env vars at launch: `BW_OPEN=<file.nbt>` open file · `BW_CAPTURE=<out.png>` render, screenshot,
 quit (`BW_CAPTURE_DELAY=8000` on cold dev starts) · `BW_CONTENT=<dir>` content pack ·
 `BW_WORKSPACE=<dir>` activate workspace · `BW_OPEN_WORLD=<save>` open world ·
-`BW_WORLD_CAM=x,y,z` / `BW_WORLD_LOOK=x,y,z` aim the world camera.
+`BW_WORLD_CAM=x,y,z` / `BW_WORLD_LOOK=x,y,z` aim the world camera ·
+`BW_OPEN_SETTINGS=<tab>` open Settings on a tab (appearance/viewer/world/ai/library/about).

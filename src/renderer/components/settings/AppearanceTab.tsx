@@ -7,6 +7,7 @@ import { useI18n, useSettings, useT } from '../../hooks/useStores';
 import { i18nStore } from '../../state/i18n';
 import { settingsStore } from '../../state/settings';
 import { Segmented } from '../ui/Segmented';
+import { SettingRow } from './rows';
 import { ThemePicker } from './ThemePicker';
 
 export function AppearanceTab() {
@@ -30,15 +31,14 @@ export function AppearanceTab() {
       </section>
       <section className="settings-group">
         <div className="settings-group-name">{t('appearance.languageGroup')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('appearance.language')}</span>
+        <SettingRow label={t('appearance.language')}>
           <Segmented<LanguagePref>
             ariaLabel={t('appearance.language')}
             value={langPref}
             onChange={(v) => i18nStore.getState().setLanguage(v)}
             options={languageOptions}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('appearance.languageNote')}</p>
       </section>
     </>

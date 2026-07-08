@@ -10,7 +10,7 @@ import { useActiveDoc, useSettings, useT } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
 import { Select } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
-import { Switch } from '../ui/Switch';
+import { SettingRow, ToggleRow } from './rows';
 
 function fmtBytes(n: number): string {
   if (n >= 1 << 30) return `${(n / (1 << 30)).toFixed(1)} GB`;
@@ -60,17 +60,17 @@ export function WorldTab() {
     <>
       <section className="settings-group">
         <div className="settings-group-name">{t('settingsWorld.editingGroup')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.enableEditing')}</span>
-          <Switch checked={settings.worldEditing} onChange={(v) => set('worldEditing', v)} />
-        </label>
+        <ToggleRow
+          label={t('settingsWorld.enableEditing')}
+          checked={settings.worldEditing}
+          onChange={(v) => set('worldEditing', v)}
+        />
         <p className="setting-note">{t('settingsWorld.enableEditingNote')}</p>
       </section>
 
       <section className="settings-group">
         <div className="settings-group-name">{t('settingsWorld.streamingGroup')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.renderDistance')}</span>
+        <SettingRow label={t('settingsWorld.renderDistance')}>
           <Stepper
             value={settings.worldRenderDistance}
             onChange={(v) => set('worldRenderDistance', Math.min(32, Math.max(4, Math.round(v))))}
@@ -79,10 +79,10 @@ export function WorldTab() {
             step={2}
             size="sm"
             unit="ch"
+            ariaLabel={t('settingsWorld.renderDistance')}
           />
-        </label>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.chunkCap')}</span>
+        </SettingRow>
+        <SettingRow label={t('settingsWorld.chunkCap')}>
           <Stepper
             value={settings.worldChunkCap}
             onChange={(v) => set('worldChunkCap', Math.min(6000, Math.max(200, Math.round(v))))}
@@ -90,11 +90,11 @@ export function WorldTab() {
             max={6000}
             step={100}
             size="sm"
+            ariaLabel={t('settingsWorld.chunkCap')}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('settingsWorld.chunkCapNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.meshWorkers')}</span>
+        <SettingRow label={t('settingsWorld.meshWorkers')}>
           <Stepper
             value={settings.worldMeshWorkers}
             onChange={(v) => set('worldMeshWorkers', Math.min(8, Math.max(0, Math.round(v))))}
@@ -102,11 +102,11 @@ export function WorldTab() {
             max={8}
             step={1}
             size="sm"
+            ariaLabel={t('settingsWorld.meshWorkers')}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('settingsWorld.meshWorkersNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.defaultDimension')}</span>
+        <SettingRow label={t('settingsWorld.defaultDimension')}>
           <Select
             value={settings.worldDefaultDimension}
             options={[
@@ -116,13 +116,12 @@ export function WorldTab() {
             onChange={(v) => set('worldDefaultDimension', v as 'last' | 'overworld')}
             ariaLabel={t('settingsWorld.defaultDimension')}
           />
-        </label>
+        </SettingRow>
       </section>
 
       <section className="settings-group">
         <div className="settings-group-name">{t('settingsWorld.backupsGroup')}</div>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.retention')}</span>
+        <SettingRow label={t('settingsWorld.retention')}>
           <Stepper
             value={settings.worldBackupRetention}
             onChange={(v) => set('worldBackupRetention', Math.max(0, Math.round(v)))}
@@ -130,11 +129,11 @@ export function WorldTab() {
             max={100}
             step={1}
             size="sm"
+            ariaLabel={t('settingsWorld.retention')}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('settingsWorld.retentionNote')}</p>
-        <label className="setting-row">
-          <span className="setting-label">{t('settingsWorld.sizeCap')}</span>
+        <SettingRow label={t('settingsWorld.sizeCap')}>
           <Stepper
             value={settings.worldBackupSizeCapMb}
             onChange={(v) => set('worldBackupSizeCapMb', Math.max(0, Math.round(v)))}
@@ -143,8 +142,9 @@ export function WorldTab() {
             step={128}
             size="sm"
             unit="MB"
+            ariaLabel={t('settingsWorld.sizeCap')}
           />
-        </label>
+        </SettingRow>
         <p className="setting-note">{t('settingsWorld.sizeCapNote')}</p>
 
         {!worldOpen ? (
@@ -155,16 +155,16 @@ export function WorldTab() {
             {backups && backups.length === 0 && <p className="setting-note">{t('settingsWorld.noBackups')}</p>}
             {backups?.map((b) => (
               <div className="setting-row" key={b.id}>
-                <span className="setting-label" style={{ fontFamily: 'var(--mono)' }}>
+                <span className="setting-label setting-label-mono">
                   {new Date(b.createdMs).toLocaleString()}{' '}
                   <span className="setting-note-inline">
                     · {b.files.length} {t('settingsWorld.filesLabel')} · {fmtBytes(b.bytes)}
                   </span>
                 </span>
-                <span>
+                <span className="setting-actions">
                   <button className="btn sm" disabled={busy !== null} onClick={() => void restore(b.id)}>
                     {busy === b.id ? '…' : t('settingsWorld.restore')}
-                  </button>{' '}
+                  </button>
                   <button className="btn sm" disabled={busy !== null} onClick={() => void remove(b.id)}>
                     {t('settingsWorld.delete')}
                   </button>

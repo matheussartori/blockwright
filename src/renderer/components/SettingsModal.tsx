@@ -3,7 +3,8 @@
 // its own component in ./settings; this shell owns only the nav + tab dispatch. Tabs
 // mutate `settingsStore`; applying values to the viewer/theme happens in one place
 // (App's effect / state/theme.ts) so settings take effect whether or not this is open.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
+import { Box, FolderOpen, Globe, Info, Palette, Sparkles } from 'lucide-react';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
 import type { MessageKey } from '@/shared/i18n';
@@ -17,13 +18,13 @@ import { WorldTab } from './settings/WorldTab';
 import { AboutTab } from './settings/AboutTab';
 
 type TabId = 'appearance' | 'viewer' | 'world' | 'ai' | 'library' | 'about';
-const TABS: { id: TabId; label: MessageKey }[] = [
-  { id: 'appearance', label: 'settings.tab.appearance' },
-  { id: 'viewer', label: 'settings.tab.viewer' },
-  { id: 'world', label: 'settings.tab.world' },
-  { id: 'ai', label: 'settings.tab.ai' },
-  { id: 'library', label: 'settings.tab.library' },
-  { id: 'about', label: 'settings.tab.about' },
+const TABS: { id: TabId; label: MessageKey; Icon: ComponentType<{ size?: number }> }[] = [
+  { id: 'appearance', label: 'settings.tab.appearance', Icon: Palette },
+  { id: 'viewer', label: 'settings.tab.viewer', Icon: Box },
+  { id: 'world', label: 'settings.tab.world', Icon: Globe },
+  { id: 'ai', label: 'settings.tab.ai', Icon: Sparkles },
+  { id: 'library', label: 'settings.tab.library', Icon: FolderOpen },
+  { id: 'about', label: 'settings.tab.about', Icon: Info },
 ];
 
 const TAB_IDS = TABS.map((t) => t.id);
@@ -66,6 +67,7 @@ export function SettingsModal() {
             className={`settings-nav-item${tab === tab2.id ? ' active' : ''}`}
             onClick={() => setTab(tab2.id)}
           >
+            <tab2.Icon size={15} aria-hidden />
             {t(tab2.label)}
           </button>
         ))}
