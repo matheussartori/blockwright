@@ -116,6 +116,9 @@ interface Prefs {
   models: Partial<Record<AiProviderId, string>>;
   /** The generation cost/quality knobs (see shared/ai.ts). Absent = the cheap default. */
   generation: GenerationSettings;
+  /** Library retention: keep the last N `versions/vN.nbt` per build (0 = keep all,
+   *  the default — generated libraries otherwise grow unbounded). */
+  libraryRetention: number;
 }
 let prefsCache: Prefs | undefined;
 
@@ -153,10 +156,16 @@ function readPrefs(): Prefs {
         : DEFAULT_PROVIDER,
       models: parsed.models ?? {},
       generation: normalizeGeneration(parsed.generation),
+      libraryRetention: normalizeRetention(parsed.libraryRetention),
     };
   } catch {
-    return { activeProvider: DEFAULT_PROVIDER, models: {}, generation: normalizeGeneration(undefined) };
+    return { activeProvider: DEFAULT_PROVIDER, models: {}, generation: normalizeGeneration(undefined), libraryRetention: 0 };
   }
+}
+
+/** 0 = keep all; otherwise a small positive count. */
+function normalizeRetention(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.min(100, Math.trunc(v)) : 0;
 }
 
 function prefs(): Prefs {
@@ -187,6 +196,17 @@ export function setModel(id: AiProviderId, model: string): void {
 /** The persisted generation cost/quality settings (clamped to valid bounds). */
 export function getGenerationSettings(): GenerationSettings {
   return prefs().generation;
+}
+
+/** Library retention: keep the last N versions per build (0 = keep all). */
+export function getLibraryRetention(): number {
+  return prefs().libraryRetention;
+}
+
+export function setLibraryRetention(keep: number): number {
+  const next = normalizeRetention(keep);
+  writePrefs({ ...prefs(), libraryRetention: next });
+  return next;
 }
 
 /** Merge a partial generation update over the current settings (clamping), persist
@@ -278,7 +298,7 @@ export function getConfig(): AiConfig {
       model: modelFor(meta.id),
     };
   });
-  return { providers, activeProvider: prefs().activeProvider, generation: prefs().generation };
+  return { providers, activeProvider: prefs().activeProvider, generation: prefs().generation, libraryRetention: prefs().libraryRetention };
 }
 
 // --- subprocess env for the SDK-based providers ------------------------------

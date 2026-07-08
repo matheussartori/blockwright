@@ -75,6 +75,10 @@ export const IPC_CHANNELS = {
   watchFile: 'watch:file',
   /** Run the Worldgen Doctor over the active workspace → WorkspaceDoctorReport. */
   workspaceDoctor: 'workspace:doctor',
+  /** Apply one Doctor fix-it (payload: finding code + workspace-relative file) → DoctorFixResult. */
+  workspaceDoctorFix: 'workspace:doctor-fix',
+  /** Run the datapack upgrader over the active workspace → WorkspaceUpgradeReport (the loss report). */
+  workspaceUpgrade: 'workspace:upgrade',
   /** Save the edited structure as a new version (payload: SaveVersionRequest) → SaveVersionResult. */
   saveVersion: 'structure:save-version',
   /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */
@@ -102,6 +106,9 @@ export const IPC_CHANNELS = {
   /** Install the current build into a user-chosen Minecraft world save as a ready-to-run
    *  datapack (payload: srcPath + suggestedName + nbtLimit) → ExportResult. */
   exportWorld: 'file:export-world',
+  /** Save the Materials panel's Bill of Materials to a user-chosen file (payload:
+   *  MaterialsExportRequest — CSV + JSON, extension picks the payload) → ExportResult. */
+  exportMaterials: 'materials:export',
   /** Renderer reports its floating-window state so the View menu checkmarks stay in sync. */
   windowsReport: 'windows:report',
   /** Dev-only: capture/auto-assemble config from main's env (BW_ASSEMBLE). */
@@ -120,6 +127,8 @@ export const IPC_CHANNELS = {
   aiClearCredential: 'ai:clear-credential',
   /** Update the generation cost/quality settings — payload: a partial GenerationSettings. */
   aiSetGeneration: 'ai:set-generation',
+  /** Set the library retention (keep last N versions per build; 0 = all) → the clamped value. */
+  aiSetLibraryRetention: 'ai:set-library-retention',
   /** Generate/edit a structure for a session (payload: sessionId + prompt). */
   aiGenerate: 'ai:generate',
   /** Cancel the in-flight generation for a session (payload: sessionId). */
@@ -182,6 +191,10 @@ export const IPC_CHANNELS = {
   worldGetChunks: 'world:get-chunks',
   /** Find generated structures in a dimension (payload: dim) → StructureLocation[] (cached). */
   worldFindStructures: 'world:find-structures',
+  /** A world's saved camera waypoints (payload: world root) → WorldWaypoint[]. */
+  worldWaypointsGet: 'world:waypoints-get',
+  /** Replace a world's waypoint list (payload: root, WorldWaypoint[]) → the persisted list. */
+  worldWaypointsSet: 'world:waypoints-set',
   /** Open a WORLD-EDIT session on the active world (payload: dim) → WorldEditOpenResult. Takes the
    *  session.lock; throws when Minecraft demonstrably holds it (Windows). */
   worldEditOpen: 'world:edit-open',

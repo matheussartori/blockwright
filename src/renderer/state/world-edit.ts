@@ -134,7 +134,7 @@ export interface WorldEditState {
   discard(): void;
   setSaveOpen(open: boolean): void;
   /** Commit the pending edits through the safe write path. Returns the report (also stored). */
-  save(retention: number): Promise<WorldEditApplyResult | null>;
+  save(retention: number, sizeCapMb?: number): Promise<WorldEditApplyResult | null>;
   clearError(): void;
   /** Extraction (Save selection as… / Open as tab) in flight — the buttons show a busy state. */
   extracting: boolean;
@@ -479,12 +479,12 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
 
     setSaveOpen: (saveOpen) => set({ saveOpen }),
 
-    save: async (retention) => {
+    save: async (retention, sizeCapMb = 0) => {
       const s = get();
       if (!s.dim || !s.pendingCount || s.saving) return null;
       set({ saving: true, error: null });
       try {
-        const report = await api.applyWorldEdits(s.dim, Object.values(s.pending), retention);
+        const report = await api.applyWorldEdits(s.dim, Object.values(s.pending), retention, sizeCapMb);
         const touched = chunksOf(Object.keys(s.pending));
         set({
           saving: false,

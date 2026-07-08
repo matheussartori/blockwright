@@ -6872,6 +6872,166 @@ body.row-resizing {
   cursor: help;
 }
 
+/* Doctor fix-it button + the upgrader's loss report. */
+.doctor-fix-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: center;
+}
+.doctor-fix-error {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--danger);
+}
+.doctor-upgrade {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.doctor-upgrade-head {
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.doctor-item.changed > svg {
+  color: var(--ok);
+}
+
+/* A copyable Minecraft command row (export success + Jigsaw panel). */
+.command-chip {
+  margin: 10px 0 2px;
+}
+.command-chip-hint {
+  margin: 0 0 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.command-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.command-chip-cmd {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.command-chip-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.command-chip-copy:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.command-chip-copy.done {
+  color: var(--ok);
+}
+
+/* The Materials panel (Bill of Materials): header with total + export buttons,
+   then one row per material — swatch / name / count / stack readout. */
+.materials-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.materials-total {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.materials-actions {
+  display: flex;
+  gap: 6px;
+}
+.materials-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.materials-export-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: var(--panel);
+}
+.materials-saved {
+  margin: 6px 8px 0;
+  font-size: 11px;
+  color: var(--ok, var(--accent));
+}
+.materials-empty {
+  margin: 10px 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.materials-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+.materials-row .block-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.materials-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.materials-stacks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 84px;
+  justify-content: flex-end;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.materials-shulkers {
+  flex-shrink: 0;
+}
+.materials-section {
+  padding: 8px 8px 3px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 /* The Worldgen Doctor: summary line + a findings list with per-level hues. */
 .doctor-summary {
   display: flex;
@@ -7691,6 +7851,18 @@ body.row-resizing {
   padding-left: 10px;
   border-left: 1px solid var(--border);
 }
+.world-hud-missing {
+  color: var(--warn);
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  cursor: help;
+}
+.world-hud-cursor {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
 
 /* World HUD — top bar (dimension / controls / goto) + hint. */
 .world-hud-top {
@@ -7777,6 +7949,199 @@ body.row-resizing {
   color: var(--text);
   font-family: var(--mono);
 }
+/* Y-slice panel (world HUD). */
+.world-hud-yslice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+.world-yslice-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.world-hud-yslice input[type='range'] {
+  width: 140px;
+}
+.world-yslice-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+/* Bottom-left view cluster (plan-view presets / measure / storey isolation). */
+.stage-view-cluster {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.view-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.measure-readout {
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+}
+
+/* Storey isolation / view-preset chip (structure viewer, in the bottom-left cluster). */
+.storey-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  color: var(--text-muted);
+}
+.storey-btn {
+  min-width: 24px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11.5px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.storey-btn:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+.storey-btn.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+/* Find-blocks form (search input + Find button on one row). */
+.world-blockfind-form {
+  display: flex;
+  gap: 6px;
+}
+.world-blockfind-form .world-hud-search {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Waypoints panel (per-world camera bookmarks). */
+.world-hud-waypoints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+}
+.world-waypoint-add {
+  display: flex;
+  gap: 6px;
+}
+.world-waypoint-add input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+}
+.world-waypoint-empty {
+  margin: 2px 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.world-waypoint-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.world-waypoint-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.world-waypoint-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+.world-waypoint-row:hover {
+  background: var(--panel);
+}
+.world-waypoint-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.world-waypoint-pos {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.world-waypoint-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.world-waypoint-del:hover {
+  color: var(--danger, #e5534b);
+  background: var(--panel);
+}
+
 .world-hud-hint {
   position: absolute;
   top: 14px;
@@ -7794,18 +8159,51 @@ body.row-resizing {
 .world-hud-dim { min-width: 150px; }
 
 /* World minimap — 2D top-down chunk map (bottom-right). */
-.world-minimap {
+.world-minimap-wrap {
   position: absolute;
   right: 16px;
   bottom: 16px;
+  z-index: 20;
+}
+.world-minimap {
+  display: block;
   width: 160px;
   height: 160px;
   border-radius: 10px;
   border: 1px solid var(--border);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
-  z-index: 20;
   pointer-events: none;
   background: var(--elevated);
+}
+.world-minimap-toggles {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+.world-minimap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--elevated) 80%, transparent);
+  cursor: pointer;
+}
+.world-minimap-btn:hover {
+  color: var(--text);
+}
+.world-minimap-btn.active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.world-minimap-btn.active.slime {
+  color: #5ed76e;
+  border-color: color-mix(in srgb, #5ed76e 55%, var(--border));
 }
 
 /* World structure-search panel. */

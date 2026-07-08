@@ -14,6 +14,7 @@ import type {
   ChatRecord,
   ExportMode,
   ExportResult,
+  MaterialsExportRequest,
   RegionRef,
   StructureLocation,
   WorldBackupInfo,
@@ -24,6 +25,7 @@ import type {
   WorldExtractResult,
   WorldMeta,
   WorldRef,
+  WorldWaypoint,
   ReassembleResult,
   RenameProjectResult,
   WorkspaceExportRequest,
@@ -31,6 +33,8 @@ import type {
   WorkspaceJigsawPool,
   WorkspaceExportResult,
   WorkspaceDoctorReport,
+  DoctorFixResult,
+  WorkspaceUpgradeReport,
   ResolveBlockResult,
   SaveVersionRequest,
   SaveVersionResult,
@@ -119,11 +123,15 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.worldGetChunks, dim, coords),
   findWorldStructures: (dim: DimensionId): Promise<StructureLocation[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldFindStructures, dim),
+  getWorldWaypoints: (root: string): Promise<WorldWaypoint[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldWaypointsGet, root),
+  setWorldWaypoints: (root: string, waypoints: WorldWaypoint[]): Promise<WorldWaypoint[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldWaypointsSet, root, waypoints),
   openWorldEdit: (dim: DimensionId): Promise<WorldEditOpenResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldEditOpen, dim),
   closeWorldEdit: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.worldEditClose),
-  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number): Promise<WorldEditApplyResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, retention),
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb = 0): Promise<WorldEditApplyResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, retention, sizeCapMb),
   extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number): Promise<WorldExtractResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldExtract, dim, box, nbtLimit),
   listWorldBackups: (): Promise<WorldBackupInfo[]> => ipcRenderer.invoke(IPC_CHANNELS.worldBackupsList),
@@ -152,6 +160,9 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.saveRender, data, suggestedName, kind),
   watchFile: (filePath: string | null): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.watchFile, filePath),
   workspaceDoctor: (): Promise<WorkspaceDoctorReport> => ipcRenderer.invoke(IPC_CHANNELS.workspaceDoctor),
+  workspaceDoctorFix: (code: string, file: string): Promise<DoctorFixResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceDoctorFix, code, file),
+  workspaceUpgrade: (): Promise<WorkspaceUpgradeReport> => ipcRenderer.invoke(IPC_CHANNELS.workspaceUpgrade),
   onFileChanged: (cb: (path: string) => void) => {
     ipcRenderer.on(IPC_EVENTS.fileChanged, (_e, p: string) => cb(p));
   },
@@ -179,6 +190,8 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.aiClearCredential, id),
   aiSetGeneration: (patch: Partial<GenerationSettings>): Promise<AiConfig> =>
     ipcRenderer.invoke(IPC_CHANNELS.aiSetGeneration, patch),
+  aiSetLibraryRetention: (keep: number): Promise<AiConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.aiSetLibraryRetention, keep),
   aiGenerate: (
     sessionId: string,
     prompt: string,
@@ -224,10 +237,12 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.projectRename, currentFile, newName, sessionId),
   reassembleAssembly: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.assemblyReassemble),
   reimportWorld: (): Promise<ReassembleResult> => ipcRenderer.invoke(IPC_CHANNELS.worldReimport),
-  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode): Promise<ExportResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit, mode),
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode, preferred?: 'nbt' | 'schem' | 'litematic'): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportFile, srcPath, suggestedName, nbtLimit, mode, preferred),
   exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number): Promise<ExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.exportWorld, srcPath, suggestedName, nbtLimit),
+  exportMaterials: (req: MaterialsExportRequest): Promise<ExportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.exportMaterials, req),
   reportWindows: (state: WindowsReport) => {
     ipcRenderer.invoke(IPC_CHANNELS.windowsReport, state);
   },

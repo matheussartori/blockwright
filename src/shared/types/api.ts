@@ -17,6 +17,7 @@ import type {
   WorldExtractResult,
   WorldMeta,
   WorldRef,
+  WorldWaypoint,
 } from './world';
 import type { AssembleOptions, JigsawPlan, JigsawCandidate } from './jigsaw';
 import type {
@@ -31,7 +32,7 @@ import type {
   FloorDef,
 } from './generation';
 import type { BlockDictionary, BlockNote, ExportMode, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
-import type { WorkspaceDoctorReport, WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult } from './export';
+import type { DoctorFixResult, MaterialsExportRequest, WorkspaceDoctorReport, WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult, WorkspaceUpgradeReport } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
 export interface BlockwrightApi {
@@ -100,6 +101,10 @@ export interface BlockwrightApi {
   getChunks: (dim: DimensionId, coords: { cx: number; cz: number }[]) => Promise<(ChunkRenderPayload | null)[]>;
   /** Find generated structures in a dimension (cached after the first scan). */
   findWorldStructures: (dim: DimensionId) => Promise<StructureLocation[]>;
+  /** A world's saved camera waypoints (persisted in userData, keyed by world root). */
+  getWorldWaypoints: (root: string) => Promise<WorldWaypoint[]>;
+  /** Replace a world's waypoint list; resolves to the persisted list. */
+  setWorldWaypoints: (root: string, waypoints: WorldWaypoint[]) => Promise<WorldWaypoint[]>;
   /** Open a WORLD-EDIT session on the active world (takes session.lock; throws when Minecraft
    *  demonstrably holds it). */
   openWorldEdit: (dim: DimensionId) => Promise<WorldEditOpenResult>;
@@ -107,7 +112,7 @@ export interface BlockwrightApi {
   closeWorldEdit: () => Promise<void>;
   /** Write block edits through the safe write path (enforced backup, per-chunk refusals reported).
    *  `retention` prunes backup sets past that count after the save (0 = keep all). */
-  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number) => Promise<WorldEditApplyResult>;
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb?: number) => Promise<WorldEditApplyResult>;
   /** Extract a box of the active world into a temp `.nbt` structure (committed world, not pending
    *  edits). `nbtLimit` decides `oversized`. The renderer opens it as a tab or routes it to Export As. */
   extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number) => Promise<WorldExtractResult>;
@@ -146,6 +151,10 @@ export interface BlockwrightApi {
   watchFile: (filePath: string | null) => Promise<void>;
   /** Run the Worldgen Doctor over the active workspace. */
   workspaceDoctor: () => Promise<WorkspaceDoctorReport>;
+  /** Apply one Doctor fix-it (safe codes only: folder rename / spawn_overrides / format). */
+  workspaceDoctorFix: (code: string, file: string) => Promise<DoctorFixResult>;
+  /** Run the datapack upgrader over the active workspace; resolves to the loss report. */
+  workspaceUpgrade: () => Promise<WorkspaceUpgradeReport>;
   /** Watch mode: the on-screen structure file changed on disk (hot-reload it). */
   onFileChanged: (cb: (path: string) => void) => void;
   /** Watch mode: the active workspace's structure folder changed on disk. */
@@ -172,6 +181,8 @@ export interface BlockwrightApi {
   aiClearCredential: (id: AiProviderId) => Promise<AiConfig>;
   /** Update the generation cost/quality settings (a partial merge); returns the updated config. */
   aiSetGeneration: (patch: Partial<GenerationSettings>) => Promise<AiConfig>;
+  /** Library retention: keep the last N versions per generated build (0 = keep all). */
+  aiSetLibraryRetention: (keep: number) => Promise<AiConfig>;
   /** Generate or edit a structure for a session; returns the written `.nbt` or an error.
    *  Optional reference images are sent to the model as visual guidance. `basePath` is
    *  the `.nbt` currently open in the viewer; on a fresh session it seeds the model with
@@ -238,11 +249,14 @@ export interface BlockwrightApi {
    *  one pure file regardless of size (mods need that), `jigsaw` cuts it into a jigsaw
    *  assembly folder (`nbtLimit` is the resolved per-axis size limit it must exceed).
    *  Returns where it landed, or a canceled/error result. */
-  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode) => Promise<ExportResult>;
+  exportStructure: (srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode, preferred?: 'nbt' | 'schem' | 'litematic') => Promise<ExportResult>;
   /** Install the build into a user-chosen Minecraft world save for editing + round-trip: within
    *  the size limit → the raw `.nbt` loadable with one structure block; oversized → an editing
    *  datapack of ≤-limit pieces with SAVE-mode structure blocks. Reimport from World brings it back. */
   exportToWorld: (srcPath: string, suggestedName: string, nbtLimit: number) => Promise<ExportResult>;
+  /** Save the Materials panel's Bill of Materials via a Save dialog (CSV/JSON — the
+   *  chosen extension picks the payload; `format` orders the dialog's filters). */
+  exportMaterials: (req: MaterialsExportRequest) => Promise<ExportResult>;
   /** Report the floating-window state so the View menu's checkmarks/enabled state track it. */
   reportWindows: (state: WindowsReport) => void;
   /** Whether a path still exists on disk (used to validate recents before opening). */

@@ -18,6 +18,7 @@ import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { getLibraryRetention } from './credentials';
 
 let cache: string | null = null;
 
@@ -130,9 +131,26 @@ export async function mirrorToLibrary(
     try {
       await fsp.copyFile(nbtPath, path.join(target.dir, 'versions', `v${version}.nbt`));
       await fsp.copyFile(nbtPath, target.latest);
+      pruneLibraryVersions(path.join(target.dir, 'versions'), getLibraryRetention());
     } catch {
       /* library mirror failed — keep going on the scratch version */
     }
   }
   return target;
+}
+
+/** Library retention (Settings ▸ AI): keep only the newest `keep` `vN.nbt`s in a
+ *  build's `versions/` folder (0 = keep all). Best-effort, sorted by version number. */
+function pruneLibraryVersions(versionsDir: string, keep: number): void {
+  if (keep <= 0) return;
+  try {
+    const versions = fs
+      .readdirSync(versionsDir)
+      .map((name) => ({ name, n: Number(/^v(\d+)\.nbt$/.exec(name)?.[1] ?? NaN) }))
+      .filter((v) => Number.isFinite(v.n))
+      .sort((a, b) => b.n - a.n);
+    for (const v of versions.slice(keep)) fs.rmSync(path.join(versionsDir, v.name), { force: true });
+  } catch {
+    /* best-effort — retention never breaks a run */
+  }
 }

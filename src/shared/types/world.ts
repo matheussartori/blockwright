@@ -33,6 +33,9 @@ export interface WorldMeta {
   spawn: [number, number, number];
   /** Last known player position (blocks), when the save records one. */
   player: [number, number, number] | null;
+  /** World-generation seed as a decimal string (signed 64-bit), or null when unknown.
+   *  Drives the seed-derived slime-chunk overlay. */
+  seed: string | null;
   /** Dev-only: an explicit initial camera look target (BW_WORLD_LOOK) so a headless capture can aim
    *  at a specific feature (a cave, a world edge). Ignored in normal use. */
   debugLook?: [number, number, number];
@@ -44,6 +47,15 @@ export interface WorldRef {
   root: string;
   /** Display name. */
   name: string;
+}
+
+/** A named camera bookmark in a world (persisted per world root in userData). */
+export interface WorldWaypoint {
+  name: string;
+  /** Camera position (world coords) the jump restores. */
+  pos: [number, number, number];
+  /** The dimension it was captured in (a jump switches there first). */
+  dimension: DimensionId;
 }
 
 /** A region coordinate `(rx, rz)` present on disk for a dimension (drives the load plan / minimap).
@@ -146,6 +158,12 @@ export interface ChunkSectionPayload {
   uniform: boolean;
   /** Palette index that fills a uniform section (ignored when `blocks` is present). */
   fill: number;
+  /** Biome ids present in this section (4×4×4 quart resolution); absent/null when the chunk
+   *  predates paletted biomes (or for synthesized sections — the edit compositor's). Drives
+   *  the world cursor readout's biome line. */
+  biomePalette?: string[] | null;
+  /** 64 indices into `biomePalette` (YZX quarts); absent/null when uniform (one biome). */
+  biomes?: Uint8Array | null;
 }
 
 /** A chunk column resolved to renderable data, streamed to the renderer's mesh worker. The palette

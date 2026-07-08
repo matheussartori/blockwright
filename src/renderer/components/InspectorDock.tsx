@@ -3,13 +3,14 @@
 // a FloatingWindow; both render the exact same content component. Availability
 // is passed in from App (Info = a structure is open, Jigsaw = it has jigsaws).
 import type { ComponentType, FC } from 'react';
-import { ChevronsLeft, ChevronsRight, History, Info, PictureInPicture2, Puzzle, Sparkles } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, History, Info, Package, PictureInPicture2, Puzzle, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
 import { windowsStore, type PanelId } from '../state/windows';
 import { startColDrag } from '../ui/resize';
 import { useT, useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
+import { MaterialsContent } from '../windows/MaterialsWindow';
 import { JigsawContent } from '../windows/JigsawWindow';
 import { VersionsContent } from '../windows/VersionsWindow';
 import { GenerateContent } from './NewStructurePanel';
@@ -20,20 +21,22 @@ type PanelIcon = ComponentType<{ size?: number; strokeWidth?: number; className?
 
 const PANELS: Record<PanelId, { title: MessageKey; icon: PanelIcon; Content: FC }> = {
   inspector: { title: 'panel.info', icon: Info, Content: InspectorContent },
+  materials: { title: 'panel.materials', icon: Package, Content: MaterialsContent },
   jigsaw: { title: 'panel.jigsaw', icon: Puzzle, Content: JigsawContent },
   versions: { title: 'panel.versions', icon: History, Content: VersionsContent },
   generate: { title: 'panel.generate', icon: Sparkles, Content: GenerateContent },
 };
 
-const PANEL_IDS: PanelId[] = ['inspector', 'jigsaw', 'versions', 'generate'];
+const PANEL_IDS: PanelId[] = ['inspector', 'materials', 'jigsaw', 'versions', 'generate'];
 
 /** The chat panel manages its own layout (pinned composer), so its container
  *  drops the default padding/scroll the static panels rely on. */
-const FLUSH: Record<PanelId, boolean> = { inspector: false, jigsaw: false, versions: false, generate: true };
+const FLUSH: Record<PanelId, boolean> = { inspector: false, materials: false, jigsaw: false, versions: false, generate: true };
 
 export function InspectorDock({ availability }: { availability: Availability }) {
   const t = useT();
   const inspector = useWindows((s) => s.inspector);
+  const materials = useWindows((s) => s.materials);
   const jigsaw = useWindows((s) => s.jigsaw);
   const versions = useWindows((s) => s.versions);
   const generate = useWindows((s) => s.generate);
@@ -41,7 +44,7 @@ export function InspectorDock({ availability }: { availability: Availability }) 
   const collapsed = useWindows((s) => s.sidebarCollapsed);
   const width = useWindows((s) => s.rightWidth);
 
-  const state: Record<PanelId, typeof inspector> = { inspector, jigsaw, versions, generate };
+  const state: Record<PanelId, typeof inspector> = { inspector, materials, jigsaw, versions, generate };
   // Tabs are the panels that are shown, docked (not floating), and available.
   const tabs = PANEL_IDS.filter(
     (id) => availability[id] && state[id].visible && !state[id].floating,

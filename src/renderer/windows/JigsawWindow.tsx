@@ -4,12 +4,13 @@
 // Manual per-connector piece selection was removed — assembly is random-only.
 // Rendered as a tab in the docked sidebar (or a FloatingWindow when torn off);
 // the chrome lives in InspectorDock / FloatingPanels.
-import { useEffect, useRef, useState } from 'react';
-import type { JigsawWarning, PlacedPiece, StructureData } from '@/shared/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { JigsawWarning, PlacedPiece, StructureData, WorkspaceJigsawPool } from '@/shared/types';
 import { isJigsawSupported } from '@/shared/mc-version';
 import { api } from '../api';
 import { useViewer } from '../viewer/ViewerProvider';
 import { useApp, useSettings, useActiveDoc, useT } from '../hooks/useStores';
+import { CommandChip } from '../components/ui/CommandChip';
 import { settingsStore } from '../state/settings';
 import { documentsStore } from '../state/documents';
 import { loadDoc } from '../state/doc-loader';
@@ -50,6 +51,34 @@ export function JigsawContent() {
 
   // A run-scoped cache so re-rolls and repeated pieces don't reload the same file.
   const cache = useRef<Map<string, Promise<StructureData>>>(new Map());
+
+  // The in-game test command: prefer a workspace pool that CONTAINS this piece
+  // (`/place jigsaw <pool> <ownConnectorName> …` anchors on this structure when
+  // it's picked); with none, fall back to expanding the first connector
+  // (`/place jigsaw <its pool> <its target> …` — what vanilla does at that seam).
+  const [pools, setPools] = useState<WorkspaceJigsawPool[]>([]);
+  useEffect(() => {
+    if (!workspace) {
+      setPools([]);
+      return;
+    }
+    let stale = false;
+    void api.listWorkspaceJigsaws().then((list) => {
+      if (!stale) setPools(list ?? []);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [workspace?.root, structure?.path]);
+
+  const placeCommand = useMemo(() => {
+    if (!structure || structure.jigsaws.length === 0) return null;
+    const j = structure.jigsaws[0];
+    const containing = pools.find((p) => p.pieces.some((piece) => piece.structurePath === structure.path));
+    if (containing && j.name) return `/place jigsaw ${containing.id} ${j.name} 7 ~ ~ ~`;
+    if (j.pool && j.pool !== 'minecraft:empty' && j.target) return `/place jigsaw ${j.pool} ${j.target} 7 ~ ~ ~`;
+    return null;
+  }, [structure, pools]);
 
   // Fresh structure → reset the cache, seed and transient UI.
   useEffect(() => {
@@ -272,6 +301,8 @@ export function JigsawContent() {
           </li>
         ))}
       </ul>
+
+      {placeCommand && <CommandChip command={placeCommand} hint={t('jigsaw.placeHint')} />}
     </>
   );
 }

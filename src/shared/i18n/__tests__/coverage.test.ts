@@ -23,6 +23,8 @@ const CHROME_IDENTICAL_OK = new Set<string>([
   'gen.autoSuffix', 'viewer.contentPack',
   'editor.axisX', 'editor.axisY', 'editor.axisZ',
   'viewer.nbtLimit48', // "48³ (1.16+)" — a numeric label, identical in both languages
+  'viewer.presetPersp', // "3D" — the same label in both languages
+  'settingsEditor.group', // "Editor" — the same loanword in both languages
   // World-viewer: loanwords / proper nouns kept as-is in pt-BR (Minecraft terms).
   'world.spawn', 'world.dimNether', 'world.dimEnd', 'world.chunksLoaded',
   'guide.world.hudT', // "HUD." — the same loanword in both languages

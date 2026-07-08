@@ -43,6 +43,19 @@ export interface WorkspaceExportResult {
   detail?: string;
 }
 
+/** The Materials panel's export ask: the renderer serializes BOTH formats (the
+ *  rollup is pure renderer math) and main writes whichever extension the user
+ *  picks in the Save dialog; `format` orders the dialog's filters. */
+export interface MaterialsExportRequest {
+  /** Suggested file stem (the structure's name), extension appended from `format`. */
+  suggestedName: string;
+  format: MaterialsFormat;
+  csv: string;
+  json: string;
+}
+
+export type MaterialsFormat = 'csv' | 'json';
+
 /** One Worldgen Doctor finding: a stable `code` the renderer localizes (with a fix-it
  *  explanation), the workspace-relative file it concerns, and optional raw detail. */
 export interface DoctorFinding {
@@ -59,4 +72,28 @@ export interface WorkspaceDoctorReport {
   /** How many files were scanned (for the "all clear" summary). */
   checkedFiles: number;
   findings: DoctorFinding[];
+}
+
+/** The outcome of one Doctor fix-it (folder rename / spawn_overrides / format re-stamp). */
+export type DoctorFixResult = { ok: true; detail?: string } | { ok: false; error: string };
+
+/** One datapack-upgrader entry: something it CHANGED, or a LOSS it could not map
+ *  (a newer DataVersion, an unknown block id). Codes localize as `upgrade.entry.<code>`. */
+export interface UpgradeEntry {
+  kind: 'changed' | 'loss';
+  code: string;
+  /** Workspace-relative path the entry concerns. */
+  file: string;
+  detail?: string;
+}
+
+/** The datapack upgrader's loss report (Part III): every change + everything it
+ *  couldn't map, over the active workspace at its target Minecraft version. */
+export interface WorkspaceUpgradeReport {
+  workspace: string | null;
+  /** The target MC version the pack was upgraded to (null = no workspace/version). */
+  target: string | null;
+  /** Structure `.nbt`s examined. */
+  checkedFiles: number;
+  entries: UpgradeEntry[];
 }

@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { useViewer } from '../../viewer/ViewerProvider';
 import { useEditor } from '../../hooks/useStores';
 import { editorStore, TOOL_ORDER, type EditorState, type PickMode } from '../../state/editor';
+import { settingsStore } from '../../state/settings';
 import { cellKey, describeCell, inBounds, voidMarkers } from '../../editor/ops';
 import { documentsStore, activeDocument } from '../../state/documents';
 import { ACCENT, FOCUS, AIR_MARK, VOID_MARK } from '../../viewer/overlay-colors';
@@ -125,7 +126,10 @@ export function EditorLayer() {
         clearHover(); // the preview/readout belongs to hovering, not an active stroke
         canvas.setPointerCapture(e.pointerId);
         const cell = target(s, e.clientX, e.clientY);
-        strokePlane = cell ? planeFor(s, cell, e.clientX, e.clientY) : null;
+        // Settings ▸ Editor's plane-lock default: OFF means every drag re-picks the
+        // surface (free-form strokes) instead of locking to the clicked face's plane.
+        strokePlane =
+          cell && settingsStore.getState().editorPlaneLock ? planeFor(s, cell, e.clientX, e.clientY) : null;
         // strokeBegin resets the undo-coalescing synchronously and resolves the brush block
         // (Void resolves immediately). Paint the first cell once it's ready, regardless of
         // whether the pointer is still down — then finalize if the click already ended.

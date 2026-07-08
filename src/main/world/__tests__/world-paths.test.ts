@@ -29,10 +29,12 @@ describe('regionDirs', () => {
     expect(regionDirs('/w', 'minecraft:the_nether')).toEqual([
       path.join('/w', 'dimensions', 'minecraft', 'the_nether', 'region'),
       path.join('/w', 'DIM-1', 'region'),
+      path.join('/w_nether', 'DIM-1', 'region'),
     ]);
     expect(regionDirs('/w', 'minecraft:the_end')).toEqual([
       path.join('/w', 'dimensions', 'minecraft', 'the_end', 'region'),
       path.join('/w', 'DIM1', 'region'),
+      path.join('/w_the_end', 'DIM1', 'region'),
     ]);
     expect(regionDirs('/w', 'theplacebeyond:bleak_db599711')).toEqual([
       path.join('/w', 'dimensions', 'theplacebeyond', 'bleak_db599711', 'region'),
@@ -69,6 +71,25 @@ describe('availableDimensions', () => {
     const root = makeWorld('full', ['region', 'DIM-1/region', 'DIM1/region']);
     const ids = (await availableDimensions(root)).map((d) => d.id);
     expect(ids).toEqual(['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end']);
+  });
+
+  it('resolves Bukkit-style server saves (sibling <world>_nether / <world>_the_end folders)', async () => {
+    const root = makeWorld('srv', ['region']);
+    // The server siblings live BESIDE the main world folder, each a world of its own.
+    for (const [folder, classic] of [
+      ['srv_nether', 'DIM-1'],
+      ['srv_the_end', 'DIM1'],
+    ] as const) {
+      const dir = path.join(tmp, folder, classic, 'region');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(tmp, folder, 'level.dat'), Buffer.alloc(4));
+      fs.writeFileSync(path.join(dir, 'r.0.0.mca'), Buffer.alloc(4));
+    }
+    const ids = (await availableDimensions(root)).map((d) => d.id);
+    expect(ids).toEqual(['minecraft:overworld', 'minecraft:the_nether', 'minecraft:the_end']);
+    expect(await listRegions(root, 'minecraft:the_nether')).toEqual([{ rx: 0, rz: 0 }]);
+    // The sibling folder is the LAST candidate — the in-root layouts stay authoritative.
+    expect(regionDirs(root, 'minecraft:the_nether')[2]).toBe(path.join(tmp, 'srv_nether', 'DIM-1', 'region'));
   });
 
   it('resolves the 26.x layout (vanilla dims under dimensions/minecraft/) without double-listing', async () => {

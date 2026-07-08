@@ -21,6 +21,7 @@ export function WorldSaveModal() {
   const error = useWorldEdit((s) => s.error);
   const lockExclusive = useWorldEdit((s) => s.lockExclusive);
   const retention = useSettings((s) => s.worldBackupRetention);
+  const sizeCapMb = useSettings((s) => s.worldBackupSizeCapMb);
   const [done, setDone] = useState(false);
   const we = worldEditStore.getState;
 
@@ -88,7 +89,7 @@ export function WorldSaveModal() {
               disabled={saving || !pendingCount}
               onClick={() => {
                 void we()
-                  .save(retention)
+                  .save(retention, sizeCapMb)
                   .then((r) => {
                     if (r) setDone(true);
                   });

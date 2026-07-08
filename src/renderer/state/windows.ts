@@ -11,7 +11,7 @@ import { createStore } from 'zustand/vanilla';
 import type { WindowId } from '@/shared/types';
 
 /** The dockable panels (every WindowId except `controls`). */
-export type PanelId = 'inspector' | 'jigsaw' | 'generate' | 'versions';
+export type PanelId = 'inspector' | 'materials' | 'jigsaw' | 'generate' | 'versions';
 
 export interface WindowState {
   visible: boolean;
@@ -28,6 +28,7 @@ export interface WindowState {
 export const WINDOW_WIDTHS: Record<WindowId, number> = {
   controls: 200,
   inspector: 288,
+  materials: 320,
   jigsaw: 288,
   generate: 380,
   versions: 240,
@@ -79,6 +80,8 @@ export function homePosition(id: WindowId): { x: number; y: number } {
       return { x: MARGIN, y: MARGIN };
     case 'inspector':
       return { x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - MARGIN), y: MARGIN };
+    case 'materials':
+      return { x: Math.max(MARGIN, w - WINDOW_WIDTHS.materials - MARGIN), y: MARGIN };
     case 'jigsaw':
       return {
         x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.jigsaw - MARGIN * 2),
@@ -114,6 +117,7 @@ function onStage(x: number, y: number): boolean {
 interface WindowsLayout {
   controls: WindowState;
   inspector: WindowState;
+  materials: WindowState;
   jigsaw: WindowState;
   generate: WindowState;
   versions: WindowState;
@@ -137,6 +141,9 @@ function defaults(): WindowsLayout {
   return {
     controls: { ...freshWindow('controls'), visible: false },
     inspector: freshWindow('inspector'),
+    // Materials starts hidden: it's opened on demand (View ▸ Materials / the
+    // build card's "Materials…"), then persists like the other panels.
+    materials: { ...freshWindow('materials'), visible: false },
     jigsaw: freshWindow('jigsaw'),
     // Generate starts hidden and floating: it's opened on demand (File ▸ New
     // Structure / View ▸ Generate) as a movable window the user can dock right.
@@ -164,7 +171,7 @@ function load(): WindowsLayout {
     const saved = JSON.parse(raw) as Partial<WindowsLayout>;
     // `controls` is intentionally NOT restored — the shortcuts popover always
     // starts closed (it's an opt-in help affordance, not a persistent panel).
-    for (const id of ['inspector', 'jigsaw', 'versions'] as const) {
+    for (const id of ['inspector', 'materials', 'jigsaw', 'versions'] as const) {
       base[id] = { ...base[id], ...saved[id] };
     }
     // Generate persists like the other panels: its visibility/float/position/
@@ -177,6 +184,7 @@ function load(): WindowsLayout {
     }
     if (
       saved.activeTab === 'inspector' ||
+      saved.activeTab === 'materials' ||
       saved.activeTab === 'jigsaw' ||
       saved.activeTab === 'generate' ||
       saved.activeTab === 'versions'
@@ -266,6 +274,7 @@ function snapshot(s: WindowsStore): WindowsLayout {
   return {
     controls: s.controls,
     inspector: s.inspector,
+    materials: s.materials,
     jigsaw: s.jigsaw,
     generate: s.generate,
     versions: s.versions,

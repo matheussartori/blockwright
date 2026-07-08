@@ -5,6 +5,7 @@
 // caller only needs to leave fly mode and drop any highlight first.
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { settingsStore } from '../state/settings';
 
 /** The live viewer bits a capture path reads/mutates. `current` is the loaded build. */
 export interface CaptureContext {
@@ -28,8 +29,12 @@ export interface SnapOpts {
 /** Encoding for the AI self-review screenshots: a smaller edge + JPEG. The model only
  *  judges massing/layout (not pixel detail), and these images are RE-SENT every review
  *  round and accumulate in the conversation (uncached), so each kept byte is paid many
- *  times over — JPEG@512 cuts the per-image token cost to a fraction of a PNG@720. */
-export const REVIEW_SNAP: SnapOpts = { maxSize: 512, format: 'image/jpeg', quality: 0.8 };
+ *  times over — JPEG@512 cuts the per-image token cost to a fraction of a PNG@720.
+ *  The max edge is Settings ▸ AI's review-image-size knob (the token/quality lever). */
+export function reviewSnap(): SnapOpts {
+  const size = settingsStore.getState().aiReviewImageSize;
+  return { maxSize: Number.isFinite(size) && size >= 256 ? Math.min(1024, size) : 512, format: 'image/jpeg', quality: 0.8 };
+}
 
 /** Downscale the current framebuffer to a data URL per `opts` (max edge, format,
  *  quality). Assumes the caller already rendered the frame; shared by the capture paths. */

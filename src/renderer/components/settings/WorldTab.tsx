@@ -1,12 +1,14 @@
 // Settings ▸ World: the world-editing MASTER SWITCH (off by default — worlds open read-only
-// until the user opts in; the v2.2 safety latch), backup retention, and the backup manager for
-// the open world (list / restore / delete — the backups themselves are enforced, only retention
-// is configurable).
+// until the user opts in; the v2.2 safety latch), backup retention + total-size cap and the
+// backup manager for the open world (list / restore / delete — the backups themselves are
+// enforced, only retention is configurable), plus the streaming budget (default render
+// distance, resident chunk cap, mesh worker threads) and the default dimension on open.
 import { useCallback, useEffect, useState } from 'react';
 import type { WorldBackupInfo } from '@/shared/types';
 import { api } from '../../api';
 import { useActiveDoc, useSettings, useT } from '../../hooks/useStores';
 import { settingsStore } from '../../state/settings';
+import { Select } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
 import { Switch } from '../ui/Switch';
 
@@ -66,6 +68,58 @@ export function WorldTab() {
       </section>
 
       <section className="settings-group">
+        <div className="settings-group-name">{t('settingsWorld.streamingGroup')}</div>
+        <label className="setting-row">
+          <span className="setting-label">{t('settingsWorld.renderDistance')}</span>
+          <Stepper
+            value={settings.worldRenderDistance}
+            onChange={(v) => set('worldRenderDistance', Math.min(32, Math.max(4, Math.round(v))))}
+            min={4}
+            max={32}
+            step={2}
+            size="sm"
+            unit="ch"
+          />
+        </label>
+        <label className="setting-row">
+          <span className="setting-label">{t('settingsWorld.chunkCap')}</span>
+          <Stepper
+            value={settings.worldChunkCap}
+            onChange={(v) => set('worldChunkCap', Math.min(6000, Math.max(200, Math.round(v))))}
+            min={200}
+            max={6000}
+            step={100}
+            size="sm"
+          />
+        </label>
+        <p className="setting-note">{t('settingsWorld.chunkCapNote')}</p>
+        <label className="setting-row">
+          <span className="setting-label">{t('settingsWorld.meshWorkers')}</span>
+          <Stepper
+            value={settings.worldMeshWorkers}
+            onChange={(v) => set('worldMeshWorkers', Math.min(8, Math.max(0, Math.round(v))))}
+            min={0}
+            max={8}
+            step={1}
+            size="sm"
+          />
+        </label>
+        <p className="setting-note">{t('settingsWorld.meshWorkersNote')}</p>
+        <label className="setting-row">
+          <span className="setting-label">{t('settingsWorld.defaultDimension')}</span>
+          <Select
+            value={settings.worldDefaultDimension}
+            options={[
+              { value: 'last', label: t('settingsWorld.dimLast') },
+              { value: 'overworld', label: t('settingsWorld.dimOverworld') },
+            ]}
+            onChange={(v) => set('worldDefaultDimension', v as 'last' | 'overworld')}
+            ariaLabel={t('settingsWorld.defaultDimension')}
+          />
+        </label>
+      </section>
+
+      <section className="settings-group">
         <div className="settings-group-name">{t('settingsWorld.backupsGroup')}</div>
         <label className="setting-row">
           <span className="setting-label">{t('settingsWorld.retention')}</span>
@@ -79,6 +133,19 @@ export function WorldTab() {
           />
         </label>
         <p className="setting-note">{t('settingsWorld.retentionNote')}</p>
+        <label className="setting-row">
+          <span className="setting-label">{t('settingsWorld.sizeCap')}</span>
+          <Stepper
+            value={settings.worldBackupSizeCapMb}
+            onChange={(v) => set('worldBackupSizeCapMb', Math.max(0, Math.round(v)))}
+            min={0}
+            max={10240}
+            step={128}
+            size="sm"
+            unit="MB"
+          />
+        </label>
+        <p className="setting-note">{t('settingsWorld.sizeCapNote')}</p>
 
         {!worldOpen ? (
           <p className="setting-note">{t('settingsWorld.noWorld')}</p>

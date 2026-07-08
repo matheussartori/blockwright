@@ -8,6 +8,7 @@ import type { BlockwrightApi, DimensionId, WorldMeta } from '@/shared/types';
 import { type MinimapCell, WorldView } from '../world/world-view';
 import type { CameraController } from './camera-controller';
 import type { TextureLoader } from './texture-loader';
+import { WorldGridOverlay } from './world-grid';
 
 /** The scene lights the day/night toggle dims (created and owned by the Viewer). */
 export interface WorldLights {
@@ -20,12 +21,21 @@ export class WorldMode {
   /** The streamed world view; null in structure mode. */
   private world: WorldView | null = null;
 
+  /** Chunk-boundary line overlay (toggled from the HUD; follows the camera). */
+  private grid: WorldGridOverlay;
+
+  /** Settings ▸ World tuning, applied to the WorldView (cap live; workers + render
+   *  distance at the next world open). Pushed by useViewerSync before any world opens. */
+  private tuning: { chunkCap?: number; meshWorkers?: number; renderDistance?: number } = {};
+
   constructor(
     private scene: THREE.Scene,
     private textures: TextureLoader,
     private nav: CameraController,
     private lights: WorldLights,
-  ) {}
+  ) {
+    this.grid = new WorldGridOverlay(scene);
+  }
 
   /** True while a world is loaded (world mode). */
   get active(): boolean {
@@ -35,6 +45,22 @@ export class WorldMode {
   /** Per-frame streaming update; no-op in structure mode. */
   update(camera: THREE.Camera): void {
     this.world?.update(camera);
+    if (this.world && this.grid.isEnabled) {
+      const p = camera.position;
+      this.grid.follow([p.x, p.y, p.z], [-64, 320]);
+    }
+  }
+
+  /** Toggle the chunk-boundary grid overlay (rebuilds as the camera crosses chunks). */
+  setChunkGrid(on: boolean): void {
+    this.grid.setEnabled(on);
+  }
+
+  /** Settings ▸ World tuning: the chunk cap applies live; worker count + the default
+   *  render distance take effect on the next world open. */
+  setTuning(tuning: { chunkCap?: number; meshWorkers?: number; renderDistance?: number }): void {
+    this.tuning = tuning;
+    if (tuning.chunkCap) this.world?.setChunkCap(tuning.chunkCap);
   }
 
   /** Enter world-viewer mode: start streaming the world's chunks around the camera
@@ -42,7 +68,7 @@ export class WorldMode {
   enter(meta: WorldMeta, api: BlockwrightApi): void {
     this.world?.dispose();
     const dim: DimensionId = meta.dimensions[0]?.id ?? 'minecraft:overworld';
-    this.world = new WorldView(this.scene, this.textures, api, dim);
+    this.world = new WorldView(this.scene, this.textures, api, dim, this.tuning.renderDistance, this.tuning);
     this.frameAt(meta.spawn);
     // Dev-only (BW_WORLD_LOOK): aim the initial camera at an explicit target for headless capture.
     if (meta.debugLook) {
@@ -56,6 +82,7 @@ export class WorldMode {
   exit(): void {
     this.world?.dispose();
     this.world = null;
+    this.grid.setEnabled(false);
     this.nav.setMode('orbit');
     this.setDaylight(true); // don't leave structure mode dark if the user toggled night
   }
@@ -124,14 +151,30 @@ export class WorldMode {
     fill.intensity = day ? 0.5 : 0.2;
   }
 
-  /** Loaded / pending chunk counts for the HUD streaming indicator. */
-  stats(): { loaded: number; pending: number } {
-    return this.world?.stats() ?? { loaded: 0, pending: 0 };
+  /** Loaded / pending chunk counts (+ missing-texture tally) for the HUD readouts. */
+  stats(): { loaded: number; pending: number; missing: number } {
+    return this.world?.stats() ?? { loaded: 0, pending: 0, missing: 0 };
   }
 
   /** Minimap cells (per-chunk top-down colours) for the world map overlay. */
   minimapCells(): MinimapCell[] {
     return this.world?.minimapCells() ?? [];
+  }
+
+  /** Block ids that fell back to flat colours in the streamed chunks (the world-side
+   *  missing-texture diagnostics the HUD surfaces). */
+  missingTextures(): string[] {
+    return this.world?.missingTextures() ?? [];
+  }
+
+  /** Name the block + biome at a world cell from resident chunk data (cursor readout). */
+  describeCell(x: number, y: number, z: number): { block: string; biome: string | null } | null {
+    return this.world?.describeCell(x, y, z) ?? null;
+  }
+
+  /** Find blocks by id in the loaded area (see WorldView.findBlocks). */
+  findBlocks(query: string, from: [number, number, number], cap?: number): { hits: { pos: [number, number, number]; name: string }[]; total: number } {
+    return this.world?.findBlocks(query, from, cap) ?? { hits: [], total: 0 };
   }
 
   /** Fly the camera to a world coordinate (go-to-coordinate / jump-to-spawn/player). */

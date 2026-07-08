@@ -14,6 +14,7 @@ import { useActiveDoc } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
 import { useAiRenderBridge } from './app/useAiRenderBridge';
 import { useAppIpc } from './app/useAppIpc';
+import { useSessionRestore } from './app/useSessionRestore';
 import { useViewerSync } from './app/useViewerSync';
 import { TabBar } from './components/TabBar';
 import { ActivityBar } from './components/ActivityBar';
@@ -44,6 +45,8 @@ import { EditorPanel } from './components/editor/EditorPanel';
 import { EditorLayer } from './components/editor/EditorLayer';
 import { EditorCanvasHint } from './components/editor/EditorCanvasHint';
 import { DiffPanel } from './components/DiffPanel';
+import { StoreyIsolation } from './components/StoreyIsolation';
+import { ViewTools } from './components/ViewTools';
 import { editorStore } from './state/editor';
 import { WorldHud } from './world/components/WorldHud';
 import { WorldEditLayer } from './components/world-edit/WorldEditLayer';
@@ -60,6 +63,7 @@ function Shell() {
   const isWorld = activeDoc?.kind === 'world';
   const availability = {
     inspector: fileOpen,
+    materials: fileOpen,
     jigsaw: structure !== null && structure.jigsaws.length > 0,
     // Generate is the ITERATION chat — it shows only once there's something to iterate on:
     // an open structure, a build in flight, or a tab that already produced versions. A
@@ -79,6 +83,7 @@ function Shell() {
   const flow = useDocumentFlow(viewerRef);
   useAiRenderBridge(viewerRef, captureRef);
   useAppIpc(flow);
+  useSessionRestore(flow);
   useViewerSync(viewer);
 
   // Leave edit mode when the active tab changes, so a selection never bleeds across docs.
@@ -139,6 +144,14 @@ function Shell() {
               {fileOpen && <EditorPanel />}
               {fileOpen && <EditorCanvasHint />}
               {fileOpen && <DiffPanel />}
+              {fileOpen && activeDoc && (
+                <div className="stage-view-cluster">
+                  <ViewTools key={`vt-${activeDoc.id}`} />
+                  {activeDoc.floors.length > 0 && (
+                    <StoreyIsolation key={activeDoc.id} floors={activeDoc.floors} path={activeDoc.path ?? null} />
+                  )}
+                </div>
+              )}
               <WorkspaceSuggest
                 onAccept={() => void flow.acceptSuggest()}
                 onDismiss={() => store.getState().setSuggest(null)}

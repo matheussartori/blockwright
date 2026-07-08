@@ -10,6 +10,7 @@ import { Boxes, Wrench } from 'lucide-react';
 import { api } from '../../api';
 import { basename, dirname } from '../../ui/path';
 import { store } from '../../state/store';
+import { windowsStore } from '../../state/windows';
 import { sanitizeResourceName } from '@/shared/domain/worldgen';
 import { MODULE_SLOTS } from '@/shared/domain/module-slots';
 import type { MessageKey } from '@/shared/i18n';
@@ -139,6 +140,14 @@ export function BuildCard({ build, t }: { build: BuildBrief; t: (key: MessageKey
             title={t('gen.revealBuildTitle')}
           >
             {t('gen.revealBuild')}
+          </button>
+          {/* The Bill of Materials for this build (the tab's open structure). */}
+          <button
+            className="btn sm ghost no-drag"
+            onClick={() => windowsStore.getState().openPanel('materials')}
+            title={t('gen.materialsTitle')}
+          >
+            {t('gen.materials')}
           </button>
         </div>
       )}

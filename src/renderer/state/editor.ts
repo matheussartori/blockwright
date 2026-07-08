@@ -9,6 +9,7 @@ import { createStore } from 'zustand/vanilla';
 import type { StructureData } from '@/shared/types';
 import { api } from '../api';
 import { store } from './store';
+import { settingsStore } from './settings';
 import { documentsStore, activeDocument } from './documents';
 import { commitManualVersion, currentBasePath } from './versions';
 import { transformProps } from '@/shared/structure/orientation';
@@ -79,7 +80,26 @@ interface Snapshot {
   textures: string[];
 }
 
+/** Undo snapshot cap fallback — Settings ▸ Editor's undo depth overrides it live. */
 const UNDO_CAP = 60;
+
+/** The stack cap right now (the setting, clamped to something sane). */
+const undoCap = (): number => {
+  const depth = settingsStore.getState().editorUndoDepth;
+  return Number.isFinite(depth) && depth >= 10 ? Math.min(500, Math.round(depth)) : UNDO_CAP;
+};
+
+const SYMMETRY_KEY = 'blockwright.editor.symmetry';
+
+/** The symmetry remembered across sessions (Settings ▸ Editor's persist toggle). */
+function loadPersistedSymmetry(): Symmetry {
+  try {
+    const v = localStorage.getItem(SYMMETRY_KEY);
+    return v === 'x' || v === 'z' ? v : 'none';
+  } catch {
+    return 'none';
+  }
+}
 
 export interface EditorState {
   active: boolean;
@@ -191,7 +211,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
   const applyResult = (result: OpResult, extraTextures: string[], snap: boolean): void => {
     const doc = activeDocument(documentsStore.getState());
     if (!doc?.structure) return;
-    const past = snap ? [...get().past, snapshot(doc.structure)].slice(-UNDO_CAP) : get().past;
+    const past = snap ? [...get().past, snapshot(doc.structure)].slice(-undoCap()) : get().past;
     const textures = extraTextures.length
       ? [...new Set([...doc.structure.textures, ...extraTextures])]
       : doc.structure.textures;
@@ -251,7 +271,19 @@ export const editorStore = createStore<EditorState>((set, get) => {
         stroke = null;
         strokeSnapped = false;
       }
-      set(active ? { active } : { active, selection: [], anchor: null, eyedropper: false, hoverInfo: null });
+      if (active) {
+        // Settings ▸ Editor: start on the configured tool, and either restore the
+        // remembered symmetry (persist ON) or reset it (a stale mirror plane from a
+        // past session is a surprise, not a preference).
+        const s = settingsStore.getState();
+        set({
+          active,
+          tool: s.editorDefaultTool,
+          symmetry: s.editorSymmetryPersist ? loadPersistedSymmetry() : 'none',
+        });
+        return;
+      }
+      set({ active, selection: [], anchor: null, eyedropper: false, hoverInfo: null });
     },
     // The Void tool always reveals the air/void markers (the eye is disabled meanwhile). We
     // remember the overlay state on entry and restore it on exit, so toggling the tool doesn't
@@ -303,7 +335,17 @@ export const editorStore = createStore<EditorState>((set, get) => {
     setExtrudeCount: (extrudeCount) => set({ extrudeCount: Math.max(1, Math.min(64, extrudeCount)) }),
     setExtrudeStep: (extrudeStep) => set({ extrudeStep: Math.max(1, Math.min(16, extrudeStep)) }),
     setEyedropper: (eyedropper) => set({ eyedropper }),
-    setSymmetry: (symmetry) => set({ symmetry }),
+    setSymmetry: (symmetry) => {
+      set({ symmetry });
+      // Remember it across sessions when Settings ▸ Editor says so.
+      if (settingsStore.getState().editorSymmetryPersist) {
+        try {
+          localStorage.setItem(SYMMETRY_KEY, symmetry);
+        } catch {
+          /* storage unavailable */
+        }
+      }
+    },
     sample: (cell) => {
       const doc = activeDocument(documentsStore.getState());
       if (!doc?.structure) {

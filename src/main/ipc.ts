@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, ExportMode, WorkspaceExportRequest, FloorDef, GenerateImage, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, ExportMode, WorkspaceExportRequest, FloorDef, GenerateImage, MaterialsExportRequest, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport, WorldWaypoint } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -22,7 +22,7 @@ import { listModuleCatalog } from './structure/domain';
 import { localizeCatalog } from '@/shared/i18n/registry';
 import { aiAvailable, cancelGeneration, generateStructure, resetSession, primeSession, listVersions, type CapturePreview } from './ai/generate';
 import { deleteVersion } from './ai/session';
-import { getConfig, setActiveProvider, setModel, setCredential, clearCredential, setGenerationSettings } from './ai/credentials';
+import { getConfig, setActiveProvider, setModel, setCredential, clearCredential, setGenerationSettings, setLibraryRetention } from './ai/credentials';
 import { getOutputDir, setOutputDir } from './ai/output-dir';
 import type { AiProviderId, GenerationSettings } from '@/shared/ai';
 import { getChat, saveChat } from './chat-history';
@@ -31,6 +31,7 @@ import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { addRecentWorld, clearRecentWorlds, getRecentWorlds } from './recent-worlds';
 import { activeWorldMeta, findWorldStructures, getChunkPayload, getChunksPayload, listWorldRegions, openWorld as openWorldSource } from './world/world-service';
+import { getWorldWaypoints, setWorldWaypoints } from './world-waypoints';
 import { applyWorldEdits, closeWorldEdit, deleteWorldBackup, listWorldBackups, openWorldEdit, restoreWorldBackup } from './world/edit-service';
 import { extractWorldRegion } from './world/extract';
 import type { WorldEditBlock, WorldExtractBox } from '@/shared/types';
@@ -51,9 +52,11 @@ import {
 import { getPinnedWorkspace } from './pinned-workspace';
 import { planExport, runExport } from './export';
 import { runWorkspaceDoctor } from './export/doctor';
+import { applyDoctorFix, runWorkspaceUpgrade } from './export/upgrade';
 import { watchOpenFile } from './file-watch';
 import { getMainWindow, notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
+import { exportMaterials } from './export/materials-export';
 import { reassembleAssemblyDialog, reimportWorldDialog } from './export/reassemble';
 import { renameProject } from './ai/rename-project';
 import { relinkSessionLibrary } from './ai/session';
@@ -233,11 +236,16 @@ export function registerIpc(): void {
     getChunksPayload(dim, coords),
   );
   ipcMain.handle(IPC_CHANNELS.worldFindStructures, async (_e, dim: DimensionId) => findWorldStructures(dim));
+
+  ipcMain.handle(IPC_CHANNELS.worldWaypointsGet, async (_e, root: string) => getWorldWaypoints(root));
+  ipcMain.handle(IPC_CHANNELS.worldWaypointsSet, async (_e, root: string, waypoints: WorldWaypoint[]) =>
+    setWorldWaypoints(root, waypoints),
+  );
   // ── World editing (v2.2): the safe write path (main/world/edit/) behind IPC ─────────
   ipcMain.handle(IPC_CHANNELS.worldEditOpen, async (_e, dim: DimensionId) => openWorldEdit(dim));
   ipcMain.handle(IPC_CHANNELS.worldEditClose, async () => closeWorldEdit());
-  ipcMain.handle(IPC_CHANNELS.worldEditApply, async (_e, dim: DimensionId, edits: WorldEditBlock[], retention: number) =>
-    applyWorldEdits(dim, edits, retention),
+  ipcMain.handle(IPC_CHANNELS.worldEditApply, async (_e, dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb: number) =>
+    applyWorldEdits(dim, edits, retention, sizeCapMb ?? 0),
   );
   ipcMain.handle(IPC_CHANNELS.worldExtract, async (_e, dim: DimensionId, box: WorldExtractBox, nbtLimit: number) =>
     extractWorldRegion(dim, box, nbtLimit),
@@ -269,6 +277,10 @@ export function registerIpc(): void {
   // Watch mode: the renderer reports which structure file is on screen.
   ipcMain.handle(IPC_CHANNELS.watchFile, (_e, filePath: string | null) => watchOpenFile(filePath));
   ipcMain.handle(IPC_CHANNELS.workspaceDoctor, async () => runWorkspaceDoctor());
+  ipcMain.handle(IPC_CHANNELS.workspaceDoctorFix, async (_e, code: string, file: string) =>
+    applyDoctorFix(code, file),
+  );
+  ipcMain.handle(IPC_CHANNELS.workspaceUpgrade, async () => runWorkspaceUpgrade());
 
   // Save a Beauty Render (PNG still / WebM turntable) via the native save dialog.
   ipcMain.handle(IPC_CHANNELS.saveRender, async (_e, data: ArrayBuffer, suggestedName: string, kind: 'png' | 'webm') => {
@@ -312,6 +324,10 @@ export function registerIpc(): void {
   });
   ipcMain.handle(IPC_CHANNELS.aiSetGeneration, async (_e, patch: Partial<GenerationSettings>) => {
     setGenerationSettings(patch);
+    return getConfig();
+  });
+  ipcMain.handle(IPC_CHANNELS.aiSetLibraryRetention, async (_e, keep: number) => {
+    setLibraryRetention(keep);
     return getConfig();
   });
   // Render round-trip for the generator's self-review loop: generate.ts calls the
@@ -408,12 +424,16 @@ export function registerIpc(): void {
     return result;
   });
 
-  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode) =>
-    exportStructure(srcPath, suggestedName, nbtLimit, mode ?? 'nbt'),
+  ipcMain.handle(IPC_CHANNELS.exportFile, async (_e, srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode, preferred?: 'nbt' | 'schem' | 'litematic') =>
+    exportStructure(srcPath, suggestedName, nbtLimit, mode ?? 'nbt', preferred ?? 'nbt'),
   );
 
   ipcMain.handle(IPC_CHANNELS.exportWorld, async (_e, srcPath: string, suggestedName: string, nbtLimit: number) =>
     exportToWorld(srcPath, suggestedName, nbtLimit),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.exportMaterials, async (_e, req: MaterialsExportRequest) =>
+    exportMaterials(req),
   );
 
   ipcMain.handle(IPC_CHANNELS.assemblyReassemble, async () => reassembleAssemblyDialog());

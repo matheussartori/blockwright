@@ -114,3 +114,17 @@ export async function pruneBackups(root: string, keep: number): Promise<string[]
   for (const set of excess) await deleteBackup(root, set.id);
   return excess.map((s) => s.id);
 }
+
+/** Size cap: delete OLDEST sets until the total is within `capBytes` — but never the
+ *  newest set (the one just taken must survive whatever the cap says). Returns ids deleted. */
+export async function pruneBackupsToSize(root: string, capBytes: number): Promise<string[]> {
+  const sets = await listBackups(root); // newest first
+  let total = sets.reduce((sum, s) => sum + s.bytes, 0);
+  const deleted: string[] = [];
+  for (let i = sets.length - 1; i > 0 && total > capBytes; i--) {
+    await deleteBackup(root, sets[i].id);
+    total -= sets[i].bytes;
+    deleted.push(sets[i].id);
+  }
+  return deleted;
+}

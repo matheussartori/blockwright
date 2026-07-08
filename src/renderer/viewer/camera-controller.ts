@@ -10,6 +10,13 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 
 export type NavMode = 'orbit' | 'fly';
 
+/** Plan-view presets: axis-aligned near-orthographic views (+ the perspective reset). */
+export type ViewPreset = 'top' | 'front' | 'side' | 'persp';
+
+/** The default perspective FOV; presets drop to a telephoto FOV that reads as a plan. */
+const DEFAULT_FOV = 50;
+const ORTHO_FOV = 10;
+
 /** A serializable snapshot of the current viewpoint — position + look direction +
  *  the orbit-pivot distance — used to preserve the camera across tab switches. */
 export interface CameraSnapshot {
@@ -125,8 +132,14 @@ export class CameraController {
     this.onModeChange?.(mode);
   }
 
-  /** Frame the camera to a build's bounding box (also scales fly speed to its size). */
+  /** Frame the camera to a build's bounding box (also scales fly speed to its size).
+   *  Always restores the default perspective FOV — a lingering plan-view telephoto
+   *  would silently distort the next build's framing. */
   frame(box: THREE.Box3): void {
+    if (this.camera.fov !== DEFAULT_FOV) {
+      this.camera.fov = DEFAULT_FOV;
+      this.camera.updateProjectionMatrix();
+    }
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const radius = Math.max(size.x, size.y, size.z, 1);
@@ -142,6 +155,39 @@ export class CameraController {
     this.camera.near = Math.max(0.05, dist / 100);
     this.camera.far = dist * 20;
     this.camera.updateProjectionMatrix();
+    this.controls.update();
+  }
+
+  /** Snap to an axis-aligned plan view (top/front/side) of `box`, or back to the default
+   *  perspective. Plan views use a TELEPHOTO FOV (10°) at the matching distance — visually
+   *  near-orthographic without swapping the camera (orbit/fly/raycast/captures all keep
+   *  working on the one PerspectiveCamera). `front` faces the south (+Z) side, Minecraft's
+   *  build-facing convention; `side` faces east (+X). */
+  viewPreset(preset: ViewPreset, box: THREE.Box3): void {
+    if (this.mode === 'fly') this.setMode('orbit');
+    if (preset === 'persp') {
+      this.camera.fov = DEFAULT_FOV;
+      this.camera.updateProjectionMatrix();
+      this.frame(box);
+      return;
+    }
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    // Half-extent across the viewing plane (what must fit the frame), plus the depth
+    // toward the camera, sets the telephoto distance.
+    const spans: Record<Exclude<ViewPreset, 'persp'>, { half: number; depth: number; dir: THREE.Vector3 }> = {
+      top: { half: Math.max(size.x, size.z) / 2, depth: size.y / 2, dir: new THREE.Vector3(0.001, 1, 0.001) },
+      front: { half: Math.max(size.x, size.y) / 2, depth: size.z / 2, dir: new THREE.Vector3(0, 0, 1) },
+      side: { half: Math.max(size.y, size.z) / 2, depth: size.x / 2, dir: new THREE.Vector3(1, 0, 0) },
+    };
+    const { half, depth, dir } = spans[preset];
+    const dist = (Math.max(half, 1) * 1.1) / Math.tan(THREE.MathUtils.degToRad(ORTHO_FOV / 2)) + depth;
+    this.camera.fov = ORTHO_FOV;
+    this.camera.near = Math.max(0.05, dist / 200);
+    this.camera.far = dist * 4;
+    this.camera.position.copy(center).addScaledVector(dir.normalize(), dist);
+    this.camera.updateProjectionMatrix();
+    this.controls.target.copy(center);
     this.controls.update();
   }
 

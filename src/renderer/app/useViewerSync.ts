@@ -8,6 +8,7 @@ import { documentsStore, activeDocument } from '../state/documents';
 import { editorStore } from '../state/editor';
 import { store } from '../state/store';
 import { api } from '../api';
+import { setOverlayScheme } from '../viewer/overlay-colors';
 import type { CameraSnapshot, Viewer } from '../viewer/viewer';
 
 export function useViewerSync(viewer: Viewer | null): void {
@@ -36,6 +37,9 @@ export function useViewerSync(viewer: Viewer | null): void {
       const open = new Set(documentsStore.getState().documents.map((d) => d.id));
       for (const key of cameras.keys()) if (!open.has(key)) cameras.delete(key);
       lastId = id;
+      // A Y-slice/storey clip belongs to the outgoing doc — the incoming tab's own
+      // slice control re-applies its remembered level after mount.
+      viewer.setClipRange(null);
       const saved = id ? cameras.get(id) : undefined;
       if (doc?.kind === 'world' && doc.worldMeta) {
         viewer.enterWorldMode(doc.worldMeta, api); // streams the world around the camera
@@ -65,6 +69,12 @@ export function useViewerSync(viewer: Viewer | null): void {
       viewer.setShowGrid(s.showGrid);
       viewer.setShowJigsaw(s.showJigsaw);
       viewer.setHideShell(s.hideShell);
+      viewer.setWorldTuning({
+        chunkCap: s.worldChunkCap,
+        meshWorkers: s.worldMeshWorkers,
+        renderDistance: s.worldRenderDistance,
+      });
+      setOverlayScheme(s.overlayScheme);
     };
     apply();
     return settingsStore.subscribe(apply);

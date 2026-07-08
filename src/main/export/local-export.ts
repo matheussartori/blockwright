@@ -108,19 +108,20 @@ async function passesSplitLimits(split: SplitPlan): Promise<boolean> {
  *    in-world. Only meaningful when the structure EXCEEDS `nbtLimit` (the menu item is gated
  *    on that); a within-limit build is refused with a pointer at Export as NBT. A native
  *    dialog then explains the assembly needs a datapack to spawn. */
-export async function exportStructure(srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode = 'nbt'): Promise<ExportResult> {
+export async function exportStructure(srcPath: string, suggestedName: string, nbtLimit: number, mode: ExportMode = 'nbt', preferred: 'nbt' | 'schem' | 'litematic' = 'nbt'): Promise<ExportResult> {
   if (!fs.existsSync(srcPath)) return { ok: false, error: 'The structure file no longer exists on disk.' };
   const jigsaw = mode === 'jigsaw';
+  // Settings ▸ Files' default format leads the dialog: its filter goes first and the
+  // suggested filename carries its extension (jigsaw mode is `.nbt`-only by nature).
+  const filters = [
+    { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
+    { name: mt('dialog.schemFilter'), extensions: ['schem'] },
+    { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
+  ].sort((a, b) => Number(b.extensions[0] === preferred) - Number(a.extensions[0] === preferred));
   const options: SaveDialogOptions = {
     title: mt(jigsaw ? 'dialog.exportJigsawTitle' : 'dialog.exportTitle'),
-    defaultPath: suggestedName,
-    filters: jigsaw
-      ? [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }]
-      : [
-          { name: mt('dialog.nbtFilter'), extensions: ['nbt'] },
-          { name: mt('dialog.schemFilter'), extensions: ['schem'] },
-          { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
-        ],
+    defaultPath: jigsaw ? suggestedName : suggestedName.replace(/\.(nbt|schem|litematic)$/i, `.${preferred}`),
+    filters: jigsaw ? [{ name: mt('dialog.nbtFilter'), extensions: ['nbt'] }] : filters,
   };
   const win = getMainWindow();
   const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);

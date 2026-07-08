@@ -5,7 +5,7 @@
 import type { DimensionId, WorldBackupInfo, WorldEditApplyResult, WorldEditBlock, WorldEditOpenResult } from '@/shared/types';
 import { getActiveWorld } from './active-world';
 import { clearChunkResolveCache } from './chunk-resolve';
-import { deleteBackup, listBackups, pruneBackups, restoreBackup } from './edit/backup';
+import { deleteBackup, listBackups, pruneBackups, pruneBackupsToSize, restoreBackup } from './edit/backup';
 import type { WorldBlockEdit } from './edit/world-edit-session';
 import { WorldEditSession } from './edit/world-edit-session';
 
@@ -36,12 +36,14 @@ export async function closeWorldEdit(): Promise<void> {
 
 /**
  * Write a batch of block edits through the safe write path, then evict the read caches for the
- * touched chunks (+ the 8 neighbors, whose light flags changed) and prune backups per retention.
+ * touched chunks (+ the 8 neighbors, whose light flags changed) and prune backups per retention
+ * (set count) and per total-size cap (MB; 0 = uncapped — the newest set always survives).
  */
 export async function applyWorldEdits(
   dim: DimensionId,
   edits: WorldEditBlock[],
   retention: number,
+  sizeCapMb = 0,
 ): Promise<WorldEditApplyResult> {
   const root = activeRoot();
   if (!session || session.root !== root || session.dim !== dim) {
@@ -75,6 +77,7 @@ export async function applyWorldEdits(
   }
 
   if (retention > 0) await pruneBackups(root, retention);
+  if (sizeCapMb > 0) await pruneBackupsToSize(root, sizeCapMb * 1024 * 1024);
 
   return {
     changedBlocks: report.changedBlocks,

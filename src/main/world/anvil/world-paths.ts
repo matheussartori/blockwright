@@ -3,7 +3,10 @@
 // `DIM-1/region/`, end = `DIM1/region/`, MOD dimensions under `dimensions/<namespace>/<path>/region/`.
 // Since the 26.x saves the VANILLA dimensions moved under `dimensions/minecraft/<path>/` too
 // (`dimensions/minecraft/overworld/region/`, …), so every vanilla dim resolves through BOTH layouts
-// (modern first — an upgraded save's authoritative data is there). A dimension is only offered if its
+// (modern first — an upgraded save's authoritative data is there). SERVER saves (Bukkit/Spigot/
+// Paper) split the vanilla dimensions into SIBLING top-level worlds — `<world>/`,
+// `<world>_nether/DIM-1/` and `<world>_the_end/DIM1/` — so the nether/end also resolve through
+// those siblings when opening the main world folder. A dimension is only offered if its
 // `region/` actually holds `.mca` (an ungenerated nether/end you never visited isn't listed).
 // A region file `r.<rx>.<rz>.mca` covers 32×32 chunks; `rx = chunkX >> 5`, `lx = chunkX & 31`.
 import { promises as fs } from 'node:fs';
@@ -16,12 +19,16 @@ export const END = 'minecraft:the_end';
 
 /** Candidate data sub-folders (`region`, `entities`, …) for a dimension id, MOST authoritative
  *  first. Every id resolves under the 26.x `dimensions/<ns>/<path>/<sub>` layout; the vanilla three
- *  ALSO resolve to their classic pre-26 folder, so both save generations open. */
+ *  ALSO resolve to their classic pre-26 folder, and the nether/end additionally to the Bukkit-style
+ *  sibling worlds (`<world>_nether/DIM-1`, `<world>_the_end/DIM1`), so singleplayer AND server
+ *  saves open. */
 function dimSubdirs(root: string, dim: DimensionId, sub: string): string[] {
   const [ns, ...rest] = dim.split(':');
   const modern = path.join(root, 'dimensions', ns, rest.join(':'), sub);
-  if (dim === NETHER) return [modern, path.join(root, 'DIM-1', sub)];
-  if (dim === END) return [modern, path.join(root, 'DIM1', sub)];
+  const sibling = (suffix: string, classic: string) =>
+    path.join(path.dirname(root), `${path.basename(root)}${suffix}`, classic, sub);
+  if (dim === NETHER) return [modern, path.join(root, 'DIM-1', sub), sibling('_nether', 'DIM-1')];
+  if (dim === END) return [modern, path.join(root, 'DIM1', sub), sibling('_the_end', 'DIM1')];
   if (dim === OVERWORLD) return [modern, path.join(root, sub)];
   return [modern];
 }

@@ -216,4 +216,6 @@ export interface AiConfig {
   activeProvider: AiProviderId;
   /** The generation cost/quality settings (see {@link GenerationSettings}). */
   generation: GenerationSettings;
+  /** Library retention: keep the last N versions per generated build (0 = keep all). */
+  libraryRetention: number;
 }

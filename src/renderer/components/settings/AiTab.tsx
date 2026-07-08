@@ -5,7 +5,10 @@
 // behind a toggle.
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
-import { useT, useLocale } from '../../hooks/useStores';
+import { useSettings, useT, useLocale } from '../../hooks/useStores';
+import { settingsStore } from '../../state/settings';
+import { Select } from '../ui/Select';
+import { Stepper } from '../ui/Stepper';
 import type { MessageKey } from '@/shared/i18n';
 import { localizeData, aiProviderKey, aiPresetKey } from '@/shared/i18n/registry';
 import {
@@ -70,6 +73,8 @@ export function AiTab() {
 
       <GenerationCard generation={config.generation} onChange={setConfig} />
 
+      <ReviewLibraryCard libraryRetention={config.libraryRetention} onChange={setConfig} />
+
       {stable.map(card)}
 
       <section className="settings-group ai-beta-section">
@@ -88,6 +93,51 @@ export function AiTab() {
       </section>
       {showBeta && beta.map(card)}
     </>
+  );
+}
+
+/** Review-image + library housekeeping (the v2.2 knobs): the self-review screenshot
+ *  size (renderer-side — the token/quality lever of the review loop) and the library
+ *  retention (main-side pref — keep the last N versions per generated build). */
+function ReviewLibraryCard({
+  libraryRetention,
+  onChange,
+}: {
+  libraryRetention: number;
+  onChange: (config: AiConfig) => void;
+}) {
+  const t = useT();
+  const reviewSize = useSettings((s) => s.aiReviewImageSize);
+  return (
+    <section className="settings-group">
+      <div className="settings-group-name">{t('ai.reviewGroup')}</div>
+      <label className="setting-row">
+        <span className="setting-label">{t('ai.reviewSize')}</span>
+        <Select
+          value={String(reviewSize)}
+          options={[
+            { value: '384', label: t('ai.reviewSizeSmall') },
+            { value: '512', label: t('ai.reviewSizeMedium') },
+            { value: '768', label: t('ai.reviewSizeLarge') },
+          ]}
+          onChange={(v) => settingsStore.getState().set('aiReviewImageSize', Number(v))}
+          ariaLabel={t('ai.reviewSize')}
+        />
+      </label>
+      <p className="setting-note">{t('ai.reviewSizeNote')}</p>
+      <label className="setting-row">
+        <span className="setting-label">{t('ai.libraryRetention')}</span>
+        <Stepper
+          value={libraryRetention}
+          onChange={(v) => void api.aiSetLibraryRetention(Math.max(0, Math.round(v))).then(onChange)}
+          min={0}
+          max={100}
+          step={1}
+          size="sm"
+        />
+      </label>
+      <p className="setting-note">{t('ai.libraryRetentionNote')}</p>
+    </section>
   );
 }
 

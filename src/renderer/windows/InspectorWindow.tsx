@@ -25,8 +25,9 @@ interface BlockGroup {
 }
 
 /** Pick one texture key to represent a block in the list — prefer a side face
- *  (the most recognizable), then top/bottom, scanning the resolved models. */
-function representativeTexture(entry: PaletteEntry): string | null {
+ *  (the most recognizable), then top/bottom, scanning the resolved models.
+ *  (Exported for the Materials panel's swatches — same visual language.) */
+export function representativeTexture(entry: PaletteEntry): string | null {
   const order: ('south' | 'north' | 'east' | 'west' | 'up' | 'down')[] = [
     'south', 'north', 'east', 'west', 'up', 'down',
   ];

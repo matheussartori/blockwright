@@ -13,6 +13,8 @@ import { settingsStore } from '../state/settings';
 import { plannerStore } from '../state/planner';
 import { windowsStore } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
+import { editorStore } from '../state/editor';
+import { i18nStore } from '../state/i18n';
 import { bindGenerationProgress, hydrateDoc, cancelGeneration } from '../state/generation';
 import { setDocLoader } from '../state/doc-loader';
 import { currentBasePath, commitManualVersion } from '../state/versions';
@@ -46,8 +48,26 @@ export interface DocumentFlow {
  *  viewer (read from `viewerRef` so the handlers stay stable). */
 export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): DocumentFlow {
   // Close a tab, first cancelling any generation running in it (so a closed tab
-  // doesn't keep burning a generation in the background).
+  // doesn't keep burning a generation in the background). Unsaved BLOCK-EDITOR
+  // changes on the active tab go through Settings ▸ Editor's guard first:
+  // warn (confirm) / auto-save a version / discard silently.
   const closeDocById = useCallback((id: string) => {
+    const editor = editorStore.getState();
+    const isActiveTab = documentsStore.getState().activeId === id;
+    if (isActiveTab && editor.active && editor.dirty) {
+      const guard = settingsStore.getState().editorUnsavedGuard;
+      if (guard === 'warn' && !window.confirm(i18nStore.getState().t('editor.unsavedConfirm'))) {
+        return;
+      }
+      if (guard === 'save') {
+        // Commit the edits as a version, THEN close — the save re-encodes via IPC.
+        void editor.save().then(() => {
+          cancelGeneration(id);
+          documentsStore.getState().closeDoc(id);
+        });
+        return;
+      }
+    }
     cancelGeneration(id);
     documentsStore.getState().closeDoc(id);
   }, []);
@@ -192,7 +212,7 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
     if (!src) return; // nothing loaded to export
     const suggested = doc.filePath ? basename(doc.filePath) : `${doc.title || 'structure'}.nbt`;
     const nbtLimit = effectiveNbtLimit(settingsStore.getState().nbtSizeLimit, store.getState().workspace?.minecraftVersion ?? null);
-    const result = await api.exportStructure(src, suggested, nbtLimit, mode);
+    const result = await api.exportStructure(src, suggested, nbtLimit, mode, settingsStore.getState().defaultExportFormat);
     if (result.ok) {
       const text = result.splitPieces ? `Split into ${result.splitPieces} jigsaw pieces` : `Exported to ${basename(result.path)}`;
       store.getState().setNotice({ text, warn: false });

@@ -15,12 +15,27 @@ export interface LevelInfo {
   versionName: string | null;
   spawn: [number, number, number];
   player: [number, number, number] | null;
+  /** World-generation seed as a decimal string (a signed 64-bit value doesn't fit a JS
+   *  number), or null when the save doesn't record one. Drives the slime-chunk overlay. */
+  seed: string | null;
 }
 
 const num = (v: unknown, fallback = 0): number => (Number.isFinite(Number(v)) ? Number(v) : fallback);
 
 const xyz = (v: unknown): [number, number, number] | null =>
   Array.isArray(v) && v.length === 3 ? [num(v[0]), num(v[1]), num(v[2])] : null;
+
+/** A simplified NBT long → its SIGNED 64-bit decimal string. prismarine-nbt's `simplify`
+ *  yields `[high, low]` int32 pairs for longs (BigInt/number tolerated for safety). */
+function longStr(v: unknown): string | null {
+  if (typeof v === 'bigint') return BigInt.asIntN(64, v).toString();
+  if (typeof v === 'number' && Number.isFinite(v)) return String(Math.trunc(v));
+  if (Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === 'number')) {
+    const unsigned = (BigInt(v[0] >>> 0) << 32n) | BigInt(v[1] >>> 0);
+    return BigInt.asIntN(64, unsigned).toString();
+  }
+  return null;
+}
 
 /** Read `<worldDir>/level.dat` into `LevelInfo`. Throws if the file is missing/unparseable. */
 export async function readLevelDat(worldDir: string): Promise<LevelInfo> {
@@ -40,6 +55,8 @@ export async function readLevelDat(worldDir: string): Promise<LevelInfo> {
     versionName: version?.Name ?? null,
     spawn: spawnPos ?? [num(data.SpawnX), num(data.SpawnY, 64), num(data.SpawnZ)],
     player: inlinePlayer ?? (await singleplayerPos(worldDir, data)),
+    // Modern: WorldGenSettings.seed; legacy (pre-1.16): flat RandomSeed.
+    seed: longStr((data.WorldGenSettings as { seed?: unknown } | undefined)?.seed) ?? longStr(data.RandomSeed),
   };
 }
 

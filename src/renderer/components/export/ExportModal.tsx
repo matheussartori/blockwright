@@ -99,7 +99,14 @@ export function ExportModal() {
       {!workspace ? (
         <ExportEmpty t={t} />
       ) : result?.ok ? (
-        <ExportSuccess result={result} workspaceName={workspace.name} namespace={workspace.namespace} t={t} />
+        <ExportSuccess
+          result={result}
+          workspaceName={workspace.name}
+          namespace={workspace.namespace}
+          resourceName={draft?.resourceName}
+          worldgen={draft?.worldgen.generate ?? false}
+          t={t}
+        />
       ) : (
         <div className="export-grid">
           <ExportConfig

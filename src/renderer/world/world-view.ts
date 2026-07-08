@@ -44,7 +44,7 @@ const EDGE_DIRS: EdgeDir[] = [
 
 const MAX_INFLIGHT = 6; // concurrent chunk IPC requests
 const EVICT_MARGIN = 2; // chunks kept past the render edge before eviction
-const MAX_LOADED = 1400; // hard cap on resident chunks (payload + meshes) — LRU beyond this
+const DEFAULT_MAX_LOADED = 1400; // default resident-chunk cap — Settings ▸ World tunes it per machine
 
 const key = (cx: number, cz: number): string => `${cx},${cz}`;
 
@@ -77,7 +77,9 @@ interface ChunkEntry {
 }
 
 export class WorldView {
-  private readonly pool = new WorkerPool();
+  private readonly pool: WorkerPool;
+  /** Resident-chunk hard cap (Settings ▸ World's chunk memory budget). */
+  private maxLoaded = DEFAULT_MAX_LOADED;
   private readonly chunks = new Map<string, ChunkEntry>();
   private readonly texInfo = new Map<string, TexInfo>();
   private readonly loaded = new Map<string, LoadedTexture>();
@@ -92,6 +94,10 @@ export class WorldView {
   });
   /** Per-chunk top-down colour for the minimap (persists across eviction — the map keeps filling). */
   private readonly minimap = new Map<string, MinimapCell>();
+  /** Block ids that fell back to flat colours in streamed chunks (missing model/texture) —
+   *  the world-side missing-texture diagnostics. Persists across eviction; cleared on
+   *  dimension change / asset refresh (the re-resolution may now know them). */
+  private readonly missingTex = new Set<string>();
   private queue: { cx: number; cz: number }[] = [];
 
   private centerX = NaN;
@@ -110,9 +116,25 @@ export class WorldView {
     private readonly api: BlockwrightApi,
     private dim: DimensionId = 'minecraft:overworld',
     renderDistance = 10, // modest first-open default; the HUD control pushes it out to the max band
+    tuning?: { chunkCap?: number; meshWorkers?: number },
   ) {
     this.renderDistance = renderDistance;
+    if (tuning?.chunkCap && tuning.chunkCap > 0) this.maxLoaded = tuning.chunkCap;
+    // 0/undefined = auto (the pool derives its size from the machine's cores); an
+    // explicit count is clamped — each worker holds a THREE bundle.
+    this.pool = new WorkerPool(
+      tuning?.meshWorkers && tuning.meshWorkers > 0 ? Math.min(8, Math.round(tuning.meshWorkers)) : undefined,
+    );
     this.applyBands();
+  }
+
+  /** Live-tune the resident-chunk cap (Settings ▸ World). Worker count applies on the
+   *  next world open — the pool is fixed at construction. */
+  setChunkCap(cap: number): void {
+    if (cap > 0) {
+      this.maxLoaded = cap;
+      this.centerX = NaN; // re-evaluate eviction next frame
+    }
   }
 
   setDimension(dim: DimensionId): void {
@@ -137,6 +159,7 @@ export class WorldView {
    *  textures — re-meshing the cached payload alone would not. */
   refresh(): void {
     if (!this.chunks.size) return;
+    this.missingTex.clear(); // the new asset source may resolve what the old one missed
     this.epoch++; // invalidate any in-flight streaming/mesh results resolved before the switch
     for (const e of this.chunks.values()) {
       if (e.jobId !== null) {
@@ -291,12 +314,12 @@ export class WorldView {
       if (this.dist(e.cx, e.cz) > r + EVICT_MARGIN && !wanted.has(k)) this.evict(k, e);
     }
     // Hard memory cap: if still over, drop the farthest resident chunks.
-    if (this.chunks.size > MAX_LOADED) {
+    if (this.chunks.size > this.maxLoaded) {
       const byDist = [...this.chunks.entries()].sort(
         (a, b) => this.dist(b[1].cx, b[1].cz) - this.dist(a[1].cx, a[1].cz),
       );
       for (const [k, e] of byDist) {
-        if (this.chunks.size <= MAX_LOADED) break;
+        if (this.chunks.size <= this.maxLoaded) break;
         this.evict(k, e);
       }
     }
@@ -354,6 +377,10 @@ export class WorldView {
       }
       entry.payload = payload;
       entry.tex = tex;
+      // Track the flat-colour fallbacks (unresolved model/texture) for the HUD diagnostics.
+      for (const p of payload.palette) {
+        if (!p.air && p.models.length === 0) this.missingTex.add(p.name);
+      }
       this.minimap.set(k, { cx, cz, color: chunkSurfaceColor(payload, this.texInfo) });
       this.mesh(entry, this.lodFor(entry));
     } finally {
@@ -579,6 +606,7 @@ export class WorldView {
     this.centerX = NaN;
     this.centerZ = NaN;
     this.clearMinimap();
+    this.missingTex.clear();
   }
 
   dispose(): void {
@@ -599,11 +627,93 @@ export class WorldView {
     this.minimap.clear();
   }
 
-  /** Loaded / pending chunk counts for the HUD streaming indicator. */
-  stats(): { loaded: number; pending: number } {
+  /** Loaded / pending chunk counts (+ the missing-texture tally) for the HUD readouts. */
+  stats(): { loaded: number; pending: number; missing: number } {
     let ready = 0;
     for (const e of this.chunks.values()) if (e.group || e.empty || e.absent) ready++;
-    return { loaded: ready, pending: this.queue.length + this.inflight };
+    return { loaded: ready, pending: this.queue.length + this.inflight, missing: this.missingTex.size };
+  }
+
+  /** Block ids that render as flat colours in the streamed chunks (missing model/texture),
+   *  sorted — the world-side missing-texture diagnostics the HUD surfaces. */
+  missingTextures(): string[] {
+    return [...this.missingTex].sort();
+  }
+
+  /** Find blocks by id in the LOADED area (the resident chunk payloads — no disk scan):
+   *  substring match on the block name, results sorted by distance to `from`, capped. A
+   *  UNIFORM matching section (a solid slab of the block) yields ONE representative hit
+   *  at its centre rather than 4096. Returns the shown hits + the total tally. */
+  findBlocks(query: string, from: [number, number, number], cap = 300): { hits: { pos: [number, number, number]; name: string }[]; total: number } {
+    const q = query.trim().toLowerCase().replace(/^minecraft:/, '');
+    if (!q) return { hits: [], total: 0 };
+    const hits: { pos: [number, number, number]; name: string; d: number }[] = [];
+    let total = 0;
+    const dist2 = (x: number, y: number, z: number) =>
+      (x - from[0]) ** 2 + (y - from[1]) ** 2 + (z - from[2]) ** 2;
+    for (const e of this.chunks.values()) {
+      const payload = e.payload;
+      if (!payload) continue;
+      const matching = new Set<number>();
+      for (let i = 0; i < payload.palette.length; i++) {
+        const p = payload.palette[i];
+        if (!p.air && p.name.replace('minecraft:', '').includes(q)) matching.add(i);
+      }
+      if (!matching.size) continue;
+      const bx = e.cx * 16;
+      const bz = e.cz * 16;
+      for (const s of payload.sections) {
+        const by = s.sectionY * 16;
+        if (s.uniform || !s.blocks) {
+          if (matching.has(s.fill)) {
+            total += 4096;
+            const name = payload.palette[s.fill].name;
+            hits.push({ pos: [bx + 8, by + 8, bz + 8], name, d: dist2(bx + 8, by + 8, bz + 8) });
+          }
+          continue;
+        }
+        for (let c = 0; c < 4096; c++) {
+          if (!matching.has(s.blocks[c])) continue;
+          total++;
+          const y = by + (c >> 8);
+          const z = bz + ((c >> 4) & 15);
+          const x = bx + (c & 15);
+          hits.push({ pos: [x, y, z], name: payload.palette[s.blocks[c]].name, d: dist2(x, y, z) });
+        }
+      }
+    }
+    hits.sort((a, b) => a.d - b.d);
+    return { hits: hits.slice(0, cap).map(({ pos, name }) => ({ pos, name })), total };
+  }
+
+  /** Name the block + biome at a world cell from the RESIDENT payload (the cursor readout) —
+   *  no IPC: the palette and biome quarts already crossed with the chunk. Null when the
+   *  chunk isn't resident; a cell in a dropped all-air section reads as air. */
+  describeCell(x: number, y: number, z: number): { block: string; biome: string | null } | null {
+    const payload = this.chunks.get(key(Math.floor(x / 16), Math.floor(z / 16)))?.payload;
+    if (!payload) return null;
+    const sy = Math.floor(y / 16);
+    const lx = x & 15;
+    const ly = y & 15;
+    const lz = z & 15;
+    const section = payload.sections.find((s) => s.sectionY === sy);
+    let block = 'minecraft:air'; // all-air sections are dropped from the payload
+    if (section) {
+      const idx = section.uniform || !section.blocks ? section.fill : section.blocks[ly * 256 + lz * 16 + lx];
+      block = payload.palette[idx]?.name ?? block;
+    }
+    // Biome quarts (4×4×4 per section, YZX). A section without biome data (synthesized, or a
+    // dropped all-air one) falls back to any sibling section's dominant palette entry.
+    const carrier = section?.biomePalette?.length ? section : payload.sections.find((s) => s.biomePalette?.length);
+    let biome: string | null = null;
+    if (carrier?.biomePalette?.length) {
+      if (carrier !== section || !carrier.biomes || carrier.biomePalette.length === 1) {
+        biome = carrier.biomePalette[0];
+      } else {
+        biome = carrier.biomePalette[carrier.biomes[(ly >> 2) * 16 + (lz >> 2) * 4 + (lx >> 2)]] ?? carrier.biomePalette[0];
+      }
+    }
+    return { block, biome };
   }
 }
 

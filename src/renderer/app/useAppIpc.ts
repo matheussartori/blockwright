@@ -140,6 +140,7 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
       const report: WindowsReport = {
         controls: { visible: w.controls.visible, available: open },
         inspector: { visible: w.inspector.visible, available: open },
+        materials: { visible: w.materials.visible, available: open },
         jigsaw: { visible: w.jigsaw.visible, available: hasJigsaw },
         generate: { visible: w.generate.visible, available: true },
         versions: { visible: w.versions.visible, available: hasVersions },

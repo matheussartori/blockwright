@@ -69,12 +69,14 @@ export function resolveColumn(col: ColumnData): ChunkRenderPayload {
 
   for (const s of col.sections) {
     const localToUnified = s.palette.map(intern);
+    // Biome palette + quart indices ride along (the cursor readout resolves them client-side).
+    const biome = { biomePalette: s.biomePalette, biomes: s.biomes };
     if (s.uniform || !s.blocks) {
-      sections.push({ sectionY: s.sectionY, blocks: null, uniform: true, fill: localToUnified[0] ?? 0 });
+      sections.push({ sectionY: s.sectionY, blocks: null, uniform: true, fill: localToUnified[0] ?? 0, ...biome });
     } else {
       const blocks = new Uint16Array(4096);
       for (let c = 0; c < 4096; c++) blocks[c] = localToUnified[s.blocks[c]];
-      sections.push({ sectionY: s.sectionY, blocks, uniform: false, fill: 0 });
+      sections.push({ sectionY: s.sectionY, blocks, uniform: false, fill: 0, ...biome });
     }
   }
 

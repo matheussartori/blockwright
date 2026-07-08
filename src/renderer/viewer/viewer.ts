@@ -6,10 +6,10 @@
 // streamed world-viewer mode (world-mode).
 import * as THREE from 'three';
 import type { BlockwrightApi, ChunkRenderPayload, DimensionId, StructureData, WorldMeta } from '@/shared/types';
-import { CameraController, type CameraSnapshot, type NavMode } from './camera-controller';
+import { CameraController, type CameraSnapshot, type NavMode, type ViewPreset } from './camera-controller';
 import { WorldMode } from './world-mode';
 import { disposeObject } from './dispose';
-import { type CaptureContext, captureCutaways, captureOrbit, captureSection, REVIEW_SNAP, type SnapOpts } from './capture';
+import { type CaptureContext, captureCutaways, captureOrbit, captureSection, reviewSnap, type SnapOpts } from './capture';
 import { renderStill, renderTurntable, type StillOpts, type TurntableOpts } from './beauty-render';
 import { type FloorRegion, FloorRegionsOverlay } from './floor-regions';
 import { FocusHighlight } from './highlight';
@@ -24,10 +24,12 @@ import { DiffOverlay } from './diff-overlay';
 import type { DiffCellMark } from '../diff/diff';
 import { TextureLoader } from './texture-loader';
 import { WorldGhost } from './world-ghost';
+import { WorldMarkersOverlay } from './world-markers';
+import { MeasureOverlay } from './measure-overlay';
 import type { PlaceTurns } from '../world/place';
 
 export type { FloorRegion } from './floor-regions';
-export type { NavMode, CameraSnapshot } from './camera-controller';
+export type { NavMode, CameraSnapshot, ViewPreset } from './camera-controller';
 
 /** One structure placed in the scene: its data plus a rigid transform. Rotation
  *  is quarter-turns about +Y, offset is the position of its local origin — the
@@ -66,6 +68,12 @@ export class Viewer {
 
   /** The translucent place-into-world preview (world-edit's Place tool). */
   private worldGhost = new WorldGhost(this.scene, this.textures);
+
+  /** Find-blocks result markers in the world scene (amber cubes, visible through terrain). */
+  private worldMarkers = new WorldMarkersOverlay(this.scene);
+
+  /** The two-point measure tool's endpoint cubes + connecting line. */
+  private measureOverlay = new MeasureOverlay(this.scene);
 
   private raycaster = new THREE.Raycaster();
   /** Floor-plan bands (one per named level), persisted across builds. */
@@ -230,6 +238,7 @@ export class Viewer {
   exitWorldMode(): void {
     this.worldGhost.clear();
     this.worldSelection.clear();
+    this.worldMarkers.set(null);
     this.worldMode.exit();
   }
 
@@ -255,9 +264,14 @@ export class Viewer {
     this.worldMode.setDaylight(day);
   }
 
-  /** Loaded / pending chunk counts for the HUD streaming indicator. */
-  worldStats(): { loaded: number; pending: number } {
+  /** Loaded / pending chunk counts (+ missing-texture tally) for the HUD readouts. */
+  worldStats(): { loaded: number; pending: number; missing: number } {
     return this.worldMode.stats();
+  }
+
+  /** Block ids rendering as flat colours in streamed chunks (missing model/texture). */
+  worldMissingTextures(): string[] {
+    return this.worldMode.missingTextures();
   }
 
   /** Current camera world position (for the HUD coordinate readout). */
@@ -350,6 +364,59 @@ export class Viewer {
   /** The empty WORLD cell adjacent to the clicked face (paint-brush placement). */
   pickWorldPlacement(clientX: number, clientY: number): [number, number, number] | null {
     return this.worldRayCell(clientX, clientY, -0.05);
+  }
+
+  /** The cursor readout: the world cell under a screen point named — position + block id +
+   *  biome, resolved entirely from resident chunk data (no IPC). Null on a miss. */
+  identifyWorldCell(clientX: number, clientY: number): { pos: [number, number, number]; block: string; biome: string | null } | null {
+    const cell = this.pickWorldBlock(clientX, clientY);
+    if (!cell) return null;
+    const info = this.worldMode.describeCell(cell[0], cell[1], cell[2]);
+    if (!info) return null;
+    return { pos: cell, ...info };
+  }
+
+  /** Find blocks by id in the loaded area (resident chunks), nearest-first (see WorldView). */
+  findWorldBlocks(query: string, cap?: number): { hits: { pos: [number, number, number]; name: string }[]; total: number } {
+    return this.worldMode.findBlocks(query, this.cameraPosition(), cap);
+  }
+
+  /** Show (or clear, with null) the find-blocks result markers in the world scene. */
+  setWorldMarkers(positions: [number, number, number][] | null): void {
+    this.worldMarkers.set(positions);
+  }
+
+  /** Toggle the chunk-boundary grid overlay (world mode). */
+  setWorldChunkGrid(on: boolean): void {
+    this.worldMode.setChunkGrid(on);
+  }
+
+  /** Settings ▸ World tuning (chunk cap live; workers/render distance at next open). */
+  setWorldTuning(tuning: { chunkCap?: number; meshWorkers?: number; renderDistance?: number }): void {
+    this.worldMode.setTuning(tuning);
+  }
+
+  /** Snap to an axis-aligned plan view of the current build (top/front/side, telephoto
+   *  near-ortho) or back to perspective. No-op when nothing is loaded. */
+  viewPreset(preset: ViewPreset): void {
+    if (!this.current) return;
+    this.nav.viewPreset(preset, new THREE.Box3().setFromObject(this.current));
+  }
+
+  /** Show (or clear) the measure tool's marks (point A, optional point B + line). */
+  setMeasure(a: [number, number, number] | null, b: [number, number, number] | null): void {
+    this.measureOverlay.set(a, b);
+  }
+
+  /** Persistent horizontal clip: cut everything ABOVE `maxY` and/or BELOW `minY` away —
+   *  the world Y-slice / structure storey isolation. Applies to every material via the
+   *  renderer's global clipping planes (the same mechanism the cutaway captures use;
+   *  captures save/restore the plane list, so a live slice survives them). Null clears. */
+  setClipRange(range: { minY?: number | null; maxY?: number | null } | null): void {
+    const planes: THREE.Plane[] = [];
+    if (range?.maxY != null) planes.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), range.maxY));
+    if (range?.minY != null) planes.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), -range.minY));
+    this.renderer.clippingPlanes = planes;
   }
 
   /** Show (or clear, with null) the world editor's box-selection region overlay. */
@@ -603,7 +670,7 @@ export class Viewer {
   }
 
   /** Orbited exterior screenshots (angle 0 = the current camera) for the AI review. */
-  capture(angles = 2, opts: SnapOpts = REVIEW_SNAP): string[] {
+  capture(angles = 2, opts: SnapOpts = reviewSnap()): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
@@ -627,7 +694,7 @@ export class Viewer {
   }
 
   /** Top-down floor-plan cutaways (interior layout) for the AI review. */
-  captureCutaways(opts: SnapOpts = REVIEW_SNAP): string[] {
+  captureCutaways(opts: SnapOpts = reviewSnap()): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();
@@ -635,7 +702,7 @@ export class Viewer {
   }
 
   /** A vertical cross-section screenshot (storey heights / hanging detail) for review. */
-  captureSection(opts: SnapOpts = REVIEW_SNAP): string[] {
+  captureSection(opts: SnapOpts = reviewSnap()): string[] {
     if (!this.current) return [];
     if (this.nav.isFly()) this.nav.setMode('orbit');
     this.highlight.clear();

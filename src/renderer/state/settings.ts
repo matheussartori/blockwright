@@ -5,9 +5,20 @@
 // match the rest of the renderer.
 import { createStore } from 'zustand/vanilla';
 import { DEFAULT_NBT_SIZE_PREF, type NbtSizePref } from '@/shared/domain/split';
+import type { MaterialsFormat } from '@/shared/types';
 import { isThemePref, type ThemePref } from './themes';
 
 export type { ThemePref } from './themes';
+
+/** Overlay palette for the viewer's marks (diff/void/selection/waypoints):
+ *  the default hues or a colorblind-safe set (see viewer/overlay-colors.ts). */
+export type OverlayScheme = 'default' | 'colorblind';
+/** How much the world cursor readout names: coords only, +block, +block+biome. */
+export type CursorReadout = 'coords' | 'block' | 'biome';
+/** What happens to unsaved block-editor changes on tab close / quit. */
+export type UnsavedEditGuard = 'warn' | 'save' | 'discard';
+/** "Export As…" default format (orders the save dialog's filters). */
+export type ExportFormatPref = 'nbt' | 'schem' | 'litematic';
 
 export interface Settings {
   /** Color theme. `system` follows the OS appearance (the default). */
@@ -37,6 +48,40 @@ export interface Settings {
   /** Backup sets kept per world (the enforced pre-save backups are NOT optional — only this
    *  retention is). 0 = keep all. */
   worldBackupRetention: number;
+  /** Total backup size cap per world in MB (oldest sets pruned past it). 0 = no cap. */
+  worldBackupSizeCapMb: number;
+  /** Default render distance (chunks) a world opens with. */
+  worldRenderDistance: number;
+  /** Resident chunk cap for the world scene's LRU (the "never OOM" budget). */
+  worldChunkCap: number;
+  /** Mesh worker threads for world chunks. 0 = auto (cores − 2, clamped). */
+  worldMeshWorkers: number;
+  /** Dimension a world opens in: the last one used for it, or always the overworld. */
+  worldDefaultDimension: 'last' | 'overworld';
+  /** Overlay color scheme for the viewer marks (default / colorblind-safe). */
+  overlayScheme: OverlayScheme;
+  /** Remember the Y-slice level per world/structure (restored on reopen). */
+  ySliceRemember: boolean;
+  /** World cursor readout verbosity (coords / +block / +biome). */
+  cursorReadout: CursorReadout;
+  /** Tool the block editor starts on when entering edit mode. */
+  editorDefaultTool: 'select' | 'paint';
+  /** Whether paint/void strokes lock to the face's plane by default. */
+  editorPlaneLock: boolean;
+  /** Keep the symmetry setting across editing sessions (else reset to off). */
+  editorSymmetryPersist: boolean;
+  /** Undo snapshot stack cap (big builds trade memory for history). */
+  editorUndoDepth: number;
+  /** Unsaved-edit guard on tab close / app quit: warn, auto-save a version, or discard. */
+  editorUnsavedGuard: UnsavedEditGuard;
+  /** Max size (px) of the AI self-review screenshots (the token/quality lever). */
+  aiReviewImageSize: number;
+  /** Default format for "Export As…" (orders the dialog's filters). */
+  defaultExportFormat: ExportFormatPref;
+  /** Default material-list export format (orders the dialog's filters). */
+  materialsFormat: MaterialsFormat;
+  /** Reopen the last session's tabs + world on launch. */
+  reopenSession: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -50,6 +95,23 @@ export const SETTINGS_DEFAULTS: Settings = {
   nbtSizeLimit: DEFAULT_NBT_SIZE_PREF,
   worldEditing: false,
   worldBackupRetention: 10,
+  worldBackupSizeCapMb: 0,
+  worldRenderDistance: 10,
+  worldChunkCap: 1400,
+  worldMeshWorkers: 0,
+  worldDefaultDimension: 'last',
+  overlayScheme: 'default',
+  ySliceRemember: true,
+  cursorReadout: 'biome',
+  editorDefaultTool: 'select',
+  editorPlaneLock: true,
+  editorSymmetryPersist: false,
+  editorUndoDepth: 60,
+  editorUnsavedGuard: 'warn',
+  aiReviewImageSize: 512,
+  defaultExportFormat: 'nbt',
+  materialsFormat: 'csv',
+  reopenSession: false,
 };
 
 const STORAGE_KEY = 'blockwright.settings';
@@ -95,6 +157,23 @@ function snapshot(s: SettingsState): Settings {
     nbtSizeLimit: s.nbtSizeLimit,
     worldEditing: s.worldEditing,
     worldBackupRetention: s.worldBackupRetention,
+    worldBackupSizeCapMb: s.worldBackupSizeCapMb,
+    worldRenderDistance: s.worldRenderDistance,
+    worldChunkCap: s.worldChunkCap,
+    worldMeshWorkers: s.worldMeshWorkers,
+    worldDefaultDimension: s.worldDefaultDimension,
+    overlayScheme: s.overlayScheme,
+    ySliceRemember: s.ySliceRemember,
+    cursorReadout: s.cursorReadout,
+    editorDefaultTool: s.editorDefaultTool,
+    editorPlaneLock: s.editorPlaneLock,
+    editorSymmetryPersist: s.editorSymmetryPersist,
+    editorUndoDepth: s.editorUndoDepth,
+    editorUnsavedGuard: s.editorUnsavedGuard,
+    aiReviewImageSize: s.aiReviewImageSize,
+    defaultExportFormat: s.defaultExportFormat,
+    materialsFormat: s.materialsFormat,
+    reopenSession: s.reopenSession,
   };
 }
 

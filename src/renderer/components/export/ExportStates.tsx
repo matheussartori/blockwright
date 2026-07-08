@@ -4,6 +4,7 @@
 import { CheckCircle2, FolderTree } from 'lucide-react';
 import { api } from '../../api';
 import { ExportFileRow } from './ExportFileRow';
+import { CommandChip } from '../ui/CommandChip';
 import type { TFunction } from '@/shared/i18n';
 import type { WorkspaceExportResult } from '@/shared/types';
 
@@ -24,10 +25,21 @@ interface ExportSuccessProps {
   result: WorkspaceExportResult;
   workspaceName: string;
   namespace: string;
+  /** The exported resource name — builds the in-game `/place` test command. */
+  resourceName?: string;
+  /** Whether worldgen JSON was written (a structure DEF exists to `/place`). */
+  worldgen?: boolean;
   t: TFunction;
 }
 
-export function ExportSuccess({ result, workspaceName, namespace, t }: ExportSuccessProps) {
+export function ExportSuccess({ result, workspaceName, namespace, resourceName, worldgen, t }: ExportSuccessProps) {
+  // The one-paste test loop: with worldgen files the structure DEF is placeable
+  // (`/place structure`); a plain `.nbt` drop still places as a raw template.
+  const command = resourceName
+    ? worldgen
+      ? `/place structure ${namespace}:${resourceName}`
+      : `/place template ${namespace}:${resourceName}`
+    : null;
   return (
     <div className="export-success">
       <CheckCircle2 size={32} strokeWidth={1.6} aria-hidden />
@@ -43,6 +55,7 @@ export function ExportSuccess({ result, workspaceName, namespace, t }: ExportSuc
           />
         ))}
       </ul>
+      {command && <CommandChip command={command} hint={t('export.placeHint')} />}
     </div>
   );
 }

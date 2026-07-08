@@ -252,6 +252,34 @@ const config: ForgeConfig = {
     // the user points Blockwright at their own extraction at runtime (see
     // structure/assets/content-dir.ts).
     extraResource: ['knowledge'],
+    // OS file associations (macOS): register .nbt/.schem/.litematic so double-click /
+    // Open With reaches the app (main.ts handles the `open-file` event). Declared as
+    // Alternate handlers — other tools (Minecraft-adjacent editors) may own them too.
+    // Windows/Linux associations need installer-level registry/.desktop wiring the
+    // Squirrel/deb makers don't expose here; macOS is the platform with the runtime
+    // `open-file` plumbing already in place.
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeName: 'Minecraft Structure',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Alternate',
+          CFBundleTypeExtensions: ['nbt'],
+        },
+        {
+          CFBundleTypeName: 'WorldEdit Schematic',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Alternate',
+          CFBundleTypeExtensions: ['schem'],
+        },
+        {
+          CFBundleTypeName: 'Litematica Schematic',
+          CFBundleTypeRole: 'Editor',
+          LSHandlerRank: 'Alternate',
+          CFBundleTypeExtensions: ['litematic'],
+        },
+      ],
+    },
     // Off unless the APPLE_* env vars are set (see macSigning); unsigned otherwise.
     ...macSigning(),
   },
