@@ -74,10 +74,13 @@ export function buildStructureData(
   const textureSet = new Set<string>();
   for (const entry of palette) collectTextures(entry.models, textureSet);
 
-  // Entities carry their own texture keys (e.g. an armor stand's atlas); fold them into the
-  // load set so the viewer fetches them alongside the block textures.
+  // Entities carry their own texture keys (an armor stand's atlas, each mob layer's skin);
+  // fold them into the load set so the viewer fetches them alongside the block textures.
   const entities = resolveEntities(rawEntities, canResolve);
-  for (const e of entities) if (e.textureKey) textureSet.add(e.textureKey);
+  for (const e of entities) {
+    if (e.textureKey) textureSet.add(e.textureKey);
+    for (const layer of e.mob ?? []) textureSet.add(layer.textureKey);
+  }
 
   // Fidelity payloads for Place-into-World: full block-entity NBT (from the codec's separate
   // list when it has one — `.schem`/`.litematic` — else derived from the `.nbt` per-block nbt)

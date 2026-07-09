@@ -80,11 +80,14 @@ export function resolveColumn(col: ColumnData): ChunkRenderPayload {
     }
   }
 
-  // Resolve entities to render shapes (armor stand → real model when its texture is on disk, else a
-  // fallback cube) and fold their texture keys into the preload set. Skip entirely for the common
-  // entity-free chunk (also keeps the content-pack probe off the hot path).
+  // Resolve entities to render shapes (armor stand / mobs → real models when their textures are on
+  // disk, else a fallback cube) and fold their texture keys into the preload set. Skip entirely for
+  // the common entity-free chunk (also keeps the content-pack probe off the hot path).
   const entities = col.entities.length ? resolveEntities(col.entities, hasContent()) : [];
-  for (const e of entities) if (e.textureKey) textureKeys.add(e.textureKey);
+  for (const e of entities) {
+    if (e.textureKey) textureKeys.add(e.textureKey);
+    for (const layer of e.mob ?? []) textureKeys.add(layer.textureKey);
+  }
 
   return {
     cx: col.cx,

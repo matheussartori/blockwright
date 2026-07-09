@@ -100,10 +100,16 @@ src/
                              index.ts (dispatcher)
         entity.ts            Project the raw `entities` (armor stands, item frames, mobs — NOT
                              blocks, so no palette entry) into render-ready `StructureEntity`s:
-                             id/pos/yaw/fallback-color/resolved-texture-key + armor-stand display
-                             flags & `Pose`. `resolveEntities(raw, canResolve)` (canResolve gates
-                             the armor-stand texture disk check); the viewer draws the result (see
+                             id/pos/yaw/fallback-color + armor-stand display flags & `Pose` + the
+                             VANILLA MOB render layers — for every id in `shared/entity-registry.ts`
+                             it resolves the texture variant off the NBT (wolf coat, cat breed,
+                             horse color, sheep dye tint + Sheared, villager biome/profession
+                             overlays, slime `Size` scale, baby flags) and existence-checks each
+                             layer against the content pack. `resolveEntities(raw, canResolve)`
+                             (canResolve gates the disk checks); the viewer draws the result (see
                              renderer `viewer/entity-mesh.ts`).
+        dye-colors.ts        The 16 dye colors (Java's diffuse values) + numeric NBT order —
+                             shared by banner cloth, sheep wool, shulker.
       catalog/
         block-catalog.ts     Enumerate placeable blocks (vanilla pack + active workspace namespace,
                              namespace-aware) + a representative texture per block → the Block Catalog.
@@ -585,8 +591,11 @@ src/
                           chunk-mesh worker calls the SAME core, so the two renderers can't drift (a
                           golden test pins the structure output).
                           entity-mesh.ts for `StructureData.entities` — the vanilla armor-stand box
-                          model textured from the entity atlas with `Pose`/flags applied, else a
-                          fallback cube, added per-piece alongside the block group. Focused concerns
+                          model (with `Pose`/flags) plus every mob in `shared/entity-models.ts`:
+                          a data-driven bone/box builder (box-UV or per-face rects, mirror, inflate,
+                          nested bone groups with default-pose rotations, per-layer materials with
+                          tint/translucency, per-type × slime-`Size` × baby scaling about the feet),
+                          else a fallback cube, added per-piece alongside the block group. Focused concerns
                           split out of the Viewer class: camera-controller.ts (CameraController — the camera + orbit/fly
                           navigation + framing), world-mode.ts (WorldMode — the world-mode facade: owns
                           the WorldView lifecycle, day/night lighting, HUD stats/minimap, goTo/framing;
@@ -1512,8 +1521,21 @@ writes by the destination extension (`.nbt`→`.nbt` is a lossless copy, else re
   path DOES render them: `loadStructure` projects each raw entity into a `StructureData.entities`
   (`StructureEntity`) via `assets/entity.ts` `resolveEntities`, and the viewer draws them
   (`viewer/entity-mesh.ts`) — the armor stand as its real vanilla box model (entity texture + `Pose`
-  + Small/ShowArms/NoBasePlate flags), every other id as a deterministic fallback cube. They're also
-  listed (grouped by id, with a focus jump) in the Inspector alongside the block palette.
+  + Small/ShowArms/NoBasePlate flags), EVERY VANILLA MOB as its real box model (see below), and any
+  other/unresolvable id as a deterministic fallback cube. They're also listed (grouped by id, with a
+  focus jump) in the Inspector alongside the block palette.
+- **Vanilla mob models** are data-driven: `shared/entity-models.ts` (GENERATED — regenerate with
+  `build/gen-entity-models.mjs`, which converts the geometry data in Mojang's public bedrock-samples
+  repo to Java model space and bakes the Java default-pose rotations: quadruped bodies lie down,
+  spider legs splay, zombie arms reach, villager hat brim/arms, blaze rod rings) holds the bone/box
+  geometry; `shared/entity-registry.ts` (hand-curated) maps entity id → render layers (model key +
+  texture path under `textures/entity/` + per-type scale). Main (`assets/entity.ts`) picks texture
+  VARIANTS from NBT (wolf/cat/frog `variant`, horse/llama/parrot/axolotl `Variant`, rabbit/fox/
+  mooshroom/panda/shulker fields, sheep `Color` wool tint + `Sheared`, villager & zombie-villager
+  biome/profession overlay layers, slime/magma `Size` scale, `IsBaby`/`Age` half-scale) and
+  existence-checks every layer texture against the content pack — a missing overlay drops the layer,
+  a missing base texture drops the mob (fallback cube). A contract test pins registry ↔ models
+  consistency. Textures are never bundled; everything resolves from the user's pack at load.
 
 ### World viewer
 

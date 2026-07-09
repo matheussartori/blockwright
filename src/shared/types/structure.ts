@@ -78,6 +78,16 @@ export interface ArmorStandPose {
   rightLeg?: [number, number, number];
 }
 
+/** One resolved render layer of a mob: a MOB_MODELS geometry key plus the
+ *  existence-checked texture key it samples, with an optional multiply tint
+ *  (sheep wool dye) and alpha blending (the slime's outer jelly). */
+export interface MobRenderLayer {
+  model: string;
+  textureKey: string;
+  tint?: [number, number, number];
+  translucent?: boolean;
+}
+
 /** A renderable structure entity (armor stand, item frame, mob, …). Unlike block
  *  entities — which the renderer synthesizes from the block NAME — entities have no
  *  block in the palette, so the loader carries the few fields the viewer needs to
@@ -93,8 +103,15 @@ export interface StructureEntity {
    *  (or texture) is available — the same treatment blocks get. */
   color: [number, number, number];
   /** The resolved entity texture key ("namespace/path") when it exists in the content
-   *  pack / workspace; null → render the fallback cube. Armor stand only for now. */
+   *  pack / workspace; null → render the fallback cube. Armor stand only. */
   textureKey: string | null;
+  /** Vanilla mob render layers (model + texture resolved from the registry + NBT
+   *  variants). Absent → not a known mob or its base texture is missing (fallback cube). */
+  mob?: MobRenderLayer[];
+  /** Render-time uniform scale: Java's per-type scale × slime/magma-cube `Size`. */
+  scale?: number;
+  /** Baby mob (`IsBaby`/`Age<0`) — drawn at half scale. */
+  baby?: boolean;
   /** Armor-stand only: a "small" stand renders at half scale. */
   small?: boolean;
   /** Armor-stand only: whether the arms are shown. */

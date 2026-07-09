@@ -38,7 +38,8 @@ src/
       io/                   RawStructure codecs: .nbt / .schem / .litematic, long-bits (BigInt bit
                             packing), convert, splitToJigsaw (oversized → jigsaw), data-markers
       assets/               Content-pack roots, blockstate/model resolution, fluids, synthesized
-                            block-entity models, entity.ts, block-dictionary (mod-block annotations)
+                            block-entity models, entity.ts (armor stand + vanilla-mob render layers,
+                            NBT texture variants), block-dictionary (mod-block annotations)
       catalog/              Block catalog, previewBlock, retheme-map, module-preview
       jigsaw/               Connectors, template pools, seeded assembler (geometry in shared/jigsaw.ts)
       domain/               Composable generation: modules by category (structure/decoration/roof/
@@ -73,6 +74,8 @@ src/
   shared/
     ipc.ts types/           ALL channel/event names + type-only contracts (BlockwrightApi)
     jigsaw.ts mc-version.ts Pure geometry / version math
+    entity-models.ts        GENERATED vanilla mob box models (build/gen-entity-models.mjs) +
+    entity-registry.ts      hand-curated mob id → render layers/textures (contract test-enforced)
     domain/                 Pure predicates used by BOTH processes (applies-to, module-slots,
                             storeys, furnishing, worldgen, split, surroundings) — no drift
     i18n/                   en.ts + pt-BR.ts + registry-data overrides (data-pt-BR.ts)

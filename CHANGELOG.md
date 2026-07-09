@@ -4,6 +4,20 @@ All notable changes to Blockwright are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Entity rendering: every vanilla mob now draws as its real Minecraft box model
+  (creepers, wolves, villagers, horses, the warden, the ender dragon — ~80 in
+  all) in both the structure viewer and the streamed world, textured from your
+  content pack. NBT is honored: wolf coats, cat breeds, horse colors, sheep
+  wool dyed and sheared, villager biome + profession overlays, slime size,
+  babies at half scale, the slime's translucent outer jelly, enderman/spider
+  glowing-eye layers. Unknown or untextured entities keep the colored-cube
+  fallback. Geometry lives in a generated registry
+  (`build/gen-entity-models.mjs`); no Mojang assets are bundled.
+
 ## [2.2.0] - 2026-07-08
 
 Edit your world like you edit a build — place blocks, paste whole structures
