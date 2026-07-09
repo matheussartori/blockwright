@@ -196,7 +196,7 @@ export class WorldView {
     const loaded = await this.textures.load(missing);
     for (const [tk, lt] of loaded) {
       this.loaded.set(tk, lt);
-      this.texInfo.set(tk, { frames: lt.frames, translucent: lt.translucent, avgColor: lt.avgColor });
+      this.texInfo.set(tk, { frames: lt.frames, translucent: lt.translucent, cutout: lt.cutout, avgColor: lt.avgColor });
     }
   }
 
@@ -368,7 +368,7 @@ export class WorldView {
       if (epoch !== this.epoch || this.chunks.get(k) !== entry) return;
       for (const [tk, lt] of loaded) {
         this.loaded.set(tk, lt);
-        this.texInfo.set(tk, { frames: lt.frames, translucent: lt.translucent, avgColor: lt.avgColor });
+        this.texInfo.set(tk, { frames: lt.frames, translucent: lt.translucent, cutout: lt.cutout, avgColor: lt.avgColor });
       }
       const tex: [string, TexInfo][] = [];
       for (const tk of payload.textureKeys) {

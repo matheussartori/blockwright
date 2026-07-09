@@ -141,10 +141,14 @@ export function packBuffers(raw: RawVertexArrays, meta: Omit<MaterialBuffers, ke
 }
 
 /** Is this palette entry a full opaque cube (so it hides neighbour faces)? A model-less coloured
- *  fallback counts; a translucent (stained glass) or non-full model does not. */
+ *  fallback counts; a translucent (stained glass), cutout (leaves/glass — the world behind shows
+ *  through the texture's holes) or non-full model does not. Coverage is judged PER DIRECTION: each
+ *  of the six directions needs at least one full-cube face with a fully-opaque texture, so a cutout
+ *  OVERLAY face (grass_block's side overlay) doesn't disqualify the opaque base underneath it. */
 function isFullOpaqueCube(entry: PaletteEntry, textures: Map<string, TexInfo>): boolean {
   if (entry.air) return false;
   if (entry.models.length === 0) return true; // fallback colour cube fills the cell
+  const covered = new Set<FaceDir>();
   for (const model of entry.models) {
     if (model.elements.length === 0) return false;
     for (const el of model.elements) {
@@ -153,12 +157,16 @@ function isFullOpaqueCube(entry: PaletteEntry, textures: Map<string, TexInfo>): 
         el.to[0] === 16 && el.to[1] === 16 && el.to[2] === 16;
       if (!full) return false;
       for (const dir of DIRS) {
-        const tex = el.faces[dir]?.texture;
-        if (tex && textures.get(tex)?.translucent) return false;
+        const face = el.faces[dir];
+        if (!face) continue;
+        const info = face.texture ? textures.get(face.texture) : undefined;
+        // An unknown texture keeps the pre-cutout behaviour (counts as opaque) — the face renders
+        // as a solid fallback quad anyway.
+        if (!info || (!info.translucent && !info.cutout)) covered.add(dir);
       }
     }
   }
-  return true;
+  return covered.size === 6;
 }
 
 /** Build per-material vertex buffers for a resolved palette + block list. Pure: no scene/DOM. */

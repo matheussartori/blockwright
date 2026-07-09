@@ -14,6 +14,9 @@ import type { FaceDir, ModelElement, ResolvedModel } from '@/shared/types';
 export interface TexInfo {
   frames: number;
   translucent: boolean;
+  /** True when the texture has fully-transparent holes (leaves, glass) — disqualifies the face
+   *  from covering a direction in the occluder test (see `isFullOpaqueCube`). */
+  cutout?: boolean;
   /** Average sRGB colour (0..1) — used by the far-LOD surface + minimap, ignored by full geometry. */
   avgColor?: [number, number, number];
 }

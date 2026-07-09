@@ -9,6 +9,9 @@ export interface LoadedTexture {
   // panes). These render with alpha blending instead of a binary alphaTest cut,
   // so the colored body shows through instead of being discarded.
   translucent: boolean;
+  /** True when the texture has fully-transparent holes (leaves, glass, spawner). Such a block can
+   *  never be a face-culling occluder — the world behind shows through the holes. */
+  cutout: boolean;
   /** Average (alpha-weighted) sRGB colour of the first frame, 0..1 — drives the far-LOD surface
    *  colour + the minimap, so distant terrain reads with real block colours (grass green, sand tan)
    *  instead of a deterministic hash. */
@@ -53,30 +56,32 @@ export class TextureLoader {
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.needsUpdate = true;
-    const { translucent, avgColor } = analyzeImage(img, frames);
-    return { texture, frames, translucent, avgColor };
+    const { translucent, cutout, avgColor } = analyzeImage(img, frames);
+    return { texture, frames, translucent, cutout, avgColor };
   }
 }
 
 /** Analyse a texture image in one canvas pass: partial-alpha detection (stained glass vs binary
- *  cutout) + the alpha-weighted average colour of its FIRST animation frame (for far-LOD / minimap).
+ *  cutout), fully-transparent-hole detection (leaves/glass — never occluders) + the alpha-weighted
+ *  average colour of its FIRST animation frame (for far-LOD / minimap).
  *  Colours are read in the texture's storage space (sRGB) and returned 0..1. */
 function analyzeImage(
   img: CanvasImageSource & { width: number; height: number },
   frames: number,
-): { translucent: boolean; avgColor: [number, number, number] } {
+): { translucent: boolean; cutout: boolean; avgColor: [number, number, number] } {
   const w = img.width;
   const h = img.height;
-  if (!w || !h) return { translucent: false, avgColor: [0.5, 0.5, 0.5] };
+  if (!w || !h) return { translucent: false, cutout: false, avgColor: [0.5, 0.5, 0.5] };
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return { translucent: false, avgColor: [0.5, 0.5, 0.5] };
+  if (!ctx) return { translucent: false, cutout: false, avgColor: [0.5, 0.5, 0.5] };
   ctx.drawImage(img, 0, 0);
   const frameH = Math.max(1, Math.floor(h / Math.max(1, frames))); // first frame only
   const { data } = ctx.getImageData(0, 0, w, frameH);
   let partial = 0;
+  let holes = 0;
   let r = 0;
   let g = 0;
   let b = 0;
@@ -84,6 +89,7 @@ function analyzeImage(
   for (let i = 0; i < data.length; i += 4) {
     const a = data[i + 3];
     if (a > 12 && a < 243) partial++;
+    else if (a <= 12) holes++;
     if (a > 8) {
       const aw = a / 255;
       r += data[i] * aw;
@@ -96,7 +102,8 @@ function analyzeImage(
     ? [r / wsum / 255, g / wsum / 255, b / wsum / 255]
     : [0.5, 0.5, 0.5];
   // Require a meaningful fraction so a few antialiased edge pixels don't flip an otherwise-opaque
-  // texture into the (more expensive, sort-sensitive) blend path. `partial` is counted over the
-  // whole strip but that's fine — the threshold scales with total pixels.
-  return { translucent: partial > w * h * 0.1, avgColor: avg };
+  // texture into the (more expensive, sort-sensitive) blend path (`partial` is counted over the
+  // first frame but thresholded against the whole strip — historical, kept stable) or out of the
+  // occluder set (`holes` thresholds against the sampled frame).
+  return { translucent: partial > w * h * 0.1, cutout: holes > (data.length / 4) * 0.01, avgColor: avg };
 }

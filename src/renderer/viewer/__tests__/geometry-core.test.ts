@@ -31,6 +31,43 @@ const slab: PaletteEntry = {
 };
 const air: PaletteEntry = { name: 'minecraft:air', properties: {}, air: true, color: [0, 0, 0], models: [] };
 
+// A full cube whose six faces all use a CUTOUT texture (leaves): the world shows through the
+// texture's holes, so it must never occlude neighbour faces.
+const allFaces = (texture: string) =>
+  Object.fromEntries((['up', 'down', 'north', 'south', 'east', 'west'] as const).map((d) => [d, { texture }]));
+const leaves: PaletteEntry = {
+  name: 'minecraft:oak_leaves',
+  properties: {},
+  air: false,
+  color: [0.2, 0.5, 0.2],
+  models: [{ elements: [{ from: [0, 0, 0], to: [16, 16, 16], faces: allFaces('block/oak_leaves') }] }],
+};
+// A grass_block-like model: an opaque base cube + a second full-cube element whose side faces are a
+// cutout overlay. The opaque base still covers every direction, so it stays an occluder.
+const grass: PaletteEntry = {
+  name: 'minecraft:grass_block',
+  properties: {},
+  air: false,
+  color: [0.3, 0.6, 0.3],
+  models: [
+    {
+      elements: [
+        { from: [0, 0, 0], to: [16, 16, 16], faces: allFaces('block/dirt') },
+        {
+          from: [0, 0, 0],
+          to: [16, 16, 16],
+          faces: {
+            north: { texture: 'block/grass_overlay' },
+            south: { texture: 'block/grass_overlay' },
+            east: { texture: 'block/grass_overlay' },
+            west: { texture: 'block/grass_overlay' },
+          },
+        },
+      ],
+    },
+  ],
+};
+
 const input: GeomInput = {
   palette: [air, textured, flat],
   blocks: [
@@ -39,7 +76,12 @@ const input: GeomInput = {
     { state: 2, pos: [1, 0, 0] }, // fallback cube
   ],
 };
-const tex = new Map<string, TexInfo>([['block/stone', { frames: 1, translucent: false }]]);
+const tex = new Map<string, TexInfo>([
+  ['block/stone', { frames: 1, translucent: false }],
+  ['block/dirt', { frames: 1, translucent: false, cutout: false }],
+  ['block/oak_leaves', { frames: 1, translucent: false, cutout: true }],
+  ['block/grass_overlay', { frames: 1, translucent: false, cutout: true }],
+]);
 
 describe('buildGeometryBuffers', () => {
   it('emits one textured material (single face) and one flat-colour cube', () => {
@@ -115,6 +157,29 @@ describe('buildGeometryBuffers', () => {
     // Without a floor: all six faces (the underside shows). With floorY=-64: the down face is culled.
     expect(verts(buildGeometryBuffers(block, tex, { occlude: true }))).toBe(6 * 6);
     expect(verts(buildGeometryBuffers(block, tex, { occlude: true, floorY: -64 }))).toBe(5 * 6);
+  });
+
+  it('never treats a cutout-textured cube (leaves) as an occluder, but keeps a cutout OVERLAY opaque', () => {
+    const palette = [air, leaves, grass, flat];
+    const occ = occluderStates(palette, tex);
+    expect(occ[1]).toBe(false); // leaves: holes show the world behind — must not hide neighbour faces
+    expect(occ[2]).toBe(true); // grass_block: opaque base covers all six dirs despite the cutout overlay
+
+    // A solid cube buried under leaves on one side still emits that face (nothing culled by leaves),
+    // and the leaves themselves render double-sided with no faces culled.
+    const input: GeomInput = {
+      palette,
+      blocks: [
+        { state: 3, pos: [0, 0, 0] }, // fallback occluder cube
+        { state: 1, pos: [0, 1, 0] }, // leaves sitting on top of it
+      ],
+    };
+    const buffers = buildGeometryBuffers(input, tex, { occlude: true });
+    const cube = buffers.find((b) => !b.textured)!;
+    const leaf = buffers.find((b) => b.textured)!;
+    expect(cube.positions.length / 3).toBe(6 * 6); // all six faces survive — leaves hide nothing
+    expect(leaf.doubleSided).toBe(true);
+    expect(leaf.positions.length / 3).toBe(6 * 6); // leaves emit all their faces too
   });
 
   it('marks full opaque cubes single-sided and other geometry double-sided when occluding', () => {
