@@ -59,6 +59,15 @@ export function compoundListTag(items: Compound[]): Tag {
 /** LongArray from prismarine's `[hi, lo]` signed-int32 pairs. */
 export const longArrayTag = (pairs: [number, number][]): Tag => ({ type: 'longArray', value: pairs });
 
+/** IntArray tag (chunk `Position`, entity `UUID`). */
+export const intArrayTag = (values: number[]): Tag => ({ type: 'intArray', value: values.map((v) => v | 0) });
+
+/** List of doubles (entity `Pos`/`Motion` — the game requires the EXACT element type). */
+export const doubleListTag = (values: number[]): Tag => ({ type: 'list', value: { type: 'double', value: values } });
+
+/** List of floats (entity `Rotation` — `getList(…, FLOAT)` drops a double-typed list). */
+export const floatListTag = (values: number[]): Tag => ({ type: 'list', value: { type: 'float', value: values } });
+
 /** LongArray value → `[hi, lo]` pairs (`[]` for absent/non-longArray). */
 export function longArrayPairs(tag: Tag | undefined): [number, number][] {
   if (!tag || tag.type !== 'longArray' || !Array.isArray(tag.value)) return [];

@@ -49,6 +49,13 @@ function readOriginalEntry(buf: Buffer, i: number): OriginalEntry | null {
   return { offsetSectors, sectorCount, timestamp, externalFlag };
 }
 
+export interface RegionBuildOptions {
+  /** Allow edits whose chunk is ABSENT from the original: they are APPENDED as new records
+   *  (in slot order, after every present chunk). The entity-region write path needs this —
+   *  a column that never held entities has no record; block regions keep the strict check. */
+  allowAbsent?: boolean;
+}
+
 /**
  * Build the rewritten region file in memory (pure — no IO, unit-testable).
  *
@@ -57,11 +64,13 @@ function readOriginalEntry(buf: Buffer, i: number): OriginalEntry | null {
  *
  * @param original The current region file bytes (must contain the two header sectors).
  * @param edits    Chunks to re-encode. Every edit must target a chunk PRESENT in the original —
- *   the edit gate upstream only passes fully generated chunks, so an absent slot is a caller bug.
+ *   the edit gate upstream only passes fully generated chunks, so an absent slot is a caller
+ *   bug — unless `allowAbsent` (entity regions insert new records).
  * @param nowSec   Timestamp (epoch seconds) stamped on edited chunks' header entries.
- * @throws If an edit targets an absent chunk or the original header is truncated.
+ * @param options  See {@link RegionBuildOptions}.
+ * @throws If an edit targets an absent chunk (without `allowAbsent`) or the header is truncated.
  */
-export function buildRegionBuffer(original: Buffer, edits: ChunkRewrite[], nowSec: number): RegionBuildResult {
+export function buildRegionBuffer(original: Buffer, edits: ChunkRewrite[], nowSec: number, options: RegionBuildOptions = {}): RegionBuildResult {
   if (original.length < HEADER_SECTORS * SECTOR) {
     throw new Error(`region file is truncated (${original.length} bytes) — refusing to rewrite`);
   }
@@ -69,18 +78,24 @@ export function buildRegionBuffer(original: Buffer, edits: ChunkRewrite[], nowSe
   for (const e of edits) editBySlot.set(slot(e.lx, e.lz), e);
 
   // Every present chunk, in original offset order (stable layout ⇒ byte-identical no-op).
-  const present: { i: number; entry: OriginalEntry }[] = [];
+  const present: { i: number; entry: OriginalEntry | null }[] = [];
   for (let i = 0; i < 1024; i++) {
     const entry = readOriginalEntry(original, i);
     if (entry) present.push({ i, entry });
   }
-  present.sort((a, b) => a.entry.offsetSectors - b.entry.offsetSectors);
+  present.sort((a, b) => (a.entry?.offsetSectors ?? 0) - (b.entry?.offsetSectors ?? 0));
   const presentSlots = new Set(present.map((p) => p.i));
+  const inserted: { i: number; entry: null }[] = [];
   for (const e of edits) {
     if (!presentSlots.has(slot(e.lx, e.lz))) {
-      throw new Error(`edit targets absent chunk ${e.lx},${e.lz} — the edit gate should have refused it`);
+      if (!options.allowAbsent) {
+        throw new Error(`edit targets absent chunk ${e.lx},${e.lz} — the edit gate should have refused it`);
+      }
+      inserted.push({ i: slot(e.lx, e.lz), entry: null });
     }
   }
+  inserted.sort((a, b) => a.i - b.i);
+  present.push(...inserted);
 
   const external: RegionBuildResult['external'] = [];
   const removeExternal: RegionBuildResult['removeExternal'] = [];
@@ -110,10 +125,11 @@ export function buildRegionBuffer(original: Buffer, edits: ChunkRewrite[], nowSe
         payload.writeUInt32BE(compressed.length + 1, 0);
         payload[4] = 2; // zlib
         compressed.copy(payload, 5);
-        if (entry.externalFlag) removeExternal.push({ lx, lz });
+        if (entry?.externalFlag) removeExternal.push({ lx, lz });
       }
       timestamp = nowSec;
     } else {
+      if (!entry) throw new Error(`inserted chunk ${lx},${lz} has no edit — caller bug`);
       // Untouched: full sectors copied verbatim, padding bytes included.
       const start = entry.offsetSectors * SECTOR;
       const end = Math.min(start + entry.sectorCount * SECTOR, original.length);
@@ -160,17 +176,29 @@ export async function writeFileAtomic(filePath: string, data: Buffer): Promise<v
   }
 }
 
+export interface RegionRewriteOptions extends RegionBuildOptions {
+  /** Create the region file (and its folder) when absent — a fresh header + only the edited
+   *  chunks. The entity-region write path needs this; block regions always exist. */
+  createIfMissing?: boolean;
+}
+
 /**
  * Rewrite one region file on disk with the given chunk edits.
  *
  * Ordering: new `.mcc` payloads land (atomically) BEFORE the region swap so the region never
  * references a missing external file; stale `.mcc` files are removed only AFTER the swap.
  *
- * @param filePath Absolute path to the `r.<rx>.<rz>.mca` (must exist).
+ * @param filePath Absolute path to the `r.<rx>.<rz>.mca` (must exist unless `createIfMissing`).
  * @param edits    Chunks to re-encode (see `buildRegionBuffer`).
  * @param nowSec   Header timestamp for edited chunks (defaults to now).
+ * @param options  See {@link RegionRewriteOptions}.
  */
-export async function rewriteRegion(filePath: string, edits: ChunkRewrite[], nowSec = Math.floor(Date.now() / 1000)): Promise<void> {
+export async function rewriteRegion(
+  filePath: string,
+  edits: ChunkRewrite[],
+  nowSec = Math.floor(Date.now() / 1000),
+  options: RegionRewriteOptions = {},
+): Promise<void> {
   const m = path.basename(filePath).match(/^r\.(-?\d+)\.(-?\d+)\.mca$/);
   if (!m) throw new Error(`not a region file name: ${filePath}`);
   const rx = Number(m[1]);
@@ -178,8 +206,15 @@ export async function rewriteRegion(filePath: string, edits: ChunkRewrite[], now
   const dir = path.dirname(filePath);
   const mccPath = (lx: number, lz: number) => path.join(dir, `c.${rx * 32 + lx}.${rz * 32 + lz}.mcc`);
 
-  const original = await fs.readFile(filePath);
-  const { buffer, external, removeExternal } = buildRegionBuffer(original, edits, nowSec);
+  let original: Buffer;
+  try {
+    original = await fs.readFile(filePath);
+  } catch (err) {
+    if (!options.createIfMissing || (err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    original = Buffer.alloc(HEADER_SECTORS * SECTOR); // empty header — every chunk absent
+    await fs.mkdir(dir, { recursive: true });
+  }
+  const { buffer, external, removeExternal } = buildRegionBuffer(original, edits, nowSec, options);
 
   for (const ext of external) await writeFileAtomic(mccPath(ext.lx, ext.lz), ext.data);
   await writeFileAtomic(filePath, buffer);

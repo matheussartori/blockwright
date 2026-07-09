@@ -4,9 +4,9 @@
 // facing right — the transform WorldEdit never fixed. No Three.js, no IO — unit-tested in
 // __tests__/place.test.ts. The ghost preview and the commit share THIS mapping
 // (`ghostTransform` ⇄ `rotateCell`), so what the ghost shows is exactly what lands.
-import type { StructureData } from '@/shared/types';
+import type { StructureData, WorldEntityEdit } from '@/shared/types';
 import { transformProps } from '@/shared/structure/orientation';
-import { AIR, stateKeyOf, type PendingWorldEdit } from './edit-overlay';
+import { AIR, cellKeyOf, stateKeyOf, type PendingWorldEdit } from './edit-overlay';
 
 /** Clockwise quarter-turns about +Y — the `transformProps` rotate convention. */
 export type PlaceTurns = 0 | 1 | 2 | 3;
@@ -55,6 +55,58 @@ export interface PlacePlan {
   edits: PendingWorldEdit[];
   /** Unique SOLID states to resolve for the composite mesh, by state key (air needs none). */
   states: Map<string, PlaceBlockState>;
+  /** Entities to spawn at absolute world positions (rotated with the placement). */
+  entities: WorldEntityEdit[];
+}
+
+/** Rotate a continuous structure-local point CW about +Y, re-normalized like `rotateCell`
+ *  (the min corner of the rotated box back at the origin) — the entity-position analogue. */
+export function rotatePoint(p: readonly number[], size: Vec3, turns: PlaceTurns): Vec3 {
+  const [x, y, z] = p;
+  const [W, , D] = size;
+  switch (turns) {
+    case 1: return [D - z, y, x];
+    case 2: return [W - x, y, D - z];
+    case 3: return [z, y, W - x];
+    default: return [x, y, z];
+  }
+}
+
+/** CW facing chains under one +Y quarter-turn (matches `rotateCell`: south→west→north→east). */
+const PAINTING_FACING_CW = [1, 2, 3, 0]; // 0=south 1=west 2=north 3=east
+const FRAME_FACING_CW: Record<number, number> = { 2: 5, 5: 3, 3: 4, 4: 2 }; // 2=north 3=south 4=west 5=east (0/1 = down/up fixed)
+
+/**
+ * Best-effort rotation of an entity compound for `turns` quarter-turns: yaw in `Rotation`
+ * (+90° per CW turn — south→west, matching the block-property transform), and the hanging
+ * entities' `facing`/`Facing` byte. Anything else rides through verbatim; `Pos`/Tile coords
+ * are stamped by the write path from the final position.
+ */
+export function rotateEntityNbt(nbt: Record<string, unknown>, turns: PlaceTurns): Record<string, unknown> {
+  if (turns === 0) return nbt;
+  const out: Record<string, unknown> = { ...nbt };
+  const rot = out.Rotation;
+  if (Array.isArray(rot) && typeof rot[0] === 'number') {
+    let yaw = (rot[0] + 90 * turns) % 360;
+    if (yaw > 180) yaw -= 360;
+    if (yaw < -180) yaw += 360;
+    out.Rotation = [yaw, ...rot.slice(1)];
+  }
+  const id = typeof out.id === 'string' ? out.id : '';
+  const facingKey = 'facing' in out ? 'facing' : 'Facing' in out ? 'Facing' : null;
+  if (facingKey && typeof out[facingKey] === 'number') {
+    const f = out[facingKey] as number;
+    if (id.endsWith('painting')) {
+      let next = f & 3;
+      for (let i = 0; i < turns; i++) next = PAINTING_FACING_CW[next];
+      out[facingKey] = next;
+    } else if (id.endsWith('item_frame')) {
+      let next = f;
+      for (let i = 0; i < turns; i++) next = FRAME_FACING_CW[next] ?? next;
+      out[facingKey] = next;
+    }
+  }
+  return out;
 }
 
 const VOID = 'minecraft:structure_void';
@@ -65,18 +117,24 @@ const VOID = 'minecraft:structure_void';
  * Void tool): explicit air CLEARS the world cell, `structure_void` and OMITTED cells
  * leave the terrain untouched (they produce no edit).
  *
- * @param data   The structure's size/palette/blocks (the open doc's StructureData).
+ * Fidelity (§2.2): block-entity payloads ride on their cell's edit (a placed chest keeps
+ * its contents) and entities land at their rotated absolute positions — both only when the
+ * source doc carries them.
+ *
+ * @param data   The structure's size/palette/blocks (+ fidelity payloads when present).
  * @param anchor World cell the ROTATED bounding box's min corner sits at.
  * @param turns  CW quarter-turns about +Y.
- * @returns The pending edits plus the unique solid states to resolve.
+ * @returns The pending edits plus the unique solid states to resolve and the entities.
  */
 export function planPlacement(
-  data: Pick<StructureData, 'size' | 'palette' | 'blocks'>,
+  data: Pick<StructureData, 'size' | 'palette' | 'blocks' | 'blockEntities' | 'rawEntities'>,
   anchor: Vec3,
   turns: PlaceTurns,
 ): PlacePlan {
   const edits: PendingWorldEdit[] = [];
   const states = new Map<string, PlaceBlockState>();
+  const beByCell = new Map<string, { id: string; nbt: Record<string, unknown> }>();
+  for (const be of data.blockEntities ?? []) beByCell.set(cellKeyOf(be.pos[0], be.pos[1], be.pos[2]), be);
   // Rewrite each palette entry's props once, not per block.
   const rotated = data.palette.map((entry): { name: string; properties?: Record<string, string> } | null => {
     if (entry.name === VOID) return null; // terrain preserved
@@ -91,11 +149,26 @@ export function planPlacement(
     const st = rotated[b.state];
     if (!st) continue;
     const [x, y, z] = rotateCell(b.pos, data.size, turns);
-    edits.push({ x: anchor[0] + x, y: anchor[1] + y, z: anchor[2] + z, name: st.name, ...(st.properties ? { properties: st.properties } : {}) });
+    const be = st.name !== AIR ? beByCell.get(cellKeyOf(b.pos[0], b.pos[1], b.pos[2])) : undefined;
+    edits.push({
+      x: anchor[0] + x,
+      y: anchor[1] + y,
+      z: anchor[2] + z,
+      name: st.name,
+      ...(st.properties ? { properties: st.properties } : {}),
+      ...(be ? { blockEntity: { ...be.nbt, id: be.id } } : {}),
+    });
     if (st.name !== AIR) {
       const key = stateKeyOf(st.name, st.properties);
       if (!states.has(key)) states.set(key, { name: st.name, properties: st.properties, sourceState: b.state });
     }
   }
-  return { edits, states };
+  const entities: WorldEntityEdit[] = (data.rawEntities ?? []).map((e) => {
+    const [x, y, z] = rotatePoint(e.pos, data.size, turns);
+    return {
+      pos: [anchor[0] + x, anchor[1] + y, anchor[2] + z],
+      nbt: rotateEntityNbt(e.nbt, turns),
+    };
+  });
+  return { edits, states, entities };
 }

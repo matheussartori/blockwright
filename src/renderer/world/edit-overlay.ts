@@ -12,6 +12,10 @@ export interface PendingWorldEdit {
   z: number;
   name: string;
   properties?: Record<string, string>;
+  /** Full block-entity NBT (with `id`) the Place tool carries for this cell — chest contents
+   *  survive the paste. Painting/erasing over the cell replaces the record (and so drops it),
+   *  which is exactly vanilla's "changed block loses its block entity" semantics. */
+  blockEntity?: Record<string, unknown>;
 }
 
 /** A renderable palette entry + its texture keys for one painted block state (from

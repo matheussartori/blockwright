@@ -4,7 +4,7 @@
 // structure block editor) but deliberately its own store: edits here are per-cell records over
 // an unbounded streamed world, not ops over a bounded StructureData.
 import { createStore } from 'zustand/vanilla';
-import type { DimensionId, StructureData, WorldEditApplyResult, WorldExtractResult } from '@/shared/types';
+import type { DimensionId, StructureData, WorldEditApplyResult, WorldEntityEdit, WorldExtractResult } from '@/shared/types';
 import { api } from '../api';
 import {
   AIR,
@@ -52,6 +52,13 @@ const HISTORY_CAP = 60;
 
 type PendingMap = Record<string, PendingWorldEdit>;
 
+/** One undo step: the per-cell block edits plus the entities pending placement. Entities
+ *  aren't cell-keyed, so they snapshot as a plain list alongside the map. */
+interface PendingSnapshot {
+  blocks: PendingMap;
+  entities: WorldEntityEdit[];
+}
+
 export interface WorldEditState {
   /** Edit mode live (a session is open in main and the overlay is composited). */
   active: boolean;
@@ -67,6 +74,9 @@ export interface WorldEditState {
   /** Pending edits, keyed `"x,y,z"` — the overlay compositor + the save payload. */
   pending: PendingMap;
   pendingCount: number;
+  /** Entities pending placement (the Place tool's fidelity payload) — saved with the blocks.
+   *  Not composited into the overlay mesh; the Save dialog reports the count. */
+  pendingEntities: WorldEntityEdit[];
   /** Renderable palette entries per state key (resolved once, reused by the compositor). */
   resolved: Record<string, ResolvedWorldBlock>;
   /** Box-select state: the first corner, and the committed box (both inclusive). */
@@ -76,8 +86,8 @@ export interface WorldEditState {
   place: PlaceGhostState | null;
   /** Chunk keys whose composite changed in the LAST mutation — the layer re-meshes exactly these. */
   lastTouched: string[];
-  past: PendingMap[];
-  future: PendingMap[];
+  past: PendingSnapshot[];
+  future: PendingSnapshot[];
   saving: boolean;
   saveOpen: boolean;
   lastReport: WorldEditApplyResult | null;
@@ -207,6 +217,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     paintBlock: 'minecraft:stone',
     pending: {},
     pendingCount: 0,
+    pendingEntities: [],
     resolved: {},
     anchor: null,
     selection: null,
@@ -245,6 +256,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
         dim: null,
         pending: {},
         pendingCount: 0,
+        pendingEntities: [],
         anchor: null,
         selection: null,
         place: null,
@@ -277,7 +289,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
 
     strokeBegin: () => {
       const s = get();
-      const past = [...s.past, s.pending].slice(-HISTORY_CAP);
+      const past = [...s.past, { blocks: s.pending, entities: s.pendingEntities }].slice(-HISTORY_CAP);
       set({ past, future: [], pending: { ...s.pending } });
     },
 
@@ -439,6 +451,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       set({
         resolved,
         pendingCount: Object.keys(pending).length,
+        pendingEntities: [...get().pendingEntities, ...plan.entities],
         lastTouched: [...touched],
         future: [],
         error: null,
@@ -452,10 +465,11 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       if (!prev) return;
       set({
         past: s.past.slice(0, -1),
-        future: [...s.future, s.pending],
-        pending: prev,
-        pendingCount: Object.keys(prev).length,
-        lastTouched: changedChunks(s.pending, prev),
+        future: [...s.future, { blocks: s.pending, entities: s.pendingEntities }],
+        pending: prev.blocks,
+        pendingCount: Object.keys(prev.blocks).length,
+        pendingEntities: prev.entities,
+        lastTouched: changedChunks(s.pending, prev.blocks),
       });
     },
 
@@ -465,16 +479,17 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       if (!next) return;
       set({
         future: s.future.slice(0, -1),
-        past: [...s.past, s.pending],
-        pending: next,
-        pendingCount: Object.keys(next).length,
-        lastTouched: changedChunks(s.pending, next),
+        past: [...s.past, { blocks: s.pending, entities: s.pendingEntities }],
+        pending: next.blocks,
+        pendingCount: Object.keys(next.blocks).length,
+        pendingEntities: next.entities,
+        lastTouched: changedChunks(s.pending, next.blocks),
       });
     },
 
     discard: () => {
       const touched = chunksOf(Object.keys(get().pending));
-      set({ pending: {}, pendingCount: 0, past: [], future: [], lastTouched: touched, anchor: null });
+      set({ pending: {}, pendingCount: 0, pendingEntities: [], past: [], future: [], lastTouched: touched, anchor: null });
     },
 
     setSaveOpen: (saveOpen) => set({ saveOpen }),
@@ -484,13 +499,14 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       if (!s.dim || !s.pendingCount || s.saving) return null;
       set({ saving: true, error: null });
       try {
-        const report = await api.applyWorldEdits(s.dim, Object.values(s.pending), retention, sizeCapMb);
+        const report = await api.applyWorldEdits(s.dim, Object.values(s.pending), s.pendingEntities, retention, sizeCapMb);
         const touched = chunksOf(Object.keys(s.pending));
         set({
           saving: false,
           lastReport: report,
           pending: {},
           pendingCount: 0,
+          pendingEntities: [],
           past: [],
           future: [],
           lastTouched: touched,

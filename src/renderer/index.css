@@ -6945,6 +6945,11 @@ body.row-resizing {
 .doctor-item.changed > svg {
   color: var(--ok);
 }
+/* The downgrader's target-version picker sits inline in the modal footer. */
+.doctor-downgrade-target {
+  width: 96px;
+  flex-shrink: 0;
+}
 
 /* A copyable Minecraft command row (export success + Jigsaw panel). */
 .command-chip {

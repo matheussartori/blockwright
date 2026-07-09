@@ -13,6 +13,7 @@ import type {
   WorldEditApplyResult,
   WorldEditBlock,
   WorldEditOpenResult,
+  WorldEntityEdit,
   WorldExtractBox,
   WorldExtractResult,
   WorldMeta,
@@ -32,7 +33,7 @@ import type {
   FloorDef,
 } from './generation';
 import type { BlockDictionary, BlockNote, ExportMode, ExportResult, ReassembleResult, RenameProjectResult, ModBlockScope, WindowsReport, WindowId, CatalogBlock, GenerationCatalog, ModuleCategory, LogEntry, UpdateInfo } from './app';
-import type { DoctorFixResult, MaterialsExportRequest, WorkspaceDoctorReport, WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult, WorkspaceUpgradeReport } from './export';
+import type { DoctorFixResult, MaterialsExportRequest, WorkspaceDoctorReport, WorkspaceDowngradeReport, WorkspaceExportRequest, WorkspaceExportPlan, WorkspaceExportResult, WorkspaceUpgradeReport } from './export';
 import type { ResolveBlockResult, SaveVersionRequest, SaveVersionResult } from './edit';
 
 export interface BlockwrightApi {
@@ -110,9 +111,10 @@ export interface BlockwrightApi {
   openWorldEdit: (dim: DimensionId) => Promise<WorldEditOpenResult>;
   /** Close the world-edit session, releasing the session lock. */
   closeWorldEdit: () => Promise<void>;
-  /** Write block edits through the safe write path (enforced backup, per-chunk refusals reported).
-   *  `retention` prunes backup sets past that count after the save (0 = keep all). */
-  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb?: number) => Promise<WorldEditApplyResult>;
+  /** Write block edits (+ placed entities) through the safe write path (enforced backup,
+   *  per-chunk refusals reported). `retention` prunes backup sets past that count after the
+   *  save (0 = keep all). */
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], entities: WorldEntityEdit[], retention: number, sizeCapMb?: number) => Promise<WorldEditApplyResult>;
   /** Extract a box of the active world into a temp `.nbt` structure (committed world, not pending
    *  edits). `nbtLimit` decides `oversized`. The renderer opens it as a tab or routes it to Export As. */
   extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number) => Promise<WorldExtractResult>;
@@ -155,6 +157,9 @@ export interface BlockwrightApi {
   workspaceDoctorFix: (code: string, file: string) => Promise<DoctorFixResult>;
   /** Run the datapack upgrader over the active workspace; resolves to the loss report. */
   workspaceUpgrade: () => Promise<WorkspaceUpgradeReport>;
+  /** Downgrade the workspace's structures to an older MC version (suffixed copies, originals
+   *  untouched); resolves to the loss report. */
+  workspaceDowngrade: (target: string) => Promise<WorkspaceDowngradeReport>;
   /** Watch mode: the on-screen structure file changed on disk (hot-reload it). */
   onFileChanged: (cb: (path: string) => void) => void;
   /** Watch mode: the active workspace's structure folder changed on disk. */

@@ -16,6 +16,7 @@ export function WorldSaveModal() {
   const open = useWorldEdit((s) => s.saveOpen);
   const pending = useWorldEdit((s) => s.pending);
   const pendingCount = useWorldEdit((s) => s.pendingCount);
+  const pendingEntities = useWorldEdit((s) => s.pendingEntities);
   const saving = useWorldEdit((s) => s.saving);
   const report = useWorldEdit((s) => s.lastReport);
   const error = useWorldEdit((s) => s.error);
@@ -43,14 +44,17 @@ export function WorldSaveModal() {
 
   if (!open) return null;
 
+  // The entities tile only appears when a placement carries some — most saves are block-only.
   const stats: { value: number; label: string }[] = done
     ? [
         { value: report?.changedBlocks ?? 0, label: t('worldEdit.statBlocks') },
+        ...((report?.placedEntities ?? 0) > 0 ? [{ value: report!.placedEntities, label: t('worldEdit.statEntities') }] : []),
         { value: report?.editedChunks.length ?? 0, label: t('worldEdit.statChunks') },
         { value: report?.regions.length ?? 0, label: t('worldEdit.statRegions') },
       ]
     : [
         { value: pendingCount, label: t('worldEdit.statBlocks') },
+        ...(pendingEntities.length > 0 ? [{ value: pendingEntities.length, label: t('worldEdit.statEntities') }] : []),
         { value: plan.chunks, label: t('worldEdit.statChunks') },
         { value: plan.regions, label: t('worldEdit.statRegions') },
       ];

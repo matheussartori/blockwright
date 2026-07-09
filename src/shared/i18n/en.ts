@@ -251,6 +251,7 @@ export const en = {
   'worldEdit.confirmSave': 'Write to world',
   'worldEdit.done': 'Done',
   'worldEdit.statBlocks': 'Blocks',
+  'worldEdit.statEntities': 'Entities',
   'worldEdit.statChunks': 'Chunks',
   'worldEdit.statRegions': 'Region files',
   'worldEdit.saveResultTitle': 'Written to the world',
@@ -1103,6 +1104,19 @@ export const en = {
   'upgrade.entry.unknown_block': 'Block id not found at the target version: {detail} — check for a rename or a missing mod.',
   'upgrade.entry.unreadable_nbt': 'Could not read this file ({detail}) — left untouched.',
   'upgrade.entry.no_target_version': 'The workspace has no target Minecraft version — set one first (File ▸ Workspace).',
+
+  // The datapack DOWNGRADER (v2.3 §1.4) — suffixed copies, originals untouched.
+  'doctor.downgrade': 'Downgrade copies…',
+  'doctor.downgradeSummary': 'Downgraded to {target}: {files} structures checked, {written} copies written, {losses} to review.',
+  'doctor.downgradeClean': 'Nothing to downgrade — every structure already loads on that version.',
+  'downgrade.entry.copy_written': 'Downgraded copy written: {detail} (the original is untouched).',
+  'downgrade.entry.dataversion_restamped': 'DataVersion re-stamped down ({detail}).',
+  'downgrade.entry.id_renamed': 'Block id restored to its older name ({detail}) — lossless.',
+  'downgrade.entry.block_substituted': 'Block doesn\'t exist at the target — substituted ({detail}).',
+  'downgrade.entry.block_voided': 'Block doesn\'t exist at the target and has no stand-in — replaced with structure_void: {detail}.',
+  'downgrade.entry.unreadable_nbt': 'Could not read this file ({detail}) — skipped.',
+  'downgrade.entry.target_unsupported': 'Target version {detail} is not supported — the registry floor is 1.18.2.',
+  'downgrade.entry.no_workspace': 'No active workspace — open one first.',
 
   // Beauty Render (File ▸ Render Image… — showcase stills + turntable).
   'menu.renderImage': 'Render Image…',

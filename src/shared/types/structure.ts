@@ -105,6 +105,29 @@ export interface StructureEntity {
   pose?: ArmorStandPose;
 }
 
+/** A block entity's full data payload at a structure-local cell (chest contents, spawner
+ *  config, sign text, …). Unlike `StructureBlock.nbtPos` — a pointer resolved against the
+ *  source file on save — this carries the payload itself, so Place-into-World can re-attach
+ *  container data without re-reading the source. */
+export interface StructureBlockEntity {
+  /** Block position within the structure's local coordinate space. */
+  pos: [number, number, number];
+  /** Block-entity type id, e.g. "minecraft:chest". */
+  id: string;
+  /** Data fields only (`id` and the position live separately). */
+  nbt: Record<string, unknown>;
+}
+
+/** An entity's full NBT for the fidelity paths (Place-into-World) — the renderable
+ *  projection is `StructureData.entities`; this keeps what that projection drops
+ *  (inventory, health, pose details, …). */
+export interface StructureRawEntity {
+  /** Precise structure-local position (doubles). */
+  pos: [number, number, number];
+  /** The whole entity compound (id, Rotation, items, …) verbatim from the source. */
+  nbt: Record<string, unknown>;
+}
+
 /** How a jigsaw constrains the rotation of the piece attached to it. */
 export type JigsawJoint = 'rollable' | 'aligned';
 
@@ -160,6 +183,12 @@ export interface StructureData {
   /** Structure entities (armor stands, item frames, mobs) to draw. Empty when none —
    *  these have no palette block, so the renderer builds their meshes from this list. */
   entities: StructureEntity[];
+  /** Full block-entity payloads by structure-local cell — the fidelity data Place-into-World
+   *  re-attaches (chest contents survive a paste). Absent when the source carries none. */
+  blockEntities?: StructureBlockEntity[];
+  /** Full entity NBT compounds for Place-into-World (what `entities` renders is a lossy
+   *  projection; this is what actually lands in the save). Absent when the source has none. */
+  rawEntities?: StructureRawEntity[];
   /** Storeys recognised from the geometry on load (see `detectFloors`) — the app no
    *  longer asks the user to define the floor plan by hand. Seeds the (editable) Floors
    *  panel + the viewer bands; absent for structures with no clear floor plane. */

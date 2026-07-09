@@ -2,7 +2,7 @@
 // one edit session at a time, opened on the ACTIVE world. Owns the session lifecycle, maps the
 // IPC-shaped edits to the write path's contract, evicts read caches after a save (so re-streamed
 // chunks show the committed state), and fronts the backup manager.
-import type { DimensionId, WorldBackupInfo, WorldEditApplyResult, WorldEditBlock, WorldEditOpenResult } from '@/shared/types';
+import type { DimensionId, WorldBackupInfo, WorldEditApplyResult, WorldEditBlock, WorldEditOpenResult, WorldEntityEdit } from '@/shared/types';
 import { getActiveWorld } from './active-world';
 import { clearChunkResolveCache } from './chunk-resolve';
 import { deleteBackup, listBackups, pruneBackups, pruneBackupsToSize, restoreBackup } from './edit/backup';
@@ -35,13 +35,15 @@ export async function closeWorldEdit(): Promise<void> {
 }
 
 /**
- * Write a batch of block edits through the safe write path, then evict the read caches for the
- * touched chunks (+ the 8 neighbors, whose light flags changed) and prune backups per retention
- * (set count) and per total-size cap (MB; 0 = uncapped — the newest set always survives).
+ * Write a batch of block edits (+ placed entities) through the safe write path, then evict the
+ * read caches for the touched chunks (+ the 8 neighbors, whose light flags changed) and prune
+ * backups per retention (set count) and per total-size cap (MB; 0 = uncapped — the newest set
+ * always survives).
  */
 export async function applyWorldEdits(
   dim: DimensionId,
   edits: WorldEditBlock[],
+  entities: WorldEntityEdit[],
   retention: number,
   sizeCapMb = 0,
 ): Promise<WorldEditApplyResult> {
@@ -54,8 +56,9 @@ export async function applyWorldEdits(
     y: e.y,
     z: e.z,
     state: e.properties && Object.keys(e.properties).length ? { Name: e.name, Properties: e.properties } : { Name: e.name },
+    ...(e.blockEntity ? { blockEntity: e.blockEntity } : {}),
   }));
-  const report = await session.applyEdits(mapped);
+  const report = await session.applyEdits(mapped, entities);
 
   // Committed state must be what streams next: evict the edited chunks AND their neighbors.
   const world = getActiveWorld();
@@ -81,6 +84,7 @@ export async function applyWorldEdits(
 
   return {
     changedBlocks: report.changedBlocks,
+    placedEntities: report.placedEntities,
     editedChunks: report.editedChunks,
     regions: report.regions,
     backup: report.backup,

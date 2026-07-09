@@ -97,3 +97,18 @@ export interface WorkspaceUpgradeReport {
   checkedFiles: number;
   entries: UpgradeEntry[];
 }
+
+/** The DOWNGRADER's loss report (v2.3 §1.4) — the upgrader's mirror, with one hard rule the
+ *  upgrader doesn't need: originals are NEVER touched; every downgrade lands as a sibling
+ *  copy suffixed with the target version. Entries reuse `UpgradeEntry` and localize as
+ *  `downgrade.entry.<code>`. */
+export interface WorkspaceDowngradeReport {
+  workspace: string | null;
+  /** The MC version the copies were downgraded to. */
+  target: string;
+  /** Structure `.nbt`s examined (files already at/below the target are skipped). */
+  checkedFiles: number;
+  /** Downgraded copies written. */
+  written: number;
+  entries: UpgradeEntry[];
+}

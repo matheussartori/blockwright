@@ -21,6 +21,7 @@ import type {
   WorldEditApplyResult,
   WorldEditBlock,
   WorldEditOpenResult,
+  WorldEntityEdit,
   WorldExtractBox,
   WorldExtractResult,
   WorldMeta,
@@ -35,6 +36,7 @@ import type {
   WorkspaceDoctorReport,
   DoctorFixResult,
   WorkspaceUpgradeReport,
+  WorkspaceDowngradeReport,
   ResolveBlockResult,
   SaveVersionRequest,
   SaveVersionResult,
@@ -130,8 +132,8 @@ const api: BlockwrightApi = {
   openWorldEdit: (dim: DimensionId): Promise<WorldEditOpenResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldEditOpen, dim),
   closeWorldEdit: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.worldEditClose),
-  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb = 0): Promise<WorldEditApplyResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, retention, sizeCapMb),
+  applyWorldEdits: (dim: DimensionId, edits: WorldEditBlock[], entities: WorldEntityEdit[], retention: number, sizeCapMb = 0): Promise<WorldEditApplyResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldEditApply, dim, edits, entities, retention, sizeCapMb),
   extractFromWorld: (dim: DimensionId, box: WorldExtractBox, nbtLimit: number): Promise<WorldExtractResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.worldExtract, dim, box, nbtLimit),
   listWorldBackups: (): Promise<WorldBackupInfo[]> => ipcRenderer.invoke(IPC_CHANNELS.worldBackupsList),
@@ -163,6 +165,8 @@ const api: BlockwrightApi = {
   workspaceDoctorFix: (code: string, file: string): Promise<DoctorFixResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.workspaceDoctorFix, code, file),
   workspaceUpgrade: (): Promise<WorkspaceUpgradeReport> => ipcRenderer.invoke(IPC_CHANNELS.workspaceUpgrade),
+  workspaceDowngrade: (target: string): Promise<WorkspaceDowngradeReport> =>
+    ipcRenderer.invoke(IPC_CHANNELS.workspaceDowngrade, target),
   onFileChanged: (cb: (path: string) => void) => {
     ipcRenderer.on(IPC_EVENTS.fileChanged, (_e, p: string) => cb(p));
   },

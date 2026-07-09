@@ -34,7 +34,7 @@ import { activeWorldMeta, findWorldStructures, getChunkPayload, getChunksPayload
 import { getWorldWaypoints, setWorldWaypoints } from './world-waypoints';
 import { applyWorldEdits, closeWorldEdit, deleteWorldBackup, listWorldBackups, openWorldEdit, restoreWorldBackup } from './world/edit-service';
 import { extractWorldRegion } from './world/extract';
-import type { WorldEditBlock, WorldExtractBox } from '@/shared/types';
+import type { WorldEditBlock, WorldEntityEdit, WorldExtractBox } from '@/shared/types';
 import { clearChunkResolveCache } from './world/chunk-resolve';
 import { isWorldDir } from './world/anvil/world-paths';
 import {
@@ -53,6 +53,7 @@ import { getPinnedWorkspace } from './pinned-workspace';
 import { planExport, runExport } from './export';
 import { runWorkspaceDoctor } from './export/doctor';
 import { applyDoctorFix, runWorkspaceUpgrade } from './export/upgrade';
+import { runWorkspaceDowngrade } from './export/downgrade';
 import { watchOpenFile } from './file-watch';
 import { getMainWindow, notifyRecentWorkspaces, notifyRecentWorlds, openFileDialog, openWorldDialog } from './window';
 import { exportStructure, exportToWorld } from './export/local-export';
@@ -244,8 +245,10 @@ export function registerIpc(): void {
   // ── World editing (v2.2): the safe write path (main/world/edit/) behind IPC ─────────
   ipcMain.handle(IPC_CHANNELS.worldEditOpen, async (_e, dim: DimensionId) => openWorldEdit(dim));
   ipcMain.handle(IPC_CHANNELS.worldEditClose, async () => closeWorldEdit());
-  ipcMain.handle(IPC_CHANNELS.worldEditApply, async (_e, dim: DimensionId, edits: WorldEditBlock[], retention: number, sizeCapMb: number) =>
-    applyWorldEdits(dim, edits, retention, sizeCapMb ?? 0),
+  ipcMain.handle(
+    IPC_CHANNELS.worldEditApply,
+    async (_e, dim: DimensionId, edits: WorldEditBlock[], entities: WorldEntityEdit[], retention: number, sizeCapMb: number) =>
+      applyWorldEdits(dim, edits, entities ?? [], retention, sizeCapMb ?? 0),
   );
   ipcMain.handle(IPC_CHANNELS.worldExtract, async (_e, dim: DimensionId, box: WorldExtractBox, nbtLimit: number) =>
     extractWorldRegion(dim, box, nbtLimit),
@@ -281,6 +284,7 @@ export function registerIpc(): void {
     applyDoctorFix(code, file),
   );
   ipcMain.handle(IPC_CHANNELS.workspaceUpgrade, async () => runWorkspaceUpgrade());
+  ipcMain.handle(IPC_CHANNELS.workspaceDowngrade, async (_e, target: string) => runWorkspaceDowngrade(target));
 
   // Save a Beauty Render (PNG still / WebM turntable) via the native save dialog.
   ipcMain.handle(IPC_CHANNELS.saveRender, async (_e, data: ArrayBuffer, suggestedName: string, kind: 'png' | 'webm') => {

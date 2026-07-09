@@ -79,6 +79,9 @@ export const IPC_CHANNELS = {
   workspaceDoctorFix: 'workspace:doctor-fix',
   /** Run the datapack upgrader over the active workspace → WorkspaceUpgradeReport (the loss report). */
   workspaceUpgrade: 'workspace:upgrade',
+  /** Run the datapack DOWNGRADER (payload: target MC version) → WorkspaceDowngradeReport.
+   *  Originals untouched — copies land with a version suffix. */
+  workspaceDowngrade: 'workspace:downgrade',
   /** Save the edited structure as a new version (payload: SaveVersionRequest) → SaveVersionResult. */
   saveVersion: 'structure:save-version',
   /** Plan a full jigsaw assembly from a structure (payload: path + AssembleOptions). */

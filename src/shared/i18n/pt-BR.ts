@@ -253,6 +253,7 @@ export const ptBR: Messages = {
   'worldEdit.confirmSave': 'Escrever no mundo',
   'worldEdit.done': 'Concluído',
   'worldEdit.statBlocks': 'Blocos',
+  'worldEdit.statEntities': 'Entidades',
   'worldEdit.statChunks': 'Chunks',
   'worldEdit.statRegions': 'Arquivos de região',
   'worldEdit.saveResultTitle': 'Escrito no mundo',
@@ -1105,6 +1106,19 @@ export const ptBR: Messages = {
   'upgrade.entry.unknown_block': 'Id de bloco não encontrado na versão alvo: {detail} — verifique um rename ou mod ausente.',
   'upgrade.entry.unreadable_nbt': 'Não foi possível ler este arquivo ({detail}) — mantido intacto.',
   'upgrade.entry.no_target_version': 'O workspace não tem versão alvo do Minecraft — defina uma primeiro (File ▸ Workspace).',
+
+  // O DOWNGRADER de datapack (v2.3 §1.4) — cópias com sufixo, originais intactos.
+  'doctor.downgrade': 'Rebaixar em cópias…',
+  'doctor.downgradeSummary': 'Rebaixado para {target}: {files} estruturas verificadas, {written} cópias gravadas, {losses} para revisar.',
+  'doctor.downgradeClean': 'Nada a rebaixar — todas as estruturas já carregam nessa versão.',
+  'downgrade.entry.copy_written': 'Cópia rebaixada gravada: {detail} (o original está intacto).',
+  'downgrade.entry.dataversion_restamped': 'DataVersion rebaixado ({detail}).',
+  'downgrade.entry.id_renamed': 'Id de bloco restaurado ao nome antigo ({detail}) — sem perdas.',
+  'downgrade.entry.block_substituted': 'Bloco não existe na versão alvo — substituído ({detail}).',
+  'downgrade.entry.block_voided': 'Bloco não existe na versão alvo e não tem substituto — trocado por structure_void: {detail}.',
+  'downgrade.entry.unreadable_nbt': 'Não foi possível ler este arquivo ({detail}) — ignorado.',
+  'downgrade.entry.target_unsupported': 'A versão alvo {detail} não é suportada — o piso do registro é 1.18.2.',
+  'downgrade.entry.no_workspace': 'Nenhum workspace ativo — abra um primeiro.',
 
   // Beauty Render (Arquivo ▸ Renderizar imagem… — capturas de vitrine + turntable).
   'menu.renderImage': 'Renderizar imagem…',

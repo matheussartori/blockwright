@@ -3,7 +3,7 @@
 // structure_void/omitted preserve, directional blockstates rewritten).
 import { describe, expect, it } from 'vitest';
 import type { PaletteEntry, StructureBlock } from '@/shared/types';
-import { ghostTransform, planPlacement, rotateCell, rotatedSize, type PlaceTurns, type Vec3 } from '../place';
+import { ghostTransform, planPlacement, rotateCell, rotateEntityNbt, rotatePoint, rotatedSize, type PlaceTurns, type Vec3 } from '../place';
 
 const SIZE: Vec3 = [3, 2, 5];
 const TURNS: PlaceTurns[] = [0, 1, 2, 3];
@@ -117,5 +117,58 @@ describe('planPlacement', () => {
       'minecraft:stone',
     ]);
     expect(plan.states.get('minecraft:stone')?.sourceState).toBe(0);
+  });
+
+  it('carries the cell block-entity NBT onto its (rotated) edit', () => {
+    const chest = { pos: [0, 0, 0] as Vec3, id: 'minecraft:chest', nbt: { Items: [{ Slot: 0, id: 'minecraft:diamond', Count: 3 }] } };
+    const plan = planPlacement({ ...data, blockEntities: [chest] }, [10, 64, -5], 1);
+    // Local [0,0,0] in a 3×2×1 box, 1 CW turn → [D-1-z, y, x] = [0,0,0]; anchor offsets it.
+    const edit = plan.edits.find((e) => e.blockEntity);
+    expect([edit?.x, edit?.y, edit?.z]).toEqual([10, 64, -5]);
+    expect(edit?.name).toBe('minecraft:stone');
+    expect(edit?.blockEntity).toMatchObject({ id: 'minecraft:chest', Items: [{ Slot: 0, id: 'minecraft:diamond', Count: 3 }] });
+  });
+
+  it('maps entities to rotated absolute positions with rotated yaw', () => {
+    const stand = { pos: [0.5, 0, 0.5] as Vec3, nbt: { id: 'minecraft:armor_stand', Rotation: [0, 0] } };
+    const plan = planPlacement({ ...data, rawEntities: [stand] }, [10, 64, -5], 1);
+    expect(plan.entities).toHaveLength(1);
+    // Continuous [0.5,0,0.5] in a 3×2×1 box, 1 CW turn → [D - z, y, x] = [0.5, 0, 0.5].
+    expect(plan.entities[0].pos).toEqual([10.5, 64, -4.5]);
+    // Yaw 0 = south; a CW turn faces it west (+90), matching the blockstate rewrite.
+    expect(plan.entities[0].nbt.Rotation).toEqual([90, 0]);
+  });
+});
+
+describe('rotatePoint', () => {
+  it('agrees with rotateCell on block centers', () => {
+    for (const turns of TURNS) {
+      for (const cell of [
+        [0, 0, 0],
+        [2, 1, 4],
+        [1, 0, 3],
+      ] as const) {
+        const p = rotatePoint([cell[0] + 0.5, cell[1], cell[2] + 0.5], SIZE, turns);
+        expect([Math.floor(p[0]), p[1], Math.floor(p[2])]).toEqual(rotateCell(cell, SIZE, turns));
+      }
+    }
+  });
+});
+
+describe('rotateEntityNbt', () => {
+  it('normalizes yaw into (-180, 180] and leaves pitch alone', () => {
+    expect(rotateEntityNbt({ Rotation: [170, 10] }, 1).Rotation).toEqual([-100, 10]);
+    expect(rotateEntityNbt({ Rotation: [-90, 0] }, 2).Rotation).toEqual([90, 0]);
+  });
+
+  it('rotates hanging-entity facing (item frame: north→east; painting: south→west)', () => {
+    expect(rotateEntityNbt({ id: 'minecraft:item_frame', Facing: 2 }, 1).Facing).toBe(5);
+    expect(rotateEntityNbt({ id: 'minecraft:item_frame', Facing: 1 }, 1).Facing).toBe(1); // up stays
+    expect(rotateEntityNbt({ id: 'minecraft:painting', facing: 0 }, 1).facing).toBe(1);
+  });
+
+  it('is the identity at zero turns (same reference — no copies for the common case)', () => {
+    const nbt = { id: 'minecraft:cow', Rotation: [45, 0] };
+    expect(rotateEntityNbt(nbt, 0)).toBe(nbt);
   });
 });

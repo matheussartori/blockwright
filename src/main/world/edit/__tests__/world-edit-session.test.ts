@@ -5,7 +5,7 @@ import { access, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { blockIndexAt, decodeChunk } from '../../anvil/chunk-decode';
+import { blockIndexAt, decodeChunk, decodeEntities } from '../../anvil/chunk-decode';
 import { RegionFile } from '../../anvil/region-file';
 import { listBackups, restoreBackup } from '../backup';
 import { encodeTagRoot } from '../nbt-tree';
@@ -63,6 +63,7 @@ describe('WorldEditSession (integration)', () => {
         { x: 1, y: 2, z: 3, state: { Name: 'minecraft:diamond_block' } }, // chunk (0,0)
         { x: 33, y: 1, z: 1, state: { Name: 'minecraft:gold_block' } }, // chunk (2,0) — proto, refused
       ],
+      [],
       1751800000000,
     );
 
@@ -105,10 +106,10 @@ describe('WorldEditSession (integration)', () => {
 
   it('backs up each file only once per session, and restore brings the original back', async () => {
     session = await WorldEditSession.open(root, DIM);
-    const first = await session.applyEdits([{ x: 1, y: 2, z: 3, state: { Name: 'minecraft:diamond_block' } }], 1751800000000);
+    const first = await session.applyEdits([{ x: 1, y: 2, z: 3, state: { Name: 'minecraft:diamond_block' } }], [], 1751800000000);
     expect(first.backup).not.toBeNull();
 
-    const second = await session.applyEdits([{ x: 2, y: 2, z: 3, state: { Name: 'minecraft:gold_block' } }], 1751800600000);
+    const second = await session.applyEdits([{ x: 2, y: 2, z: 3, state: { Name: 'minecraft:gold_block' } }], [], 1751800600000);
     expect(second.backup).toBeNull(); // same files — already backed up this session
 
     await restoreBackup(root, first.backup!.id);
@@ -137,6 +138,65 @@ describe('WorldEditSession (integration)', () => {
     const nbt = (await region.readChunkNBT(0, 0)) as { block_entities: Record<string, unknown>[] };
     expect(nbt.block_entities).toHaveLength(1);
     expect(nbt.block_entities[0]).toMatchObject({ id: 'minecraft:chest', x: 4, y: 5, z: 6 });
+  });
+
+  it('places entities into the entities/ set, creating the file and regenerating UUIDs', async () => {
+    session = await WorldEditSession.open(root, DIM);
+    const report = await session.applyEdits(
+      [{ x: 4, y: 2, z: 4, state: { Name: 'minecraft:chest' }, blockEntity: { id: 'minecraft:chest', Items: [{ Slot: 0, id: 'minecraft:diamond', Count: 3 }] } }],
+      [
+        { pos: [4.5, 1, 4.5], nbt: { id: 'minecraft:armor_stand', Rotation: [90, 0], UUID: [1, 2, 3, 4] } },
+        { pos: [20.5, 1, 3.5], nbt: { id: 'minecraft:cow' } }, // chunk (1,0) — entity-only, no block edit
+      ],
+      1751800000000,
+    );
+    expect(report.placedEntities).toBe(2);
+    expect(report.refused).toHaveLength(0);
+    expect(report.editedChunks).toEqual(expect.arrayContaining([{ cx: 0, cz: 0 }, { cx: 1, cz: 0 }]));
+
+    // The chest's inventory landed in the chunk's block_entities.
+    const region = await RegionFile.open(path.join(root, 'region', 'r.0.0.mca'));
+    const chunkNbt = (await region.readChunkNBT(0, 0)) as { block_entities: Record<string, unknown>[] };
+    expect(chunkNbt.block_entities[0]).toMatchObject({
+      id: 'minecraft:chest',
+      Items: [{ Slot: 0, id: 'minecraft:diamond', Count: 3 }],
+    });
+
+    // The fixture world has NO entities/ folder — the write created it (and the report says so).
+    const entPath = path.join(root, 'entities', 'r.0.0.mca');
+    expect(report.regions).toContain(entPath);
+    const entRegion = await RegionFile.open(entPath);
+    const chunk00 = (await entRegion.readChunkNBT(0, 0)) as Record<string, unknown>;
+    expect(chunk00.Position).toEqual([0, 0]);
+    expect(chunk00.DataVersion).toBe(3955); // synthesized from the block chunk's
+    const stands = decodeEntities(chunk00);
+    expect(stands).toHaveLength(1);
+    expect(stands[0].pos).toEqual([4.5, 1, 4.5]);
+    expect(stands[0].nbt.Rotation).toEqual([90, 0]);
+    expect(stands[0].nbt.UUID).not.toEqual([1, 2, 3, 4]); // regenerated — a paste never duplicates one
+
+    // The entity-only chunk (1,0) got its own record in the same file.
+    const chunk10 = (await entRegion.readChunkNBT(1, 0)) as Record<string, unknown>;
+    const cows = decodeEntities(chunk10);
+    expect(cows[0].nbt.id).toBe('minecraft:cow');
+    expect(cows[0].pos).toEqual([20.5, 1, 3.5]);
+
+    // A freshly created entities file is NOT in the backup set (there was nothing to back up).
+    expect(report.backup?.files ?? []).not.toContain(path.join('entities', 'r.0.0.mca'));
+  });
+
+  it('refuses entities aimed at ungenerated or proto chunks', async () => {
+    session = await WorldEditSession.open(root, DIM);
+    const report = await session.applyEdits(
+      [],
+      [
+        { pos: [36.5, 1, 3.5], nbt: { id: 'minecraft:cow' } }, // chunk (2,0) — proto
+        { pos: [5000.5, 1, 5000.5], nbt: { id: 'minecraft:cow' } }, // ungenerated
+      ],
+      1751800000000,
+    );
+    expect(report.placedEntities).toBe(0);
+    expect(report.refused).toHaveLength(2);
   });
 
   it('close releases the lock and further writes are refused', async () => {

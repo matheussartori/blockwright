@@ -87,12 +87,41 @@ function blockEntry(block: AuthoringBlock): Record<string, Tag> {
   return out;
 }
 
+/** `inferCompound` for an ENTITY compound: the fields the game reads by EXACT list/array type
+ *  are stamped explicitly — `Rotation` must be a FLOAT list (`getList(…, FLOAT)` silently drops
+ *  a double/int-typed one, losing every pasted mob's facing), `Pos`/`Motion` double lists, and
+ *  a 4-int `UUID` the IntArray form. Everything else keeps the best-effort inference. Exported
+ *  for the world entity-write path (same fidelity rule, same tag shapes). */
+export function inferEntityCompound(obj: Record<string, unknown>): { type: string; value: Record<string, Tag> } {
+  const out = inferCompound(obj);
+  const numbers = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => typeof n === 'number');
+  const floatList = (v: number[]): Tag => ({ type: 'list', value: { type: 'float', value: v } });
+  if (numbers(obj.Rotation)) out.value.Rotation = floatList(obj.Rotation);
+  if (numbers(obj.Pos)) out.value.Pos = doubleList(obj.Pos);
+  if (numbers(obj.Motion)) out.value.Motion = doubleList(obj.Motion);
+  if (numbers(obj.UUID) && obj.UUID.length === 4) out.value.UUID = { type: 'intArray', value: obj.UUID.map(Math.trunc) };
+  // Armor-stand `Pose`: every bone is a float list too.
+  const pose = obj.Pose;
+  if (pose && typeof pose === 'object' && !Array.isArray(pose)) {
+    const bones: Record<string, Tag> = {};
+    for (const [bone, v] of Object.entries(pose as Record<string, unknown>)) {
+      if (numbers(v)) bones[bone] = floatList(v);
+    }
+    if (Object.keys(bones).length) {
+      const poseTag = out.value.Pose;
+      const poseValue = poseTag && poseTag.type === 'compound' ? (poseTag.value as Record<string, Tag>) : {};
+      out.value.Pose = compound({ ...poseValue, ...bones });
+    }
+  }
+  return out;
+}
+
 function entityEntry(entity: AuthoringEntity): Record<string, Tag> {
   const out: Record<string, Tag> = {
     pos: doubleList(entity.pos),
     blockPos: intList(entity.blockPos),
   };
-  if (entity.nbt && Object.keys(entity.nbt).length > 0) out.nbt = inferCompound(entity.nbt);
+  if (entity.nbt && Object.keys(entity.nbt).length > 0) out.nbt = inferEntityCompound(entity.nbt);
   return out;
 }
 

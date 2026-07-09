@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import * as nbt from 'prismarine-nbt';
-import type { JigsawConnector, PaletteEntry, StructureData } from '@/shared/types';
+import type { JigsawConnector, PaletteEntry, StructureBlockEntity, StructureData } from '@/shared/types';
 import { getActiveWorkspace, hasContent } from '../assets/content-pack';
 import { collectTextures } from '../assets/model-loader';
 import { isAir, resolveBlock } from '../assets/blockstate-resolver';
@@ -16,7 +16,7 @@ import { decodeLitematic } from './litematica';
 // The raw structure shape lives in ./raw (shared by every codec); re-exported here so the
 // existing `from './load-structure'` importers (jigsaw extraction) keep resolving it.
 export type { RawPaletteEntry, RawBlock } from './raw';
-import type { RawEntity, RawPaletteEntry, RawBlock } from './raw';
+import { omitKeys, type RawBlockEntity, type RawEntity, type RawPaletteEntry, type RawBlock } from './raw';
 
 /** Lightweight structure metadata for jigsaw assembly: just size + connectors,
  *  skipping the (expensive) model resolution that full loading does. */
@@ -48,6 +48,7 @@ export function buildStructureData(
   rawBlocks: RawBlock[],
   rawEntities: RawEntity[] = [],
   dataVersion?: number,
+  rawBlockEntities?: RawBlockEntity[],
 ): StructureData {
   const withContent = hasContent();
   // Resolve models if the vanilla pack is present or a mod workspace is open
@@ -78,6 +79,22 @@ export function buildStructureData(
   const entities = resolveEntities(rawEntities, canResolve);
   for (const e of entities) if (e.textureKey) textureSet.add(e.textureKey);
 
+  // Fidelity payloads for Place-into-World: full block-entity NBT (from the codec's separate
+  // list when it has one — `.schem`/`.litematic` — else derived from the `.nbt` per-block nbt)
+  // and full entity compounds (what `entities` above renders is a lossy projection).
+  const blockEntities: StructureBlockEntity[] =
+    rawBlockEntities?.map((be) => ({ pos: be.pos, id: be.id, nbt: be.nbt })) ??
+    rawBlocks
+      .filter((b) => b.nbt && typeof b.nbt.id === 'string')
+      .map((b) => ({
+        pos: b.pos as [number, number, number],
+        id: b.nbt!.id as string,
+        nbt: omitKeys(b.nbt!, ['id']),
+      }));
+  const fullEntities = rawEntities
+    .filter((e) => typeof e.nbt.id === 'string')
+    .map((e) => ({ pos: e.pos, nbt: e.nbt }));
+
   return {
     name: path.basename(filePath),
     path: filePath,
@@ -90,6 +107,8 @@ export function buildStructureData(
     jigsaws: extractJigsaws(rawPalette, rawBlocks),
     dataMarkers: extractDataMarkers(rawPalette, rawBlocks),
     entities,
+    ...(blockEntities.length ? { blockEntities } : {}),
+    ...(fullEntities.length ? { rawEntities: fullEntities } : {}),
     ...(dataVersion !== undefined ? { dataVersion } : {}),
   };
 }
@@ -102,7 +121,7 @@ export async function loadStructure(filePath: string): Promise<StructureData> {
   const lower = filePath.toLowerCase();
   if (lower.endsWith('.schem') || lower.endsWith('.litematic')) {
     const raw = lower.endsWith('.schem') ? await decodeSchem(buffer) : await decodeLitematic(buffer);
-    return buildStructureData(filePath, raw.size, raw.palette, raw.blocks, raw.entities ?? []);
+    return buildStructureData(filePath, raw.size, raw.palette, raw.blocks, raw.entities ?? [], undefined, raw.blockEntities);
   }
   const { parsed } = await nbt.parse(buffer);
   const root = nbt.simplify(parsed) as {
