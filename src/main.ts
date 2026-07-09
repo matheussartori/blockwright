@@ -32,10 +32,14 @@ configureGpuFallback();
 // Privileged scheme must be declared before the app is ready.
 registerTextureScheme();
 
-// Open-with on macOS (file association / drag onto dock icon).
+// Open-with on macOS (file association / drag onto dock icon). The app can be
+// alive with NO window (last window closed, still in the dock): openFile()
+// queues the path, and we recreate the window here so the queue flushes on
+// first paint — `activate` is not guaranteed to fire for open-file launches.
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
   openFile(filePath);
+  if (app.isReady() && BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
 /** The app/dock icon (the squircle app-icon tile, `build/icon.png`). The packaged

@@ -14,17 +14,24 @@ import { getRecentWorlds } from './recent-worlds';
 import { getActiveWorkspace } from './structure/assets/content-pack';
 
 let mainWindow: BrowserWindow | null = null;
+// True once the CURRENT window's renderer finished loading — sends before that
+// are lost (no listeners yet), so open requests queue until first paint.
+let rendererReady = false;
 let pendingOpenPath: string | null = null;
 let pendingOpenWorld: string | null = null;
 
+/** The main window, or null if it doesn't exist or was closed. On macOS the app
+ *  outlives its last window (still in the dock), so the stale reference would
+ *  otherwise be a destroyed shell whose `webContents.send` throws. */
 export function getMainWindow(): BrowserWindow | null {
-  return mainWindow;
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
 }
 
 /** Open a file now if the window is ready, otherwise queue it until first paint. */
 export function openFile(filePath: string): void {
-  if (mainWindow) {
-    mainWindow.webContents.send(IPC_EVENTS.openPath, filePath);
+  const win = getMainWindow();
+  if (win && rendererReady) {
+    win.webContents.send(IPC_EVENTS.openPath, filePath);
   } else {
     pendingOpenPath = filePath;
   }
@@ -42,8 +49,9 @@ export async function openFileDialog(): Promise<string | null> {
       { name: mt('dialog.litematicFilter'), extensions: ['litematic'] },
     ],
   };
-  const result = mainWindow
-    ? await dialog.showOpenDialog(mainWindow, options)
+  const win = getMainWindow();
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
     : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths[0];
 }
@@ -54,8 +62,9 @@ export async function openDirectoryDialog(): Promise<string | null> {
     title: mt('dialog.openWorkspaceTitle'),
     properties: ['openDirectory'],
   };
-  const result = mainWindow
-    ? await dialog.showOpenDialog(mainWindow, options)
+  const win = getMainWindow();
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
     : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths[0];
 }
@@ -66,142 +75,144 @@ export async function openWorldDialog(): Promise<string | null> {
     title: mt('dialog.openWorldTitle'),
     properties: ['openDirectory'],
   };
-  const result = mainWindow
-    ? await dialog.showOpenDialog(mainWindow, options)
+  const win = getMainWindow();
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
     : await dialog.showOpenDialog(options);
   return result.canceled ? null : result.filePaths[0];
 }
 
 /** Ask the renderer to open a world folder now, or queue it until first paint. */
 export function openWorld(root: string): void {
-  if (mainWindow) mainWindow.webContents.send(IPC_EVENTS.openWorld, root);
+  const win = getMainWindow();
+  if (win && rendererReady) win.webContents.send(IPC_EVENTS.openWorld, root);
   else pendingOpenWorld = root;
 }
 
 /** Push the recent-worlds list to the renderer (keeps the welcome view in sync). */
 export function notifyRecentWorlds(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.recentWorldsChanged, getRecentWorlds());
+  getMainWindow()?.webContents.send(IPC_EVENTS.recentWorldsChanged, getRecentWorlds());
 }
 
 /** Ask the renderer to export the current build (it picks the source + name).
  *  `mode` picks the flavour: a pure single `.nbt` or the jigsaw assembly. */
 export function notifyExportFile(mode: ExportMode): void {
-  mainWindow?.webContents.send(IPC_EVENTS.exportFile, mode);
+  getMainWindow()?.webContents.send(IPC_EVENTS.exportFile, mode);
 }
 
 /** Ask the renderer to export the current build into a Minecraft world save. */
 export function notifyExportToWorld(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.exportToWorld);
+  getMainWindow()?.webContents.send(IPC_EVENTS.exportToWorld);
 }
 
 /** Ask the renderer to open the "Export to mod" dialog for the active document. */
 export function notifyExportToWorkspace(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.exportToWorkspace);
+  getMainWindow()?.webContents.send(IPC_EVENTS.exportToWorkspace);
 }
 
 /** Ask the renderer to open the Rename Project dialog (File ▸ Rename Project…). */
 export function notifyRenameProject(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.renameProject);
+  getMainWindow()?.webContents.send(IPC_EVENTS.renameProject);
 }
 
 /** Ask the renderer to run the Open Jigsaw Assembly flow (File ▸ Open Jigsaw Assembly…). */
 export function notifyOpenAssembly(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openAssembly);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openAssembly);
 }
 
 /** Ask the renderer to run the Compare-with-File flow (File ▸ Compare with File…). */
 export function notifyCompareFile(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.compareFile);
+  getMainWindow()?.webContents.send(IPC_EVENTS.compareFile);
 }
 
 /** Ask the renderer to open the Re-theme dialog (File ▸ Re-theme Structure…). */
 export function notifyRetheme(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.retheme);
+  getMainWindow()?.webContents.send(IPC_EVENTS.retheme);
 }
 
 /** Ask the renderer to open the Beauty Render dialog (File ▸ Render Image…). */
 export function notifyRenderImage(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.renderImage);
+  getMainWindow()?.webContents.send(IPC_EVENTS.renderImage);
 }
 
 /** Ask the renderer to open the Worldgen Doctor (File ▸ Workspace Check-Up…). */
 export function notifyOpenDoctor(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openDoctor);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openDoctor);
 }
 
 /** Ask the renderer to run the Reimport from World flow (File ▸ Reimport from World…). */
 export function notifyReimportWorld(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.reimportWorld);
+  getMainWindow()?.webContents.send(IPC_EVENTS.reimportWorld);
 }
 
 /** Push the current recents list to the renderer (keeps the welcome view in sync). */
 export function notifyRecents(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());
+  getMainWindow()?.webContents.send(IPC_EVENTS.recentsChanged, getRecents());
 }
 
 /** Push the active workspace to the renderer (drives the workspace badge). */
 export function notifyWorkspace(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.workspaceChanged, getActiveWorkspace());
+  getMainWindow()?.webContents.send(IPC_EVENTS.workspaceChanged, getActiveWorkspace());
 }
 
 /** Push the recent-workspaces list to the renderer (keeps the welcome view in sync). */
 export function notifyRecentWorkspaces(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.recentWorkspacesChanged, getRecentWorkspaces());
+  getMainWindow()?.webContents.send(IPC_EVENTS.recentWorkspacesChanged, getRecentWorkspaces());
 }
 
 /** Push the pinned workspace's root (or null) to the renderer (drives the statusbar pin). */
 export function notifyPinnedWorkspace(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.pinnedWorkspaceChanged, getPinnedWorkspace()?.root ?? null);
+  getMainWindow()?.webContents.send(IPC_EVENTS.pinnedWorkspaceChanged, getPinnedWorkspace()?.root ?? null);
 }
 
 /** Ask the renderer to close the current structure (back to the welcome view). */
 export function notifyClose(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.closeStructure);
+  getMainWindow()?.webContents.send(IPC_EVENTS.closeStructure);
 }
 
 /** Ask the renderer to open the Settings panel, optionally on a given section
  *  (e.g. 'about' when invoked from the native About menu item). */
 export function notifyOpenSettings(section?: string): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openSettings, section);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openSettings, section);
 }
 
 /** Ask the renderer to toggle a floating window's visibility (View menu). */
 export function notifyWindowToggle(id: string): void {
-  mainWindow?.webContents.send(IPC_EVENTS.windowToggle, id);
+  getMainWindow()?.webContents.send(IPC_EVENTS.windowToggle, id);
 }
 
 /** Ask the renderer to reset all floating windows to their home positions. */
 export function notifyResetWindows(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.windowsReset);
+  getMainWindow()?.webContents.send(IPC_EVENTS.windowsReset);
 }
 
 /** Ask the renderer to open the AI "New Structure" generation panel. */
 export function notifyNewStructure(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.newStructure);
+  getMainWindow()?.webContents.send(IPC_EVENTS.newStructure);
 }
 
 /** Ask the renderer to open the Block Catalog modal (View menu). */
 export function notifyOpenCatalog(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openCatalog);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openCatalog);
 }
 
 /** Ask the renderer to open the Module Gallery modal (View menu). */
 export function notifyOpenModules(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openModules);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openModules);
 }
 
 /** Ask the renderer to open the in-app user Guide modal (Help ▸ Guide). */
 export function notifyOpenGuide(): void {
-  mainWindow?.webContents.send(IPC_EVENTS.openGuide);
+  getMainWindow()?.webContents.send(IPC_EVENTS.openGuide);
 }
 
 /** Push the new language to the renderer (it re-renders the UI in that locale). */
 export function notifyLanguageChanged(info: LanguageInfo): void {
-  mainWindow?.webContents.send(IPC_EVENTS.languageChanged, info);
+  getMainWindow()?.webContents.send(IPC_EVENTS.languageChanged, info);
 }
 
 export function notifyUpdateAvailable(info: UpdateInfo): void {
-  mainWindow?.webContents.send(IPC_EVENTS.updateAvailable, info);
+  getMainWindow()?.webContents.send(IPC_EVENTS.updateAvailable, info);
 }
 
 /** Window icon (the squircle app-icon tile) for Windows/Linux — macOS uses the
@@ -250,18 +261,26 @@ export function createWindow(): BrowserWindow {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
   mainWindow.webContents.on('did-finish-load', onDidFinishLoad);
+  // macOS keeps the app alive after the last window closes; drop the reference
+  // so open-file/openWorld queue into pendingOpenPath instead of sending into a
+  // destroyed webContents (JS error dialogs + the file silently not opening).
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    rendererReady = false;
+  });
   return mainWindow;
 }
 
 function onDidFinishLoad() {
+  rendererReady = true;
   const initial = pendingOpenPath ?? process.env.BW_OPEN ?? null;
   if (initial) {
-    mainWindow?.webContents.send(IPC_EVENTS.openPath, initial);
+    getMainWindow()?.webContents.send(IPC_EVENTS.openPath, initial);
     pendingOpenPath = null;
   }
   const initialWorld = pendingOpenWorld ?? process.env.BW_OPEN_WORLD ?? null;
   if (initialWorld) {
-    mainWindow?.webContents.send(IPC_EVENTS.openWorld, initialWorld);
+    getMainWindow()?.webContents.send(IPC_EVENTS.openWorld, initialWorld);
     pendingOpenWorld = null;
   }
   // Dev-only: open Settings on a given tab (e.g. BW_OPEN_SETTINGS=viewer) so
