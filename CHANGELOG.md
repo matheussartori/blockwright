@@ -116,6 +116,13 @@ that tells you exactly what changed.
 - The backup retention setting now pairs with the new total-size cap: past
   either limit the oldest backup sets are pruned, and the newest set always
   survives whatever the cap says.
+- Settings, polished as one surface: a consistent spacing rhythm across every
+  tab, controls that line up on a single right-hand column, and one control
+  language throughout — every boolean is the same switch (no more stray native
+  checkboxes), every dropdown is the themed select (the AI tab's model /
+  thinking / max-rounds pickers included; max rounds now offers an explicit
+  "Auto"), and the sidebar tabs gained icons. The whole row of a toggle is now
+  its click target.
 
 ## [2.1.1] - 2026-07-05
 
