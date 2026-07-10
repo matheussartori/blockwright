@@ -134,7 +134,10 @@ export function useDocumentFlow(viewerRef: MutableRefObject<Viewer | null>): Doc
       // Opening a file is a VIEW action — default the dock to Info, not whatever tab
       // (often Generate) was last left selected. The new-build/generate flow sets its
       // own tab in `build()`, so this only affects opening an existing structure.
-      windowsStore.getState().setActiveTab('inspector');
+      // Dev-only exception: a BW_ASSEMBLE capture needs the Jigsaw Lab MOUNTED (its
+      // auto-assembly effect lives in the panel), so the capture config wins the tab.
+      const assembleCapture = await api.captureAssemble();
+      windowsStore.getState().setActiveTab(assembleCapture ? 'jigsaw' : 'inspector');
       await hydrateDoc(id);
       // If this file has AI generation history, resume on its LATEST version so
       // reopening lands exactly where the user left off (and the viewer matches the

@@ -4098,6 +4098,103 @@ body.row-resizing {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+/* Jigsaw Lab: the per-pool color chip beside connector / pool rows (matches the gizmo tint). */
+.bw-pool-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+/* A pool row can carry several tags (count, missing fallback); only the first floats right. */
+.bw-pool-row .bw-row-tag {
+  margin-left: 6px;
+}
+.bw-pool-row .bw-row-tag:first-of-type {
+  margin-left: auto;
+}
+.bw-tag-bad {
+  color: var(--danger);
+}
+/* Jigsaw Lab seed simulator: the run currently on screen + seed numbers in --mono. */
+.bw-row-active {
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.bw-mono {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+/* Worldgen Studio panel: paired steppers, biome chips, and the save row. */
+.studio-row {
+  display: flex;
+  gap: 12px;
+}
+.studio-row .bw-field {
+  flex: 1;
+}
+.bw-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+.studio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0 8px;
+}
+.studio-chip {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.studio-chip:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.studio-save {
+  margin-top: 10px;
+}
+/* Structure Lint panel: finding rows (icon tinted by level; positional rows clickable). */
+.lint-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lint-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 7px;
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.lint-row.clickable {
+  cursor: pointer;
+}
+.lint-row.clickable:hover {
+  outline: 1px solid var(--accent);
+}
+.lint-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.lint-icon.error {
+  color: var(--danger);
+}
+.lint-icon.warning {
+  color: var(--warn);
+}
 .bw-ok {
   margin: 2px 0 6px;
   color: var(--text-muted);

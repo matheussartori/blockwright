@@ -49,6 +49,10 @@ import type {
   RenderResult,
   JigsawCandidate,
   JigsawPlan,
+  JigsawPoolInfo,
+  LintReport,
+  WorldgenModel,
+  WorldgenWriteResult,
   LogEntry,
   StructureData,
   UpdateInfo,
@@ -182,6 +186,15 @@ const api: BlockwrightApi = {
     ipcRenderer.invoke(IPC_CHANNELS.jigsawAssemble, path, options),
   jigsawCandidates: (path: string, connectorIndex: number): Promise<JigsawCandidate[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.jigsawCandidates, path, connectorIndex),
+  jigsawPools: (path: string): Promise<JigsawPoolInfo[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.jigsawPools, path),
+  lintStructure: (path: string, targetVersion: string | null): Promise<LintReport> =>
+    ipcRenderer.invoke(IPC_CHANNELS.structureLint, path, targetVersion),
+  worldgenDefs: (): Promise<string[]> => ipcRenderer.invoke(IPC_CHANNELS.worldgenDefs),
+  worldgenRead: (name: string): Promise<WorldgenModel | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldgenRead, name),
+  worldgenWrite: (model: WorldgenModel): Promise<WorldgenWriteResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.worldgenWrite, model),
   aiAvailable: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.aiAvailable),
   aiGetConfig: (): Promise<AiConfig> => ipcRenderer.invoke(IPC_CHANNELS.aiGetConfig),
   aiSetActiveProvider: (id: AiProviderId): Promise<AiConfig> =>

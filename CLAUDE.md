@@ -33,7 +33,8 @@ src/
     texture-protocol.ts                      bw-texture:// privileged scheme (namespaced PNGs)
     file-watch.ts                            Hot-reload the open file + workspace structure folder
     export/                 Workspace export (planExport/runExport), Export As, Export to World,
-                            worldgen JSON builders, writeSplitFiles, doctor.ts (workspace check-up)
+                            worldgen JSON builders, writeSplitFiles, doctor.ts (workspace check-up),
+                            worldgen-studio.ts (Worldgen Studio: read + surgical write of the 4 JSONs)
     structure/
       io/                   RawStructure codecs: .nbt / .schem / .litematic, long-bits (BigInt bit
                             packing), convert, splitToJigsaw (oversized → jigsaw), data-markers
@@ -41,7 +42,10 @@ src/
                             block-entity models, entity.ts (armor stand + vanilla-mob render layers,
                             NBT texture variants), block-dictionary (mod-block annotations)
       catalog/              Block catalog, previewBlock, retheme-map, module-preview
-      jigsaw/               Connectors, template pools, seeded assembler (geometry in shared/jigsaw.ts)
+      jigsaw/               Connectors, template pools, seeded assembler (geometry in shared/jigsaw.ts),
+                            pool-info.ts (Jigsaw Lab pool inspector); assembler emits validator warnings
+      lint.ts               Per-file structure linter (air-vs-void, out-of-range blocks, orphan
+                            palette, data markers) — standalone panel + re-reported by the Doctor
       domain/               Composable generation: modules by category (structure/decoration/roof/
                             basement/attic/room/surroundings), composeStructure crosses them, seeded
                             archetype shells, registries. Contract test-enforced — see docs.

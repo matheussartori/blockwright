@@ -18,6 +18,10 @@ import { moduleKey, paramKey, paramOptionKey, groupKey, presetKey, aiProviderKey
 const CHROME_IDENTICAL_OK = new Set<string>([
   'menu.jigsaw', 'menu.console', 'menu.layout', 'menu.zoom', 'panel.jigsaw', 'inspector.jigsaws', 'jigsaw.seed',
   'statusbar.jigsawLabel', 'project.jigsaws',
+  'panel.lint', // "Lint" — the same loanword in both languages
+  'jigsaw.simSeeds', // "Seeds" — the same loanword in both languages (matches jigsaw.seed)
+  // Worldgen Studio: Minecraft codec-field loanwords kept as-is in pt-BR.
+  'menu.worldgen', 'panel.worldgen', 'studio.spacing', 'studio.separation',
   'console.title', 'catalog.namespace', 'workspace.label', 'modules.presetsCount', 'modules.universal',
   'ai.beta', 'ai.genPreset', 'shortcuts.zoom', 'versions.original', 'gen.designPhase.interior',
   'gen.autoSuffix', 'viewer.contentPack',

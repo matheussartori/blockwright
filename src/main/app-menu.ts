@@ -65,6 +65,8 @@ let windowsState: WindowsReport = {
   inspector: { visible: true, available: false },
   materials: { visible: false, available: false },
   jigsaw: { visible: true, available: false },
+  lint: { visible: false, available: false },
+  worldgen: { visible: false, available: false },
   generate: { visible: false, available: true },
   versions: { visible: false, available: false },
   console: { visible: false, available: true },
@@ -267,6 +269,8 @@ function viewMenu(): MenuItemConstructorOptions {
       windowItem('jigsaw', mt('menu.jigsaw'), 'CmdOrCtrl+2'),
       windowItem('versions', mt('menu.versions'), 'CmdOrCtrl+3'),
       windowItem('materials', mt('menu.materials'), 'CmdOrCtrl+4'),
+      windowItem('lint', mt('menu.lint'), 'CmdOrCtrl+5'),
+      windowItem('worldgen', mt('menu.worldgen'), 'CmdOrCtrl+6'),
       windowItem('console', mt('menu.console'), 'CmdOrCtrl+Shift+K'),
       // Browsers/galleries: modals rather than docked panels, so they get their
       // own group apart from the window toggles above.

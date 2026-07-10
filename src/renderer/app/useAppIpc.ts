@@ -142,6 +142,8 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
         inspector: { visible: w.inspector.visible, available: open },
         materials: { visible: w.materials.visible, available: open },
         jigsaw: { visible: w.jigsaw.visible, available: hasJigsaw },
+        lint: { visible: w.lint.visible, available: open },
+        worldgen: { visible: w.worldgen.visible, available: store.getState().workspace !== null },
         generate: { visible: w.generate.visible, available: true },
         versions: { visible: w.versions.visible, available: hasVersions },
         // The Console dock is always available (logs exist regardless of state).

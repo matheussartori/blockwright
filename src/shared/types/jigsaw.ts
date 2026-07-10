@@ -25,7 +25,8 @@ export type JigsawWarningKind =
   | 'unmatched-target'
   | 'overlap'
   | 'depth-limit'
-  | 'unsupported-orientation';
+  | 'unsupported-orientation'
+  | 'fallback-expansion';
 
 /** A problem found while assembling/validating, surfaced to the user. */
 export interface JigsawWarning {
@@ -45,6 +46,28 @@ export interface AssembleOptions {
   seed: number;
   /** Maximum recursion depth from the root piece. */
   maxDepth: number;
+}
+
+/** One element of a resolved template pool, for the Jigsaw Lab's pool inspector. */
+export interface JigsawPoolElementInfo {
+  /** The element's structure id (namespace:path); "(empty)" elements keep theirs too. */
+  structureId: string;
+  /** Whether the element's `.nbt` exists on disk (always true for empty elements). */
+  exists: boolean;
+  weight: number;
+  /** A terminal element (empty/feature/unknown) — placeable as "stop here". */
+  empty: boolean;
+}
+
+/** A template pool as the Jigsaw Lab presents it: existence, elements and fallback. */
+export interface JigsawPoolInfo {
+  id: string;
+  /** Whether the pool JSON resolved at all. */
+  exists: boolean;
+  fallback: string | null;
+  /** Whether the fallback pool resolves (null when there is no fallback). */
+  fallbackExists: boolean | null;
+  elements: JigsawPoolElementInfo[];
 }
 
 /** One candidate piece that could attach to a given connector (manual mode). */

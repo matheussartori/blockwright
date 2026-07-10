@@ -5,6 +5,8 @@ export * from './structure';
 export * from './workspace';
 export * from './world';
 export * from './jigsaw';
+export * from './lint';
+export * from './worldgen-studio';
 export * from './generation';
 export * from './export';
 export * from './edit';

@@ -88,6 +88,16 @@ export const IPC_CHANNELS = {
   jigsawAssemble: 'jigsaw:assemble',
   /** Candidate pieces for one connector of a structure (payload: path + index). */
   jigsawCandidates: 'jigsaw:candidates',
+  /** Resolve a structure's template pools for the Jigsaw Lab (payload: path) → JigsawPoolInfo[]. */
+  jigsawPools: 'jigsaw:pools',
+  /** Lint one structure file (payload: path + target MC version | null) → LintReport. */
+  structureLint: 'structure:lint',
+  /** Worldgen Studio: jigsaw structure-def names in the active workspace → string[]. */
+  worldgenDefs: 'worldgen:defs',
+  /** Worldgen Studio: read one def's editable model (payload: name) → WorldgenModel | null. */
+  worldgenRead: 'worldgen:read',
+  /** Worldgen Studio: surgically write a model back (payload: WorldgenModel) → WorldgenWriteResult. */
+  worldgenWrite: 'worldgen:write',
   /** Renderer tells main whether a structure is currently open (drives Close File). */
   setFileOpen: 'file:set-open',
   /** Renderer tells main whether the active doc is a renamable generated project

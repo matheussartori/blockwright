@@ -10,7 +10,7 @@ import { api } from './api';
 import { store } from './state/store';
 import { plannerStore } from './state/planner';
 import { ViewerProvider, Viewport, useViewer, useCaptureViewer } from './viewer/ViewerProvider';
-import { useActiveDoc } from './hooks/useStores';
+import { useActiveDoc, useApp } from './hooks/useStores';
 import { useDocumentFlow } from './app/useDocumentFlow';
 import { useAiRenderBridge } from './app/useAiRenderBridge';
 import { useAppIpc } from './app/useAppIpc';
@@ -58,6 +58,7 @@ function Shell() {
   const activeDoc = useActiveDoc();
   const structure = activeDoc?.structure ?? null;
   const fileOpen = structure !== null;
+  const workspace = useApp((s) => s.workspace);
   // A world doc streams into the viewport (view-only fly-through) — not a structure, so the
   // build planner / editor / inspector don't apply; the stage is just the viewer + the world HUD.
   const isWorld = activeDoc?.kind === 'world';
@@ -65,6 +66,10 @@ function Shell() {
     inspector: fileOpen,
     materials: fileOpen,
     jigsaw: structure !== null && structure.jigsaws.length > 0,
+    // Lint works on any open structure file (workspace optional).
+    lint: fileOpen,
+    // Worldgen Studio edits the active workspace's worldgen JSONs (no file needed).
+    worldgen: workspace !== null,
     // Generate is the ITERATION chat — it shows only once there's something to iterate on:
     // an open structure, a build in flight, or a tab that already produced versions. A
     // brand-new blank build tab shows ONLY the inline planner, and Home shows neither — so

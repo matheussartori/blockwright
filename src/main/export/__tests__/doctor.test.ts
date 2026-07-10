@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Workspace } from '@/shared/types';
 import { en } from '@/shared/i18n/en';
+import { encodeStructure } from '../../structure/authoring/nbt-encode';
 import { doctorWorkspace, DOCTOR_CODES } from '../doctor';
 
 let root: string;
@@ -13,7 +14,8 @@ const ws = (): Workspace => ({ name: 'MyMod', root, namespace: NS, minecraftVers
 const write = (rel: string, content: unknown) => {
   const abs = path.join(root, rel);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, typeof content === 'string' ? content : JSON.stringify(content));
+  const data = typeof content === 'string' || Buffer.isBuffer(content) ? content : JSON.stringify(content);
+  fs.writeFileSync(abs, data);
 };
 
 beforeEach(() => {
@@ -104,6 +106,76 @@ describe('doctorWorkspace', () => {
     const report = await doctorWorkspace(ws());
     expect(codes(report.findings)).toEqual(['stale_format']);
     expect(report.findings[0].level).toBe('warning');
+  });
+
+  it('warns when a mob in a structure carries equipment (re-rolled on generation)', async () => {
+    write(
+      `data/${NS}/structure/guard.nbt`,
+      encodeStructure({
+        dataVersion: 3953,
+        size: [1, 1, 1],
+        palette: [{ Name: 'minecraft:stone' }],
+        blocks: [{ pos: [0, 0, 0], state: 0 }],
+        entities: [{
+          pos: [0.5, 1, 0.5],
+          blockPos: [0, 1, 0],
+          nbt: { id: 'minecraft:zombie', HandItems: [{ id: 'minecraft:iron_sword', count: 1 }, {}] },
+        }],
+      }),
+    );
+    const report = await doctorWorkspace(ws());
+    expect(codes(report.findings)).toEqual(['mob_equipment']);
+    expect(report.findings[0].level).toBe('warning');
+  });
+
+  it('warns about waterloggable blocks in an aquatic-biome jigsaw structure', async () => {
+    write(`data/${NS}/worldgen/structure/wreck.json`, {
+      type: 'minecraft:jigsaw',
+      spawn_overrides: {},
+      start_pool: `${NS}:wreck/start`,
+      biomes: [`#${NS}:has_structure/wreck`],
+    });
+    write(`data/${NS}/tags/worldgen/biome/has_structure/wreck.json`, { values: ['minecraft:deep_ocean'] });
+    write(`data/${NS}/worldgen/template_pool/wreck/start.json`, {
+      elements: [{ element: { location: `${NS}:wreck` } }],
+    });
+    write(
+      `data/${NS}/structure/wreck.nbt`,
+      encodeStructure({
+        dataVersion: 3953,
+        size: [1, 1, 1],
+        palette: [{ Name: 'minecraft:oak_stairs', Properties: { waterlogged: 'false', facing: 'north' } }],
+        blocks: [{ pos: [0, 0, 0], state: 0 }],
+        entities: [],
+      }),
+    );
+    const report = await doctorWorkspace(ws());
+    expect(codes(report.findings)).toEqual(['waterlog_risk']);
+    expect(report.findings[0].detail).toBe('minecraft:oak_stairs');
+  });
+
+  it('stays quiet about waterloggable blocks when no biome is aquatic', async () => {
+    write(`data/${NS}/worldgen/structure/tower.json`, {
+      type: 'minecraft:jigsaw',
+      spawn_overrides: {},
+      start_pool: `${NS}:tower/start`,
+      biomes: ['minecraft:plains'],
+    });
+    write(`data/${NS}/worldgen/template_pool/tower/start.json`, {
+      elements: [{ element: { location: `${NS}:tower` } }],
+    });
+    write(
+      `data/${NS}/structure/tower.nbt`,
+      encodeStructure({
+        dataVersion: 3953,
+        size: [1, 1, 1],
+        palette: [{ Name: 'minecraft:oak_stairs', Properties: { waterlogged: 'false', facing: 'north' } }],
+        blocks: [{ pos: [0, 0, 0], state: 0 }],
+        entities: [],
+      }),
+    );
+    const report = await doctorWorkspace(ws());
+    expect(report.findings).toEqual([]);
   });
 
   it('every doctor code has a localized fix-it explanation', () => {

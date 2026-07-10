@@ -90,6 +90,9 @@ export interface AppState {
   renderOpen: boolean;
   /** Whether the Worldgen Doctor is open (File ▸ Workspace Check-Up…). */
   doctorOpen: boolean;
+  /** Bumped whenever the Worldgen Studio saves — dependents (the Jigsaw Lab's pool
+   *  inspector) re-read from disk on change. */
+  worldgenRev: number;
 
   setRecents: (recents: string[]) => void;
   setWorkspace: (workspace: Workspace | null) => void;
@@ -116,6 +119,7 @@ export interface AppState {
   setRethemeOpen: (open: boolean) => void;
   setRenderOpen: (open: boolean) => void;
   setDoctorOpen: (open: boolean) => void;
+  bumpWorldgenRev: () => void;
 }
 
 /** Fallback content-pack version until main reports the real one (its
@@ -148,6 +152,7 @@ export const store = createStore<AppState>((set) => ({
   rethemeOpen: false,
   renderOpen: false,
   doctorOpen: false,
+  worldgenRev: 0,
 
   setRecents: (recents) => set({ recents }),
   setWorkspace: (workspace) => set({ workspace }),
@@ -174,6 +179,7 @@ export const store = createStore<AppState>((set) => ({
   setRethemeOpen: (rethemeOpen) => set({ rethemeOpen }),
   setRenderOpen: (renderOpen) => set({ renderOpen }),
   setDoctorOpen: (doctorOpen) => set({ doctorOpen }),
+  bumpWorldgenRev: () => set((s) => ({ worldgenRev: s.worldgenRev + 1 })),
 }));
 
 /** Subscribe to one derived slice, invoking `run` immediately and on change.

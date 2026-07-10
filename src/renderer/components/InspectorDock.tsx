@@ -3,7 +3,7 @@
 // a FloatingWindow; both render the exact same content component. Availability
 // is passed in from App (Info = a structure is open, Jigsaw = it has jigsaws).
 import type { ComponentType, FC } from 'react';
-import { ChevronsLeft, ChevronsRight, History, Info, Package, PictureInPicture2, Puzzle, Sparkles } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Globe, History, Info, Package, PictureInPicture2, Puzzle, ShieldCheck, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
 import { windowsStore, type PanelId } from '../state/windows';
 import { startColDrag } from '../ui/resize';
@@ -12,6 +12,8 @@ import { FloatingWindow } from './FloatingWindow';
 import { InspectorContent } from '../windows/InspectorWindow';
 import { MaterialsContent } from '../windows/MaterialsWindow';
 import { JigsawContent } from '../windows/JigsawWindow';
+import { LintContent } from '../windows/LintWindow';
+import { WorldgenContent } from '../windows/WorldgenWindow';
 import { VersionsContent } from '../windows/VersionsWindow';
 import { GenerateContent } from './NewStructurePanel';
 
@@ -23,28 +25,32 @@ const PANELS: Record<PanelId, { title: MessageKey; icon: PanelIcon; Content: FC 
   inspector: { title: 'panel.info', icon: Info, Content: InspectorContent },
   materials: { title: 'panel.materials', icon: Package, Content: MaterialsContent },
   jigsaw: { title: 'panel.jigsaw', icon: Puzzle, Content: JigsawContent },
+  lint: { title: 'panel.lint', icon: ShieldCheck, Content: LintContent },
+  worldgen: { title: 'panel.worldgen', icon: Globe, Content: WorldgenContent },
   versions: { title: 'panel.versions', icon: History, Content: VersionsContent },
   generate: { title: 'panel.generate', icon: Sparkles, Content: GenerateContent },
 };
 
-const PANEL_IDS: PanelId[] = ['inspector', 'materials', 'jigsaw', 'versions', 'generate'];
+const PANEL_IDS: PanelId[] = ['inspector', 'materials', 'jigsaw', 'worldgen', 'lint', 'versions', 'generate'];
 
 /** The chat panel manages its own layout (pinned composer), so its container
  *  drops the default padding/scroll the static panels rely on. */
-const FLUSH: Record<PanelId, boolean> = { inspector: false, materials: false, jigsaw: false, versions: false, generate: true };
+const FLUSH: Record<PanelId, boolean> = { inspector: false, materials: false, jigsaw: false, lint: false, worldgen: false, versions: false, generate: true };
 
 export function InspectorDock({ availability }: { availability: Availability }) {
   const t = useT();
   const inspector = useWindows((s) => s.inspector);
   const materials = useWindows((s) => s.materials);
   const jigsaw = useWindows((s) => s.jigsaw);
+  const lint = useWindows((s) => s.lint);
+  const worldgen = useWindows((s) => s.worldgen);
   const versions = useWindows((s) => s.versions);
   const generate = useWindows((s) => s.generate);
   const activeTab = useWindows((s) => s.activeTab);
   const collapsed = useWindows((s) => s.sidebarCollapsed);
   const width = useWindows((s) => s.rightWidth);
 
-  const state: Record<PanelId, typeof inspector> = { inspector, materials, jigsaw, versions, generate };
+  const state: Record<PanelId, typeof inspector> = { inspector, materials, jigsaw, lint, worldgen, versions, generate };
   // Tabs are the panels that are shown, docked (not floating), and available.
   const tabs = PANEL_IDS.filter(
     (id) => availability[id] && state[id].visible && !state[id].floating,

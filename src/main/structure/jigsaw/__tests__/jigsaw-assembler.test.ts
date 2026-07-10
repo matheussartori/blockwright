@@ -100,6 +100,49 @@ describe('assembleJigsaw', () => {
     expect(plan.warnings.some((w) => w.kind === 'missing-structure')).toBe(true);
   });
 
+  it('warns with "overlap" when every candidate partially crosses placed bounds', async () => {
+    // Same setup as the overlap-rejection test: the second connector's only
+    // candidate placement partially crosses the first attached piece. The slot
+    // stays empty AND the validator now says why instead of dropping it silently.
+    h.metaByPath.set('root.nbt', meta([2, 2, 2], [
+      connector([0, 0, 0], 'south', 'a', 't', 'main'),
+      connector([0, 0, 0], 'south', 'b', 't', 'main'),
+    ]));
+    h.metaByPath.set('piece.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'north', 't', 'x', 'minecraft:empty')]));
+    h.poolById.set('main', singleElementPool('main', 'piece.nbt'));
+
+    const plan = await assembleJigsaw('root.nbt', 'ns:root', { seed: 1, maxDepth: 1 });
+    expect(plan.pieces).toHaveLength(2);
+    expect(plan.warnings.some((w) => w.kind === 'overlap')).toBe(true);
+  });
+
+  it('warns with "unsupported-orientation" when matches exist but can never face the connector', async () => {
+    // The root connector faces UP; the pool's only piece carries the right target
+    // name but a HORIZONTAL front — Y-only rotation can never make them oppose.
+    h.metaByPath.set('root.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'up', 'root', 't', 'main')]));
+    h.metaByPath.set('piece.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'north', 't', 'x', 'minecraft:empty')]));
+    h.poolById.set('main', singleElementPool('main', 'piece.nbt'));
+
+    const plan = await assembleJigsaw('root.nbt', 'ns:root', { seed: 1, maxDepth: 1 });
+    expect(plan.pieces).toHaveLength(1);
+    expect(plan.warnings.some((w) => w.kind === 'unsupported-orientation')).toBe(true);
+    // The blunter "no piece has that jigsaw" warning must NOT double-fire.
+    expect(plan.warnings.some((w) => w.kind === 'unmatched-target')).toBe(false);
+  });
+
+  it('warns with "fallback-expansion" when a fallback pool keeps expanding', async () => {
+    h.metaByPath.set('root.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'south', 'root', 't', 'main')]));
+    h.metaByPath.set('piece.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'north', 't', 'x', 'minecraft:empty')]));
+    // The fallback's piece has its own expandable connector — worldgen would keep
+    // growing past the structure def's `size` through it.
+    h.metaByPath.set('cap.nbt', meta([2, 2, 2], [connector([0, 0, 0], 'north', 't', 't', 'main')]));
+    h.poolById.set('main', { ...singleElementPool('main', 'piece.nbt'), fallback: 'caps' });
+    h.poolById.set('caps', singleElementPool('caps', 'cap.nbt'));
+
+    const plan = await assembleJigsaw('root.nbt', 'ns:root', { seed: 1, maxDepth: 1 });
+    expect(plan.warnings.some((w) => w.kind === 'fallback-expansion')).toBe(true);
+  });
+
   it('warns when the depth limit leaves connectors unexpanded', async () => {
     // The attached piece carries its own expandable connector, but maxDepth=1 stops
     // the walk before it can be followed.

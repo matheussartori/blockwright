@@ -18,6 +18,8 @@ import { buildEntities } from './entity-mesh';
 import { SelectionOverlay } from './selection-overlay';
 import { WorldSelectionOverlay, type HeightHandle, type SelectionPhase } from './region-overlay';
 import { WorldMagicOverlay } from './world-magic-overlay';
+import { JigsawConnectorsOverlay } from './jigsaw-overlay';
+import type { ConnectorMarker } from './jigsaw-markers';
 import { SymmetryOverlay } from './symmetry-overlay';
 import { HoverOverlay } from './hover-overlay';
 import { VoidOverlay, type VoidCell } from './void-overlay';
@@ -58,6 +60,9 @@ export class Viewer {
 
   /** The world editor's magic-select blob (instanced translucent cell boxes). */
   private worldMagic = new WorldMagicOverlay(this.scene);
+
+  /** The Jigsaw Lab's connector gizmos (anchor + arrow per jigsaw block, tinted per pool). */
+  private jigsawOverlay = new JigsawConnectorsOverlay(this.scene);
 
   private symmetryOverlay = new SymmetryOverlay(this.scene);
 
@@ -221,6 +226,7 @@ export class Viewer {
     // meshes but kept the desired regions). Diff marks persist the same way.
     this.floors.reapply(this.current);
     this.diffOverlay.reapply();
+    this.jigsawOverlay.reapply();
     if (preserveCamera) this.nav.controls.update();
     else this.nav.frame(box);
   }
@@ -634,6 +640,17 @@ export class Viewer {
     this.hoverOverlay.set(cell, color);
   }
 
+  /** Show the Jigsaw Lab's connector gizmos (null/empty = hidden). Markers are in world
+   *  space — the caller computes them from the placed pieces via jigsaw-markers.ts. */
+  setJigsawMarkers(markers: ConnectorMarker[] | null): void {
+    this.jigsawOverlay.set(markers);
+  }
+
+  /** Focus one connector gizmo by its marker key (null = unfocus). */
+  focusJigsawMarker(key: string | null): void {
+    this.jigsawOverlay.focus(key);
+  }
+
   /** Hand the LEFT mouse button to painting (orbit moves to the RIGHT button) while a Paint/
    *  Void tool is active, so a drag paints instead of rotating — the camera-vs-paint split
    *  voxel editors are faulted for blurring. Restores the orbit defaults when off. */
@@ -649,6 +666,9 @@ export class Viewer {
     this.symmetryOverlay.clear();
     this.voidOverlay.clear();
     this.hoverOverlay.clear();
+    // Like the bands/diff below: drop the gizmo meshes but keep the desired markers
+    // (showAssembly reapplies them; the Jigsaw Lab replaces them on doc change).
+    this.jigsawOverlay.clearMeshes();
     // Drop the live band/diff meshes but keep the desired regions/marks so the next
     // build re-renders the same plan (re-applied at the end of showAssembly).
     this.floors.clearMeshes();

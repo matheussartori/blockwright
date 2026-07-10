@@ -129,13 +129,25 @@ class Assembler {
     depth: number,
   ): Promise<PlacedNode | null> {
     const pool = resolvePool(connector.pool);
-    const result = await this.attachFromPool(pool, connector, parent, rng, placed, nextIndex, depth);
+    const cross = { crossed: false };
+    const result = await this.attachFromPool(pool, connector, parent, rng, placed, nextIndex, depth, cross);
     if (result === 'empty') return null; // terminated cleanly — no fallback
     if (result !== 'none') return result; // a piece fit
     // Nothing fit; cap the slot with the fallback pool (terminators).
     if (pool.fallback && pool.fallback !== EMPTY_POOL) {
-      const fb = await this.attachFromPool(resolvePool(pool.fallback), connector, parent, rng, placed, nextIndex, depth);
+      const fb = await this.attachFromPool(resolvePool(pool.fallback), connector, parent, rng, placed, nextIndex, depth, cross);
       if (fb !== 'empty' && fb !== 'none') return fb;
+    }
+    // The slot stayed bare and at least one candidate DID align but partially
+    // crossed an already-placed piece's bounds — the exact vanilla rejection
+    // ("boxes may only touch or be contained") authors are told to expect to
+    // fail on the first try. Surface it instead of dropping it silently.
+    if (cross.crossed) {
+      this.warn(
+        'overlap',
+        `Every fitting piece for pool ${pool.id} at "${connector.name || connector.target}" partially crossed another piece's bounds; the slot was left empty.`,
+        parent.piece.id,
+      );
     }
     return null;
   }
@@ -151,6 +163,7 @@ class Assembler {
     placed: PlacedNode[],
     nextIndex: number,
     depth: number,
+    cross?: { crossed: boolean },
   ): Promise<PlacedNode | 'empty' | 'none'> {
     for (const el of weightedOrder(pool.elements, rng)) {
       if (el.empty) return 'empty';
@@ -169,7 +182,10 @@ class Assembler {
         // Reject overlaps with other pieces, but not with the parent: a child
         // intentionally interpenetrates the piece it attaches to (a house's
         // entrance reaches into the street, on-surface decor sits in the plaza).
-        if (placed.some((n) => n !== parent && aabbOverlap(n.box, box))) continue;
+        if (placed.some((n) => n !== parent && aabbOverlap(n.box, box))) {
+          if (cross) cross.crossed = true;
+          continue;
+        }
         return {
           piece: {
             id: `p${nextIndex}`,
@@ -224,7 +240,9 @@ class Assembler {
   // --- Validation (step 5) ---------------------------------------------------
 
   /** Static checks on a structure's connectors: missing/empty pools, broken
-   *  template references, and "dead" connectors whose target matches nothing. */
+   *  template references, "dead" connectors whose target matches nothing (or
+   *  matches only pieces that can never face them), and fallback pools that
+   *  keep expanding (which is how worldgen blows past the structure's `size`). */
   private async validate(meta: StructureMeta, structureId: string): Promise<void> {
     for (const c of meta.jigsaws.filter(isExpandable)) {
       const pool = resolvePool(c.pool);
@@ -238,7 +256,12 @@ class Assembler {
       }
       // An `empty` element is a valid terminal outcome, so a pool with one can
       // always "satisfy" the connector even if no piece carries the target name.
-      let targetMatched = pool.elements.some((el) => el.empty);
+      const hasEmpty = pool.elements.some((el) => el.empty);
+      let targetMatched = hasEmpty;
+      // Whether any name-matching jigsaw can actually FACE this connector: a
+      // vertical connector needs a child front that already opposes it (rotation
+      // is Y-only), so an axis mismatch is a permanently dead pairing.
+      let connectable = hasEmpty;
       for (const el of pool.elements) {
         if (el.empty) continue;
         if (!el.structurePath) {
@@ -246,10 +269,39 @@ class Assembler {
           continue;
         }
         const childMeta = await this.meta(el.structurePath);
-        if (childMeta.jigsaws.some((j) => j.name === c.target)) targetMatched = true;
+        const matches = childMeta.jigsaws.filter((j) => j.name === c.target);
+        if (matches.length > 0) targetMatched = true;
+        if (matches.some((j) => solveAttachment(c, rootPlacement(), j) !== null)) connectable = true;
       }
       if (!targetMatched) {
         this.warn('unmatched-target', `No piece in pool ${c.pool} has a jigsaw named "${c.target}".`);
+      } else if (!connectable) {
+        this.warn(
+          'unsupported-orientation',
+          `Pool ${c.pool} has pieces named "${c.target}", but none can face this connector (${c.orientation}) — vertical fronts can't be rotated to fit.`,
+        );
+      }
+      await this.validateFallback(pool);
+    }
+  }
+
+  /** Warn when a pool's fallback contains pieces that THEMSELVES expand: vanilla
+   *  consults fallbacks after the structure's `size` (1–7) is exhausted, so an
+   *  expanding fallback keeps growing past the declared size — the documented
+   *  "size is not strictly respected" gotcha. */
+  private async validateFallback(pool: ResolvedPool): Promise<void> {
+    if (!pool.fallback || pool.fallback === EMPTY_POOL) return;
+    const fb = resolvePool(pool.fallback);
+    if (!fb.exists) return; // a missing fallback surfaces as empty-pool if it's ever consulted
+    for (const el of fb.elements) {
+      if (el.empty || !el.structurePath) continue;
+      const meta = await this.meta(el.structurePath);
+      if (meta.jigsaws.some(isExpandable)) {
+        this.warn(
+          'fallback-expansion',
+          `Fallback pool ${fb.id} (of ${pool.id}) contains expanding piece ${el.structureId} — worldgen may exceed the structure's declared size.`,
+        );
+        return;
       }
     }
   }

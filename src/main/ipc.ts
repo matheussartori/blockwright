@@ -2,7 +2,7 @@
 import { app, dialog, ipcMain, nativeTheme, shell } from 'electron';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, ExportMode, WorkspaceExportRequest, FloorDef, GenerateImage, MaterialsExportRequest, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport, WorldWaypoint } from '@/shared/types';
+import type { AssembleOptions, BlockNote, BuildSelection, ChatRecord, DimensionId, ExportMode, WorkspaceExportRequest, FloorDef, GenerateImage, MaterialsExportRequest, ModBlockScope, ModuleCategory, RenderResult, SaveVersionRequest, Workspace, WindowsReport, WorldWaypoint, WorldgenModel } from '@/shared/types';
 import type { LanguagePref } from '@/shared/i18n';
 import { getLanguage, setLanguage, mt } from './language';
 import { IPC_CHANNELS, IPC_EVENTS } from '@/shared/ipc';
@@ -27,6 +27,9 @@ import { getOutputDir, setOutputDir } from './ai/output-dir';
 import type { AiProviderId, GenerationSettings } from '@/shared/ai';
 import { getChat, saveChat } from './chat-history';
 import { structureIdFromPath } from './structure/jigsaw/template-pool';
+import { resolveJigsawPools } from './structure/jigsaw/pool-info';
+import { lintStructureFile } from './structure/lint';
+import { listWorldgenDefs, readWorldgenModel, writeWorldgenModel } from './export/worldgen-studio';
 import { addRecent, clearRecents, getRecents, removeRecent } from './recents';
 import { clearRecentWorkspaces, getRecentWorkspaces } from './recent-workspaces';
 import { addRecentWorld, clearRecentWorlds, getRecentWorlds } from './recent-worlds';
@@ -307,6 +310,13 @@ export function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.jigsawCandidates, async (_e, filePath: string, index: number) =>
     jigsawCandidates(filePath, index),
   );
+  ipcMain.handle(IPC_CHANNELS.jigsawPools, async (_e, filePath: string) => resolveJigsawPools(filePath));
+  ipcMain.handle(IPC_CHANNELS.structureLint, async (_e, filePath: string, targetVersion: string | null) =>
+    lintStructureFile(filePath, targetVersion),
+  );
+  ipcMain.handle(IPC_CHANNELS.worldgenDefs, async () => listWorldgenDefs());
+  ipcMain.handle(IPC_CHANNELS.worldgenRead, async (_e, name: string) => readWorldgenModel(name));
+  ipcMain.handle(IPC_CHANNELS.worldgenWrite, async (_e, model: WorldgenModel) => writeWorldgenModel(model));
 
   ipcMain.handle(IPC_CHANNELS.aiAvailable, async () => aiAvailable());
   ipcMain.handle(IPC_CHANNELS.aiGetConfig, async () => getConfig());

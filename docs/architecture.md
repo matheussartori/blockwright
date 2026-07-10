@@ -838,6 +838,61 @@ plan's coordinates land exactly where the meshes go. Jigsaw features are gated t
 via `isJigsawSupported`; unsupported versions show a notice instead. Pieces only resolve when the
 relevant data is reachable (an active workspace, or the vanilla pack for `minecraft:` pools).
 
+### v2.3 Jigsaw Lab (connector overlay / seed simulator / validator)
+
+The Jigsaw panel grew into an authoring tool — the datapack-dev pain no other tool covers:
+
+- **Connector gizmos**: `viewer/jigsaw-markers.ts` (PURE — positions/fronts via `worldCenter`/
+  `worldFront`, deterministic pool→color from `POOL_PALETTE`, `MAX_MARKERS` cap; tested) feeds
+  `viewer/jigsaw-overlay.ts` (`JigsawConnectorsOverlay`, an anchor cube + arrow cone per jigsaw
+  block, depth + x-ray passes, a FOCUS shell on panel-row hover via `focusJigsawMarker`). Like the
+  floor bands/diff marks, DESIRED markers persist across scene rebuilds (`clearMeshes`/`reapply` in
+  `showAssembly`). The panel builds markers for EVERY placed piece after an assembly.
+- **Pool inspector**: `jigsaw:pools` (`structure/jigsaw/pool-info.ts` → `resolveJigsawPools`) lists
+  each distinct pool with existence, element count/missing, and fallback (+ whether it resolves);
+  color chips match the gizmos. Re-reads when the Worldgen Studio saves (`store.worldgenRev`).
+- **Seed simulator**: "Simulate seeds" plans N random seeds in one go (count in Advanced, 2–16)
+  and keeps every `JigsawPlan`; clicking a run re-shows it from the piece cache (no replanning);
+  the seed field follows the selected run so re-roll continues from it.
+- **Validator**: the assembler now EMITS the once-declared-but-silent kinds — `overlap` (a slot
+  stayed empty because every aligned candidate partially crossed placed bounds — the vanilla
+  "boxes may only touch or be contained" rejection), `unsupported-orientation` (target-name
+  matches exist but none can face the connector: Y-only rotation can't fix a vertical/horizontal
+  axis mismatch) and the new `fallback-expansion` (a fallback pool contains pieces that
+  themselves expand — how worldgen blows past the def's `size`). Doctor-side companions:
+  `waterlog_risk` (aquatic-biome def + waterloggable palette in its start pool — vanilla
+  force-waterlogs below the surface) and `mob_equipment` (natural generation re-rolls saved gear).
+- Dev capture: `BW_ASSEMBLE` now also ACTIVATES the Jigsaw tab on open (the auto-assembly effect
+  lives in the panel, which must be mounted).
+
+### v2.3 Worldgen Studio + structure Lint (dockable panels)
+
+Two new sidebar tabs (registered like every panel: `WindowId`/`PanelId` + `windows.ts` layout +
+`InspectorDock` PANELS + App availability + View-menu `windowItem` + `WindowsReport`):
+
+- **Worldgen Studio** (`windows/WorldgenWindow.tsx`, View ▸ Worldgen Studio, workspace required):
+  schema-validated forms over the four JSONs the export writes. Main's
+  `export/worldgen-studio.ts` reads a def into a `WorldgenModel` (terrain adaptation, size,
+  max distance, biomes — via the def's own `#has_structure` tag when own-namespace, inline
+  otherwise — set spacing/separation, start-pool element weights + fallback) and writes it back
+  SURGICALLY (each file re-read, only modeled fields patched — `spawn_overrides`, processors,
+  salt, empty elements all survive; test-enforced), then `clearJsonCache()` so the assembler
+  sees the edits. Validation is PURE + shared (`shared/domain/worldgen-studio.ts`
+  `validateStudioModel`: biomes_empty, spacing 1–256, separation<spacing, size 1–7, distance
+  1–128 and ≤116 with adaptation, weights 1–150) and gates Save. Saving bumps
+  `store.worldgenRev` — the Jigsaw Lab re-reads pools, so the loop is edit → Save →
+  re-simulate → 3D preview, without launching the game.
+- **Structure Lint** (`windows/LintWindow.tsx`, View ▸ Structure Lint, any open structure —
+  workspace optional): per-file checks over `structure:lint` → `structure/lint.ts`. Its
+  `readLintRaw` KEEPS explicit air + block-entity NBT (what `readAuthoring`/`readRaw` drop —
+  the air rule is about exactly those cells). Rules (`LintCode`): `suspect_air` (explicit
+  boundary air in a DENSE capture — paste clears terrain), `block_out_of_range` (the downgrader
+  registry doubles as the existence oracle; suggests the curated stand-in), `orphan_palette`,
+  `bad_data_marker` (data mode, empty `metadata`). Findings carry a `pos` — clicking a row
+  focuses the cell (`Viewer.focusBlock`). The Doctor re-reports the same codes workspace-wide
+  (`checkStructureFiles` now parses via `readLintRaw` once per file and runs the linter against
+  `ws.minecraftVersion`).
+
 ### Composable generation domain
 
 `structure/domain/` is the data-driven model behind the authoring `template` op. Everything

@@ -11,7 +11,7 @@ import { createStore } from 'zustand/vanilla';
 import type { WindowId } from '@/shared/types';
 
 /** The dockable panels (every WindowId except `controls`). */
-export type PanelId = 'inspector' | 'materials' | 'jigsaw' | 'generate' | 'versions';
+export type PanelId = 'inspector' | 'materials' | 'jigsaw' | 'lint' | 'worldgen' | 'generate' | 'versions';
 
 export interface WindowState {
   visible: boolean;
@@ -30,6 +30,8 @@ export const WINDOW_WIDTHS: Record<WindowId, number> = {
   inspector: 288,
   materials: 320,
   jigsaw: 288,
+  lint: 288,
+  worldgen: 300,
   generate: 380,
   versions: 240,
   console: 0,
@@ -87,6 +89,16 @@ export function homePosition(id: WindowId): { x: number; y: number } {
         x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.jigsaw - MARGIN * 2),
         y: Math.max(MARGIN, h - JIGSAW_H - MARGIN),
       };
+    case 'lint':
+      return {
+        x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.lint - MARGIN * 2),
+        y: MARGIN,
+      };
+    case 'worldgen':
+      return {
+        x: Math.max(MARGIN, w - WINDOW_WIDTHS.inspector - WINDOW_WIDTHS.worldgen - MARGIN * 2),
+        y: Math.max(MARGIN, h - JIGSAW_H - MARGIN),
+      };
     case 'generate':
       return { x: MARGIN, y: MARGIN };
     case 'versions':
@@ -119,6 +131,8 @@ interface WindowsLayout {
   inspector: WindowState;
   materials: WindowState;
   jigsaw: WindowState;
+  lint: WindowState;
+  worldgen: WindowState;
   generate: WindowState;
   versions: WindowState;
   /** The bottom Console dock — like `controls`, only its `.visible` matters. */
@@ -145,6 +159,11 @@ function defaults(): WindowsLayout {
     // build card's "Materials…"), then persists like the other panels.
     materials: { ...freshWindow('materials'), visible: false },
     jigsaw: freshWindow('jigsaw'),
+    // Lint starts hidden: it's opened on demand (View ▸ Structure Lint), then
+    // persists like the other panels.
+    lint: { ...freshWindow('lint'), visible: false },
+    // Worldgen Studio starts hidden: opened on demand (View ▸ Worldgen Studio).
+    worldgen: { ...freshWindow('worldgen'), visible: false },
     // Generate starts hidden and floating: it's opened on demand (File ▸ New
     // Structure / View ▸ Generate) as a movable window the user can dock right.
     generate: { ...freshWindow('generate'), visible: false, floating: true },
@@ -171,7 +190,7 @@ function load(): WindowsLayout {
     const saved = JSON.parse(raw) as Partial<WindowsLayout>;
     // `controls` is intentionally NOT restored — the shortcuts popover always
     // starts closed (it's an opt-in help affordance, not a persistent panel).
-    for (const id of ['inspector', 'materials', 'jigsaw', 'versions'] as const) {
+    for (const id of ['inspector', 'materials', 'jigsaw', 'lint', 'worldgen', 'versions'] as const) {
       base[id] = { ...base[id], ...saved[id] };
     }
     // Generate persists like the other panels: its visibility/float/position/
@@ -186,6 +205,8 @@ function load(): WindowsLayout {
       saved.activeTab === 'inspector' ||
       saved.activeTab === 'materials' ||
       saved.activeTab === 'jigsaw' ||
+      saved.activeTab === 'lint' ||
+      saved.activeTab === 'worldgen' ||
       saved.activeTab === 'generate' ||
       saved.activeTab === 'versions'
     ) {
@@ -276,6 +297,8 @@ function snapshot(s: WindowsStore): WindowsLayout {
     inspector: s.inspector,
     materials: s.materials,
     jigsaw: s.jigsaw,
+    lint: s.lint,
+    worldgen: s.worldgen,
     generate: s.generate,
     versions: s.versions,
     console: s.console,

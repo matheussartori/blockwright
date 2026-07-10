@@ -20,7 +20,9 @@ import type {
   WorldRef,
   WorldWaypoint,
 } from './world';
-import type { AssembleOptions, JigsawPlan, JigsawCandidate } from './jigsaw';
+import type { AssembleOptions, JigsawPlan, JigsawCandidate, JigsawPoolInfo } from './jigsaw';
+import type { LintReport } from './lint';
+import type { WorldgenModel, WorldgenWriteResult } from './worldgen-studio';
 import type {
   GenerateImage,
   GenerateResult,
@@ -172,6 +174,16 @@ export interface BlockwrightApi {
   assembleJigsaw: (path: string, options: AssembleOptions) => Promise<JigsawPlan>;
   /** Candidate pieces that can attach to one connector of a structure (manual mode). */
   jigsawCandidates: (path: string, connectorIndex: number) => Promise<JigsawCandidate[]>;
+  /** Resolve a structure's template pools (elements + fallback) for the Jigsaw Lab. */
+  jigsawPools: (path: string) => Promise<JigsawPoolInfo[]>;
+  /** Lint one structure file against a target MC version (null = skip version rules). */
+  lintStructure: (path: string, targetVersion: string | null) => Promise<LintReport>;
+  /** Worldgen Studio: the active workspace's editable jigsaw structure defs. */
+  worldgenDefs: () => Promise<string[]>;
+  /** Worldgen Studio: read one def's editable worldgen model. */
+  worldgenRead: (name: string) => Promise<WorldgenModel | null>;
+  /** Worldgen Studio: write an edited model back (surgical patch; cache invalidated). */
+  worldgenWrite: (model: WorldgenModel) => Promise<WorldgenWriteResult>;
   /** Whether the active AI provider is usable right now (gates the generation UI). */
   aiAvailable: () => Promise<boolean>;
   /** The full multi-provider AI config (providers + active selection) for Settings. */
