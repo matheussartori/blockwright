@@ -17,6 +17,7 @@ import { buildStructure } from './mesh-builder';
 import { buildEntities } from './entity-mesh';
 import { SelectionOverlay } from './selection-overlay';
 import { WorldSelectionOverlay, type HeightHandle, type SelectionPhase } from './region-overlay';
+import { WorldMagicOverlay } from './world-magic-overlay';
 import { SymmetryOverlay } from './symmetry-overlay';
 import { HoverOverlay } from './hover-overlay';
 import { VoidOverlay, type VoidCell } from './void-overlay';
@@ -54,6 +55,9 @@ export class Viewer {
 
   /** The world editor's box-selection region (filled volume + edges + height handles). */
   private worldSelection = new WorldSelectionOverlay(this.scene);
+
+  /** The world editor's magic-select blob (instanced translucent cell boxes). */
+  private worldMagic = new WorldMagicOverlay(this.scene);
 
   private symmetryOverlay = new SymmetryOverlay(this.scene);
 
@@ -238,6 +242,7 @@ export class Viewer {
   exitWorldMode(): void {
     this.worldGhost.clear();
     this.worldSelection.clear();
+    this.worldMagic.clear();
     this.worldMarkers.set(null);
     this.worldMode.exit();
   }
@@ -430,6 +435,23 @@ export class Viewer {
   /** Tint the hovered/dragged selection height handle (null = none). */
   setWorldSelectionHandleHover(face: HeightHandle | null): void {
     this.worldSelection.setHandleHover(face);
+  }
+
+  /** Show (or clear, with null) the magic-select cell blob overlay. */
+  setWorldMagicCells(cells: [number, number, number][] | null): void {
+    this.worldMagic.set(cells);
+  }
+
+  /** The full block state at a world cell from resident chunk data (magic select's
+   *  matcher + the Terrain Blend sampler). Null when the chunk isn't streamed in. */
+  worldBlockStateAt(x: number, y: number, z: number): { name: string; properties?: Record<string, string> } | null {
+    return this.worldMode.blockStateAt(x, y, z);
+  }
+
+  /** The terrain surface at a world column (see WorldView.surfaceAt) — Terrain Blend's
+   *  ground/material read. Null when the chunk isn't streamed in. */
+  worldSurfaceAt(x: number, z: number): { y: number; surface: { name: string; properties?: Record<string, string> }; filler: { name: string; properties?: Record<string, string> } } | null {
+    return this.worldMode.surfaceAt(x, z);
   }
 
   /** The selection height handle under a screen point, if any. */

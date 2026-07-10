@@ -4,8 +4,9 @@
 import { useMemo } from 'react';
 import { Pipette, Trash2 } from 'lucide-react';
 import { useEditor } from '../../hooks/useStores';
-import { editorStore, type PaintMode, type Tool, type VoidKind } from '../../state/editor';
+import { editorStore, type MatchMode, type PaintMode, type Tool, type VoidKind } from '../../state/editor';
 import type { Axis, Cell, Horizontal } from '../../editor/ops';
+import { parsePattern } from '../../editor/pattern';
 import { Segmented } from '../ui/Segmented';
 import { Select } from '../ui/Select';
 import { Stepper } from '../ui/Stepper';
@@ -32,6 +33,7 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
   const replaceBlock = useEditor((s) => s.replaceBlock);
   const paintBlock = useEditor((s) => s.paintBlock);
   const paintMode = useEditor((s) => s.paintMode);
+  const magicMatch = useEditor((s) => s.magicMatch);
   const voidKind = useEditor((s) => s.voidKind);
   const paintDepth = useEditor((s) => s.paintDepth);
   const eyedropper = useEditor((s) => s.eyedropper);
@@ -41,7 +43,25 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
 
   switch (tool) {
     case 'select':
-      return <p className="editor-hint">{t('editor.selectHint')}</p>;
+      return (
+        <>
+          <p className="editor-hint">{t('editor.selectHint')}</p>
+          <p className="editor-hint">{t('editor.magicHint')}</p>
+          <label className="editor-field">
+            <span className="editor-label">{t('editor.magicMatch')}</span>
+            <Select
+              value={magicMatch}
+              ariaLabel={t('editor.magicMatch')}
+              options={[
+                { value: 'state', label: t('editor.magicState'), description: t('editor.magicStateDesc') },
+                { value: 'block', label: t('editor.magicBlock'), description: t('editor.magicBlockDesc') },
+                { value: 'family', label: t('editor.magicFamily'), description: t('editor.magicFamilyDesc') },
+              ]}
+              onChange={(v) => ed().setMagicMatch(v as MatchMode)}
+            />
+          </label>
+        </>
+      );
 
     case 'move':
       return (
@@ -102,10 +122,12 @@ export function ToolControls({ tool, t }: { tool: Tool; t: TFunction }) {
           <p className="editor-hint">{t(`editor.paintHint.${paintMode}` as MessageKey)}</p>
           <div className="editor-blockrow">
             <div className="editor-swatch">
-              <BlockPreview blockId={paintBlock} />
+              {/* A multi-entry pattern previews its first block (the heaviest visual anchor). */}
+              <BlockPreview blockId={parsePattern(paintBlock)?.[0]?.name ?? paintBlock} />
             </div>
             <BlockField label={t('editor.paintBlockLabel')} value={paintBlock} onChange={(v) => ed().setPaintBlock(v)} options={blockIds} listId="editor-paint-blocks" />
           </div>
+          <p className="editor-hint editor-note">{t('editor.patternHint')}</p>
           <button
             className={`btn sm ghost editor-eyedrop${eyedropper ? ' active' : ''}`}
             onClick={() => ed().setEyedropper(!eyedropper)}

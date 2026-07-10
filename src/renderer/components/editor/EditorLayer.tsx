@@ -203,7 +203,9 @@ export function EditorLayer() {
         return;
       }
       const cell = viewer.pickBlock(e.clientX, e.clientY);
-      const mode: PickMode = e.shiftKey ? 'box' : e.metaKey || e.ctrlKey ? 'add' : 'single';
+      // Alt+click on Select = magic select (Alt is the eyedropper only on the paint-family
+      // tools, which returned above), Shift = box, Cmd/Ctrl = add, plain = single.
+      const mode: PickMode = e.altKey ? 'magic' : e.shiftKey ? 'box' : e.metaKey || e.ctrlKey ? 'add' : 'single';
       s.pick(cell, mode);
     };
 

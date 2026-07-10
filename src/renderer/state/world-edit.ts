@@ -16,9 +16,38 @@ import {
 } from '../world/edit-overlay';
 import { adjustFaceY, spanRegion } from '../world/selection';
 import { planPlacement, rotatedSize, type PlaceTurns } from '../world/place';
+import { parsePattern, pickPatternIndex, type PatternEntry } from '../editor/pattern';
+import type { MatchMode } from '../editor/ops';
+import { worldMagicRegion, type WorldMagicRegion } from '../world/magic';
+import { planTerrainBlend, type BlockState, type SurfaceSample, type TerrainSampler } from '../world/blend';
+import type { FloorDef } from '@/shared/types';
 
 export type WorldTool = 'paint' | 'erase' | 'select' | 'place';
 export type WorldPaintMode = 'brush' | 'recolor';
+/** How the Select tool picks: two-corner box, or magic (contiguous same-block region). */
+export type WorldSelectMode = 'box' | 'magic';
+
+/** The Terrain Blend toggles (v2.3 §1.2), persisted across placements in the session. */
+export interface BlendState {
+  /** Pillar grounded footprint columns down to the terrain ("beard"). */
+  foundation: boolean;
+  /** Feather-ring radius around the footprint (0 = off). */
+  feather: number;
+  /** Clear terrain poking through cells the structure leaves undefined. */
+  excavate: boolean;
+  /** Sink the aim by the structure's detected basement depth (only when one exists). */
+  sink: boolean;
+}
+
+/** Below-grade depth (cells) declared by a structure's floor metadata — the storeys-based
+ *  basement detection behind the Place tool's "sink" toggle. 0 when nothing is marked. */
+export function basementDepthOf(floors: FloorDef[] | undefined): number {
+  let depth = 0;
+  for (const f of floors ?? []) {
+    if (f.role === 'basement') depth = Math.max(depth, f.to + 1);
+  }
+  return depth;
+}
 
 /** The live Place-tool ghost: the source structure plus where it currently sits. */
 export interface PlaceGhostState {
@@ -33,6 +62,9 @@ export interface PlaceGhostState {
   locked: boolean;
   /** CW quarter-turns about +Y (the `transformProps` convention). */
   turns: PlaceTurns;
+  /** Below-grade basement depth detected from the doc's floor metadata (0 = none) —
+   *  the "sink" toggle drops the aim by this much so the basement lands buried. */
+  sink: number;
 }
 
 /** What `commitPlace` needs from the viewer (kept as callbacks so the store stays pure). */
@@ -41,6 +73,10 @@ export interface CommitPlaceHost {
   chunkLoaded(cx: number, cz: number): boolean;
   /** Preload textures so the composited placement meshes textured. */
   loadTextures(keys: string[]): Promise<void>;
+  /** Terrain surface at a world column (Terrain Blend), or null when not streamed in. */
+  surfaceAt(x: number, z: number): SurfaceSample | null;
+  /** Block state at a world cell (Terrain Blend), or null when not streamed in. */
+  blockAt(x: number, y: number, z: number): BlockState | null;
 }
 
 /** Hard cap on a box-selection's volume — a runaway fill would freeze the mesher and produce a
@@ -82,6 +118,14 @@ export interface WorldEditState {
   /** Box-select state: the first corner, and the committed box (both inclusive). */
   anchor: [number, number, number] | null;
   selection: { min: [number, number, number]; max: [number, number, number] } | null;
+  /** How the Select tool picks (box corners / magic region). */
+  selectMode: WorldSelectMode;
+  /** Magic select's tolerance (exact state / same block / same family). */
+  magicMatch: MatchMode;
+  /** The committed magic region, or null. */
+  magic: WorldMagicRegion | null;
+  /** The Place tool's Terrain Blend toggles. */
+  blend: BlendState;
   /** The Place tool's ghost (a structure being positioned), or null. */
   place: PlaceGhostState | null;
   /** Chunk keys whose composite changed in the LAST mutation — the layer re-meshes exactly these. */
@@ -98,8 +142,13 @@ export interface WorldEditState {
   setTool(tool: WorldTool): void;
   setPaintMode(mode: WorldPaintMode): void;
   setPaintBlock(id: string): void;
-  /** Resolve the current paint block to a renderable entry (cached). Null on failure. */
-  ensurePaintResolved(): Promise<ResolvedWorldBlock | null>;
+  setSelectMode(mode: WorldSelectMode): void;
+  setMagicMatch(mode: MatchMode): void;
+  /** Patch the Terrain Blend toggles. */
+  setBlend(patch: Partial<BlendState>): void;
+  /** Resolve every entry of the current paint pattern to renderable entries (cached).
+   *  Null when the pattern is malformed or any block fails to resolve. */
+  ensurePaintResolved(): Promise<ResolvedWorldBlock[] | null>;
   /** Snapshot for undo — one per stroke/batch, so a drag coalesces into one step. */
   strokeBegin(): void;
   /** Place the paint block (brush/recolor target cell already picked by the layer). */
@@ -108,6 +157,13 @@ export interface WorldEditState {
   eraseCell(cell: [number, number, number]): void;
   /** Box-select: first pick anchors, second commits the box, a third re-anchors. */
   pickSelect(cell: [number, number, number]): void;
+  /** Magic select: flood the contiguous same-block region from a picked cell (reads the
+   *  committed world through `blockAt`). Replaces any box selection. */
+  magicPick(cell: [number, number, number], blockAt: (x: number, y: number, z: number) => BlockState | null): void;
+  /** Fill the magic region with the paint pattern (one undo step). */
+  fillMagic(): Promise<void>;
+  /** Fill the magic region with air. */
+  deleteMagic(): void;
   /** Live rubber band: while the first corner is anchored, stretch the box to the aimed
    *  cell so the region is visible BEFORE the second click. No-op once committed. */
   previewSelect(cell: [number, number, number]): void;
@@ -181,10 +237,34 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     });
   };
 
-  /** Fill the committed selection box with `name` as ONE undo step (volume-capped). */
-  const fillBox = (name: string): void => {
-    const s = get();
-    const sel = s.selection;
+  // Memoized parse of the paint field — a pattern string would otherwise re-parse on
+  // every painted cell of a drag.
+  let patternSrc: string | null = null;
+  let patternCache: PatternEntry[] | null = null;
+  const paintPattern = (): PatternEntry[] | null => {
+    const src = get().paintBlock;
+    if (src !== patternSrc) {
+      patternSrc = src;
+      patternCache = parsePattern(src);
+    }
+    return patternCache;
+  };
+
+  /** Fill `cells` with the pattern (each cell picks deterministically) as ONE undo step. */
+  const fillCells = (cells: Iterable<readonly [number, number, number]>, pattern: PatternEntry[]): void => {
+    get().strokeBegin();
+    const pending = get().pending;
+    const touched = new Set<string>();
+    for (const [x, y, z] of cells) {
+      pending[cellKeyOf(x, y, z)] = { x, y, z, name: pattern[pickPatternIndex(pattern, x, y, z)].name };
+      touched.add(chunkKeyOf(x, z));
+    }
+    set({ pendingCount: Object.keys(pending).length, lastTouched: [...touched], future: [] });
+  };
+
+  /** Fill the committed selection box with a pattern as ONE undo step (volume-capped). */
+  const fillBox = (pattern: PatternEntry[]): void => {
+    const sel = get().selection;
     if (!sel) return;
     const [x0, y0, z0] = sel.min;
     const [x1, y1, z1] = sel.max;
@@ -193,19 +273,15 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       set({ error: `selection too large (${volume.toLocaleString()} blocks — cap ${WORLD_SELECTION_CAP.toLocaleString()})` });
       return;
     }
-    s.strokeBegin();
-    const pending = get().pending;
-    const touched = new Set<string>();
-    for (let y = y0; y <= y1; y++) {
-      for (let z = z0; z <= z1; z++) {
-        for (let x = x0; x <= x1; x++) {
-          pending[cellKeyOf(x, y, z)] = { x, y, z, name };
-          touched.add(chunkKeyOf(x, z));
-        }
-      }
-    }
-    set({ pendingCount: Object.keys(pending).length, lastTouched: [...touched], future: [] });
+    const cells: [number, number, number][] = [];
+    for (let y = y0; y <= y1; y++)
+      for (let z = z0; z <= z1; z++)
+        for (let x = x0; x <= x1; x++) cells.push([x, y, z]);
+    fillCells(cells, pattern);
   };
+
+  /** One-entry air pattern (erase fills). */
+  const AIR_PATTERN: PatternEntry[] = [{ name: AIR, weight: 1 }];
 
   return {
     active: false,
@@ -221,6 +297,10 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     resolved: {},
     anchor: null,
     selection: null,
+    selectMode: 'box',
+    magicMatch: 'block',
+    magic: null,
+    blend: { foundation: true, feather: 2, excavate: false, sink: true },
     place: null,
     lastTouched: [],
     past: [],
@@ -259,6 +339,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
         pendingEntities: [],
         anchor: null,
         selection: null,
+        magic: null,
         place: null,
         past: [],
         future: [],
@@ -271,20 +352,32 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     setTool: (tool) => set({ tool, anchor: null, ...(tool !== 'place' ? { place: null } : {}) }),
     setPaintMode: (paintMode) => set({ paintMode }),
     setPaintBlock: (paintBlock) => set({ paintBlock }),
+    setSelectMode: (selectMode) => set({ selectMode, anchor: null }),
+    // A tolerance change makes the committed region stale — drop it.
+    setMagicMatch: (magicMatch) => set({ magicMatch, magic: null }),
+    setBlend: (patch) => set({ blend: { ...get().blend, ...patch } }),
 
     ensurePaintResolved: async () => {
-      const { paintBlock, resolved } = get();
-      const key = stateKeyOf(paintBlock);
-      const hit = resolved[key];
-      if (hit) return hit;
+      const pattern = paintPattern();
+      if (!pattern) return null;
+      const resolved = { ...get().resolved };
+      const out: ResolvedWorldBlock[] = [];
       try {
-        const res = await api.resolveBlock(paintBlock, {});
-        const entry: ResolvedWorldBlock = { entry: res.entry, textures: res.textures };
-        set({ resolved: { ...get().resolved, [key]: entry } });
-        return entry;
+        for (const p of pattern) {
+          const key = stateKeyOf(p.name);
+          let hit = resolved[key];
+          if (!hit) {
+            const res = await api.resolveBlock(p.name, {});
+            hit = { entry: res.entry, textures: res.textures };
+            resolved[key] = hit;
+          }
+          out.push(hit);
+        }
       } catch {
         return null;
       }
+      set({ resolved });
+      return out;
     },
 
     strokeBegin: () => {
@@ -294,8 +387,10 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     },
 
     paintCell: (cell) => {
-      const { paintBlock } = get();
-      putEdit({ x: cell[0], y: cell[1], z: cell[2], name: paintBlock });
+      const pattern = paintPattern();
+      if (!pattern) return; // malformed pattern — nothing to paint
+      const name = pattern[pickPatternIndex(pattern, cell[0], cell[1], cell[2])].name;
+      putEdit({ x: cell[0], y: cell[1], z: cell[2], name });
     },
 
     eraseCell: (cell) => {
@@ -305,10 +400,31 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     pickSelect: (cell) => {
       const { anchor } = get();
       if (!anchor) {
-        set({ anchor: cell, selection: spanRegion(cell, cell) });
+        set({ anchor: cell, selection: spanRegion(cell, cell), magic: null });
         return;
       }
       set({ selection: spanRegion(anchor, cell), anchor: null });
+    },
+
+    magicPick: (cell, blockAt) => {
+      const magic = worldMagicRegion(cell, blockAt, get().magicMatch);
+      set({ magic, anchor: null, selection: null });
+    },
+
+    fillMagic: async () => {
+      const s = get();
+      if (!s.magic?.cells.length) return;
+      const pattern = paintPattern();
+      if (!pattern || (await s.ensurePaintResolved()) === null) {
+        set({ error: `unknown block: ${s.paintBlock}` });
+        return;
+      }
+      fillCells(s.magic.cells, pattern);
+    },
+
+    deleteMagic: () => {
+      const m = get().magic;
+      if (m?.cells.length) fillCells(m.cells, AIR_PATTERN);
     },
 
     previewSelect: (cell) => {
@@ -325,20 +441,21 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       set({ selection: next });
     },
 
-    clearSelection: () => set({ anchor: null, selection: null }),
+    clearSelection: () => set({ anchor: null, selection: null, magic: null }),
 
     fillSelection: async () => {
       const s = get();
       if (!s.selection) return;
-      if ((await s.ensurePaintResolved()) === null) {
+      const pattern = paintPattern();
+      if (!pattern || (await s.ensurePaintResolved()) === null) {
         set({ error: `unknown block: ${s.paintBlock}` });
         return;
       }
-      fillBox(s.paintBlock);
+      fillBox(pattern);
     },
 
     deleteSelection: () => {
-      fillBox(AIR);
+      fillBox(AIR_PATTERN);
     },
 
     extractSelection: async (nbtLimit) => {
@@ -358,15 +475,22 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
     },
 
     beginPlace: (docId, label, data) =>
-      set({ tool: 'place', anchor: null, place: { docId, label, data, anchor: null, locked: false, turns: 0 } }),
+      set({
+        tool: 'place',
+        anchor: null,
+        place: { docId, label, data, anchor: null, locked: false, turns: 0, sink: basementDepthOf(data.floors) },
+      }),
 
     aimPlace: (cell, lock) => {
       const g = get().place;
       if (!g || (g.locked && !lock)) return; // hover stops following once pinned
       const [w, , d] = rotatedSize(g.data.size, g.turns);
+      // A detected basement sinks the aim so the below-grade storeys land buried
+      // (the semi-buried case of §1.2) — toggled by the blend "sink" switch.
+      const sink = get().blend.sink ? g.sink : 0;
       const anchor: [number, number, number] = [
         cell[0] - Math.floor(w / 2),
-        cell[1],
+        cell[1] - sink,
         cell[2] - Math.floor(d / 2),
       ];
       set({ place: { ...g, anchor, locked: g.locked || lock } });
@@ -407,8 +531,25 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
       if (!g?.anchor) return false;
       const plan = planPlacement(g.data, g.anchor, g.turns);
       if (!plan.edits.length) return false;
-      if (plan.edits.length > WORLD_SELECTION_CAP) {
-        set({ error: `placement too large (${plan.edits.length.toLocaleString()} blocks — cap ${WORLD_SELECTION_CAP.toLocaleString()})` });
+      // Terrain Blend (§1.2): foundation/feather/excavation edits planned against the
+      // COMMITTED terrain (read through the host's samplers) — never overlapping the
+      // structure's own cells, same undo step, same pending-edit preview.
+      const b = s.blend;
+      let blendEdits: PendingWorldEdit[] = [];
+      if (b.foundation || b.feather > 0 || b.excavate) {
+        const sampler: TerrainSampler = {
+          surfaceAt: (x, z) => host.surfaceAt(x, z),
+          blockAt: (x, y, z) => host.blockAt(x, y, z)?.name ?? null,
+        };
+        blendEdits = planTerrainBlend(
+          { edits: plan.edits, anchor: g.anchor, size: rotatedSize(g.data.size, g.turns) },
+          sampler,
+          b,
+        ).filter((e) => host.chunkLoaded(Math.floor(e.x / 16), Math.floor(e.z / 16)));
+      }
+      const total = plan.edits.length + blendEdits.length;
+      if (total > WORLD_SELECTION_CAP) {
+        set({ error: `placement too large (${total.toLocaleString()} blocks — cap ${WORLD_SELECTION_CAP.toLocaleString()})` });
         return false;
       }
       // The §2 rule holds for placements too: edits only land on streamed-in chunks.
@@ -440,11 +581,29 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
         }
         for (const t of resolved[key].textures) textures.add(t);
       }
+      // Blend states are terrain blocks (grass/dirt/sand…) already streamed in this world,
+      // so resolution virtually always succeeds; a failure falls back to a flat-colour
+      // entry (the chunk palette usually renders the real model anyway).
+      for (const e of blendEdits) {
+        if (e.name === AIR) continue;
+        const key = stateKeyOf(e.name, e.properties);
+        if (resolved[key]) {
+          for (const t of resolved[key].textures) textures.add(t);
+          continue;
+        }
+        try {
+          const r = await api.resolveBlock(e.name, e.properties ?? {});
+          resolved[key] = { entry: r.entry, textures: r.textures };
+          for (const t of r.textures) textures.add(t);
+        } catch {
+          resolved[key] = { entry: { name: e.name, properties: e.properties, models: [], color: [0.45, 0.37, 0.3], air: false }, textures: [] };
+        }
+      }
       await host.loadTextures([...textures]);
       s.strokeBegin();
       const pending = get().pending;
       const touched = new Set<string>();
-      for (const e of plan.edits) {
+      for (const e of [...plan.edits, ...blendEdits]) {
         pending[cellKeyOf(e.x, e.y, e.z)] = e;
         touched.add(chunkKeyOf(e.x, e.z));
       }
@@ -489,7 +648,7 @@ export const worldEditStore = createStore<WorldEditState>((set, get) => {
 
     discard: () => {
       const touched = chunksOf(Object.keys(get().pending));
-      set({ pending: {}, pendingCount: 0, pendingEntities: [], past: [], future: [], lastTouched: touched, anchor: null });
+      set({ pending: {}, pendingCount: 0, pendingEntities: [], past: [], future: [], lastTouched: touched, anchor: null, magic: null });
     },
 
     setSaveOpen: (saveOpen) => set({ saveOpen }),
@@ -529,9 +688,13 @@ export type { PendingWorldEdit, ResolvedWorldBlock } from '../world/edit-overlay
 export function commitPlaceVia(viewer: {
   worldChunkLoaded(cx: number, cz: number): boolean;
   ensureWorldTextures(keys: string[]): Promise<void>;
+  worldSurfaceAt(x: number, z: number): SurfaceSample | null;
+  worldBlockStateAt(x: number, y: number, z: number): BlockState | null;
 }): Promise<boolean> {
   return worldEditStore.getState().commitPlace({
     chunkLoaded: (cx, cz) => viewer.worldChunkLoaded(cx, cz),
     loadTextures: (keys) => viewer.ensureWorldTextures(keys),
+    surfaceAt: (x, z) => viewer.worldSurfaceAt(x, z),
+    blockAt: (x, y, z) => viewer.worldBlockStateAt(x, y, z),
   });
 }

@@ -6,7 +6,11 @@ import { useMemo } from 'react';
 import { AlertTriangle, Download, Eraser, Globe, PackageOpen, PackagePlus, Paintbrush, Redo2, RotateCcw, RotateCw, Save, SquareDashed, Trash2, Undo2, X } from 'lucide-react';
 import { effectiveNbtLimit } from '@/shared/domain/split';
 import { useDocuments, useT, useWorldEdit } from '../../hooks/useStores';
-import { commitPlaceVia, WORLD_SELECTION_CAP, worldEditStore, type WorldPaintMode, type WorldTool } from '../../state/world-edit';
+import { commitPlaceVia, WORLD_SELECTION_CAP, worldEditStore, type WorldPaintMode, type WorldSelectMode, type WorldTool } from '../../state/world-edit';
+import type { MatchMode } from '../../state/editor';
+import { BLEND_MAX_FEATHER } from '../../world/blend';
+import { WORLD_MAGIC_CAP } from '../../world/magic';
+import { Switch } from '../ui/Switch';
 import { regionVolume } from '../../world/selection';
 import { rotatedSize } from '../../world/place';
 import { useViewer } from '../../viewer/ViewerProvider';
@@ -40,6 +44,10 @@ export function WorldEditPanel({ onOpenFile }: { onOpenFile: (path: string) => v
   const pendingCount = useWorldEdit((s) => s.pendingCount);
   const selection = useWorldEdit((s) => s.selection);
   const selAnchor = useWorldEdit((s) => s.anchor);
+  const selectMode = useWorldEdit((s) => s.selectMode);
+  const magicMatch = useWorldEdit((s) => s.magicMatch);
+  const magic = useWorldEdit((s) => s.magic);
+  const blend = useWorldEdit((s) => s.blend);
   const canUndo = useWorldEdit((s) => s.past.length > 0);
   const canRedo = useWorldEdit((s) => s.future.length > 0);
   const lockExclusive = useWorldEdit((s) => s.lockExclusive);
@@ -143,6 +151,7 @@ export function WorldEditPanel({ onOpenFile }: { onOpenFile: (path: string) => v
               options={blockIds}
               listId="world-paint-blocks"
             />
+            <div className="editor-hint">{t('editor.patternHint')}</div>
           </>
         )}
         {tool === 'erase' && <div className="editor-hint">{t('worldEdit.eraseHint')}</div>}
@@ -162,6 +171,43 @@ export function WorldEditPanel({ onOpenFile }: { onOpenFile: (path: string) => v
                 </button>
               </div>
               <AxisPad t={t} onAxis={(axis, dir) => we().nudgePlace(axis, dir)} />
+              <div className="world-blend">
+                <span className="editor-label">{t('worldEdit.blendTitle')}</span>
+                <div className="world-blend-row">
+                  <Tooltip placement="right" label={t('worldEdit.blendFoundation')} description={t('worldEdit.blendFoundationDesc')}>
+                    <span className="world-blend-label">{t('worldEdit.blendFoundation')}</span>
+                  </Tooltip>
+                  <Switch checked={blend.foundation} onChange={(v) => we().setBlend({ foundation: v })} ariaLabel={t('worldEdit.blendFoundation')} />
+                </div>
+                <div className="world-blend-row">
+                  <Tooltip placement="right" label={t('worldEdit.blendExcavate')} description={t('worldEdit.blendExcavateDesc')}>
+                    <span className="world-blend-label">{t('worldEdit.blendExcavate')}</span>
+                  </Tooltip>
+                  <Switch checked={blend.excavate} onChange={(v) => we().setBlend({ excavate: v })} ariaLabel={t('worldEdit.blendExcavate')} />
+                </div>
+                {place.sink > 0 && (
+                  <div className="world-blend-row">
+                    <Tooltip placement="right" label={t('worldEdit.blendSinkLabel')} description={t('worldEdit.blendSinkDesc')}>
+                      <span className="world-blend-label">{t('worldEdit.blendSink', { n: String(place.sink) })}</span>
+                    </Tooltip>
+                    <Switch checked={blend.sink} onChange={(v) => we().setBlend({ sink: v })} ariaLabel={t('worldEdit.blendSinkLabel')} />
+                  </div>
+                )}
+                <div className="world-blend-row">
+                  <Tooltip placement="right" label={t('worldEdit.blendFeather')} description={t('worldEdit.blendFeatherDesc')}>
+                    <span className="world-blend-label">{t('worldEdit.blendFeather')}</span>
+                  </Tooltip>
+                  <Select
+                    value={String(blend.feather)}
+                    ariaLabel={t('worldEdit.blendFeather')}
+                    options={Array.from({ length: BLEND_MAX_FEATHER + 1 }, (_, i) => ({
+                      value: String(i),
+                      label: i === 0 ? t('worldEdit.blendFeatherOff') : String(i),
+                    }))}
+                    onChange={(v) => we().setBlend({ feather: Number(v) })}
+                  />
+                </div>
+              </div>
               <div className="editor-btngrid">
                 <button
                   className="btn primary sm"
@@ -193,7 +239,72 @@ export function WorldEditPanel({ onOpenFile }: { onOpenFile: (path: string) => v
           ) : (
             <div className="editor-hint">{t('worldEdit.placeNoDocs')}</div>
           ))}
+        {tool === 'select' && (
+          <Segmented<WorldSelectMode>
+            value={selectMode}
+            onChange={(v) => we().setSelectMode(v)}
+            ariaLabel={t('worldEdit.selectMode')}
+            options={[
+              { value: 'box', label: t('worldEdit.selectBox') },
+              { value: 'magic', label: t('worldEdit.selectMagic') },
+            ]}
+          />
+        )}
+        {tool === 'select' && selectMode === 'magic' && (
+          <>
+            <label className="editor-field">
+              <span className="editor-label">{t('editor.magicMatch')}</span>
+              <Select
+                value={magicMatch}
+                ariaLabel={t('editor.magicMatch')}
+                options={[
+                  { value: 'state', label: t('editor.magicState'), description: t('editor.magicStateDesc') },
+                  { value: 'block', label: t('editor.magicBlock'), description: t('editor.magicBlockDesc') },
+                  { value: 'family', label: t('editor.magicFamily'), description: t('editor.magicFamilyDesc') },
+                ]}
+                onChange={(v) => we().setMagicMatch(v as MatchMode)}
+              />
+            </label>
+            {magic ? (
+              <>
+                <div className="world-sel-readout">
+                  <div className="world-sel-dims">
+                    <span className="world-sel-size">{magic.block.replace(/^minecraft:/, '')}</span>
+                    <span className="world-sel-volume">{t('worldEdit.selVolume', { n: magic.cells.length.toLocaleString() })}</span>
+                  </div>
+                </div>
+                {magic.truncated && (
+                  <div className="world-sel-cap">
+                    <AlertTriangle size={13} strokeWidth={2} aria-hidden />
+                    {t('worldEdit.magicTruncated', { cap: WORLD_MAGIC_CAP.toLocaleString() })}
+                  </div>
+                )}
+                <BlockField
+                  label={t('worldEdit.fillBlock')}
+                  value={paintBlock}
+                  onChange={(v) => we().setPaintBlock(v)}
+                  options={blockIds}
+                  listId="world-magic-fill-blocks"
+                />
+                <div className="editor-btngrid">
+                  <button className="btn sm" onClick={() => void we().fillMagic()}>
+                    {t('worldEdit.fillSelection')}
+                  </button>
+                  <button className="btn sm" onClick={() => we().deleteMagic()}>
+                    {t('worldEdit.deleteSelection')}
+                  </button>
+                </div>
+                <button className="btn sm world-sel-clear" onClick={() => we().clearSelection()}>
+                  <X size={13} aria-hidden /> {t('worldEdit.selClear')}
+                </button>
+              </>
+            ) : (
+              <div className="editor-hint">{t('worldEdit.magicHint')}</div>
+            )}
+          </>
+        )}
         {tool === 'select' &&
+          selectMode === 'box' &&
           (selection ? (
             <>
               <div className="world-sel-readout">

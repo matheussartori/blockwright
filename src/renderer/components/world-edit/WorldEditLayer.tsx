@@ -26,6 +26,7 @@ export function WorldEditLayer() {
   const tool = useWorldEdit((s) => s.tool);
   const anchor = useWorldEdit((s) => s.anchor);
   const selection = useWorldEdit((s) => s.selection);
+  const magic = useWorldEdit((s) => s.magic);
   const place = useWorldEdit((s) => s.place);
   const navMode = useApp((s) => s.navMode);
   const placeData = place?.data ?? null;
@@ -60,6 +61,7 @@ export function WorldEditLayer() {
       if (touched.size) viewer.remeshWorldChunks([...touched]);
       viewer.setHover(null);
       viewer.setWorldSelection(null);
+      viewer.setWorldMagicCells(null);
       viewer.setPaintNav(false);
       viewer.domElement.style.cursor = '';
     };
@@ -78,6 +80,12 @@ export function WorldEditLayer() {
     if (!viewer || !active) return;
     viewer.setWorldSelection(selection, anchor ? 'preview' : 'committed');
   }, [viewer, active, selection, anchor]);
+
+  // The magic-select blob overlay follows the committed region.
+  useEffect(() => {
+    if (!viewer || !active) return;
+    viewer.setWorldMagicCells(magic?.cells ?? null);
+  }, [viewer, active, magic]);
 
   // The Place tool's ghost meshes: built once per picked structure, dropped with it.
   useEffect(() => {
@@ -176,6 +184,10 @@ export function WorldEditLayer() {
         }
         return;
       }
+      if (s.tool === 'select' && s.selectMode === 'magic') {
+        viewer.setHover(viewer.pickWorldBlock(x, y), FOCUS);
+        return;
+      }
       if (s.tool === 'select') {
         // Height handles are grabbable only with a free cursor (orbit mode).
         if (!viewer.flying && s.selection && !s.anchor) {
@@ -220,9 +232,9 @@ export function WorldEditLayer() {
         strokePlane = cell ? planeFor(cell, x, y) : null;
         s.strokeBegin();
         if (s.tool === 'paint') {
-          // Resolve the brush block once per stroke; textures preload so the composite is textured.
+          // Resolve the brush pattern once per stroke; textures preload so the composite is textured.
           void s.ensurePaintResolved().then((res) => {
-            if (res) void viewer.ensureWorldTextures(res.textures).then(() => {
+            if (res) void viewer.ensureWorldTextures(res.flatMap((r) => r.textures)).then(() => {
               if (cell) paintAt(st(), cell);
             });
           });
@@ -280,7 +292,8 @@ export function WorldEditLayer() {
       const [x, y] = aimPoint(e);
       if (s.tool === 'select') {
         const cell = viewer.pickWorldBlock(x, y);
-        if (cell) s.pickSelect(cell);
+        if (cell && s.selectMode === 'magic') s.magicPick(cell, (bx, by, bz) => viewer.worldBlockStateAt(bx, by, bz));
+        else if (cell) s.pickSelect(cell);
       }
       if (s.tool === 'place' && s.place) {
         const cell = viewer.pickWorldPlacement(x, y);
@@ -353,12 +366,13 @@ export function WorldEditLayer() {
         return;
       }
       if (e.key === 'Escape') {
-        if (s.anchor || s.selection) s.clearSelection();
+        if (s.anchor || s.selection || s.magic) s.clearSelection();
         return;
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && s.selection) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && (s.selection || s.magic)) {
         e.preventDefault();
-        s.deleteSelection();
+        if (s.magic) s.deleteMagic();
+        else s.deleteSelection();
       }
     };
 

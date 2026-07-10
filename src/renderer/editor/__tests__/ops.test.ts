@@ -12,9 +12,11 @@ import {
   fillVoidBox,
   floodFill,
   internEntry,
+  magicSelect,
   mirrorCell,
   moveSelection,
   occupancy,
+  repaintCells,
   placeBlock,
   placeCells,
   planTransform,
@@ -348,6 +350,72 @@ describe('floodFill', () => {
   });
   it('is a no-op on an empty start cell', () => {
     expect(floodFill(data(), [2, 2, 2], entry('minecraft:glass'))).toBeNull();
+  });
+});
+
+describe('magicSelect', () => {
+  /** stone + stone[props] + stone_bricks + dirt in a row, plus a DISCONNECTED stone. */
+  const wall = (): EditData => ({
+    size: [6, 1, 1],
+    palette: [
+      entry('minecraft:stone'),
+      entry('minecraft:stone', false, { variant: 'x' }),
+      entry('minecraft:stone_bricks'),
+      entry('minecraft:dirt'),
+    ],
+    blocks: [
+      block(0, [0, 0, 0]),
+      block(1, [1, 0, 0]),
+      block(2, [2, 0, 0]),
+      block(3, [3, 0, 0]),
+      block(0, [5, 0, 0]), // disconnected — never selected
+    ],
+  });
+
+  it('state mode stops at a property change', () => {
+    expect(magicSelect(wall(), [0, 0, 0], 'state').sort()).toEqual(['0,0,0']);
+  });
+
+  it('block mode crosses properties but not block ids', () => {
+    expect(magicSelect(wall(), [0, 0, 0], 'block').sort()).toEqual(['0,0,0', '1,0,0']);
+  });
+
+  it('family mode crosses finish/shape variants but not materials', () => {
+    expect(magicSelect(wall(), [0, 0, 0], 'family').sort()).toEqual(['0,0,0', '1,0,0', '2,0,0']);
+  });
+
+  it('never leaks across a gap and returns [] on an empty start', () => {
+    expect(magicSelect(wall(), [4, 0, 0], 'family')).toEqual([]);
+  });
+
+  it('honours the cap', () => {
+    const d: EditData = {
+      size: [10, 1, 1],
+      palette: [entry('minecraft:stone')],
+      blocks: Array.from({ length: 10 }, (_, x) => block(0, [x, 0, 0])),
+    };
+    expect(magicSelect(d, [0, 0, 0], 'state', 4)).toHaveLength(4);
+  });
+});
+
+describe('repaintCells', () => {
+  it('repaints each cell with its own entry and leaves air alone', () => {
+    const d: EditData = {
+      size: [3, 1, 1],
+      palette: [entry('minecraft:stone'), entry('minecraft:air', true)],
+      blocks: [block(0, [0, 0, 0]), block(0, [1, 0, 0]), block(1, [2, 0, 0])],
+    };
+    const r = repaintCells(d, ['0,0,0', '1,0,0', '2,0,0'], (cell) =>
+      entry(cell[0] === 0 ? 'minecraft:andesite' : 'minecraft:diorite'),
+    );
+    const nameAt = (k: string) => r!.palette[r!.blocks.find((b) => cellKey(b.pos) === k)!.state].name;
+    expect(nameAt('0,0,0')).toBe('minecraft:andesite');
+    expect(nameAt('1,0,0')).toBe('minecraft:diorite');
+    expect(nameAt('2,0,0')).toBe('minecraft:air');
+  });
+
+  it('is null for an empty key list', () => {
+    expect(repaintCells(data(), [], () => entry('minecraft:stone'))).toBeNull();
   });
 });
 

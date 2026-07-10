@@ -7808,6 +7808,28 @@ body.row-resizing {
   gap: 5px;
 }
 
+/* Terrain Blend controls (the Place tool): compact label + switch rows under a heading. */
+.world-blend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.world-blend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.world-blend-label {
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: default;
+}
+
 /* Fly-mode crosshair: marks where a click lands while the pointer is locked (all world-edit
    tools pick at the screen center in fly mode). Difference blend keeps it visible over any
    terrain; pointer-events off so it can never eat a click. */

@@ -12,6 +12,7 @@ import { geometryFor, materialFor } from '../viewer/mesh-builder';
 import { buildEntities } from '../viewer/entity-mesh';
 import { BORDER_PLANE_BYTES, occluderStates, type MaterialBuffers, type NeighborBorders } from '../viewer/geometry-core';
 import type { TexInfo } from '../viewer/model-geometry';
+import { isGroundBlock, type BlockState } from './blend';
 import { computeBorderPlanes, type ChunkBorderPlanes } from './chunk-borders';
 import { WorkerPool } from './worker-pool';
 import { chunkSurfaceColor } from './surface';
@@ -684,6 +685,49 @@ export class WorldView {
     }
     hits.sort((a, b) => a.d - b.d);
     return { hits: hits.slice(0, cap).map(({ pos, name }) => ({ pos, name })), total };
+  }
+
+  /** The full block STATE at a world cell from the RESIDENT payload — what magic select
+   *  matches and the Terrain Blend sampler reads. Air for a dropped all-air section;
+   *  null when the chunk isn't resident. */
+  blockStateAt(x: number, y: number, z: number): BlockState | null {
+    const payload = this.chunks.get(key(Math.floor(x / 16), Math.floor(z / 16)))?.payload;
+    if (!payload) return null;
+    const section = payload.sections.find((s) => s.sectionY === Math.floor(y / 16));
+    if (!section) return { name: 'minecraft:air' };
+    const idx = section.uniform || !section.blocks ? section.fill : section.blocks[(y & 15) * 256 + (z & 15) * 16 + (x & 15)];
+    const entry = payload.palette[idx];
+    if (!entry) return { name: 'minecraft:air' };
+    const props = entry.properties as Record<string, string> | undefined;
+    return { name: entry.name, ...(props && Object.keys(props).length ? { properties: props } : {}) };
+  }
+
+  /** The terrain surface at a world column — the Terrain Blend sampler: start from the
+   *  chunk's MOTION_BLOCKING heightmap (top section when absent) and scan DOWN past
+   *  foliage/fluids/snow to the first real ground block. Returns that block (surface),
+   *  the block beneath it as the column's filler material (dirt under grass), and its Y.
+   *  Null when the chunk isn't resident or the column has no ground. */
+  surfaceAt(x: number, z: number): { y: number; surface: BlockState; filler: BlockState } | null {
+    const payload = this.chunks.get(key(Math.floor(x / 16), Math.floor(z / 16)))?.payload;
+    if (!payload?.sections.length) return null;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const s of payload.sections) {
+      minY = Math.min(minY, s.sectionY * 16);
+      maxY = Math.max(maxY, s.sectionY * 16 + 15);
+    }
+    const hm = payload.heightmap;
+    let y = hm ? Math.min(hm[(z & 15) * 16 + (x & 15)], maxY) : maxY;
+    while (y >= minY) {
+      const st = this.blockStateAt(x, y, z);
+      if (st && isGroundBlock(st.name)) break;
+      y--;
+    }
+    if (y < minY) return null;
+    const surface = this.blockStateAt(x, y, z)!;
+    const below = this.blockStateAt(x, y - 1, z);
+    const filler = below && isGroundBlock(below.name) ? below : surface;
+    return { y, surface, filler };
   }
 
   /** Name the block + biome at a world cell from the RESIDENT payload (the cursor readout) —

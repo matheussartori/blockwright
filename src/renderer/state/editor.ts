@@ -19,15 +19,17 @@ import {
   deleteSelection,
   extrudeSelection,
   fillVoidBox,
-  floodFill,
+  floodRegion,
   HORIZONTALS,
   internEntry,
+  magicSelect,
   mirrorCell,
   moveSelection,
   parseCell,
   placeCells,
   planTransform,
   recolorCell,
+  repaintCells,
   replaceSelection,
   rethemeBlocks,
   selectBox,
@@ -37,10 +39,14 @@ import {
   type CellContent,
   type EditData,
   type Horizontal,
+  type MatchMode,
   type OpResult,
   type PropXform,
 } from '../editor/ops';
+import { parsePattern, pickPatternIndex, type PatternEntry } from '../editor/pattern';
 import type { PaletteEntry } from '@/shared/types';
+
+export type { MatchMode };
 
 /** The canonical tool order — the rail's layout AND the 1–9 number-key shortcuts, so the
  *  key you press always matches the button position you see. */
@@ -70,8 +76,9 @@ export type PaintMode = 'brush' | 'recolor' | 'fill';
  *  structure_void, so Void already covers that intent. */
 export type VoidKind = 'air' | 'void';
 
-/** How a pick combines with the current selection (decided by modifier keys). */
-export type PickMode = 'single' | 'add' | 'box';
+/** How a pick combines with the current selection (decided by modifier keys). `magic`
+ *  (Alt+click) selects the contiguous same-block region under the tolerance mode. */
+export type PickMode = 'single' | 'add' | 'box' | 'magic';
 
 /** A point-in-time snapshot for undo/redo (the parts an op can change). */
 interface Snapshot {
@@ -113,6 +120,8 @@ export interface EditorState {
   paintBlock: string;
   /** Paint sub-mode (brush / recolor / fill). */
   paintMode: PaintMode;
+  /** Magic select's tolerance: exact state / same block / same material family. */
+  magicMatch: MatchMode;
   /** What the Void tool writes (air = clears terrain / structure void = preserves it). */
   voidKind: VoidKind;
   /** How many cells DEEPER than the first surface the Void tool targets (Alt+scroll) —
@@ -146,6 +155,7 @@ export interface EditorState {
   setReplaceBlock: (id: string) => void;
   setPaintBlock: (id: string) => void;
   setPaintMode: (mode: PaintMode) => void;
+  setMagicMatch: (mode: MatchMode) => void;
   setVoidKind: (kind: VoidKind) => void;
   setPaintDepth: (n: number) => void;
   setShowVoids: (on: boolean) => void;
@@ -196,10 +206,16 @@ const countSolid = (blocks: { state: number }[], palette: { air?: boolean }[]): 
   blocks.filter((b) => !palette[b.state]?.air).length;
 
 export const editorStore = createStore<EditorState>((set, get) => {
-  // A paint/void STROKE coalesces a drag into one undo step: the brush block is resolved
+  // A paint/void STROKE coalesces a drag into one undo step: the brush pattern is resolved
   // once at `strokeBegin` (so each dragged cell is a synchronous edit), and only the
-  // stroke's FIRST committed cell snapshots for undo.
-  let stroke: { entry: PaletteEntry; textures: string[]; mirror: { entry: PaletteEntry; textures: string[] } | null } | null = null;
+  // stroke's FIRST committed cell snapshots for undo. A plain block id is the one-entry
+  // pattern; multi-entry patterns pick per cell (deterministic — see editor/pattern.ts).
+  interface StrokePick {
+    entry: PaletteEntry;
+    textures: string[];
+    mirror: { entry: PaletteEntry; textures: string[] } | null;
+  }
+  let stroke: { pattern: PatternEntry[]; picks: StrokePick[] } | null = null;
   let strokeSnapped = false;
   // The "show voids" state saved when entering the Void tool (which forces the overlay on),
   // so leaving the tool restores whatever the user had before. null = not currently in the Void tool.
@@ -250,6 +266,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
     replaceBlock: 'minecraft:stone',
     paintBlock: 'minecraft:stone',
     paintMode: 'brush',
+    magicMatch: 'block',
     voidKind: 'air',
     paintDepth: 0,
     showVoids: false,
@@ -317,6 +334,9 @@ export const editorStore = createStore<EditorState>((set, get) => {
       } else if (mode === 'box' && get().anchor) {
         const doc = activeDocument(documentsStore.getState());
         if (doc?.structure) set({ selection: selectBox(editData(doc.structure), parseCell(get().anchor!), cell) });
+      } else if (mode === 'magic') {
+        const doc = activeDocument(documentsStore.getState());
+        if (doc?.structure) set({ selection: magicSelect(editData(doc.structure), cell, get().magicMatch), anchor: key });
       } else {
         set({ selection: [key], anchor: key });
       }
@@ -325,6 +345,7 @@ export const editorStore = createStore<EditorState>((set, get) => {
     setReplaceBlock: (replaceBlock) => set({ replaceBlock }),
     setPaintBlock: (paintBlock) => set({ paintBlock }),
     setPaintMode: (paintMode) => set({ paintMode }),
+    setMagicMatch: (magicMatch) => set({ magicMatch }),
     setVoidKind: (voidKind) => set({ voidKind }),
     setPaintDepth: (n) => set({ paintDepth: Math.max(0, Math.min(64, Math.round(n))) }),
     setShowVoids: (showVoids) => set({ showVoids }),
@@ -418,17 +439,30 @@ export const editorStore = createStore<EditorState>((set, get) => {
       stroke = null;
       // The Void tool builds its (air/void) entry locally per cell — no resolve needed.
       if (get().tool === 'void') return;
-      // Resolve the brush block once, plus its mirrored variant when symmetry is on, so
+      // Parse the brush field as a (possibly one-entry) percentage pattern and resolve
+      // every entry once — plus each one's mirrored variant when symmetry is on — so
       // every dragged cell is a synchronous, model-ready edit.
-      const { entry, textures } = await api.resolveBlock(get().paintBlock);
+      const pattern = parsePattern(get().paintBlock);
+      if (!pattern) return; // malformed pattern — the stroke paints nothing
       const sym = get().symmetry;
-      let mirror: { entry: PaletteEntry; textures: string[] } | null = null;
-      if (sym !== 'none' && get().paintMode === 'brush') {
-        const mprops = (transformProps(entry.properties, { kind: 'mirror', axis: sym }) ?? {}) as Record<string, string>;
-        const same = JSON.stringify(mprops) === JSON.stringify(entry.properties ?? {});
-        mirror = same ? { entry, textures: [] } : await api.resolveBlock(entry.name, mprops);
+      const wantMirror = sym !== 'none' && get().paintMode === 'brush';
+      try {
+        const picks = await Promise.all(
+          pattern.map(async (p): Promise<StrokePick> => {
+            const { entry, textures } = await api.resolveBlock(p.name);
+            let mirror: { entry: PaletteEntry; textures: string[] } | null = null;
+            if (wantMirror) {
+              const mprops = (transformProps(entry.properties, { kind: 'mirror', axis: sym }) ?? {}) as Record<string, string>;
+              const same = JSON.stringify(mprops) === JSON.stringify(entry.properties ?? {});
+              mirror = same ? { entry, textures: [] } : await api.resolveBlock(entry.name, mprops);
+            }
+            return { entry, textures, mirror };
+          }),
+        );
+        stroke = { pattern, picks };
+      } catch {
+        stroke = null; // an unknown block in the pattern — the stroke paints nothing
       }
-      stroke = { entry, textures, mirror };
     },
     strokePaint: (cell) => {
       const doc = activeDocument(documentsStore.getState());
@@ -442,18 +476,22 @@ export const editorStore = createStore<EditorState>((set, get) => {
         result = setVoidCell(d, cell, s.voidKind);
       } else if (!stroke) {
         return; // brush block still resolving
-      } else if (s.paintMode === 'recolor') {
-        result = recolorCell(d, cell, stroke.entry);
-        extra = stroke.textures;
       } else {
-        // Brush: add the block (+ its mirror under live symmetry) in one cell edit.
-        const placements = [{ cell, entry: stroke.entry }];
-        if (stroke.mirror && s.symmetry !== 'none') {
-          const mc = mirrorCell(cell, s.symmetry, doc.structure.size);
-          if (cellKey(mc) !== cellKey(cell)) placements.push({ cell: mc, entry: stroke.mirror.entry });
+        // The pattern picks this cell's block deterministically (one-entry = the plain brush).
+        const pick = stroke.picks[pickPatternIndex(stroke.pattern, cell[0], cell[1], cell[2])];
+        if (s.paintMode === 'recolor') {
+          result = recolorCell(d, cell, pick.entry);
+          extra = pick.textures;
+        } else {
+          // Brush: add the block (+ its mirror under live symmetry) in one cell edit.
+          const placements = [{ cell, entry: pick.entry }];
+          if (pick.mirror && s.symmetry !== 'none') {
+            const mc = mirrorCell(cell, s.symmetry, doc.structure.size);
+            if (cellKey(mc) !== cellKey(cell)) placements.push({ cell: mc, entry: pick.mirror.entry });
+          }
+          result = placeCells(d, placements);
+          extra = pick.mirror ? [...pick.textures, ...pick.mirror.textures] : pick.textures;
         }
-        result = placeCells(d, placements);
-        extra = stroke.mirror ? [...stroke.textures, ...stroke.mirror.textures] : stroke.textures;
       }
       if (!result) return;
       applyResult(result, extra, !strokeSnapped);
@@ -466,11 +504,18 @@ export const editorStore = createStore<EditorState>((set, get) => {
     fillAt: async (cell) => {
       const doc = activeDocument(documentsStore.getState());
       if (!doc?.structure) return;
-      const { entry, textures } = await api.resolveBlock(get().paintBlock);
+      const pattern = parsePattern(get().paintBlock);
+      if (!pattern) return;
+      const resolved = await Promise.all(pattern.map((p) => api.resolveBlock(p.name)));
       const cur = activeDocument(documentsStore.getState());
       if (!cur?.structure) return;
-      const result = floodFill(editData(cur.structure), cell, entry);
-      if (result) commit(result, textures);
+      // The flooded region matches the clicked block's exact state (the bucket's classic
+      // rule); each region cell then takes its own pattern pick.
+      const region = floodRegion(editData(cur.structure), cell, 'state');
+      const result = repaintCells(editData(cur.structure), region, (c) =>
+        resolved[pickPatternIndex(pattern, c[0], c[1], c[2])].entry,
+      );
+      if (result) commit(result, resolved.flatMap((r) => r.textures));
     },
     fillVoid: () => editActive((d, sel) => (sel.length ? fillVoidBox(d, sel, get().voidKind) : null)),
     retheme: async (mapping) => {

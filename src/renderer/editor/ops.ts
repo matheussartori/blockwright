@@ -5,6 +5,7 @@
 // `state` (its blockstate), never re-derive it — the bug WorldEdit never fully fixed.
 import type { PaletteEntry, StructureBlock } from '@/shared/types';
 import { transformProps, type PropXform } from '@/shared/structure/orientation';
+import { sameFamily } from '@/shared/domain/block-family';
 import { cellKey, parseCell, type Cell } from './cell-key';
 
 export type { PropXform };
@@ -418,15 +419,16 @@ export function rethemeBlocks(d: EditData, mapping: Map<number, PaletteEntry>): 
   return { blocks, palette, selection: [] };
 }
 
-/** Flood-fill the connected region of blocks that share the clicked block's exact palette
- *  entry with `entry` (Paint's Fill / bucket): 6-connected over solid cells, bounded by a
- *  `cap` for safety on huge contiguous surfaces. Returns null when the start cell is empty.
- *  Pairs with Recolor (per-voxel) so the user has both the bucket and individual edits — the
- *  "fill should change individual voxels too" complaint cuts both ways. */
-export function floodFill(d: EditData, start: Cell, entry: PaletteEntry, cap = 8192): OpResult | null {
+/** How magic select / flood fill decide two blocks "match": the exact blockstate, the
+ *  block id ignoring properties, or the whole material family (see shared block-family). */
+export type MatchMode = 'state' | 'block' | 'family';
+
+/** The 6-connected region of solid cells matching the block at `start` under `mode`,
+ *  bounded by `cap` (huge contiguous surfaces stay cheap). [] when `start` is empty. */
+export function floodRegion(d: EditData, start: Cell, mode: MatchMode = 'state', cap = 8192): string[] {
   const occ = occupancy(d);
   const startIdx = occ.get(cellKey(start));
-  if (startIdx == null) return null;
+  if (startIdx == null) return [];
   const target = d.palette[d.blocks[startIdx].state];
   const targetProps = JSON.stringify(target.properties ?? {});
   const stateAt = new Map<string, number>();
@@ -435,7 +437,9 @@ export function floodFill(d: EditData, start: Cell, entry: PaletteEntry, cap = 8
     const st = stateAt.get(key);
     if (st == null) return false;
     const e = d.palette[st];
-    return e.name === target.name && JSON.stringify(e.properties ?? {}) === targetProps;
+    if (mode === 'family') return sameFamily(e.name, target.name);
+    if (e.name !== target.name) return false;
+    return mode === 'block' || JSON.stringify(e.properties ?? {}) === targetProps;
   };
   const region = new Set<string>();
   const queue: Cell[] = [start];
@@ -446,10 +450,45 @@ export function floodFill(d: EditData, start: Cell, entry: PaletteEntry, cap = 8
     region.add(ck);
     for (const n of NEIGHBORS) queue.push([c[0] + n[0], c[1] + n[1], c[2] + n[2]]);
   }
-  if (!region.size) return null;
-  const { palette, index } = internEntry(d.palette, entry);
-  const blocks = d.blocks.map((b) => (region.has(cellKey(b.pos)) ? { ...b, state: index } : b));
-  return { blocks, palette, selection: [...region] };
+  return [...region];
+}
+
+/** Magic select (v2.3 §1.1): the contiguous same-block region from a picked cell, with
+ *  `mode` as the tolerance — exact state, same block id, or same material family. */
+export function magicSelect(d: EditData, start: Cell, mode: MatchMode, cap = 8192): string[] {
+  return floodRegion(d, start, mode, cap);
+}
+
+/** Repaint existing solid blocks at `keys` with a PER-CELL entry (the percentage-pattern
+ *  primitive: `entryFor` picks each cell's block). Air cells are left alone. Returns null
+ *  when nothing repainted. */
+export function repaintCells(d: EditData, keys: string[], entryFor: (cell: Cell) => PaletteEntry): OpResult | null {
+  if (!keys.length) return null;
+  const targets = new Map<string, Cell>();
+  for (const k of keys) targets.set(k, parseCell(k));
+  let palette = d.palette;
+  let touched = false;
+  const blocks = d.blocks.map((b) => {
+    const cell = targets.get(cellKey(b.pos));
+    if (!cell || d.palette[b.state]?.air) return b;
+    const r = internEntry(palette, entryFor(cell));
+    palette = r.palette;
+    touched = true;
+    return { ...b, state: r.index };
+  });
+  if (!touched) return null;
+  return { blocks, palette, selection: keys };
+}
+
+/** Flood-fill the connected region of blocks that share the clicked block's exact palette
+ *  entry with `entry` (Paint's Fill / bucket): 6-connected over solid cells, bounded by a
+ *  `cap` for safety on huge contiguous surfaces. Returns null when the start cell is empty.
+ *  Pairs with Recolor (per-voxel) so the user has both the bucket and individual edits — the
+ *  "fill should change individual voxels too" complaint cuts both ways. */
+export function floodFill(d: EditData, start: Cell, entry: PaletteEntry, cap = 8192): OpResult | null {
+  const region = floodRegion(d, start, 'state', cap);
+  if (!region.length) return null;
+  return repaintCells(d, region, () => entry);
 }
 
 /** A straight stair run: from `start`, step `dir` horizontally and +1 up each block,

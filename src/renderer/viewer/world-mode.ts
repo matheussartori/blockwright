@@ -172,6 +172,16 @@ export class WorldMode {
     return this.world?.describeCell(x, y, z) ?? null;
   }
 
+  /** The full block state at a world cell (magic select / Terrain Blend reads). */
+  blockStateAt(x: number, y: number, z: number): { name: string; properties?: Record<string, string> } | null {
+    return this.world?.blockStateAt(x, y, z) ?? null;
+  }
+
+  /** The terrain surface at a world column (see WorldView.surfaceAt). */
+  surfaceAt(x: number, z: number): ReturnType<WorldView['surfaceAt']> {
+    return this.world?.surfaceAt(x, z) ?? null;
+  }
+
   /** Find blocks by id in the loaded area (see WorldView.findBlocks). */
   findBlocks(query: string, from: [number, number, number], cap?: number): { hits: { pos: [number, number, number]; name: string }[]; total: number } {
     return this.world?.findBlocks(query, from, cap) ?? { hits: [], total: 0 };
