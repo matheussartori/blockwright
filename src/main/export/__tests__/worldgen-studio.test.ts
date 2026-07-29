@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Workspace } from '@/shared/types';
-import { validateStudioModel } from '@/shared/domain/worldgen-studio';
+import { placementStats, validateStudioModel } from '@/shared/domain/worldgen-studio';
 import { listDefs, readModel, writeModel } from '../worldgen-studio';
 
 let root: string;
@@ -157,5 +157,28 @@ describe('validateStudioModel', () => {
     expect(validateStudioModel(m)).toEqual([]);
     m.maxDistance = 129;
     expect(validateStudioModel(m).map((i) => i.code)).toEqual(['distance_range']);
+  });
+});
+
+describe('placementStats', () => {
+  it('reads a random_spread pair as density, distance and jitter', () => {
+    // Villages: spacing 34, separation 8 → one per 1156 chunks, ~544 blocks apart.
+    expect(placementStats(34, 8)).toEqual({
+      cellChunks: 1156,
+      typicalBlocks: 544,
+      minBlocks: 128,
+      jitterChunks: 26,
+    });
+  });
+
+  it('reports no jitter when separation eats the whole cell', () => {
+    // The invalid separation ≥ spacing case still has to render — the panel draws
+    // the map while validateStudioModel is telling the user to fix it.
+    expect(placementStats(6, 6).jitterChunks).toBe(0);
+    expect(placementStats(6, 9).minBlocks).toBe(96); // clamped to the cell
+  });
+
+  it('floors spacing at one chunk', () => {
+    expect(placementStats(0, 0)).toEqual({ cellChunks: 1, typicalBlocks: 16, minBlocks: 0, jitterChunks: 1 });
   });
 });

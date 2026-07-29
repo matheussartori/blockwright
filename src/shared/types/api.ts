@@ -326,6 +326,8 @@ export interface BlockwrightApi {
   onCloseStructure: (cb: () => void) => void;
   /** Notified when main requests opening the Settings panel (native menu / Cmd+,). */
   onOpenSettings: (cb: (section?: string) => void) => void;
+  /** Notified when main requests focusing an inspector dock tab (BW_OPEN_PANEL). */
+  onOpenPanel: (cb: (id: string) => void) => void;
   /** Notified when the View menu toggles a floating window's visibility. */
   onToggleWindow: (cb: (id: WindowId) => void) => void;
   /** Notified when the View ▸ Layout menu requests resetting window positions. */

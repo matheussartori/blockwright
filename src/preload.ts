@@ -294,6 +294,9 @@ const api: BlockwrightApi = {
   onOpenSettings: (cb: (section?: string) => void) => {
     ipcRenderer.on(IPC_EVENTS.openSettings, (_e, section?: string) => cb(section));
   },
+  onOpenPanel: (cb: (id: string) => void) => {
+    ipcRenderer.on(IPC_EVENTS.openPanel, (_e, id: string) => cb(id));
+  },
   onToggleWindow: (cb: (id: WindowId) => void) => {
     ipcRenderer.on(IPC_EVENTS.windowToggle, (_e, id: WindowId) => cb(id));
   },

@@ -5,7 +5,7 @@
 import type { ComponentType, FC } from 'react';
 import { ChevronsLeft, ChevronsRight, Globe, History, Info, Package, PictureInPicture2, Puzzle, ShieldCheck, Sparkles } from 'lucide-react';
 import type { MessageKey } from '@/shared/i18n';
-import { windowsStore, type PanelId } from '../state/windows';
+import { windowsStore, PANEL_IDS, type PanelId } from '../state/windows';
 import { startColDrag } from '../ui/resize';
 import { useT, useWindows } from '../hooks/useStores';
 import { FloatingWindow } from './FloatingWindow';
@@ -30,8 +30,6 @@ const PANELS: Record<PanelId, { title: MessageKey; icon: PanelIcon; Content: FC 
   versions: { title: 'panel.versions', icon: History, Content: VersionsContent },
   generate: { title: 'panel.generate', icon: Sparkles, Content: GenerateContent },
 };
-
-const PANEL_IDS: PanelId[] = ['inspector', 'materials', 'jigsaw', 'worldgen', 'lint', 'versions', 'generate'];
 
 /** The chat panel manages its own layout (pinned composer), so its container
  *  drops the default padding/scroll the static panels rely on. */

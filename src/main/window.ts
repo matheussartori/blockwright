@@ -288,6 +288,11 @@ function onDidFinishLoad() {
   if (process.env.BW_OPEN_SETTINGS) {
     notifyOpenSettings(process.env.BW_OPEN_SETTINGS);
   }
+  // Dev-only: focus an inspector dock tab (e.g. BW_OPEN_PANEL=worldgen) so
+  // BW_CAPTURE can screenshot one panel in automated visual checks.
+  if (process.env.BW_OPEN_PANEL) {
+    getMainWindow()?.webContents.send(IPC_EVENTS.openPanel, process.env.BW_OPEN_PANEL);
+  }
   // Dev-only: render to a PNG and exit (used for automated visual checks).
   if (process.env.BW_CAPTURE) {
     const out = process.env.BW_CAPTURE;

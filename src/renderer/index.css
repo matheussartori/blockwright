@@ -4124,41 +4124,310 @@ body.row-resizing {
   font-family: var(--mono);
   font-size: 11px;
 }
-/* Worldgen Studio panel: paired steppers, biome chips, and the save row. */
-.studio-row {
-  display: flex;
-  gap: 12px;
-}
-.studio-row .bw-field {
-  flex: 1;
-}
-.bw-field-block {
+/* ── Worldgen Studio panel ───────────────────────────────────────────────────
+   Reads as a spec sheet, not a settings form: one section per JSON file on disk
+   (the folder that file lives in sits in the section rule), every number paired
+   with the plain consequence of changing it, and resource ids + figures in --mono
+   so the panel's two vocabularies — prose and data — stay visually separate. */
+.studio {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 6px 0;
 }
-.studio-chips {
+/* The def picker: the panel's subject line, so it sits above the first rule. */
+.studio-def {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+.studio-def-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+/* Section rule: name left, count, then the folder it writes into trailing right. */
+.studio-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 18px 0 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.studio-head-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-2);
+}
+.studio-head-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.studio-head-file {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+/* A stacked control (select / text input) with its label above. */
+.studio-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0;
+}
+.studio-input {
+  -webkit-app-region: no-drag;
+  width: 100%;
+  padding: 6px 9px;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.studio-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+/* A number and what it does, on one line with the stepper. */
+.studio-num {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+}
+.studio-num + .studio-num {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.studio-num-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.studio-num-label {
+  font-size: 12px;
+  color: var(--text);
+}
+.studio-num-hint {
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+.studio-num .stepper {
+  flex: none;
+}
+/* Each section gets at most one drawing, and both stretch with the column — up to
+   the dock's DEFAULT content width. The dock resizes to 560px, and past that these
+   would just balloon (both are fixed-aspect SVGs, so extra width buys no detail), so
+   they cap and centre instead. Capping the block, not the svg, keeps the caption
+   with its diagram. */
+.studio .export-terrain,
+.studio-map {
+  max-width: 336px; /* RIGHT_PANEL.default (360) minus the dock body's padding */
+}
+.studio .export-terrain {
+  margin: 8px auto 0;
+}
+.studio .tp-caption {
+  margin-top: 5px;
+}
+/* The placement map — spacing/separation drawn as the chunk lattice they are. */
+.studio-map {
+  margin: 4px auto 2px;
+}
+.pm-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: color-mix(in srgb, var(--accent) 5%, var(--panel-strong));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.pm-grid {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.pm-window {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.pm-mark {
+  fill: var(--accent);
+}
+.pm-readout {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin: 4px 0 8px;
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.pm-figure {
+  font-family: var(--mono);
+  color: var(--text-2);
+}
+.pm-sep {
+  color: var(--border-strong);
+}
+/* Biome chips: the label is inert text, removal is its own target. */
+.studio-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 8px;
+  padding: 0;
 }
 .studio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 3px 2px 9px;
   border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
   border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 11px;
+  background: var(--panel);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+/* The mod's own biomes read as authored; vanilla ones stay quiet. */
+.studio-chip.own {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--text);
+}
+.studio-chip-text {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-chip-x {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
 }
-.studio-chip:hover {
-  border-color: var(--danger);
+.studio-chip-x:hover {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
   color: var(--danger);
 }
+.studio-chip-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* Start pool: a weighted draw, so each piece shows the share of the roll it owns. */
+.studio-pool {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.studio-piece {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 8px;
+}
+.studio-piece + .studio-piece {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.studio-piece-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+.studio-piece-share {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.studio-piece-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--panel-strong);
+  overflow: hidden;
+}
+.studio-piece-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.18s ease;
+}
+.studio-issues {
+  margin-top: 12px;
+}
+/* The commit bar: pinned to the foot of the scrolling panel, quiet until dirty. */
 .studio-save {
-  margin-top: 10px;
+  position: sticky;
+  bottom: -12px;
+  z-index: 1;
+  margin: 14px -12px -12px;
+  padding: 9px 12px 12px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+}
+.studio-save.dirty {
+  border-top-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.studio-save-status {
+  margin: 0 0 7px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+.studio-save.dirty .studio-save-status {
+  color: var(--text-2);
+}
+.studio-save-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.studio-save-row .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+/* Torn off, the panel floats over a translucent frosted surface — an opaque
+   sticky bar would bleed the scrolled content through it, so it just flows. */
+.bw-window .studio-save {
+  position: static;
+  margin: 14px 0 0;
+  padding: 9px 0 0;
+  background: transparent;
 }
 /* Structure Lint panel: finding rows (icon tinted by level; positional rows clickable). */
 .lint-list {

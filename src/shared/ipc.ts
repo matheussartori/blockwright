@@ -247,6 +247,9 @@ export const IPC_EVENTS = {
   closeStructure: 'close-structure',
   /** Request the renderer to open the Settings panel (native menu / Cmd+,). */
   openSettings: 'open-settings',
+  /** Request the renderer to focus an inspector dock tab — payload is its PanelId.
+   *  Dev-only today (BW_OPEN_PANEL, so BW_CAPTURE can shoot a specific panel). */
+  openPanel: 'open-panel',
   /** Toggle a floating window's visibility from the View menu — payload is its id. */
   windowToggle: 'window-toggle',
   /** Reset every floating window to its home position (View ▸ Layout). */

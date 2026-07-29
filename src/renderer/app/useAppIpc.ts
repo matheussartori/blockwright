@@ -7,7 +7,7 @@ import { effectiveNbtLimit } from '@/shared/domain/split';
 import { api } from '../api';
 import { store } from '../state/store';
 import { settingsStore } from '../state/settings';
-import { windowsStore } from '../state/windows';
+import { windowsStore, isPanelId } from '../state/windows';
 import { documentsStore, activeDocument } from '../state/documents';
 import { editorStore } from '../state/editor';
 import { loadDoc } from '../state/doc-loader';
@@ -88,6 +88,9 @@ export function useAppIpc({ openFile, openWorld, openAssembly, reimportWorld, cl
       else w.setVisible(id, !w[id].visible);
     });
     api.onResetWindows(() => windowsStore.getState().resetAll());
+    api.onOpenPanel((id) => {
+      if (isPanelId(id)) windowsStore.getState().openPanel(id);
+    });
 
     void (async () => {
       st.setRecents(await api.listRecents());

@@ -13,6 +13,20 @@ import type { WindowId } from '@/shared/types';
 /** The dockable panels (every WindowId except `controls`). */
 export type PanelId = 'inspector' | 'materials' | 'jigsaw' | 'lint' | 'worldgen' | 'generate' | 'versions';
 
+/** Tab order in the dock, and the single list anything untrusted (a persisted
+ *  layout, an IPC payload) is validated against. */
+export const PANEL_IDS: readonly PanelId[] = [
+  'inspector',
+  'materials',
+  'jigsaw',
+  'worldgen',
+  'lint',
+  'versions',
+  'generate',
+];
+
+export const isPanelId = (id: unknown): id is PanelId => PANEL_IDS.includes(id as PanelId);
+
 export interface WindowState {
   visible: boolean;
   /** false = docked in the sidebar as a tab; true = torn off as a window. */
@@ -201,17 +215,7 @@ function load(): WindowsLayout {
     if (typeof saved.consoleHeight === 'number') {
       base.consoleHeight = Math.max(MIN_CONSOLE_H, saved.consoleHeight);
     }
-    if (
-      saved.activeTab === 'inspector' ||
-      saved.activeTab === 'materials' ||
-      saved.activeTab === 'jigsaw' ||
-      saved.activeTab === 'lint' ||
-      saved.activeTab === 'worldgen' ||
-      saved.activeTab === 'generate' ||
-      saved.activeTab === 'versions'
-    ) {
-      base.activeTab = saved.activeTab;
-    }
+    if (isPanelId(saved.activeTab)) base.activeTab = saved.activeTab;
     if (typeof saved.sidebarCollapsed === 'boolean') base.sidebarCollapsed = saved.sidebarCollapsed;
     if (typeof saved.projectVisible === 'boolean') base.projectVisible = saved.projectVisible;
     if (typeof saved.leftWidth === 'number') {
