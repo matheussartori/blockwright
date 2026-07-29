@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-29
+
+Worlds got livelier and datapacks got a workbench. Every vanilla mob now renders
+as its real model wherever it appears, structures blend into the terrain they're
+pasted onto instead of floating over it, and the jigsaw/worldgen JSONs you've
+been editing by hand became three panels — a connector-and-seed lab, a validated
+Worldgen Studio, and a per-file linter. Plus the downgrade direction no tool
+owns: take a build back to an older Minecraft, with every loss reported.
+
 ### Added
 
 - Entity rendering: every vanilla mob now draws as its real Minecraft box model
@@ -17,6 +26,104 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   glowing-eye layers. Unknown or untextured entities keep the colored-cube
   fallback. Geometry lives in a generated registry
   (`build/gen-entity-models.mjs`); no Mojang assets are bundled.
+- Terrain blend when placing a structure into a world — the gap that leaves
+  pasted builds floating on slopes or ringed by exposed dirt. Three switches on
+  the place panel, all previewed in the ghost and undoable like any edit:
+  **Foundation** pillars every grounded footprint column down to the terrain
+  using that column's own ground material; **Feather** (ring of 1–8) raises or
+  cuts the surrounding terrain toward the structure's base with a dithered mask
+  and re-caps each column with its surface block; **Excavate** clears terrain
+  poking through cells the structure leaves undefined. Builds that declare
+  below-grade floors get **Sink basement**, which aims the ghost down by the
+  basement depth so they land buried.
+- Magic select — click one block to take its whole connected region, in the
+  structure editor (Alt-click) and in the world editor (Selection mode ▸ Magic).
+  Three tolerances: exact blockstate, same block id, or **same family**, which
+  strips finish prefixes and shape suffixes so one pick grabs a wall of stone +
+  stone bricks + cracked stone bricks + their stairs and slabs. World regions
+  are capped at 4096 blocks and say so when the region continues past the cap.
+- Percentage paint patterns — the WorldEdit blending technique as a plain block
+  field value: `50% stone, 30% andesite, 20% gravel`. Weights are free-form and
+  need not sum to 100, entries without one share the average, and the per-cell
+  pick is deterministic, so re-painting is idempotent and undo/redo composites
+  identically. Works in brush and fill, in both editors.
+- Jigsaw Lab — the Jigsaw panel became an authoring tool. **Connector arrows**
+  draw an anchor and a facing cone on every jigsaw block of every placed piece,
+  colored per pool and visible through geometry, with the hovered panel row
+  highlighted in 3D. **Template pools** lists each pool with its element count,
+  missing pieces and whether its fallback resolves. **Simulate seeds** plans
+  2–16 random seeds at once and keeps them all — click a run to re-show it
+  instantly, and the seed field follows your selection so re-rolls continue
+  from there.
+- Jigsaw validator warnings the assembler used to swallow: `overlap` (a slot
+  stayed empty because every candidate crossed placed bounds — vanilla's "boxes
+  may only touch or be contained" rule), `unsupported-orientation` (matching
+  target names that can't face the connector, which Y-rotation can't fix) and
+  `fallback-expansion` (a fallback pool whose pieces themselves expand — how
+  generation blows past the def's `size`).
+- Worldgen Studio (View ▸ Worldgen Studio) — schema-validated forms over the
+  four worldgen JSONs the export writes, so terrain adaptation, size, max
+  distance, biomes, structure-set spacing/separation and start-pool weights are
+  editable in the app. Writes are surgical: each file is re-read and only the
+  modeled fields are patched, so `spawn_overrides`, processors, salt and
+  hand-authored entries survive byte-for-byte. Save is gated on validation that
+  catches the silent killers — empty biome list, separation ≥ spacing, size
+  outside 1–7, the ≤116 distance cap under terrain adaptation, weights outside
+  1–150 — and saving re-reads the pools in the Jigsaw Lab, so the loop is edit →
+  save → re-simulate → see it in 3D without launching the game.
+- Structure Lint (View ▸ Structure Lint) — per-file checks on any open build, no
+  workspace needed: explicit air on a capture boundary (it *clears* world cells
+  on paste, where void would preserve them), blocks the target version doesn't
+  know (with the closest same-shape stand-in named), orphaned palette entries,
+  and data-mode structure blocks with an empty metadata string. Clicking a
+  finding focuses the cell in the viewer. The Doctor re-reports the same checks
+  across the whole workspace.
+- Two more Doctor checks: `waterlog_risk` (an aquatic-biome def whose start pool
+  carries waterloggable blocks — vanilla force-waterlogs them below the surface
+  and floods dry interiors, and no `waterlogged=false` survives it) and
+  `mob_equipment` (saved mob gear that natural generation silently re-rolls,
+  though structure-block placement keeps it).
+- Datapack downgrader (Doctor ▸ Downgrade copies…) — the direction no tool owns:
+  Litematica's answer is "edit the version field by hand" and Amulet drops
+  renamed blocks as unknown. Pick an older target and Blockwright re-stamps
+  DataVersion down, restores renamed block ids losslessly, swaps blocks the
+  target lacks for curated same-shape stand-ins (or `structure_void` when there
+  is none), and reports every change and every loss. The original file is never
+  touched — each downgrade lands as a sibling copy suffixed with the target
+  version.
+- Placing a structure into a world now carries its entities and container
+  contents: mobs, armor stands with their pose, item frames and chest
+  inventories all survive the round trip. Entities land in the 1.17+ `entities/`
+  region set through the same safe write path, with the chunk record (or the
+  whole file) synthesized when absent, existing entities untouched, and UUIDs
+  regenerated. The save dialog counts them alongside blocks and chunks.
+
+### Fixed
+
+- Leaves, glass and other cutout blocks no longer hid what was behind them:
+  textures with fully transparent holes are now excluded from face culling, so
+  caves and terrain under foliage stop disappearing. Occlusion is judged per
+  direction, so a cutout overlay (grass block's side) no longer disqualifies the
+  opaque face beneath it.
+- Double-clicking a `.nbt` with Blockwright running but all windows closed
+  opened nothing — the app now recreates its window on `open-file` and flushes
+  the queued path on first paint.
+- The Worldgen Studio's stacked fields were centered and its fallback-pool input
+  was clipped to 64px, truncating the value.
+
+### Changed
+
+- The Worldgen Studio panel was rebuilt to read as a spec sheet: one section per
+  JSON file on disk (with the folder it writes into on the section rule), each
+  number paired with the plain consequence of changing it, and a live placement
+  map that draws what spacing/separation actually do — the chunk lattice, the
+  window a structure can roll into, and the derived density ("1 per 36 chunks ·
+  ~96 blocks apart"). Start-pool weights show each piece's real share of the
+  draw, biome chips separate the label from the remove target and mark your own
+  namespace, and the commit bar pins to the foot of the panel with a Revert and
+  a status line.
+- `BW_OPEN_PANEL=<id>` focuses an inspector dock tab at launch, so headless
+  captures can shoot a specific panel.
 
 ## [2.2.0] - 2026-07-08
 
@@ -505,6 +612,7 @@ First public release.
   for headless visual testing.
 - Auto-update via update.electronjs.org (reads published GitHub Releases).
 
+[2.3.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.3.0
 [2.2.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.2.0
 [2.1.1]: https://github.com/matheussartori/blockwright/releases/tag/v2.1.1
 [2.1.0]: https://github.com/matheussartori/blockwright/releases/tag/v2.1.0
