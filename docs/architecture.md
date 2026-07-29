@@ -740,7 +740,7 @@ returns the override or the English fallback. The module catalog is localized at
 directly by the renderer) is localized in `AiTab` via `useLocale()` + `localizeData`. The catalog re-fetches
 on `locale` change (ModulesModal + BuildPlanner deps), and chat build-card labels follow because they derive
 from the localized catalog. **When you add/edit a module, param, furnishing preset, AI provider or
-generation preset, add its pt-BR entry to `data-pt-BR.ts`** (only model labels like "Opus 4.8" stay literal).
+generation preset, add its pt-BR entry to `data-pt-BR.ts`** (only model labels like "Opus 5" stay literal).
 The guard test `shared/i18n/__tests__/coverage.test.ts` fails if any registry-data key lacks a pt-BR override,
 OR if a chrome pt-BR value is left identical to English (outside its loanword allowlist) — so English-only
 strings can't ship.

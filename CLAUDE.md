@@ -6,8 +6,9 @@ datapacks. Electron Forge + Vite + TypeScript + React + Three.js. Block models/t
 a user-supplied Minecraft "content pack" on disk (never bundled — Mojang assets).
 
 **Deep-dive docs: `docs/architecture.md`** — read the relevant section BEFORE non-trivial work on a
-subsystem (AI generation loop, world viewer/editor + safe write path, jigsaw split, export/worldgen,
-block editor, domain modules/seeded archetypes, versions, updates, theming/icons).
+subsystem (AI generation loop, world viewer/editor + safe write path, jigsaw split, Jigsaw Lab,
+Worldgen Studio + structure Lint, export/worldgen, block editor, domain modules/seeded archetypes,
+versions, updates, theming/icons).
 
 ## Commands
 
@@ -32,9 +33,12 @@ src/
     workspace.ts mc-version-detect.ts        Mod-workspace detect/apply/list + target MC version
     texture-protocol.ts                      bw-texture:// privileged scheme (namespaced PNGs)
     file-watch.ts                            Hot-reload the open file + workspace structure folder
-    export/                 Workspace export (planExport/runExport), Export As, Export to World,
-                            worldgen JSON builders, writeSplitFiles, doctor.ts (workspace check-up),
-                            worldgen-studio.ts (Worldgen Studio: read + surgical write of the 4 JSONs)
+    export/                 Workspace export (planExport/runExport), local-export (Export As),
+                            Export to World, worldgen JSON builders, writeSplitFiles, reassemble,
+                            materials-export (CSV/JSON bill of materials), doctor.ts (workspace
+                            check-up + fix-its), worldgen-studio.ts (Worldgen Studio: read +
+                            surgical write of the 4 JSONs), upgrade.ts/downgrade.ts (datapack
+                            version travel: re-stamp DataVersion, id renames, stand-ins, loss report)
     structure/
       io/                   RawStructure codecs: .nbt / .schem / .litematic, long-bits (BigInt bit
                             packing), convert, splitToJigsaw (oversized → jigsaw), data-markers
@@ -53,35 +57,48 @@ src/
                             rebuildStairwells, connectBlocks, fixDoors, fixPlacement, fillInteriorAir
                             + per-structure finalizers), compile.ts
       mc-data-version.ts data-version.ts     DataVersion registry + active-target stamping
+      mc-block-versions.ts                   Block renames + introduced-in tables w/ downgrade stand-ins
+      metadata.ts                            `.bw.json` sidecar (size/palette/storeys) the AI reads
     ai/                     Provider-agnostic generation: generate.ts (orchestrator), emit-handler
                             (validate→compile→render→review + collapse gate), providers/ (claude-sdk,
                             codex), knowledge.ts (tiered guides), session/output-dir/save-version
     world/                  World read + edit: world-source (lazy LRU Anvil reader), chunk-resolve,
-                            world-service / edit-service, anvil/ (region/chunk codecs), edit/ (the
-                            SAFE WRITE path: session lock → surgical patch → enforced backup →
-                            atomic region rewrite → POI invalidation; refused chunks reported)
+                            world-service / edit-service, extract.ts (region → structure), anvil/
+                            (region/chunk codecs), edit/ (the SAFE WRITE path: session lock →
+                            surgical patch → enforced backup → atomic region rewrite → POI
+                            invalidation; refused chunks reported; entity-patch.ts writes mobs/
+                            item frames into the 1.17+ `entities/` region set)
   renderer/                 React app — IPC only.
     App.tsx + app/          Workbench layout + per-concern hooks (useDocumentFlow/useAppIpc/…)
     components/             ActivityBar/ProjectPanel/TabBar/Statusbar/Welcome, generate/ (planner +
-                            chat), export/, editor/ (block editor UI), world-edit/, settings/,
+                            chat), export/, editor/ (block editor UI), world-edit/, worldgen/
+                            (Worldgen Studio PlacementMap), settings/,
                             ui/ primitives (Modal/Select/Tooltip/Segmented/StructurePreview…) —
                             build dialogs from ui/; prefer Select over native <select>, Tooltip over title=
+    windows/                Detached panel windows (Inspector/Jigsaw/Lint/Materials/Versions/Worldgen)
     generation/             Pure brief/details/floors helpers (unit-tested)
-    editor/ops.ts           Pure block-editing ops (move/extrude/mirror/rotate/paint/void…, tested)
+    editor/                 ops.ts = pure block-editing ops (move/extrude/mirror/rotate/paint/void…),
+                            pattern.ts = `50% stone, 30% andesite` weighted patterns (deterministic
+                            per cell, shared by BOTH editors), cell-key.ts — all tested
+    materials/              Pure bill-of-materials rollup (stacks/shulkers, CSV+JSON)
     diff/                   Pure structure diff
     state/                  Vanilla stores: store/settings/documents/generation/versions/editor/
                             windows/logs/theme/i18n/planner/world-edit (+ hooks/useStores.ts)
     viewer/                 Imperative Three.js Viewer + overlays + capture; geometry-core.ts is the
                             WORKER-SAFE geometry math shared with the world mesh worker (golden test)
-    world/                  Streamed world scene: world-view, worker-pool, LOD, surface, HUD
-                            components/, edit-overlay.ts (pending-edit compositor)
+    world/                  Streamed world scene: world-view, worker-pool, LOD, surface, chunk-borders,
+                            slime, HUD components/, edit-overlay.ts (pending-edit compositor),
+                            selection.ts + magic.ts (box / connected-region select), place.ts
+                            (structure ghost), blend.ts (foundation/feather/excavate terrain blend)
   shared/
     ipc.ts types/           ALL channel/event names + type-only contracts (BlockwrightApi)
     jigsaw.ts mc-version.ts Pure geometry / version math
     entity-models.ts        GENERATED vanilla mob box models (build/gen-entity-models.mjs) +
     entity-registry.ts      hand-curated mob id → render layers/textures (contract test-enforced)
     domain/                 Pure predicates used by BOTH processes (applies-to, module-slots,
-                            storeys, furnishing, worldgen, split, surroundings) — no drift
+                            storeys, furnishing, worldgen, worldgen-studio, split, surroundings,
+                            conflicts, scaffold, block-family = magic-select tolerance) — no drift
+    structure/              detect-floors (storey recognition) + orientation (blockstate rotation)
     i18n/                   en.ts + pt-BR.ts + registry-data overrides (data-pt-BR.ts)
 content/                    Optional local vanilla content pack (dev auto-pickup; never shipped)
 knowledge/                  Model-facing guides (core + per-module) for AI generation
@@ -125,6 +142,14 @@ channel in `shared/ipc.ts` → handler in `main/ipc.ts` → method on `Blockwrig
 - Structure blocks load ≤48 blocks/axis (32 pre-1.16): every export path auto-splits oversized
   builds into a jigsaw assembly. 1.21 jigsaw defs REQUIRE `spawn_overrides` (even `{}`);
   `max_distance_from_center` ≤ 116 (both test-enforced).
+- Occlusion is per-direction and cutout-aware (`geometry-core.ts occluderStates`): a texture with
+  fully transparent pixels must never occlude, else leaves/glass hide the terrain behind them; an
+  unknown texture counts as opaque (pre-cutout behaviour).
+- Block fields accept PATTERNS (`50% stone, 30% andesite`) — both editors parse through
+  `renderer/editor/pattern.ts`, never re-implement: the per-cell pick must stay deterministic or
+  re-paint stops being idempotent and undo/redo re-composites differently.
+- Version travel is one-way-safe: upgrade never downgrades a file newer than the target (reports
+  it), and downgrade NEVER edits the original — it writes a suffixed sibling copy + a loss report.
 - World edit safe-write invariants (`main/world/edit/`) are non-negotiable: session lock, enforced
   region-granular backup, surgical tag patch (never re-serialize from the render model), atomic
   region rewrite, strip light + delete Heightmaps (game recomputes), POI `Valid: 0`, refuse — never

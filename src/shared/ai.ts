@@ -62,11 +62,11 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     keyPlaceholder: 'sk-ant-oat… (optional)',
     models: [
       { id: 'claude-fable-5', label: 'Fable 5' },
-      { id: 'claude-opus-4-8', label: 'Opus 4.8' },
+      { id: 'claude-opus-5', label: 'Opus 5' },
       { id: 'claude-sonnet-5', label: 'Sonnet 5' },
       { id: 'claude-haiku-4-5', label: 'Haiku 4.5' },
     ],
-    defaultModel: 'claude-opus-4-8',
+    defaultModel: 'claude-opus-5',
   },
   {
     id: 'codex',
@@ -78,11 +78,12 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     envVars: ['CODEX_API_KEY'],
     keyPlaceholder: 'sk-… (optional API key)',
     models: [
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
       { id: 'gpt-5.5', label: 'GPT-5.5' },
-      { id: 'gpt-5.4', label: 'GPT-5.4' },
-      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
     ],
-    defaultModel: 'gpt-5.5',
+    defaultModel: 'gpt-5.6-sol',
   },
 ];
 
@@ -119,7 +120,7 @@ export interface AiProviderState {
 // Env vars (BW_AI_MAX_ROUNDS / BW_AI_THINKING_EFFORT) still override.
 
 /** Reasoning-effort level for Claude's extended thinking. The current Claude models
- *  (Fable 5, Opus 4.8, Sonnet 5) use ADAPTIVE thinking steered by an `effort` level —
+ *  (Fable 5, Opus 5, Sonnet 5) use ADAPTIVE thinking steered by an `effort` level —
  *  the fixed `budget_tokens` budget is removed there — so this replaces the old numeric
  *  `thinkingBudget`. `off` disables thinking entirely; the rest map to the Agent
  *  SDK's `effort` knob (the SDK silently downgrades a level the model doesn't support,

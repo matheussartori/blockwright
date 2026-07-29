@@ -132,11 +132,13 @@ export const claudeSdkDriver: Driver = async (p: DriverParams) => {
   const server = sdk.createSdkMcpServer({ name: 'blockwright', version: '1.0.0', tools: [emit] });
   const promptInput = p.images.length > 0 ? imagePrompt(p.userText, p.images) : p.userText;
 
-  // The current Claude models (Fable 5, Opus 4.8, Sonnet 5) use ADAPTIVE thinking
+  // The current Claude models (Fable 5, Opus 5, Sonnet 5) use ADAPTIVE thinking
   // steered by an `effort` level — the fixed `budgetTokens` budget is rejected there —
   // so map the effort knob to {adaptive + effort}, or disable thinking outright when
   // it's `off`. On an always-thinking model (Fable 5) an explicit `disabled` is a 400:
   // the only valid "off" is omitting the config (the model still thinks adaptively).
+  // On Opus 5 `disabled` is only accepted at effort ≤ high — safe here because the
+  // `off` branch never sends an effort (so the model's default applies).
   const thinkingOpts =
     p.thinkingEffort === 'off'
       ? isAlwaysThinkingModel(p.credential.model)
